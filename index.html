@@ -63,8 +63,17 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1
 .tile:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 #fff,inset 0 -10px 24px rgba(110,110,130,.14),0 24px 40px -18px rgba(30,30,50,.5)}
 .tile:active{transform:scale(.985)}
 .tile:focus-visible{outline:3px solid #8fb6ff;outline-offset:3px}
-.screen{width:128px;height:96px;max-width:100%;border-radius:16px;background:rgba(255,255,255,.12);display:block;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 0 4px rgba(255,255,255,.35),inset 0 0 0 1px rgba(0,0,0,.05),0 8px 16px -8px rgba(30,30,50,.35)}
+/* liquid-glass lens: frosted, see-through, with a bright rim and a curved sheen laid over the drawing */
+.glass{position:relative;display:block;width:128px;height:96px;max-width:100%;border-radius:18px;overflow:hidden;isolation:isolate;
+  background:linear-gradient(160deg,rgba(255,255,255,.34),rgba(255,255,255,.08) 55%,rgba(255,255,255,.18));
+  -webkit-backdrop-filter:blur(14px) saturate(1.8) brightness(1.05);backdrop-filter:blur(14px) saturate(1.8) brightness(1.05);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.95),inset 0 -1px 1px rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.45),
+    inset 0 -10px 18px -8px rgba(255,255,255,.55),inset 0 8px 14px -10px rgba(40,40,60,.18),0 8px 18px -10px rgba(30,30,50,.35)}
+.glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(120% 70% at 30% -10%,rgba(255,255,255,.75),rgba(255,255,255,0) 55%),
+             linear-gradient(0deg,rgba(255,255,255,.28),rgba(255,255,255,0) 30%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+.screen{position:relative;display:block;width:100%;height:100%;background:transparent}
 .meta{display:flex;flex-direction:column;gap:6px;min-width:0}
 .name{margin:0;font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.15;overflow-wrap:anywhere}
 .tag{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
@@ -72,7 +81,7 @@ h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1
   color:#f4f4f6;background:linear-gradient(180deg,#34343b,#16161a);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 4px 10px -4px rgba(0,0,0,.5)}
 footer{font-size:12px;line-height:1.6;color:var(--ink-2);text-align:center}
 footer b{color:var(--ink);font-weight:700}
-@media (max-width:380px){.tile{grid-template-columns:100px minmax(0,1fr);gap:12px}.screen{width:100px;height:75px}}
+@media (max-width:380px){.tile{grid-template-columns:100px minmax(0,1fr);gap:12px}.glass{width:100px;height:75px}}
 @media (prefers-reduced-motion:reduce){.tile{transition:none}}
 </style>
 
@@ -92,16 +101,16 @@ footer b{color:var(--ink);font-weight:700}
   </header>
 
   <ul class="shelf">
-    <li><a class="tile" href="./void-wizard/?v=1792778436">
-      <canvas class="screen" data-scene="wiz" aria-hidden="true"></canvas>
+    <li><a class="tile" href="./void-wizard/?v=1792778658">
+      <span class="glass"><canvas class="screen" data-scene="wiz" aria-hidden="true"></canvas></span>
       <div class="meta"><p class="name">Void Wizard</p><p class="tag">Two wizards pass a glowing solid through the void and hurl it at demons.</p><span class="play">Play</span></div>
     </a></li>
-    <li><a class="tile" href="./purgatory-bowl/?v=1792778436">
-      <canvas class="screen" data-scene="bowl" aria-hidden="true"></canvas>
+    <li><a class="tile" href="./purgatory-bowl/?v=1792778658">
+      <span class="glass"><canvas class="screen" data-scene="bowl" aria-hidden="true"></canvas></span>
       <div class="meta"><p class="name">Purgatory Bowl</p><p class="tag">Build a team, back it with a god, and play football with a ball that shifts between five shapes.</p><span class="play">Play</span></div>
     </a></li>
-    <li><a class="tile" href="./phosphor/?v=1792778436">
-      <canvas class="screen" data-scene="phos" aria-hidden="true"></canvas>
+    <li><a class="tile" href="./phosphor/?v=1792778658">
+      <span class="glass"><canvas class="screen" data-scene="phos" aria-hidden="true"></canvas></span>
       <div class="meta"><p class="name">Phosphor</p><p class="tag">Tune the dial and reel in signal fish that live in the static.</p><span class="play">Play</span></div>
     </a></li>
   </ul>
@@ -135,11 +144,7 @@ const scenes=[...document.querySelectorAll('canvas[data-scene]')].map(cv=>{
 const INK='#1c1c21';
 function ground(c,t){
   c.clearRect(0,0,132,99);
-  const g=c.createLinearGradient(0,0,132,99);g.addColorStop(0,'rgba(244,244,247,.55)');g.addColorStop(1,'rgba(201,202,209,.55)');
-  c.fillStyle=g;c.fillRect(0,0,132,99);
-  // soft glassy sheen across the top
-  const sh=c.createLinearGradient(0,0,0,99);sh.addColorStop(0,'rgba(255,255,255,.55)');sh.addColorStop(.45,'rgba(255,255,255,0)');
-  c.fillStyle=sh;c.fillRect(0,0,132,99);
+  c.fillStyle='rgba(255,255,255,.06)';c.fillRect(0,0,132,99);
 }
 function prismStroke(c,x0,y0,x1,y1){
   const g=c.createLinearGradient(x0,y0,x1,y1);
@@ -178,7 +183,7 @@ function bowl(c,t){
   const bx=66+Math.sin(t*1.1)*22,by=58+Math.cos(t*.8)*14,r=8+Math.sin(t*2);
   c.fillStyle='rgba(28,28,33,.14)';c.beginPath();c.ellipse(bx,by+12,8,2,0,0,7);c.fill();
   c.beginPath();for(let i=0;i<n;i++){const an=t*2+i*Math.PI*2/n;c[i?'lineTo':'moveTo'](bx+Math.cos(an)*r,by+Math.sin(an)*r);}c.closePath();
-  glow(c,true);c.fillStyle=SC[k];c.fill();glow(c,false);
+  c.fillStyle=INK;c.fill();
   c.lineJoin='round';c.strokeStyle=INK;c.lineWidth=1.4;c.stroke();
   // scoreboard chip
   c.fillStyle='rgba(255,255,255,.6)';c.beginPath();c.roundRect?c.roundRect(4,3,124,13,6):c.rect(4,3,124,13);c.fill();
@@ -207,7 +212,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>frame(2400
 reduce?frame(2400):requestAnimationFrame(frame);
 })();
 </script>
-<script>(function(){var BUILD="1792778436";
+<script>(function(){var BUILD="1792778658";
 function check(){fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
   if(j.v&&j.v!==BUILD)location.replace('./?v='+j.v);}).catch(function(){});}
 check();document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
