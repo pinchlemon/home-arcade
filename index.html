@@ -92,15 +92,15 @@ footer b{color:var(--ink);font-weight:700}
   </header>
 
   <ul class="shelf">
-    <li><a class="tile" href="./void-wizard/?v=1792778141">
+    <li><a class="tile" href="./void-wizard/?v=1792778354">
       <canvas class="screen" data-scene="wiz" aria-hidden="true"></canvas>
       <div class="meta"><p class="name">Void Wizard</p><p class="tag">Two wizards pass a glowing solid through the void and hurl it at demons.</p><span class="play">Play</span></div>
     </a></li>
-    <li><a class="tile" href="./purgatory-bowl/?v=1792778141">
+    <li><a class="tile" href="./purgatory-bowl/?v=1792778354">
       <canvas class="screen" data-scene="bowl" aria-hidden="true"></canvas>
       <div class="meta"><p class="name">Purgatory Bowl</p><p class="tag">Build a team, back it with a god, and play football with a ball that shifts between five shapes.</p><span class="play">Play</span></div>
     </a></li>
-    <li><a class="tile" href="./phosphor/?v=1792778141">
+    <li><a class="tile" href="./phosphor/?v=1792778354">
       <canvas class="screen" data-scene="phos" aria-hidden="true"></canvas>
       <div class="meta"><p class="name">Phosphor</p><p class="tag">Tune the dial and reel in signal fish that live in the static.</p><span class="play">Play</span></div>
     </a></li>
@@ -136,12 +136,9 @@ const INK='#1c1c21';
 function ground(c,t){
   const g=c.createLinearGradient(0,0,132,99);g.addColorStop(0,'#f4f4f7');g.addColorStop(1,'#c9cad1');
   c.fillStyle=g;c.fillRect(0,0,132,99);
-  // slow drifting prismatic streak
-  const s=((t*0.06)%1.6)-0.3;
-  const p=c.createLinearGradient(132*s-30,0,132*s+40,99);
-  ['rgba(255,155,179,0)','rgba(255,155,179,.45)','rgba(255,213,154,.45)','rgba(166,240,198,.45)','rgba(159,216,255,.45)','rgba(196,168,255,.45)','rgba(196,168,255,0)']
-    .forEach((col,i,a)=>p.addColorStop(i/(a.length-1),col));
-  c.fillStyle=p;c.fillRect(0,0,132,99);
+  // soft glassy sheen across the top
+  const sh=c.createLinearGradient(0,0,0,99);sh.addColorStop(0,'rgba(255,255,255,.55)');sh.addColorStop(.45,'rgba(255,255,255,0)');
+  c.fillStyle=sh;c.fillRect(0,0,132,99);
 }
 function prismStroke(c,x0,y0,x1,y1){
   const g=c.createLinearGradient(x0,y0,x1,y1);
@@ -158,7 +155,7 @@ function wiz(c,t){
   // soft shadow on the floor
   c.fillStyle='rgba(28,28,33,.14)';c.beginPath();c.ellipse(x,85,10,2.2,0,0,7);c.fill();
   c.lineJoin='round';c.lineCap='round';
-  glow(c,true);c.strokeStyle=prismStroke(c,x-11,y-11,x+11,y+11);c.lineWidth=3.2;c.beginPath();
+  glow(c,true);c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=3.2;c.beginPath();
   for(const [i,j] of OE){c.moveTo(P[i][0],P[i][1]);c.lineTo(P[j][0],P[j][1]);}c.stroke();
   glow(c,false);c.strokeStyle=INK;c.lineWidth=1.3;c.stroke();
   const wizard=wx=>{
@@ -196,7 +193,7 @@ function phos(c,t){
   c.beginPath();
   for(let x=0;x<=132;x++){const nz=(1-lock)*(Math.sin(x*1.7+t*31)*Math.sin(x*.9-t*17))*7;const y=49+Math.sin(x*.13+t*4)*18*(.6+.4*lock)+nz;x?c.lineTo(x,y):c.moveTo(x,y);}
   c.lineJoin='round';c.lineCap='round';
-  glow(c,true);c.strokeStyle=prismStroke(c,0,0,132,0);c.lineWidth=4;c.stroke();
+  glow(c,true);c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=4;c.stroke();
   glow(c,false);c.strokeStyle=INK;c.lineWidth=1.4;c.stroke();
   const on=lock>.85;
   c.fillStyle=on?INK:'rgba(255,255,255,.6)';c.beginPath();c.roundRect?c.roundRect(5,84,42,11,5.5):c.rect(5,84,42,11);c.fill();
@@ -209,7 +206,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>frame(2400
 reduce?frame(2400):requestAnimationFrame(frame);
 })();
 </script>
-<script>(function(){var BUILD="1792778141";
+<script>(function(){var BUILD="1792778354";
 function check(){fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
   if(j.v&&j.v!==BUILD)location.replace('./?v='+j.v);}).catch(function(){});}
 check();document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
