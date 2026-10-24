@@ -8,6 +8,7 @@
 addEventListener('touchstart',function(e){var t=e.touches[0];x0=(e.touches.length===1&&t.clientX<18)?t.clientX:null;y0=t.clientY;},{passive:true,capture:true});
 addEventListener('touchend',function(e){if(x0===null)return;var t=e.changedTouches[0];if(t.clientX-x0>90&&Math.abs(t.clientY-y0)<80)location.href='../';x0=null;},{passive:true,capture:true});
 })();</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('../sw.js').catch(function(){});});</script>
 </head><body>
 <title>Void Wizard</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -81,7 +82,7 @@ body{
 <div class="solid-name" id="solidName">OCTAHEDRON<span>AIR · floaty, easy to catch</span></div>
 <div class="stick" id="stick" hidden><div class="knob" id="knob"></div></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../lib/three.min.js"></script>
 <script>
 (function(){
 const canvas=document.getElementById('c');
