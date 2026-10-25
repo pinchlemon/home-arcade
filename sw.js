@@ -1,5 +1,5 @@
 // Home Arcade offline support: keeps the launcher, games, libraries and fonts on the phone.
-const CACHE='arcade-1792955860';
+const CACHE='arcade-1792956441';
 const PRE=["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "lib/three.min.js", "lib/OrbitControls.js", "lib/cannon.min.js", "void-wizard/", "purgatory-bowl/", "phosphor/", "crab-platformer/"];
 const FONTS=["https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap", "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap", "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Silkscreen&family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@600&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&display=swap"];
 
