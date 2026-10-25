@@ -96,22 +96,26 @@ footer b{color:var(--ink);font-weight:700}
     </div>
     <div>
       <h1>Home Arcade</h1>
-      <p class="sub">3 games</p>
+      <p class="sub">4 games</p>
     </div>
   </header>
 
   <ul class="shelf">
-    <li><a class="tile" href="./void-wizard/?v=1792846055">
+    <li><a class="tile" href="./void-wizard/?v=1792955860">
       <span class="glass"><canvas class="screen" data-scene="wiz" aria-hidden="true"></canvas></span>
       <div class="meta"><p class="name">Void Wizard</p><p class="tag">Two wizards pass a glowing solid through the void and hurl it at demons.</p><span class="play">Play</span></div>
     </a></li>
-    <li><a class="tile" href="./purgatory-bowl/?v=1792846055">
+    <li><a class="tile" href="./purgatory-bowl/?v=1792955860">
       <span class="glass"><canvas class="screen" data-scene="bowl" aria-hidden="true"></canvas></span>
       <div class="meta"><p class="name">Purgatory Bowl</p><p class="tag">Build a team, back it with a god, and play football with a ball that shifts between five shapes.</p><span class="play">Play</span></div>
     </a></li>
-    <li><a class="tile" href="./phosphor/?v=1792846055">
+    <li><a class="tile" href="./phosphor/?v=1792955860">
       <span class="glass"><canvas class="screen" data-scene="phos" aria-hidden="true"></canvas></span>
       <div class="meta"><p class="name">Phosphor</p><p class="tag">Tune the dial and reel in signal fish that live in the static.</p><span class="play">Play</span></div>
+    </a></li>
+    <li><a class="tile" href="./crab-platformer/?v=1792955860">
+      <span class="glass"><canvas class="screen" data-scene="crab" aria-hidden="true"></canvas></span>
+      <div class="meta"><p class="name">Crab Platformer</p><p class="tag">Squeeze lemons at floating laser eyeballs on a pixel beach.</p><span class="play">Play</span></div>
     </a></li>
   </ul>
 
@@ -205,14 +209,51 @@ function phos(c,t){
   c.fillStyle=on?INK:'rgba(255,255,255,.6)';c.beginPath();c.roundRect?c.roundRect(5,84,42,11,5.5):c.rect(5,84,42,11);c.fill();
   c.fillStyle=on?'#f4f4f6':INK;c.font='700 7px "Plus Jakarta Sans",sans-serif';c.fillText('CH1 '+(on?'LOCK':'TUNE'),10,91.8);
 }
-const draw={wiz,bowl,phos};
+function crab(c,t){
+  ground(c,t);
+  // sand line
+  c.strokeStyle=INK;c.lineWidth=1.2;c.beginPath();c.moveTo(0,86.5);c.lineTo(132,86.5);c.stroke();
+  // the crab scuttles side to side, hopping now and then
+  const x=66+Math.sin(t*.9)*30,hop=Math.max(0,Math.sin(t*2.2))**6*12,y=78-hop,face=Math.cos(t*.9)>0?1:-1;
+  c.fillStyle='rgba(28,28,33,.14)';c.beginPath();c.ellipse(x,85,13,2.2,0,0,7);c.fill();
+  c.lineJoin='round';c.lineCap='round';
+  // legs
+  c.strokeStyle=INK;c.lineWidth=1.3;c.beginPath();
+  for(const s of [-1,1])for(const k of [0,1]){const lx=x+s*(5+k*3),sw=Math.sin(t*12+k+s)*1.5;c.moveTo(lx,y+3);c.lineTo(lx+s*(3+sw),y+7);}
+  c.stroke();
+  // eye stalks + eyes
+  for(const s of [-1,1]){c.beginPath();c.moveTo(x+s*4,y-6);c.lineTo(x+s*5,y-11);c.stroke();
+    c.fillStyle=INK;c.beginPath();c.arc(x+s*5,y-12.5,2.2,0,7);c.fill();c.fillStyle='#fff';c.fillRect(x+s*5-1.2,y-13.6,1,1);}
+  // body
+  glow(c,true);c.fillStyle='rgba(255,255,255,.9)';c.beginPath();c.ellipse(x,y,9,7,0,0,7);c.fill();
+  glow(c,false);c.strokeStyle=INK;c.lineWidth=1.4;c.stroke();
+  c.beginPath();c.moveTo(x-3,y);c.lineTo(x+3,y);c.stroke();
+  // claws, each squeezing a lemon
+  const sq=(t*1.6)%2<.25;
+  for(const s of [-1,1]){const cx=x+s*15,cy=y-1;
+    c.fillStyle=INK;c.beginPath();c.ellipse(cx,cy,4.4,sq&&s===face?2.6:3.6,0,0,7);c.fill();
+    c.fillStyle='#ffd84a';c.beginPath();c.ellipse(cx+s*1.2,cy+.6,2.4,1.3,0,0,7);c.fill();}
+  // lemon juice spritzing out
+  if((t*1.6)%2<.9){const k=((t*1.6)%2)/.9;
+    for(let i=0;i<6;i++){const d=8+k*34+i*3,jx=x+face*(19+d),jy=y-2-d*.25+d*d*.006+(i%3-1)*2;
+      c.fillStyle=i%2?'#ffd84a':'#fff6b0';c.beginPath();c.arc(jx,jy,1.2,0,7);c.fill();}}
+  // a floating eyeball with its tail
+  const ex=66-Math.sin(t*.6)*36,ey=26+Math.sin(t*1.3)*5;
+  c.strokeStyle=INK;c.lineWidth=1.2;c.beginPath();
+  for(let i=0;i<=10;i++){const px=ex+Math.sin(t*.6)*i*.8+Math.sin(t*3-i*.7)*1.6*(i/10),py=ey+6+i*1.3;i?c.lineTo(px,py):c.moveTo(px,py);}c.stroke();
+  glow(c,true);c.fillStyle='rgba(255,255,255,.95)';c.beginPath();c.arc(ex,ey,6.5,0,7);c.fill();
+  glow(c,false);c.strokeStyle=INK;c.lineWidth=1.4;c.stroke();
+  const dx=x-ex,dy=y-ey,dl=Math.hypot(dx,dy)||1;
+  c.fillStyle=INK;c.beginPath();c.arc(ex+dx/dl*2.6,ey+dy/dl*2.6,2.3,0,7);c.fill();
+}
+const draw={wiz,bowl,phos,crab};
 let vis=!document.hidden;document.addEventListener('visibilitychange',()=>vis=!document.hidden);
 function frame(ms){if(vis)for(const s of scenes)draw[s.k](s.c,ms/1000);if(!reduce)requestAnimationFrame(frame);}
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>frame(2400));
 reduce?frame(2400):requestAnimationFrame(frame);
 })();
 </script>
-<script>(function(){var BUILD="1792846055";
+<script>(function(){var BUILD="1792955860";
 function check(){fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
   if(j.v&&j.v!==BUILD)location.replace('./?v='+j.v);}).catch(function(){});}
 check();document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});

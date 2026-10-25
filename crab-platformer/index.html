@@ -1,0 +1,1598 @@
+<!doctype html><html><head><link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Arcade">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script>(function(){var x0=null,y0=0;
+addEventListener('touchstart',function(e){var t=e.touches[0];x0=(e.touches.length===1&&t.clientX<18)?t.clientX:null;y0=t.clientY;},{passive:true,capture:true});
+addEventListener('touchend',function(e){if(x0===null)return;var t=e.changedTouches[0];if(t.clientX-x0>90&&Math.abs(t.clientY-y0)<80)location.href='../';x0=null;},{passive:true,capture:true});
+})();</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('../sw.js').catch(function(){});});</script>
+</head><body>
+<title>Crab Platformer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one centered column — window-framed game screen, then touch pad, then a key legend. Single deliberate dusk-beach look in both themes. */
+:root {
+  --bg: #2b1d28;          /* dusk plum */
+  --frame: #f3e6e2;       /* window chrome, like the original */
+  --frame-ink: #3a2a33;
+  --ink: #f6e4dc;
+  --muted: #b89aa6;
+  --accent: #e7b44c;      /* lemon yellow from the game palette */
+  --btn: #45303e;
+  --btn-hi: #5a3f51;
+  --display: "Silkscreen", "Courier New", monospace;
+  --body: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px;
+  box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  -webkit-user-select: none; user-select: none;
+}
+.window { max-width: 100%; flex-shrink: 0; background: var(--frame); border-radius: 6px; overflow: hidden; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+.titlebar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; color: var(--frame-ink); font-size: 12px; }
+.titlebar i { width: 12px; height: 12px; background: #c8304a; border: 2px solid var(--frame-ink); border-radius: 2px; box-sizing: border-box; }
+.titlebar span { flex: 1; }
+.titlebar b { font-weight: 400; letter-spacing: 10px; opacity: .7; }
+canvas { display: block; width: 480px; height: 432px; max-width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; background: #a8dccc; touch-action: none; }
+canvas:focus { outline: none; }
+canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.pad { width: min(100%, 520px); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pad .grp { display: flex; gap: 10px; }
+.pad button {
+  font-family: var(--display); font-size: 15px; color: var(--ink);
+  background: var(--btn); border: 0; border-bottom: 4px solid #1c121a; border-radius: 10px;
+  width: 56px; height: 56px; touch-action: none; cursor: pointer;
+}
+.pad button.round { border-radius: 50%; width: 60px; height: 60px; background: #a8404a; }
+.pad button.round.b { background: var(--accent); color: #2b1d28; }
+.pad button.on { transform: translateY(3px); border-bottom-width: 1px; background: var(--btn-hi); }
+.pad button:focus-visible { outline: 2px solid var(--accent); }
+.zoom { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.zoom button { font-family: var(--display); font-size: 12px; color: var(--ink); background: var(--btn); border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.zoom button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.zoom button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.padstat { margin: 0; font-family: var(--display); font-size: 12px; color: var(--bg); background: var(--accent); padding: 4px 10px; border-radius: 999px; }
+.tip { margin: 0; max-width: 46ch; text-align: center; font-size: 12.5px; color: var(--ink); text-wrap: balance; }
+.legend { width: min(100%, 520px); display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; font-size: 12.5px; color: var(--muted); }
+.legend .ps { flex-basis: 100%; text-align: center; }
+.legend kbd { font-family: var(--display); font-size: 11px; color: var(--ink); background: var(--btn); padding: 2px 6px; border-radius: 4px; letter-spacing: .04em; }
+@media (hover: hover) and (pointer: fine) { .pad { display: none; } }
+</style>
+
+<div class="window">
+  <div class="titlebar"><i></i><span>Crab Platformer</span><b>–□×</b></div>
+  <canvas id="game" width="160" height="144" tabindex="0" aria-label="Crab Platformer game screen"></canvas>
+</div>
+
+<div class="zoom" role="group" aria-label="Camera zoom">
+  <span>Zoom out</span>
+  <button id="z1" data-z="0" aria-pressed="true">1×</button>
+  <button id="z2" data-z="1" aria-pressed="false">1.5×</button>
+  <button id="z3" data-z="2" aria-pressed="false">2×</button>
+</div>
+
+<p id="pad-status" class="padstat" role="status" hidden>Controller connected</p>
+
+<div class="pad" aria-label="Touch controls">
+  <div class="grp">
+    <button id="bl" data-k="left" aria-label="Move left">◀</button>
+    <button id="bu" data-k="jump" aria-label="Jump">▲</button>
+    <button id="br" data-k="right" aria-label="Move right">▶</button>
+  </div>
+  <div class="grp">
+    <button id="bb" class="round b" data-k="b" aria-label="Squirt left">B</button>
+    <button id="ba" class="round" data-k="a" aria-label="Squirt right">A</button>
+  </div>
+</div>
+
+<p class="tip">Squirt lemon juice at the floating eyes to melt them. Watch for the red aim line before they fire.</p>
+
+<div class="legend">
+  <span><kbd>← →</kbd> scuttle</span>
+  <span><kbd>↑</kbd> / <kbd>Space</kbd> jump</span>
+  <span><kbd>Z</kbd> (A) squirt right</span>
+  <span><kbd>X</kbd> (B) squirt left</span>
+  <span><kbd>M</kbd> sound on/off</span>
+  <span><kbd>N</kbd> music on/off</span>
+  <span><kbd>C</kbd> zoom</span>
+  <span><kbd>P</kbd> pause</span>
+  <span class="ps">PS5 controller: <kbd>✕</kbd> jump · <kbd>□</kbd> squirt left · <kbd>○</kbd> squirt right · <kbd>Options</kbd> pause</span>
+</div>
+
+<script>
+(() => {
+// Rebuilt from Crab_Platformer.gbsproj (sprite frames, palettes with GBC colour correction,
+// platformer physics, A/B snap scripts, 4 life points), then polished and extended with eye enemies.
+const W = 160, H = 144, GROUND = 128;   // the original Game Boy screen
+// Zoomed-out views show more of the world; pixels are only ever scaled by whole numbers.
+const ZOOMS = [[160, 144], [240, 216], [320, 288]];
+let zoom = 0, VW = 160, VH = 144, OY = 0;
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+function fitCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const availW = Math.max(160, Math.min(document.documentElement.clientWidth - 32, 1100)) * dpr;
+  const availH = Math.max(144, window.innerHeight - 190) * dpr;   // leave room for the controls below
+  const scale = Math.max(1, Math.floor(Math.min(availW / VW, availH / VH))) / dpr;
+  cv.style.width = VW * scale + 'px'; cv.style.height = VH * scale + 'px';
+}
+function setZoom(z) {
+  zoom = z; [VW, VH] = ZOOMS[z]; OY = VH - H;
+  cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false;
+  document.querySelectorAll('.zoom button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.z === z)));
+  try { localStorage.setItem('crab-zoom', z); } catch (e) {}
+  fitCanvas();
+}
+addEventListener('resize', fitCanvas);
+document.querySelectorAll('.zoom button').forEach(b => b.addEventListener('click', () => setZoom(+b.dataset.z)));
+
+const sheet = new Image(); sheet.src = 'data:image/png;base64,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';
+const bg = new Image(); bg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACQCAIAAAAA1/fXAAADOUlEQVR42u3cP27bMBiH4Vjo0qGTC3TxkCPkAAWyF918gcy+Q6fcoVsBXyBbkT2A93roAToY6JTZawcVjiBKlGQjMUk/LwLBoX4WEL/885FpM/vx+9cVyqXyERAMgkEwCAbBIBgEEwyCQTDOz7tifpLlYt5qedg9twKtlktgVsAvG0K1Ec2m6KLshoHBPME52W3Fvvz5dmmOq3y9TvJUhx+v7/eb1UVN2lkKPsXQ4/W9KTqDObmebI8b9/UXwcnRXEHff/6+36xOWbMvxHFOgpsr6H6zOs7xEW8h+E0d1y9qu1MdN9+y36wO03XBozmPg46mgIfd83IxP6g6XKc67nxLeQV2BoL7htd4x5N6QGGOU5+i+6rl0O5h4g2vk2bywqbr1AX3uQntDl6vLpJ0Bde1T9/onOp4Ui1d0iCuklUbsTh1HEdq6eJJrsjqHD3xmfaImXkwUEyplYfg16DPcd1SjOAqNbtvM3NGyu+6pZjTjyodtZMOmU/sByOX7QIcV4nY7dwaRSwO9oPBHlBbHFy2c3d8fsHhUUY4f8YdRzbKY9yHpu2DX/coo/OIasw6OrIHjDk8CbfdBJ9a78S3PWPW0UFnI923rkf84wKCY+Omr/a56jlkHp+Z2t50vFzMczR9fsEPu+cjDpbPdT2YzqX4SqKKzstxc6+c/sie+TNKZeM/nxEMgkEwCAbBIBgEEwyCQTAIBsEgGAQTDIJBMAgGwSAYBINggkEwCAbBIBgEg2CCQTAIBsEgGASDYIJBMAgGwSAYBINgEEwwCAbBIBgEg2AQTDAIBsEgGASDYBBMsI+AYBAMgkEwCAbBIJhgEAyCQTAIBsEgmGAQDIJBMAgGwSAYBBMMgkEwCAbBIBhtZp8+fvAplCz478+vPgVTNLIVfHP31Gq6uXsKGyO35FPOV9v1bfP2zd3Tdn3baozckk88/38NPtzerm9bifC1fEb5jiKrlQsfJJ9R/kVwfS/yoPC58unnq8GpPNJr5NPPV60xHq7h4Wv5jPLVYDcZswzIJ5t/qaLr78NqrfO58rnkRxVZnbfks8h3n0V37qj6epN8yvmqc3EeLM/kc8kPj+AxWy75ZPP/AJvNd7BGVcxNAAAAAElFTkSuQmCC';
+// One shared palette, taken from the project's GBC palettes (with colour correction):
+// ink, cream, sky teal, lemon yellow and shell red, plus a deep teal and a few in-between tones made from them.
+const INK = '#17140d', CREAM = '#f0f0e2', SKY = '#9dd4cf', YEL = '#e7b44c', RED = '#d25855';
+const TEAL = '#6aaa9f', TEAL_DK = '#38806f', HAZE = '#84bfb7', YEL_DK = '#b8872f', PINK = '#e5a49c';
+const SHADE = PINK, IRIS = TEAL_DK;
+const JUICE = '#f4d94a', JUICE_HI = '#fff4b0', JUICE_DK = '#d8a531';   // same yellows as the lemons
+
+// ---- physics: the project's engine values (1/4096 px units), plus a little forgiveness ----
+const U = 1 / 4096;
+const WALK_ACC = 668 * U * 1.4, DEC = 709 * U * 1.6, WALK_MAX = 1.5;
+const GRAV = 1311 * U, HOLD_GRAV = 753 * U, JUMP_VEL = 15500 * U, MAX_FALL = 14202 * U;
+const COYOTE = 6, JUMP_BUFFER = 7;
+const IDLE_TICKS = 10, WALK_TICKS = 5;
+const SNAP_FRAMES = 14, SNAP_COOLDOWN = 8, RECOIL_FRAMES = 6;
+const LIFE = 4;                       // "Life Points" variable in the project
+const EYE_HP = 9, CHARGE = 62, AIM_LOCK = 46, FIRE = 18;
+
+const ROW = { moveLeft: 0, moveRight: 1, idleLeft: 2, idleRight: 3 };
+
+// outer tip of the lemon in each claw, per frame: [leftX, leftY, rightX, rightY]
+const TIPS = {"0,0": [6, 7, 40, 7], "0,1": [6, 8, 40, 6], "0,2": [6, 7, 40, 7], "0,3": [6, 6, 40, 8], "1,0": [6, 8, 40, 6], "1,1": [6, 7, 40, 7], "1,2": [6, 6, 40, 8], "1,3": [6, 7, 40, 7], "2,0": [6, 7, 40, 7], "2,1": [6, 8, 40, 6], "2,2": [6, 7, 40, 7], "2,3": [6, 6, 40, 8], "3,0": [6, 8, 40, 6], "3,1": [6, 7, 40, 7], "3,2": [6, 6, 40, 8], "3,3": [6, 7, 40, 7], "11,0": [6, 7, 40, 7], "11,1": [6, 7, 40, 7]};
+const SPARK = [".y.", "yky", ".y."];
+const DROP = ["hj", "jd"];
+const HEART = [".kk.kk.", "krrkrrk", "krrrrrk", ".krrrk.", "..krk..", "...k..."];
+const HEART_EMPTY = [".kk.kk.", "k..k..k", "k.....k", ".k...k.", "..k.k..", "...k..."];
+const EYE_ICON = ["..kkk..", ".kwwwk.", "kwwiiwk", "kwwikwk", ".kwwwk.", "..kkk.."];
+const COLS = { k: INK, y: YEL, r: RED, p: PINK, w: CREAM, i: IRIS, d: JUICE_DK, j: JUICE, h: JUICE_HI };
+const FONT = {
+  A: [".#.","#.#","###","#.#","#.#"], E: ["###","#..","##.","#..","###"], G: [".##","#..","#.#","#.#",".##"],
+  J: ["..#","..#","..#","#.#",".#."], M: ["#.#","###","###","#.#","#.#"], O: [".#.","#.#","#.#","#.#",".#."],
+  P: ["##.","#.#","##.","#..","#.."], R: ["##.","#.#","##.","#.#","#.#"], S: [".##","#..",".#.","..#","##."],
+  U: ["#.#","#.#","#.#","#.#","###"], V: ["#.#","#.#","#.#","#.#",".#."], X: ["#.#","#.#",".#.","#.#","#.#"],
+  0: ["###","#.#","#.#","#.#","###"], 1: [".#.","##.",".#.",".#.","###"], 2: ["##.","..#",".#.","#..","###"],
+  3: ["##.","..#",".#.","..#","##."], 4: ["#.#","#.#","###","..#","..#"], 5: ["###","#..","##.","..#","##."],
+  6: [".##","#..","###","#.#","###"], 7: ["###","..#",".#.",".#.",".#."], 8: ["###","#.#","###","#.#","###"],
+  9: ["###","#.#","###","..#","##."], D: ["##.","#.#","#.#","#.#","##."], ' ': ["...","...","...","...","..."],
+};
+
+// ---- input ----
+const keys = { left: false, right: false, jump: false, a: false, b: false };
+const pressed = { jump: false, a: false, b: false };
+const KEYMAP = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right',
+  ArrowUp:'jump', KeyW:'jump', Space:'jump', KeyZ:'a', KeyJ:'a', KeyX:'b', KeyK:'b' };
+function setKey(k, v) {
+  if (v && !keys[k] && k in pressed) pressed[k] = true;
+  keys[k] = v;
+  audioInit();
+}
+addEventListener('keydown', e => {
+  if (e.code === 'KeyM') { muted = !muted; return; }
+  if (e.code === 'KeyN') { musicOn = !musicOn; return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { paused = !paused; return; }
+  if (e.code === 'KeyC') { setZoom((zoom + 1) % ZOOMS.length); return; }
+  const k = KEYMAP[e.code]; if (!k) return;
+  e.preventDefault(); if (!e.repeat) setKey(k, true);
+});
+addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) { e.preventDefault(); setKey(k, false); } });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+document.querySelectorAll('.pad button').forEach(b => {
+  const k = b.dataset.k;
+  const on = e => { e.preventDefault(); b.classList.add('on'); setKey(k, true); };
+  const off = e => { e.preventDefault(); b.classList.remove('on'); setKey(k, false); };
+  b.addEventListener('pointerdown', on);
+  b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
+});
+cv.addEventListener('pointerdown', () => cv.focus());
+
+// ---- gamepad: PS5 DualSense (or any controller with the standard mapping) ----
+// ✕ jump · □ / L1 squirt left · ○ / R1 squirt right · left stick or d-pad move · Options pause
+const pad = { left: false, right: false, jump: false, a: false, b: false, pause: false };
+let gamepad = null, paused = false;
+const held = k => keys[k] || pad[k];
+function pollPad() {
+  const list = navigator.getGamepads ? navigator.getGamepads() : [];
+  gamepad = null;
+  for (const g of list) if (g && g.connected) { gamepad = g; break; }
+  const n = { left: false, right: false, jump: false, a: false, b: false, pause: false };
+  if (gamepad) {
+    const b = i => !!(gamepad.buttons[i] && gamepad.buttons[i].pressed);
+    const ax = gamepad.axes[0] || 0;
+    n.left = b(14) || ax < -0.35; n.right = b(15) || ax > 0.35;
+    n.jump = b(0) || b(12);
+    n.a = b(1) || b(5) || b(7);
+    n.b = b(2) || b(4) || b(6);
+    n.pause = b(9);
+  }
+  for (const k of ['jump', 'a', 'b']) if (n[k] && !pad[k]) { pressed[k] = true; audioInit(); }
+  if (n.pause && !pad.pause) paused = !paused;
+  Object.assign(pad, n);
+}
+function rumble(ms, strong, weak) {
+  const a = gamepad && gamepad.vibrationActuator;
+  if (!a || !a.playEffect) return;
+  try { a.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }).catch(() => {}); } catch (e) {}
+}
+const padStatus = document.getElementById('pad-status');
+function showPad(on, name) {
+  if (!padStatus) return;
+  padStatus.hidden = !on;
+  if (on) padStatus.textContent = /dualsense|054c|playstation|wireless controller/i.test(name) ? 'PS5 controller connected' : 'Controller connected';
+}
+addEventListener('gamepadconnected', e => showPad(true, e.gamepad.id));
+addEventListener('gamepaddisconnected', () => showPad(false));
+
+// ---- sound: tiny chiptune-style blips and noise ----
+let actx = null, muted = false, noiseBuf = null;
+function audioInit() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.5, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    startMusic();
+  } catch (e) {}
+}
+function blip(f0, f1, dur, type = 'square', vol = 0.05, delay = 0) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur);
+}
+function hiss(dur, vol, freq, delay = 0) {
+  if (!actx || muted || !noiseBuf) return;
+  const t0 = actx.currentTime + delay, s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.8;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  s.connect(f).connect(g).connect(actx.destination); s.start(t0); s.stop(t0 + dur);
+}
+// lemon squeeze: sharp, wet, squishy, and zesty — about an eighth of a second
+function juiceSound() {
+  if (!actx || muted || !noiseBuf) return;
+  const now = actx.currentTime, out = actx.destination;
+  const noise = (t0, dur, type, f0, f1, q, vol, rate = 1) => {
+    const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    s.buffer = noiseBuf; s.playbackRate.value = rate;
+    f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.003); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    s.connect(f).connect(g).connect(out); s.start(t0, Math.random() * 0.3); s.stop(t0 + dur + 0.01);
+  };
+  const r = () => 0.92 + Math.random() * 0.16;
+  // sharp: the claw bites through the peel
+  noise(now, 0.012, 'highpass', 2500, 2500, 0.7, 0.35);
+  // wet + squishy: two quick squelches of pulp, sweeping down
+  noise(now + 0.004, 0.06, 'bandpass', 1100 * r(), 380, 4, 0.5, 0.8);
+  noise(now + 0.03, 0.055, 'bandpass', 850 * r(), 300, 4.5, 0.38, 0.75);
+  // zesty: a tiny bright spritz, cut short
+  noise(now + 0.018, 0.07, 'bandpass', 7000, 5200, 1.3, 0.11, 1.2);
+  // peel squeak
+  {
+    const t0 = now + 0.01, o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(2300 * r(), t0); o.frequency.exponentialRampToValueAtTime(3100, t0 + 0.035);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.03, t0 + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.04);
+    o.connect(g).connect(out); o.start(t0); o.stop(t0 + 0.05);
+  }
+  // a little body underneath
+  {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(130, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.05);
+    g.gain.setValueAtTime(0.07, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    o.connect(g).connect(out); o.start(now); o.stop(now + 0.07);
+  }
+}
+// juice on an eye: a crackly sizzle like it's burning, with a tiny pained squeak
+let lastSizzle = 0;
+function sizzleSound() {
+  if (!actx || muted || !noiseBuf) return;
+  const now = actx.currentTime, out = actx.destination;
+  if (now - lastSizzle < 0.07) return;          // lots of drops land at once; don't stack them
+  lastSizzle = now;
+  {
+    const s = actx.createBufferSource(), hp = actx.createBiquadFilter(), g = actx.createGain();
+    s.buffer = noiseBuf; s.playbackRate.value = 1.3;
+    hp.type = 'highpass'; hp.frequency.value = 3500;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.045, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    s.connect(hp).connect(g).connect(out); s.start(now); s.stop(now + 0.4);
+  }
+  for (let i = 0; i < 9; i++) {                  // crackles
+    const t0 = now + Math.random() * 0.3, s = actx.createBufferSource(), bp = actx.createBiquadFilter(), g = actx.createGain();
+    s.buffer = noiseBuf; bp.type = 'bandpass'; bp.frequency.value = 2500 + Math.random() * 4000; bp.Q.value = 1.5;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.09 * (1 - i / 12), t0 + 0.002); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.012);
+    s.connect(bp).connect(g).connect(out); s.start(t0, Math.random() * 0.4); s.stop(t0 + 0.015);
+  }
+  {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(1500, now); o.frequency.exponentialRampToValueAtTime(950, now + 0.09);
+    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.025, now + 0.01); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    o.connect(g).connect(out); o.start(now); o.stop(now + 0.11);
+  }
+}
+// footsteps: a soft, low "pff" of feet pressing into sand (two per walk cycle); firmer up on a sandcastle
+function stepSound(alt, hard) {
+  if (!actx || muted || !noiseBuf) return;
+  const now = actx.currentTime, s = actx.createBufferSource(), f = actx.createBiquadFilter(), lp = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; s.playbackRate.value = hard ? 0.9 : 0.55;
+  f.type = 'bandpass'; f.Q.value = hard ? 2.2 : 0.9;
+  f.frequency.value = (hard ? 1500 : 850) * (alt ? 0.85 : 1) * (0.92 + Math.random() * 0.16);
+  lp.type = 'lowpass'; lp.frequency.value = hard ? 3000 : 1800;
+  const dur = hard ? 0.035 : 0.055;
+  g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(hard ? 0.06 : 0.07, now + 0.006); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  s.connect(f).connect(lp).connect(g).connect(actx.destination); s.start(now, Math.random() * 0.4); s.stop(now + dur + 0.01);
+}
+// ---------- music: an original chiptune bossa nova loop (16 bars in F) ----------
+// Game Boy-style voices: pulse-wave lead and chords, triangle bass (like the wave channel), noise percussion.
+let musicOn = true, musicGain = null, nextNoteTime = 0, mStep = 0, musicTimer = null, pulse25 = null, pulse12 = null;
+const BPM = 132, EIGHTH = 60 / BPM / 2;
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+// chords: [bass root, voicing]; one per bar
+const CHORDS = [
+  [41, [57, 60, 64]], [38, [54, 60, 63]], [43, [58, 62, 65]], [36, [58, 62, 64]],   // Fmaj7  D7b9  Gm7  C9
+  [45, [55, 60, 64]], [38, [54, 60, 64]], [43, [58, 62, 65]], [36, [58, 62, 64]],   // Am7    D9    Gm7  C9
+  [46, [57, 62, 65]], [46, [55, 61, 65]], [45, [55, 60, 64]], [38, [54, 60, 63]],   // Bbmaj7 Bbm6  Am7  D7b9
+  [43, [58, 62, 65]], [36, [58, 62, 64]], [41, [57, 60, 64]], [36, [58, 62, 64]],   // Gm7    C9    Fmaj7 C9
+];
+// melody per bar: [eighth, note, length in eighths]
+const MELODY = [
+  [[0, 69, 3], [3, 67, 1], [4, 69, 2], [6, 72, 2]],
+  [[0, 72, 2], [2, 70, 1], [3, 69, 3], [6, 66, 2]],
+  [[0, 67, 3], [3, 70, 1], [4, 74, 3], [7, 72, 1]],
+  [[0, 70, 4], [4, 69, 2], [6, 67, 2]],
+  [[0, 72, 3], [3, 76, 1], [4, 72, 2], [6, 69, 2]],
+  [[0, 74, 2], [2, 72, 1], [3, 66, 3], [6, 69, 2]],
+  [[0, 70, 3], [3, 69, 1], [4, 67, 2], [6, 65, 2]],
+  [[0, 64, 4], [4, 67, 2], [6, 70, 2]],
+  [[0, 69, 3], [3, 72, 1], [4, 74, 4]],
+  [[0, 73, 3], [3, 72, 1], [4, 70, 4]],
+  [[0, 72, 2], [2, 69, 1], [3, 67, 1], [4, 64, 4]],
+  [[0, 66, 2], [2, 69, 2], [4, 72, 2], [6, 75, 2]],
+  [[0, 74, 3], [3, 72, 1], [4, 70, 2], [6, 69, 2]],
+  [[0, 67, 3], [3, 70, 1], [4, 69, 2], [6, 67, 2]],
+  [[0, 65, 6]],
+  [[4, 67, 1], [5, 69, 1], [6, 70, 1], [7, 72, 1]],
+];
+const CLAVE = [[0, 3, 6], [2, 5]];            // bossa clave over two bars: 1, 2&, 4 | 2, 3&
+function pulseWave(duty) {
+  const n = 32, re = new Float32Array(n), im = new Float32Array(n);
+  for (let k = 1; k < n; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty);
+  return actx.createPeriodicWave(re, im);
+}
+function mNote(freq, t0, dur, vol, wave, opts = {}) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  if (typeof wave === 'string') o.type = wave; else o.setPeriodicWave(wave);
+  o.frequency.setValueAtTime(freq, t0);
+  if (opts.vibrato && dur > 0.3) {                // gentle vibrato on held notes
+    const l = actx.createOscillator(), lg = actx.createGain();
+    l.frequency.value = 5.5; lg.gain.setValueAtTime(0, t0); lg.gain.linearRampToValueAtTime(freq * 0.006, t0 + 0.25);
+    l.connect(lg).connect(o.frequency); l.start(t0); l.stop(t0 + dur + 0.05);
+  }
+  const a = opts.attack ?? 0.008, sus = opts.sustain ?? 0.6;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + a);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * sus), t0 + a + (opts.decay ?? 0.12));
+  g.gain.setValueAtTime(Math.max(0.0002, vol * sus), t0 + Math.max(a + 0.01, dur - 0.04));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(musicGain); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function mNoise(t0, dur, vol, type, freq, q = 1) {
+  const sN = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  sN.buffer = noiseBuf; f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  sN.connect(f).connect(g).connect(musicGain); sN.start(t0, Math.random() * 0.4); sN.stop(t0 + dur + 0.01);
+}
+function playStep(step, t0) {
+  const bar = (step >> 3) % 16, e = step & 7, [root, voicing] = CHORDS[bar];
+  // bass: root, a pushed fifth, fifth, and a pickup back to the root
+  const bassPat = { 0: [root, 3], 3: [root + 7, 1], 4: [root + 7, 3], 7: [root, 1] };
+  if (bassPat[e]) mNote(midi(bassPat[e][0]), t0, bassPat[e][1] * EIGHTH * 0.92, 0.11, 'triangle', { sustain: 0.7 });
+  // chord stabs on the clave
+  if (CLAVE[bar & 1].includes(e)) for (const n of voicing) mNote(midi(n), t0, EIGHTH * 1.1, 0.018, pulse12, { decay: 0.08, sustain: 0.35 });
+  // melody
+  for (const [st, n, len] of MELODY[bar]) if (st === e) mNote(midi(n), t0, len * EIGHTH * 0.95, 0.04, pulse25, { vibrato: true, sustain: 0.55 });
+  // percussion: shaker on every eighth, rim click on the clave, a soft kick
+  mNoise(t0, 0.035, e % 2 ? 0.018 : 0.03, 'highpass', 7000);
+  if (CLAVE[bar & 1].includes(e)) mNoise(t0, 0.025, 0.05, 'bandpass', 1800, 6);
+  if (e === 0 || e === 4) { const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.setValueAtTime(110, t0); o.frequency.exponentialRampToValueAtTime(45, t0 + 0.12);
+    g.gain.setValueAtTime(0.12, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
+    o.connect(g).connect(musicGain); o.start(t0); o.stop(t0 + 0.16); }
+}
+function startMusic() {
+  if (!actx || musicTimer) return;
+  pulse25 = pulseWave(0.25); pulse12 = pulseWave(0.125);
+  musicGain = actx.createGain(); musicGain.gain.value = 0.8; musicGain.connect(actx.destination);
+  nextNoteTime = actx.currentTime + 0.15;
+  musicTimer = setInterval(() => {
+    // hold the song in place while paused, muted, or switched off; pick up where it left off
+    if (paused || muted || !musicOn || actx.state !== 'running') { nextNoteTime = actx.currentTime + 0.06; return; }
+    while (nextNoteTime < actx.currentTime + 0.12) { playStep(mStep, nextNoteTime); nextNoteTime += EIGHTH; mStep = (mStep + 1) % 128; }
+  }, 25);
+}
+const sfx = {
+  step: stepSound,
+  jump: () => blip(320, 720, .14),
+  land: () => blip(140, 70, .08, 'triangle', .08),
+  squirt: juiceSound,
+  charge: () => blip(160, 900, CHARGE / 60, 'sine', .035),
+  laser: () => { hiss(.07, .14, 3200); blip(1700, 180, .13, 'square', .055); blip(240, 170, .32, 'sawtooth', .04, .02); blip(900, 860, .3, 'square', .018, .03); },
+  eyeHit: sizzleSound,
+  melt: () => { blip(520, 60, .7, 'triangle', .07); hiss(.5, .04, 900, .1); },
+  hurt: () => { blip(320, 70, .28, 'square', .06); },
+  over: () => { blip(440, 430, .18, 'square', .05); blip(330, 320, .18, 'square', .05, .2); blip(220, 110, .5, 'square', .05, .4); },
+};
+
+// ---- state ----
+let crab, parts, eyes, kills, spawnT, shake, over, overT, camX = 0, look = 12, t = 0;
+function reset() {
+  crab = { x: crab ? crab.x : 80, y: GROUND, vx: 0, vy: 0, onGround: true, face: 1, walking: false,
+    animT: 0, frame: 0, snapT: 0, snapSide: 1, recoil: 0, coyote: 0, buffer: 0,
+    hp: LIFE, invuln: 0, stun: 0, squirt: null, dead: false };
+  parts = []; eyes = []; kills = 0; spawnT = 100; shake = 0; over = false; overT = 0;
+}
+reset();
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const onScreen = (x, m = 0) => x > camX - m && x < camX + VW + m;
+
+// ---- juice ----
+let squirtId = 0;
+let pose = { key: '2,0', flip: false };
+function lemonTip(side) {
+  const [lx, ly, rx, ry] = TIPS[pose.key] || TIPS['2,0'];
+  let x, y;
+  if (!pose.flip) [x, y] = side < 0 ? [lx, ly] : [rx, ry];
+  else [x, y] = side < 0 ? [47 - rx, ry] : [47 - lx, ly];
+  return { x: crab.x - 24 + x + side, y: crab.y - 16 + y };
+}
+function startSquirt(side) {
+  crab.squirt = { side, n: 10, i: 0, id: ++squirtId };
+  shake = Math.max(shake, 3);
+  const tip = lemonTip(side);
+  parts.push({ kind: 'flash', x: tip.x + side * 2, y: tip.y, side, life: 4, max: 4 });
+  // sometimes a lemon seed pops out too
+  if (Math.random() < 0.4) parts.push({ kind: 'seed', x: tip.x, y: tip.y, vx: side * rnd(1.2, 2.2), vy: rnd(-2.4, -1.4), life: 160, max: 160, bounced: 0 });
+}
+function emitJuice() {
+  const s = crab.squirt; if (!s) return;
+  const side = s.side, tip = lemonTip(side), x = tip.x + side * 2, y = tip.y;
+  // a hard spritz: a burst of droplets up front, then a trailing spray, plus mist and pulp
+  const count = s.i < 3 ? 2 : 1;
+  for (let c = 0; c < count; c++) {
+    const big = (s.i + c) % 3 === 0;
+    parts.push({ kind: 'juice', big, sid: s.id, idx: s.i, x, y, px: x, py: y,
+      vx: side * (3.9 + rnd(0, 1.0) - s.i * 0.06) + crab.vx * 0.5, vy: -0.85 + rnd(-.6, .5) + crab.vy * 0.3, life: 200 });
+  }
+  if (s.i === 1 || s.i === 4) parts.push({ kind: 'pulp', x, y, vx: side * rnd(2.2, 3.2), vy: rnd(-1.6, -.6), life: 120, max: 120 });
+  for (let i = 0; i < 3; i++) parts.push({ kind: 'mist', x: x + side * rnd(1, 4), y: y + rnd(-2, 2), vx: side * rnd(.8, 2.2), vy: rnd(-.8, .5), life: 10 + (Math.random() * 6 | 0), max: 16 });
+  s.i++; if (--s.n <= 0) crab.squirt = null;
+}
+function splash(x, y, n = 3, color = JUICE) {
+  for (let i = 0; i < n; i++) parts.push({ kind: 'splash', x, y, vx: rnd(-1, 1), vy: rnd(-1.4, -.4), life: 18, max: 18, color });
+}
+
+// ---- eyes ----
+function spawnEye() {
+  const side = Math.random() < 0.7 ? crab.face : -crab.face;
+  const x = crab.x + side * (VW / 2 + 26);
+  eyes.push({ x, y: GROUND - rnd(40, 80), vx: -side * 0.8, hy: GROUND - rnd(30, 74),
+    pref: side * rnd(34, Math.max(44, VW / 2 - 20)), hp: EYE_HP, st: 'float', t: 0, timer: rnd(70, 150),
+    ax: 0, ay: 1, flash: 0, lx: 0, ly: 0, squint: 0, phase: rnd(0, 6), scale: 1, melt: 0, vy: 0, blink: 0, blinkIn: rnd(30, 160) });
+}
+function hurtCrab(srcX) {
+  if (crab.invuln > 0 || crab.dead) return;
+  crab.hp--; crab.invuln = 100; crab.stun = 14; shake = 8;
+  crab.vx = Math.sign(crab.x - srcX || 1) * 2.2; crab.vy = -2.2; crab.onGround = false;
+  splash(crab.x, crab.y - 8, 5, RED);
+  sfx.hurt(); rumble(260, 0.9, 0.6);
+  if (crab.hp <= 0) { crab.dead = true; overT = 0; sfx.over(); for (let i = 0; i < 14; i++) splash(crab.x, crab.y - 8, 1, i % 2 ? RED : YEL); }
+}
+function beamLen(e) { return e.ay > 0.02 ? Math.min(600, (GROUND - e.y) / e.ay) : 600; }
+function segDist(px, py, x0, y0, dx, dy, len) {
+  const k = Math.max(0, Math.min(len, (px - x0) * dx + (py - y0) * dy));
+  return Math.hypot(px - (x0 + dx * k), py - (y0 + dy * k));
+}
+
+// the dangling optic nerve: a little rope of points with gravity and inertia, pinned under the eye
+// The nerve swims behind the eye like a flagellum. It always comes off the back of the eye, opposite the pupil
+// (away from whatever the eye is looking or aiming at), and its points have inertia so it lags and trails.
+function updateRope(e) {
+  const N = 7, SEG = 1.8;
+  const vx = e.x - (e.lastX ?? e.x), vy = e.y - (e.lastY ?? e.y), sp = Math.hypot(vx, vy);
+  e.lastX = e.x; e.lastY = e.y;
+  // direction the tail points: straight away from where the pupil is looking
+  const aiming = e.st === 'charge' || e.st === 'fire';
+  let lx = aiming ? e.ax : crab.x - e.x, ly = aiming ? e.ay : crab.y - 8 - e.y;
+  const ll = Math.hypot(lx, ly);
+  const tx = ll > 1 ? -lx / ll : 0, ty = ll > 1 ? -ly / ll : 1;
+  e.tdx = (e.tdx ?? tx) + (tx - (e.tdx ?? tx)) * 0.06;
+  e.tdy = (e.tdy ?? ty) + (ty - (e.tdy ?? ty)) * 0.06;
+  const dl = Math.hypot(e.tdx, e.tdy) || 1, dx = e.tdx / dl, dy = e.tdy / dl;
+  e.speed = (e.speed ?? 0) * 0.9 + sp * 0.1;
+  e.wave = (e.wave ?? 0) + 0.055 + Math.min(0.05, e.speed * 0.06);
+  const ax = e.x + dx * 6, ay = e.y + dy * 6;          // attached on the rim, on the trailing side
+  if (!e.rope) e.rope = Array.from({ length: N }, (_, i) => ({ x: ax + dx * i * SEG, y: ay + dy * i * SEG, px: ax + dx * i * SEG, py: ay + dy * i * SEG }));
+  const R = e.rope;
+  R[0].x = ax; R[0].y = ay; R[0].px = ax; R[0].py = ay;
+  for (let i = 1; i < R.length; i++) {
+    const p = R[i], ivx = (p.x - p.px) * 0.86, ivy = (p.y - p.py) * 0.86;
+    p.px = p.x; p.py = p.y;
+    // gently steered toward a straight streamer behind the eye, plus a little gravity
+    const gx = ax + dx * i * SEG, gy = ay + dy * i * SEG;
+    p.x += ivx + (gx - p.x) * 0.06; p.y += ivy + (gy - p.y) * 0.06 + 0.03;
+  }
+  for (let it = 0; it < 4; it++) for (let i = 1; i < R.length; i++) {
+    const a = R[i - 1], b = R[i], ddx = b.x - a.x, ddy = b.y - a.y, d = Math.hypot(ddx, ddy) || 0.001, diff = (d - SEG) / d;
+    if (i === 1) { b.x -= ddx * diff; b.y -= ddy * diff; }
+    else { a.x += ddx * diff * 0.5; a.y += ddy * diff * 0.5; b.x -= ddx * diff * 0.5; b.y -= ddy * diff * 0.5; }
+  }
+}
+const BLINK_LEN = 10;
+function updateEyes() {
+  const want = Math.min(1 + Math.floor(kills / 3), 4);
+  const alive = eyes.filter(e => e.st !== 'dying').length;
+  if (!crab.dead && alive < want && --spawnT <= 0) { spawnEye(); spawnT = rnd(90, 170); }
+
+  for (const e of eyes) {
+    e.t++;
+    if (e.flash > 0) e.flash--;
+    if (e.shakeT > 0) e.shakeT--;
+    if (e.openT > 0) e.openT--;
+    if (e.pain > 0) {
+      e.pain--;
+      if (e.pain < 46 && e.pain % 13 === 0 && e.st !== 'dying') {   // tears from the corner of the eye
+        const side = (e.pain >> 4) % 2 ? 1 : -1;
+        parts.push({ kind: 'tear', x: e.x + side * 5, y: e.y + 3, vx: side * rnd(0.15, 0.4), vy: rnd(-0.3, 0), life: 160 });
+      }
+    }
+    updateRope(e);
+    if (e.blink > 0) e.blink--;
+    else if (e.st === 'float' && !(e.openT > 0) && --e.blinkIn <= 0) { e.blink = BLINK_LEN; e.blinkIn = Math.random() < 0.25 ? 14 : rnd(90, 240); }   // sometimes a quick double blink
+    const cxr = crab.x, cyr = crab.y - 8;
+    if (e.st === 'dying') {
+      // shrink, then melt and drip down onto the sand
+      if (e.t < 26) { e.scale = 1 - (e.t / 26) * 0.5; e.y += Math.sin(e.t * 0.9) * 0.3; }
+      else {
+        e.melt = Math.min(1, (e.t - 26) / 30);
+        e.vy = Math.min(e.vy + 0.08, 2.2); e.y += e.vy;
+        if (e.t % 3 === 0) parts.push({ kind: 'goo', x: e.x + rnd(-2, 2), y: e.y + 3, vx: rnd(-.2, .2), vy: rnd(.3, .8), life: 80, color: e.t % 2 ? PINK : RED });
+        if (e.y >= GROUND - 4) {
+          e.gone = true;
+          parts.push({ kind: 'puddle', x: e.x, w: 4, life: 220, max: 220 });
+          splash(e.x, GROUND - 1, 4, RED);
+        }
+      }
+      continue;
+    }
+    // drift toward a spot near the crab, bobbing as it floats
+    const tx = crab.x + e.pref;
+    e.vx += (tx - e.x) * 0.0016; e.vx *= 0.955;
+    e.x += e.vx;
+    const by = e.hy + Math.sin(e.t * 0.05 + e.phase) * 3;
+    e.y += (by - e.y) * 0.08;
+    // pupil follows the crab
+    const dx = cxr - e.x, dy = cyr - e.y, d = Math.hypot(dx, dy) || 1;
+    e.lx = Math.round(dx / d * 2); e.ly = Math.round(dy / d * 2);
+
+    if (e.st === 'float') {
+      e.squint = Math.max(0, e.squint - 0.08);
+      if (--e.timer <= 0 && onScreen(e.x, -8) && !crab.dead) { e.st = 'charge'; e.t = 0; sfx.charge(); }
+    } else if (e.st === 'charge') {
+      if (e.t < AIM_LOCK) { e.ax = dx / d; e.ay = dy / d; }
+      e.squint = Math.min(0.55, e.t / CHARGE * 0.7);
+      if (e.t > AIM_LOCK) e.x += (e.t % 2 ? 1 : -1) * 0.5;   // shiver right before firing
+      if (e.t % 2 === 0) {
+        const a = rnd(0, Math.PI * 2), r = rnd(10, 14);
+        parts.push({ kind: 'charge', x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, tx: e.x, ty: e.y, ang: a, rad: r, eye: e, life: 14, max: 14 });
+      }
+      if (e.t >= CHARGE) {
+        e.st = 'fire'; e.t = 0; e.squint = 0; sfx.laser();
+        if (onScreen(e.x, 20)) { shake = Math.max(shake, 8); rumble(180, 0.45, 0.5); }
+        // energy bursting off the eye as it fires
+        for (let i = 0; i < 16; i++) {
+          const a = i / 16 * Math.PI * 2 + rnd(-.15, .15), sp = rnd(1.4, 3);
+          parts.push({ kind: 'ember', x: e.x + Math.cos(a) * 8, y: e.y + Math.sin(a) * 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 18 + (Math.random() * 8 | 0), max: 26 });
+        }
+      }
+    } else if (e.st === 'fire') {
+      const len = beamLen(e);
+      if (segDist(cxr, cyr, e.x, e.y, e.ax, e.ay, len) < 7) hurtCrab(e.x);
+      if (e.ay > 0.02 && len < 590 && e.t % 2 === 0) {
+        const hx = e.x + e.ax * len;
+        parts.push({ kind: 'spark', x: hx, y: GROUND - 2, vx: rnd(-1.2, 1.2), vy: rnd(-1.6, -.4), life: 16, max: 16 });
+        parts.push({ kind: 'scorch', x: hx, life: 90, max: 90 });
+      }
+      const kick = e.t < 4 ? 1.6 : 0.3; e.x -= e.ax * kick; e.y -= e.ay * kick;   // big kick back as it fires, then a steady push
+      for (let k = 0; k < 2; k++) {
+        const a = Math.atan2(-e.ay, -e.ax) + rnd(-0.9, 0.9);
+        parts.push({ kind: 'ember', x: e.x + Math.cos(a) * 7, y: e.y + Math.sin(a) * 7, vx: Math.cos(a) * rnd(0.8, 1.8), vy: Math.sin(a) * rnd(0.8, 1.8), life: 12, max: 12 });
+      }
+      if (e.t === FIRE - 8) e.shakeT = 22;
+      if (e.t >= FIRE) e.openT = 24;
+      if (e.t >= FIRE) { e.st = 'float'; e.t = 0; e.timer = rnd(110, 220); e.hy = GROUND - rnd(30, 74); e.pref = (Math.random() < .5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)); }
+    }
+    // bumping into an eye hurts
+    if (Math.hypot(cxr - e.x, cyr - e.y) < 11) hurtCrab(e.x);
+  }
+  eyes = eyes.filter(e => !e.gone && Math.abs(e.x - crab.x) < 600);
+}
+
+function update() {
+  t++;
+  if (shake > 0) shake--;
+  if (crab.dead) {
+    overT++;
+    if (overT > 60 && (pressed.jump || pressed.a || pressed.b)) reset();
+    updateParts(); updateEyes();
+    pressed.jump = pressed.a = pressed.b = false;
+    return;
+  }
+  const dir = crab.stun > 0 ? 0 : (held('right') ? 1 : 0) - (held('left') ? 1 : 0);
+  if (crab.stun > 0) crab.stun--;
+  if (crab.invuln > 0) crab.invuln--;
+  if (dir) {
+    crab.face = dir;
+    const acc = Math.sign(crab.vx) === -dir ? WALK_ACC + DEC : WALK_ACC;
+    crab.vx += dir * acc;
+    if (Math.abs(crab.vx) > WALK_MAX) crab.vx = Math.sign(crab.vx) * Math.max(WALK_MAX, Math.abs(crab.vx) - DEC);
+  } else if (crab.onGround) {
+    crab.vx = Math.sign(crab.vx) * Math.max(0, Math.abs(crab.vx) - DEC);
+  }
+
+  if (pressed.jump) crab.buffer = JUMP_BUFFER;
+  if (crab.buffer > 0) crab.buffer--;
+  if (crab.onGround) crab.coyote = COYOTE; else if (crab.coyote > 0) crab.coyote--;
+  if (crab.buffer && crab.coyote && crab.stun === 0) {
+    crab.vy = -JUMP_VEL; crab.onGround = false; crab.coyote = 0; crab.buffer = 0; sfx.jump();
+  }
+  crab.vy += (held('jump') && crab.vy < 0) ? HOLD_GRAV : GRAV;
+  if (crab.vy > MAX_FALL) crab.vy = MAX_FALL;
+
+  const wasGround = crab.onGround, HW = 12;   // claws stay mostly outside walls; he can stand nearer an edge
+  const solids = solidsNear(crab.x);
+  // horizontal: walls of the castle block him, small ledges he just steps up
+  const prevX = crab.x;
+  crab.x += crab.vx;
+  for (const r of solids) {
+    if (crab.y <= r.top + 0.5 || crab.x + HW <= r.x0 || crab.x - HW >= r.x1) continue;
+    if (crab.y - r.top <= 3 && wasGround) { crab.y = r.top; continue; }
+    // push back out the side he came from (or the nearer side if he was already beside it)
+    const fromLeft = prevX + HW <= r.x0 + 0.01, fromRight = prevX - HW >= r.x1 - 0.01;
+    const left = fromLeft || (!fromRight && crab.x < (r.x0 + r.x1) / 2);
+    crab.x = left ? r.x0 - HW : r.x1 + HW;
+    if (Math.sign(crab.vx) === (left ? 1 : -1)) crab.vx = 0;
+  }
+  // vertical: land on the sand or on top of a castle
+  const prevY = crab.y;
+  crab.y += crab.vy;
+  let landed = null;
+  if (crab.y >= GROUND) landed = GROUND;
+  if (crab.vy >= 0) for (const r of solids) {
+    if (crab.x + 8 <= r.x0 || crab.x - 8 >= r.x1) continue;
+    if (prevY <= r.top + 0.5 && crab.y >= r.top) landed = landed === null ? r.top : Math.min(landed, r.top);
+  }
+  if (landed !== null) {
+    if (!wasGround) { spawnDust(crab.x, landed); sfx.land(); }
+    crab.y = landed; crab.vy = 0; crab.onGround = true; crab.onCastle = landed < GROUND;
+  } else crab.onGround = false;
+
+  // A squirts from the right claw, B from the left
+  if ((pressed.a || pressed.b) && crab.snapT <= SNAP_FRAMES - SNAP_COOLDOWN) {
+    const side = pressed.a ? 1 : -1;
+    crab.snapT = SNAP_FRAMES; crab.snapSide = side; crab.recoil = RECOIL_FRAMES;
+    startSquirt(side); sfx.squirt(); rumble(70, 0, 0.3);
+  }
+  emitJuice();
+  if (crab.snapT > 0) crab.snapT--;
+  if (crab.recoil > 0) crab.recoil--;
+
+  updateParts();
+  updateEyes();
+
+  const walking = crab.onGround && dir !== 0;
+  if (walking !== crab.walking) { crab.walking = walking; crab.animT = 0; crab.frame = (crab.frame + 1) & 3; }
+  if (++crab.animT >= (walking ? WALK_TICKS : IDLE_TICKS)) { crab.animT = 0; crab.frame = (crab.frame + 1) & 3; if (walking && !(crab.frame & 1)) sfx.step(crab.frame & 2, crab.onCastle); }
+
+  // camera is locked to the crab's whole-pixel position; only the look-ahead eases
+  look += (crab.face * 12 - look) * 0.08;
+  camX = Math.round(crab.x) - VW / 2 + Math.round(look);
+  pressed.jump = pressed.a = pressed.b = false;
+}
+
+function spawnDust(x, y) {
+  for (const d of [-1, 1]) for (let i = 0; i < 2; i++) parts.push({
+    kind: 'dust', x: x + d * (8 + i * 3), y: y - 1, vx: d * (0.4 + i * .3), vy: -0.15, life: 14, max: 14 });
+}
+
+function updateParts() {
+  for (const p of parts) {
+    p.life--;
+    if (p.kind === 'juice') {
+      p.px = p.x; p.py = p.y;
+      p.vy += 0.075; p.x += p.vx; p.y += p.vy;
+      for (const e of eyes) {
+        if (e.st === 'dying' || p.life <= 0) continue;
+        if (Math.hypot(p.x - e.x, p.y - e.y) < 8) {
+          p.life = 0; splash(p.x, p.y, 3);
+          e.hp--; e.flash = 8; e.pain = 52; e.vx += Math.sign(p.vx) * 0.5; e.squint = 1;
+          if (e.st === 'charge' && e.hp <= EYE_HP / 2) { e.st = 'float'; e.timer = rnd(60, 110); }   // juice in the eye interrupts the charge
+          sfx.eyeHit();
+          if (e.hp <= 0) { e.st = 'dying'; e.t = 0; kills++; sfx.melt(); rumble(160, 0.2, 0.5); splash(e.x, e.y, 6, RED); }
+        }
+      }
+      if (p.life > 0) for (const r of solidsNear(p.x, 0)) if (p.x >= r.x0 && p.x <= r.x1 && p.y >= r.top) { p.life = 0; splash(p.x, r.top - 1, 2); break; }
+      if (p.life > 0 && p.y >= GROUND - 1) {
+        p.life = 0; splash(p.x, GROUND - 1, 2);
+        if (p.big) parts.push({ kind: 'stain', x: p.x, w: 2, life: 90, max: 90 });
+      }
+    } else if (p.kind === 'seed' || p.kind === 'pulp') {
+      p.vy += 0.14; p.x += p.vx; p.y += p.vy;
+      if (p.y >= GROUND - 1) {
+        p.y = GROUND - 1;
+        if (p.kind === 'pulp') { p.life = 0; splash(p.x, GROUND - 1, 2); }
+        else if (p.bounced < 2) { p.vy *= -0.45; p.vx *= 0.6; p.bounced++; }
+        else { p.vy = 0; p.vx = 0; }
+      }
+    } else if (p.kind === 'tear') {
+      p.vy += 0.1; p.x += p.vx; p.y += p.vy; p.vx *= 0.97;
+      if (p.y >= GROUND - 1) { p.life = 0; splash(p.x, GROUND - 1, 1, CREAM); }
+    } else if (p.kind === 'goo') {
+      p.vy += 0.1; p.x += p.vx; p.y += p.vy;
+      if (p.y >= GROUND - 1) p.life = 0;
+    } else if (p.kind === 'charge') {
+      p.ang += 0.32; p.rad *= 0.84;                          // spiral in toward the eye
+      p.x = p.eye.x + Math.cos(p.ang) * p.rad; p.y = p.eye.y + Math.sin(p.ang) * p.rad;
+    } else if (p.kind === 'ember') {
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9;
+    } else if (p.kind === 'puddle') {
+      p.w = Math.min(14, p.w + 0.5);
+    } else if (p.vx !== undefined) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.kind === 'spark' || p.kind === 'mist') { p.vx *= 0.92; p.vy *= 0.92; }
+      if (p.kind === 'splash') { p.vy += 0.15; if (p.y > GROUND - 1) p.life = 0; }
+    }
+  }
+  parts = parts.filter(p => p.life > 0);
+}
+
+// ---- drawing ----
+function sprite(rows, x, y, flip = false, skip) {
+  const w = rows[0].length;
+  rows.forEach((row, j) => { for (let i = 0; i < w; i++) {
+    const c = row[flip ? w - 1 - i : i];
+    if (c === '.' || (skip && skip(i, j))) continue;
+    ctx.fillStyle = COLS[c]; ctx.fillRect(x + i, y + j, 1, 1);
+  } });
+}
+function text(str, x, y, color = INK, shadow = CREAM) {
+  for (const pass of [shadow, color]) {
+    let cx = x + (pass === shadow ? 1 : 0), cy = y + (pass === shadow ? 1 : 0);
+    if (!pass) continue;
+    for (const ch of str) {
+      const g = FONT[ch]; if (g) g.forEach((r, j) => [...r].forEach((c, i) => { if (c === '#') { ctx.fillStyle = pass; ctx.fillRect(cx + i, cy + j, 1, 1); } }));
+      cx += 4;
+    }
+  }
+}
+
+// The crab is assembled off-screen: base pose first, then (while snapping) the normal claw on that
+// side is cleared and the open claw from the project's "shooting" frames is dropped in.
+const oc = document.createElement('canvas'); oc.width = 48; oc.height = 20;
+const octx = oc.getContext('2d', { willReadFrequently: true });
+const PAD = 3;
+function ocell(r, c, y, flip = false, sx0 = 0, sx1 = 48) {
+  const w = sx1 - sx0;
+  if (!flip) { octx.drawImage(sheet, c * 48 + sx0, r * 16, w, 16, sx0, y, w, 16); return; }
+  octx.save(); octx.translate(48, y); octx.scale(-1, 1);
+  octx.drawImage(sheet, c * 48 + sx0, r * 16, w, 16, sx0, 0, w, 16);
+  octx.restore();
+}
+const tmp = document.createElement('canvas'); tmp.width = 48; tmp.height = 20;
+const tctx = tmp.getContext('2d');
+function drawCrab(x, y) {
+  octx.clearRect(0, 0, oc.width, oc.height);
+  const right = crab.face > 0;
+  if (!crab.onGround) {
+    // jump: his standing frame with both legs splayed; eyes stay exactly as when standing
+    ocell(11, right ? 1 : 0, PAD);
+    pose = { key: right ? '11,1' : '11,0', flip: false };
+  } else {
+    const row = crab.walking ? (right ? ROW.moveRight : ROW.moveLeft) : (right ? ROW.idleRight : ROW.idleLeft);
+    ocell(row, crab.frame, PAD);
+    pose = { key: row + ',' + crab.frame, flip: false };
+  }
+  // squeeze: the pincers clamp down on the lemon and it squashes flat
+  if (crab.snapT > 0) {
+    const age = SNAP_FRAMES - crab.snapT;
+    const k = age < 1 ? 1 : age < 3 ? 3 : age < 6 ? 2 : age < 9 ? 1 : 0;
+    if (k) squeezeClaw(crab.snapSide, k);
+  }
+  // expressions: straining toward the squirt, or squinting in pain when hit
+  const snapAge = SNAP_FRAMES - crab.snapT;
+  if (crab.invuln > 60 || crab.dead) moveEyes(0, 1, 0);                              // hurt: eyes drop into a squint, same as when he squeezes
+  else if (crab.snapT > 0 && snapAge < 10) moveEyes(crab.snapSide, 1, 0);           // lean toward the squirt; the glare stays put
+  else if (!crab.onGround && crab.vy < -1) moveEyes(0, 1, 0);                         // jumping: eyes lag low on the way up...
+  else if (!crab.onGround && crab.vy > 1) moveEyes(0, -1, 0);                         // ...and float high on the way down
+  if (crab.snapT > SNAP_FRAMES - 9 || crab.invuln > 60 || crab.dead) {
+    gritTeeth();
+  }
+  const strain = crab.snapT > 0 && snapAge >= 1 && snapAge < 5 ? (t % 2 ? 1 : 0) : 0;
+  ctx.drawImage(oc, x + strain, y - PAD);
+  if (crab.invuln > 45 && !crab.dead) {
+    const pop = crab.invuln > 85 ? 0 : (t >> 3) % 2;
+    sprite(ANGER, x + 24 + crab.face * 7 - 2, y - 9 - pop);
+  }
+  if (crab.snapT > 0) drawBurst(crab.snapSide, SNAP_FRAMES - crab.snapT, x, y);
+}
+
+const LEMON_RGB = new Set(['244,217,74', '216,165,49', '255,244,176', '179,194,58']);
+function squeezeClaw(side, k) {
+  const x0 = side < 0 ? 0 : 33, w = 15, h = PAD + 13;   // stops above the legs
+  const src = octx.getImageData(x0, 0, w, h), S = src.data;
+  const out = new ImageData(new Uint8ClampedArray(S), w, h), O = out.data;
+  const idx = (x, y) => (y * w + x) * 4;
+  const isLemon = i => S[i + 3] && LEMON_RGB.has(S[i] + ',' + S[i + 1] + ',' + S[i + 2]);
+  // the claw = everything solid connected to its lemon
+  const claw = new Uint8Array(w * h), stack = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (isLemon(idx(x, y))) { claw[y * w + x] = 1; stack.push([x, y]); }
+  if (!stack.length) return;
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h || claw[ny * w + nx] || !S[idx(nx, ny) + 3]) continue;
+      claw[ny * w + nx] = 1; stack.push([nx, ny]);
+    }
+  }
+  let sy = 0, n = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (isLemon(idx(x, y))) { sy += y; n++; }
+  const cy = sy / n, out1 = side > 0 ? 1 : -1;
+  for (let i = 0; i < w * h; i++) if (claw[i]) O[i * 4 + 3] = 0;
+  const put = (x, y, i) => {
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    const o = idx(x, y); O[o] = S[i]; O[o + 1] = S[i + 1]; O[o + 2] = S[i + 2]; O[o + 3] = 255;
+  };
+  // pincers close 1px: top half moves down, bottom half moves up
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = idx(x, y); if (!claw[y * w + x] || isLemon(i)) continue;
+    put(x, y < cy - 0.5 ? y + 1 : y > cy + 0.5 ? y - 1 : y, i);
+  }
+  // lemon on top, squashed by the same 1px from each side; at the peak it bulges out of the claw
+  let tipX = side > 0 ? -1 : w;
+  for (let x = 0; x < w; x++) {
+    const ys = [];
+    for (let y = 0; y < h; y++) if (isLemon(idx(x, y))) ys.push(y);
+    if (!ys.length) continue;
+    if (side > 0 ? x > tipX : x < tipX) tipX = x;
+    const top = ys[0], bot = ys[ys.length - 1];
+    for (const y of ys) put(x, bot - top >= 2 ? (y === top ? top + 1 : y === bot ? bot - 1 : y) : y, idx(x, y));
+  }
+  if (k > 1) for (let y = 0; y < h; y++) {
+    const i = idx(tipX, y);
+    if (isLemon(i) && Math.abs(y - cy) < 1.2) { put(tipX + out1, y, i); if (k > 2) put(tipX + out1 * 2, y, idx(tipX, y)); }
+  }
+  octx.putImageData(out, x0, 0);
+}
+
+// Eyes on stalks: each eyeball (found by its white highlight) can be moved, with the stalk stretched to follow,
+// and its highlight shifted so he looks one way.
+function moveEyes(dx, dy, look) {
+  for (const [x0, x1] of [[11, 21], [27, 37]]) {
+    const w = x1 - x0, hgt = PAD + 7, img = octx.getImageData(x0, 0, w, hgt), d = img.data;
+    const at = (x, y) => (y * w + x) * 4;
+    const kind = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= hgt) return '.'; const i = at(x, y); return !d[i + 3] ? '.' : d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200 ? 'w' : d[i] < 60 ? 'k' : 'r'; };
+    let hx = -1, hy = -1;
+    for (let y = 0; y <= PAD + 3 && hy < 0; y++) for (let x = 0; x < w; x++) if (kind(x, y) === 'w') { hx = x; hy = y; break; }
+    if (hy < 0) continue;
+    // eyeball = dark/white pixels connected to the highlight, within its three rows
+    const ball = [], seen = new Set([hx + ',' + hy]), st = [[hx, hy]];
+    while (st.length) {
+      const [x, y] = st.pop(); ball.push([x, y, kind(x, y)]);
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (ny < hy - 1 || ny > hy + 1 || seen.has(nx + ',' + ny)) continue;
+        const k = kind(nx, ny); if (k !== 'k' && k !== 'w') continue;
+        seen.add(nx + ',' + ny); st.push([nx, ny]);
+      }
+    }
+    const stalkCols = [];
+    for (let x = 0; x < w; x++) if (kind(x, hy + 2) === 'k' && ball.some(b => Math.abs(b[0] - x) <= 1)) stalkCols.push(x);
+    for (const [x, y] of ball) d[at(x, y) + 3] = 0;
+    // stretched stalk under a raised eyeball
+    for (let y = hy + 2 + dy; y <= hy + 1; y++) for (const x of stalkCols) if (y >= 0) { const i = at(x, y); d[i] = 23; d[i + 1] = 20; d[i + 2] = 13; d[i + 3] = 255; }
+    let wx = null;
+    for (const [x, y, k] of ball) if (k === 'w') wx = x;
+    for (const [x, y, k] of ball) {
+      const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= hgt) continue;
+      let c = k === 'w' ? [240, 240, 231] : [23, 20, 13];
+      if (look) {   // shift the highlight toward where he's looking
+        if (k === 'w') c = [23, 20, 13];
+        const row = ball.filter(b => b[1] === hy).map(b => b[0]);
+        const lx = look > 0 ? Math.max(...row) - 1 : Math.min(...row) + 1;
+        if (y === hy && x === lx) c = [240, 240, 231];
+      }
+      const i = at(nx, ny); d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    }
+    octx.putImageData(img, x0, 0);
+  }
+}
+function squintEyes() {
+  for (const [x0, x1] of [[11, 21], [27, 37]]) {
+    const w = x1 - x0, hgt = PAD + 7, img = octx.getImageData(x0, 0, w, hgt), d = img.data;
+    const at = (x, y) => (y * w + x) * 4;
+    const kind = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= hgt) return '.'; const i = at(x, y); return !d[i + 3] ? '.' : d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200 ? 'w' : d[i] < 60 ? 'k' : 'r'; };
+    let hx = -1, hy = -1;
+    for (let y = 0; y <= PAD + 3 && hy < 0; y++) for (let x = 0; x < w; x++) if (kind(x, y) === 'w') { hx = x; hy = y; break; }
+    if (hy < 0) continue;
+    // the eyeball's bottom row: dark pixels directly under the highlight row that belong to the ball
+    const row = hy + 1;
+    let xl = hx, xr = hx;
+    while (kind(xl - 1, hy) === 'k') xl--;
+    while (kind(xr + 1, hy) === 'k') xr++;
+    for (let x = xl; x <= xr; x++) if (kind(x, row) === 'k') d[at(x, row) + 3] = 0;
+    octx.putImageData(img, x0, 0);
+  }
+}
+const ANGER = [".r.r.", "rp.pr", ".....", "rp.pr", ".r.r."];
+
+const SHELL = [210, 88, 85];
+// angry face: his puckered lips part and a white line of teeth shows.
+// The lips are a ring with a short dark slit in the middle; find that slit in whatever frame is showing.
+function gritTeeth() {
+  // his mouth: a short dark slit between puckered lips. Opening it: the slit turns into a row of teeth,
+  // the lower lip (its red row and the dark line under it) drops one pixel, and a second row of teeth fills the gap.
+  const x0 = 14, w = 20, y0 = PAD + 2, h = 12;
+  const img = octx.getImageData(x0, y0, w, h), d = img.data;
+  const at = (x, y) => { const i = (y * w + x) * 4; return d[i + 3] ? (d[i] < 60 ? 'k' : d[i] > 200 && d[i + 1] > 200 ? 'w' : 'r') : '.'; };
+  const get = (x, y) => { const i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2], d[i + 3]]; };
+  const set = (x, y, c) => { const i = (y * w + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = c[3] ?? 255; };
+  const TEETH = [240, 240, 231];
+  for (let y = 1; y < h - 3; y++) for (let x = 2; x < w - 5; x++) {
+    if (at(x - 1, y) === 'r' && at(x, y) === 'k' && at(x + 1, y) === 'k' && at(x + 2, y) === 'k' && at(x + 3, y) === 'r'
+        && at(x + 1, y - 1) === 'r' && at(x + 1, y + 1) === 'r') {
+      const lipRow = [], lineRow = [];
+      for (let i = -2; i <= 4; i++) { lipRow.push(get(x + i, y + 1)); lineRow.push(get(x + i, y + 2)); }
+      for (let i = -2; i <= 4; i++) {
+        set(x + i, y + 3, lineRow[i + 2]);                       // lower lip line, one pixel lower
+        set(x + i, y + 2, lipRow[i + 2]);                        // lower lip, one pixel lower
+        set(x + i, y + 1, lipRow[i + 2]);                        // mouth corners stay where they were...
+      }
+      // on the two teeth rows, the lips' black outline beside the teeth becomes plain shell
+      for (const yy of [y, y + 1]) for (let i = -3; i <= 5; i++) if (at(x + i, yy) === 'k') set(x + i, yy, [210, 88, 85]);
+      for (let i = 0; i < 3; i++) { set(x + i, y, TEETH); set(x + i, y + 1, TEETH); }   // ...with two rows of teeth inside
+      octx.putImageData(img, x0, y0);
+      return;
+    }
+  }
+}
+
+// juice bursting out of the squeezed lemon: no outlines, just a bright splash that fans out and breaks up
+const RAYS = [-1.1, -0.72, -0.36, 0, 0.36, 0.72, 1.05];
+function drawBurst(side, age, x, y) {
+  const [lx, ly, rx, ry] = TIPS[pose.key] || TIPS['2,0'];
+  let tx, ty;
+  if (!pose.flip) [tx, ty] = side < 0 ? [lx, ly] : [rx, ry];
+  else [tx, ty] = side < 0 ? [47 - rx, ry] : [47 - lx, ly];
+  const bx = x + tx, by = y + ty;
+  const dot = (c, px, py) => { ctx.fillStyle = c; ctx.fillRect(Math.round(px), Math.round(py), 1, 1); };
+  if (age < 3) {
+    dot(JUICE, bx + side, by - 1); dot(JUICE, bx + side, by + 1); dot(JUICE, bx + side * 2, by);
+    dot(JUICE_HI, bx + side, by);
+    if (age > 0) { dot(JUICE, bx + side * 3, by - 1); dot(JUICE_HI, bx + side * 3, by + 1); }
+    return;
+  }
+  RAYS.forEach((a, i) => {
+    const ang = a - 0.2, dx = Math.cos(ang) * side, dy = Math.sin(ang);
+    if (age < 8) {
+      const r0 = 1 + (age - 3) * 1.1, r1 = r0 + (age < 6 ? 4 : 2);
+      for (let r = r0; r <= r1; r += 1) dot(r >= r1 - 0.5 ? JUICE_HI : (i > 3 ? JUICE_DK : JUICE), bx + dx * r, by + dy * r);
+    } else if ((i + age) % 2 === 0 || age < 11) {
+      const r = 5 + (age - 3) * 1.2;
+      dot(age < 11 ? JUICE : JUICE_HI, bx + dx * r, by + dy * r + (age - 8) * 0.5);
+    }
+  });
+}
+
+function drawNerve(e, cx) {
+  const R = e.rope; if (!R) return;
+  const n = R.length - 1;
+  // whip: a wave travels down the tail, sideways to it, quicker and bigger when the eye is swimming
+  const amp = 1.6 + Math.min(0.8, (e.speed ?? 0) * 0.8);   // slow, lazy undulation (advanced in updateRope)
+  const W = R.map((p, i) => {
+    const a = R[Math.max(0, i - 1)], b = R[Math.min(n, i + 1)];
+    let ux = b.x - a.x, uy = b.y - a.y; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+    const off = Math.sin(e.wave + e.phase - i * 1.1) * amp * (i / n) ** 1.1;
+    return { x: p.x - uy * off, y: p.y + ux * off };
+  });
+  const pts = [];
+  for (let i = 1; i < W.length; i++) {
+    const a = W[i - 1], b = W[i], m = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)));
+    const horiz = Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
+    for (let k = 0; k < m; k++) pts.push([Math.round(a.x + (b.x - a.x) * k / m - cx), Math.round(a.y + (b.y - a.y) * k / m), horiz]);
+  }
+  // outline on both sides of the tail
+  ctx.fillStyle = INK;
+  for (const [x, y, h] of pts) { if (h) { ctx.fillRect(x, y - 1, 1, 1); ctx.fillRect(x, y + 1, 1, 1); } else { ctx.fillRect(x - 1, y, 1, 1); ctx.fillRect(x + 1, y, 1, 1); } }
+  // red tail, in the eye's shadow where it attaches
+  pts.forEach(([x, y], k) => { ctx.fillStyle = k < 2 ? INK : k < 4 && (x + y) % 2 ? INK : RED; ctx.fillRect(x, y, 1, 1); });
+  // frayed nerve ending
+  const tip = W[n], tx = Math.round(tip.x - cx), ty = Math.round(tip.y);
+  ctx.fillStyle = INK; ctx.fillRect(tx - 1, ty - 1, 3, 3);
+  ctx.fillStyle = RED; ctx.fillRect(tx, ty, 1, 1);
+  ctx.fillStyle = PINK; ctx.fillRect(tx + Math.round(-R[n - 1].x + R[n].x), ty + Math.round(-R[n - 1].y + R[n].y), 1, 1);
+}
+// Eye: the project's eye shape, drawn 2px wider (same flat top and heavier black bottom),
+// with its ringed pupil free to aim anywhere. Veins spread as it takes damage; it flushes red as it melts.
+// the project's eye exactly: 14px across, flat top, heavier black at the bottom, and its ringed pupil
+const EYE_ART = [
+  "................",
+  "......####......",
+  "....##oooo##....",
+  "...#oooooooo#...",
+  "..#oooooooooo#..",
+  "..#oooooooooo#..",
+  ".#oooooooooooo#.",
+  ".#oooooooooooo#.",
+  ".#oooooooooooo#.",
+  ".##oooooooooo##.",
+  "..#oooooooooo#..",
+  "..##oooooooo##..",
+  "...###oooo###...",
+  "....########....",
+  "......####......",
+  "................"
+];
+const EYE_W = EYE_ART[0].length, EYE_H = EYE_ART.length, ECX = 7.5, ECY = 7.5;
+const PUPIL_SMALL = ["##", "##"];   // tiny pinpoint pupil when it's hurting
+const EYE_PUPIL = [
+  "..##..",
+  ".#++#.",
+  "#+#o+#",
+  "#+##+#",
+  ".#++#.",
+  "..##.."
+];
+// veins every eye starts with (scattered around the rim, like the earlier eye)
+const BASE_VEINS = [[2, 7], [3, 6], [3, 9], [3, 10], [12, 5], [13, 7], [12, 10], [11, 11], [7, 12], [9, 12]];
+// extra vein branches grow in from the rim as damage builds up
+const VEIN_BRANCHES = [3.3, 0.2, 2.5, 0.95, 4.1, 5.6, 1.6, 3.9].map((a, k) =>
+  [[5.9, 0], [5.1, 0.09], [4.5, -0.08], [5.0, 0.25]].map(([r, da]) => [Math.round(ECX + Math.cos(a + da) * r), Math.round(ECY + Math.sin(a + da) * r)]));
+const [eyeCv, eyeG] = (() => { const c = document.createElement('canvas'); c.width = EYE_W; c.height = EYE_H; return [c, c.getContext('2d')]; })();
+function paintEye(e) {
+  eyeG.clearRect(0, 0, EYE_W, EYE_H);
+  const put = (c, x, y) => { eyeG.fillStyle = c; eyeG.fillRect(x, y, 1, 1); };
+  const dying = e.st === 'dying';
+  const dmg = dying ? 99 : Math.floor((EYE_HP - e.hp) * 6 / EYE_HP);   // 0 = healthy … 5 = nearly melted
+  const red = dying ? Math.min(1, e.t / 14) : 0;                  // how far it has flushed red while melting
+  const wince = !dying && e.flash > 0;
+  // eyelids: 0 = wide open, 1 = shut. Blinks now and then, squints while charging, squeezes shut when juiced.
+  // top and bottom lids move separately so the eye can glare (heavy top lid) while it fires
+  let lidT = 0, lidB = 0;
+  if (!dying) {
+    if (e.blink > 0) lidT = lidB = Math.sin(Math.PI * (1 - e.blink / BLINK_LEN));
+    if (e.st === 'charge') {
+      if (e.t >= CHARGE - 6) { lidT = 0; lidB = 0; }                                       // eyes pop wide right before the shot
+      else { const k = Math.min(1, e.t / (CHARGE * 0.3)); lidT = Math.max(lidT, 0.8 * k); lidB = Math.max(lidB, 0.8 * k); }   // a quick, hard squint
+    }
+    if (e.st === 'fire') { lidT = 0; lidB = 0; }                                 // wide open for the whole blast
+    if (e.openT > 0) { lidT = 0; lidB = 0; }                                   // ...and for a moment after
+    if (!wince && e.pain > 0 && e.st !== 'fire') {                                // in pain: pinched, twitching lids
+      const tw = (t >> 2) % 3 === 0 ? 0.12 : 0;
+      lidT = Math.max(lidT, 0.6 + tw); lidB = Math.max(lidB, 0.7);
+    }
+    if (wince) lidT = lidB = 1;
+  }
+  const lid = Math.max(lidT, lidB);
+  // like a real eye, the top lid does most of the travel and they meet below the middle (around row 10)
+  const topLid = Math.round(2 + lidT * 7.5), botLid = Math.round(12 - lidB * 2.4);   // rows of the white still showing
+  // pupil aims at the crab, or along the laser while charging / firing
+  const aiming = e.st === 'charge' || e.st === 'fire';
+  let dx = aiming ? e.ax : crab.x - e.x, dy = aiming ? e.ay : crab.y - 8 - e.y;
+  const d = Math.hypot(dx, dy) || 1, near = !aiming && d < 14;
+  const ox = near ? 0 : Math.round(dx / d * 2.6), oy = near ? 0 : Math.round(dy / d * 2.2);
+  const px0 = 5 + ox, py0 = 5 + oy;
+  // veins (and any red or pink on the white) always stay at least a pixel away from the pupil
+  const nearPupil = (x, y) => {
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const r = EYE_PUPIL[y + j - py0]; if (r && r[x + i - px0] && r[x + i - px0] !== '.') return true;
+    }
+    return false;
+  };
+  const sclera = (x, y) => {
+    if (red >= 1) return (x + y) % 5 === 0 ? PINK : RED;
+    if (nearPupil(x, y)) return CREAM;
+    if (red > 0 && ((x * 7 + y * 3) % 10) / 10 < red) return RED;
+    if (dmg >= 4 && (x + y) % 3 === 0 && Math.hypot(x - ECX, y - ECY) > 4.3) return PINK;   // bloodshot
+    return CREAM;
+  };
+  const veinOK = (x, y) => EYE_ART[y][x] === 'o' && (red >= 1 || !nearPupil(x, y));
+  for (let y = 0; y < EYE_H; y++) for (let x = 0; x < EYE_W; x++) {
+    const ch = EYE_ART[y][x];
+    if (ch === '#') put(INK, x, y); else if (ch === 'o') put(sclera(x, y), x, y);
+  }
+  if (red < 1) {
+    if (e.hp < EYE_HP) for (const [x, y] of BASE_VEINS) if (veinOK(x, y)) put(RED, x, y);   // fresh eyes are clean
+    const branches = Math.min(VEIN_BRANCHES.length, dmg * 2), len = Math.min(4, 1 + dmg);
+    for (let b = 0; b < branches; b++) VEIN_BRANCHES[b].slice(0, len).forEach(([x, y]) => { if (veinOK(x, y)) put(RED, x, y); });
+  }
+  if (red >= 1) return;
+  const iris = e.st === 'fire' ? RED : e.st === 'charge' ? (((t >> (e.t > AIM_LOCK ? 1 : 2)) & 1) ? RED : PINK) : TEAL;
+  const pained = e.pain > 0 && e.st !== 'fire' && e.st !== 'charge';
+  const PUP = pained ? PUPIL_SMALL : EYE_PUPIL;
+  const pj = pained ? [((t >> 1) % 3) - 1, 0] : [0, 0];
+  const qx = pained ? px0 + 2 + pj[0] : px0, qy = pained ? py0 + 2 : py0;
+  PUP.forEach((row, j) => [...row].forEach((ch, i) => {
+    const x = qx + i, y = qy + j;
+    if (ch === '.' || !EYE_ART[y] || EYE_ART[y][x] !== 'o' || y < topLid || y > botLid) return;
+    put(ch === '#' ? INK : ch === '+' ? iris : CREAM, x, y);
+  }));
+  // eyelids over the top and bottom of the white, each with a dark lash line at its edge.
+  // When the lids meet there is no white left, so they close on one single black line.
+  const shut = botLid - topLid < 1;
+  const seam = shut ? Math.min(11, Math.max(topLid, botLid + 1) - 1) : -1;
+  if (lid > 0.02) for (let y = 0; y < EYE_H; y++) for (let x = 0; x < EYE_W; x++) {
+    if (EYE_ART[y][x] !== 'o') continue;
+    if (shut) put(y === seam ? INK : RED, x, y);
+    else if (y < topLid) put(y === topLid - 1 ? INK : RED, x, y);
+    else if (y > botLid) put(y === botLid + 1 ? INK : RED, x, y);
+  }
+}
+function drawEye(e, cx) {
+  const jit = e.shakeT > 0 ? ((t >> 1) % 2 ? 1 : -1) * (e.shakeT > 6 ? 1 : (t % 3 === 0 ? 1 : 0)) : 0;   // post-shot tremble
+  const ouch = e.pain > 20 && e.st !== 'dying' ? (t % 2 ? 1 : -1) : e.pain > 0 && t % 4 === 0 ? 1 : 0;   // shaking in pain
+  const x = Math.round(e.x - cx) + jit + ouch, y = Math.round(e.y) + (e.shakeT > 8 && t % 4 === 0 ? 1 : 0);
+  const ex = x, ey = y;
+  if (e.st === 'charge' && (e.t > AIM_LOCK || t % 2 === 0)) {          // glow ring tightening around the eye
+    const rad = 13 - e.t / CHARGE * 3;
+    for (let k = 0; k < 20; k++) {
+      const a = k / 20 * Math.PI * 2 + t * 0.12;
+      ctx.fillStyle = k % 2 ? RED : PINK; ctx.fillRect(Math.round(ex + Math.cos(a) * rad), Math.round(ey + Math.sin(a) * rad), 1, 1);
+    }
+  }
+  if (e.st === 'fire' && e.t < 10) {                                     // shockwave pushing out from the eye
+    const rad = 9 + e.t * 1.8;
+    for (let k = 0; k < 30; k++) {
+      if ((k + e.t) % 3 === 0) continue;
+      const a = k / 30 * Math.PI * 2;
+      ctx.fillStyle = k % 2 ? CREAM : RED; ctx.fillRect(Math.round(ex + Math.cos(a) * rad), Math.round(ey + Math.sin(a) * rad), 1, 1);
+    }
+  }
+  if (e.st !== 'dying') drawNerve(e, cx);
+  paintEye(e);
+  if (e.st !== 'dying') { ctx.drawImage(eyeCv, x - 8, y - 8); return; }
+  // melting: shrinks with a wobble, then squashes as it slides down, dripping red
+  const s = e.scale, m = e.melt;
+  const w = Math.max(2, Math.round(EYE_W * s * (1 + m * 0.9))), h = Math.max(1, Math.round(EYE_H * s * (1 - m * 0.8)));
+  const bottom = y + Math.round(7 * s);
+  ctx.drawImage(eyeCv, 0, 0, EYE_W, EYE_H, x - (w >> 1), bottom - h, w, h);
+  if (m > 0) {
+    for (const [ox, k, col] of [[-3, 0.9, RED], [-1, 1.4, PINK], [1, 0.7, RED], [3, 1.2, RED]]) {
+      const len = Math.round(m * 5 * k + Math.sin(t * 0.3 + ox) * 0.6);
+      const dx = x + Math.round(ox * w / 10);
+      for (let i = 0; i < len; i++) { ctx.fillStyle = i === len - 1 ? INK : col; ctx.fillRect(dx, bottom + i, 1, 1); }
+    }
+  }
+}
+function drawBeam(e, cx) {
+  const len = beamLen(e), thin = e.t < 3 || e.t > FIRE - 4;
+  for (const pass of [0, 1]) for (let i = 6; i < len; i++) {
+    const x = Math.round(e.x + e.ax * i - cx), y = Math.round(e.y + e.ay * i);
+    if (x < -2 || x > VW + 2) continue;
+    if (pass === 0) { ctx.fillStyle = (t >> 1) & 1 ? RED : PINK; thin ? ctx.fillRect(x, y, 1, 1) : ctx.fillRect(x - 1, y - 1, 3, 3); }
+    else if (!thin) { ctx.fillStyle = CREAM; ctx.fillRect(x, y, 1, 1); }
+  }
+}
+function drawTelegraph(e, cx) {
+  if (t % 2) return;
+  const reach = Math.min(beamLen(e), 30 + e.t * 3);
+  ctx.fillStyle = e.t > AIM_LOCK ? RED : PINK;
+  for (let i = 10; i < reach; i += 5) ctx.fillRect(Math.round(e.x + e.ax * i - cx), Math.round(e.y + e.ay * i), 1, 1);
+}
+
+// ---------- backdrop: sky, clouds, city across the water, sea, and beach props ----------
+const SEA = TEAL, SEA_DK = TEAL_DK, CITY = HAZE, CITY_DK = TEAL, CITY_WIN = SKY;
+const PALM = TEAL_DK, PALM_DK = INK, TRUNK = YEL, TRUNK_DK = YEL_DK, SAND = YEL;
+const HORIZON = 108;
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const hash = i => mulberry(i * 9973 + 17)();
+const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+
+// pieces cut from the original background: the ground strip and the cloud (sky made transparent)
+let ground = null, cloudR = null, cloudL = null;
+function prepBg() {
+  const [c, g] = mk(W, H); g.drawImage(bg, 0, 0);
+  const img = g.getImageData(0, 0, W, H), d = img.data;
+  const sky = [d[0], d[1], d[2]];
+  [ground] = mk(W, H - GROUND);
+  {
+    const gg = ground.getContext('2d'); gg.drawImage(c, 0, GROUND, W, H - GROUND, 0, 0, W, H - GROUND);
+    // keep the black edge on top, add a light lip under it, soften the pattern to a darker sand,
+    // and dither the lowest rows so the sand has some depth
+    const gi = gg.getImageData(0, 0, W, H - GROUND), q = gi.data, hx = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+    const [dk, cr, yl] = [hx(YEL_DK), hx(CREAM), hx(YEL)];
+    for (let y = 0; y < H - GROUND; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4, dark = q[i] < 60;
+      let col = null;
+      if (y === 0) continue;
+      if (y === 1) col = (x % 7 === 3) ? yl : cr;
+      else if (dark) col = dk;
+      else if (y >= H - GROUND - 3 && (x + y) % 2 === 0) col = dk;
+      if (col) { q[i] = col[0]; q[i + 1] = col[1]; q[i + 2] = col[2]; }
+    }
+    gg.putImageData(gi, 0, 0);
+  }
+  let x0 = W, x1 = 0, y0 = GROUND, y1 = 0;
+  for (let y = 0; y < GROUND - 4; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    if (d[i] === sky[0] && d[i + 1] === sky[1] && d[i + 2] === sky[2]) { d[i + 3] = 0; continue; }
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+  }
+  g.putImageData(img, 0, 0);
+  const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+  let cctx; [cloudR, cctx] = mk(cw, ch); cctx.drawImage(c, x0, y0, cw, ch, 0, 0, cw, ch);
+  [cloudL, cctx] = mk(cw, ch); cctx.translate(cw, 0); cctx.scale(-1, 1); cctx.drawImage(cloudR, 0, 0);
+}
+if (bg.complete) prepBg(); else bg.onload = prepBg;
+
+// hazy city skyline, generated once and tiled
+const CITY_W = 512;
+const [cityC, cityG] = mk(CITY_W, 64);
+(() => {
+  const r = mulberry(42);
+  let x = 0;
+  while (x < CITY_W) {
+    const w = 7 + (r() * 16 | 0), h = 10 + (r() * 34 | 0) + (r() < .12 ? 14 : 0);
+    const top = 64 - h, col = r() < .5 ? CITY : CITY_DK;
+    cityG.fillStyle = col; cityG.fillRect(x, top, w, h);
+    const roof = r();
+    if (roof < .2) { cityG.fillRect(x + (w >> 1), top - 5, 1, 5); }                       // antenna
+    else if (roof < .32) { cityG.fillRect(x + 1, top - 2, w - 2, 2); cityG.fillRect(x + 2, top - 3, w - 4, 1); }   // stepped top
+    else if (roof < .4 && w > 9) { for (let i = 0; i < 4; i++) cityG.fillRect(x + 2 + i, top - 1 - i, w - 4 - i * 2, 1); }  // dome
+    cityG.fillStyle = CITY_WIN;
+    for (let wy = top + 3; wy < 62; wy += 3) for (let wx = x + 2; wx < x + w - 1; wx += 3) if (r() < .55) cityG.fillRect(wx, wy, 1, 1);
+    x += w + (r() < .3 ? 1 + (r() * 3 | 0) : 0);
+  }
+})();
+
+// beach props, outlined like the crab
+// tall palm tree: curved ringed trunk and big drooping fronds
+const [palm, pg] = mk(72, 98);
+(() => {
+  const put = (c, x, y) => { pg.fillStyle = c; pg.fillRect(Math.round(x), Math.round(y), 1, 1); };
+  const baseX = 30, topX = 38, topY = 18, H0 = 97;
+  for (let y = H0; y >= topY; y--) {
+    const k = (H0 - y) / (H0 - topY), x = Math.round(baseX + (topX - baseX) * k * k);
+    const seg = (H0 - y) % 5;                                   // each ring of the trunk is lit from above
+    put(INK, x - 1, y); put(INK, x + 4, y);
+    for (let i = 0; i < 4; i++) put(seg === 0 ? INK : seg === 1 && (i + y) % 2 ? INK : TRUNK, x + i, y);
+    if (seg === 4) put(CREAM, x + 1, y);
+  }
+  // flared base
+  put(INK, baseX - 2, H0); put(INK, baseX + 5, H0); put(INK, baseX - 1, H0); put(INK, baseX + 4, H0);
+  const cx = topX + 2, cy = topY;
+  const fronds = [[-3.0, 30, 16], [-2.6, 26, 12], [-2.1, 20, 6], [-1.57, 12, 0], [-1.0, 20, 6], [-0.5, 26, 12], [-0.1, 30, 16], [2.75, 18, 14], [0.4, 18, 14]];
+  for (const [ang, len, droop] of fronds) {
+    const pts = [];
+    for (let s = 0; s <= len; s++) pts.push([cx + Math.cos(ang) * s, cy + Math.sin(ang) * s * 0.55 + droop * (s / len) ** 2]);
+    // outline pass, then fill, then leaflets hanging off the underside
+    for (const [x, y] of pts) { put(INK, x, y - 1); put(INK, x, y + 2); }
+    for (const [x, y] of pts) { put(PALM, x, y); put(PALM_DK, x, y + 1); }
+    pts.forEach(([x, y], i) => {
+      if (i < 4 || i % 2) return;
+      const ll = 2 + (i < len * 0.7 ? 2 : 1);
+      for (let j = 1; j <= ll; j++) put(j === ll ? INK : PALM_DK, x + (Math.cos(ang) > 0 ? j * 0.4 : -j * 0.4), y + 1 + j);
+    });
+  }
+  // coconuts
+  for (const [x, y] of [[cx - 2, cy + 2], [cx + 1, cy + 3], [cx - 1, cy + 4]]) {
+    put(INK, x - 1, y); put(INK, x + 2, y); put(INK, x, y - 1); put(INK, x + 1, y - 1); put(INK, x, y + 2); put(INK, x + 1, y + 2);
+    put(TRUNK, x, y); put(CREAM, x, y); put(TRUNK, x + 1, y); put(INK, x, y + 1); put(INK, x + 1, y + 1);
+  }
+})();
+const [umb, ug] = mk(17, 20);
+(() => {
+  const put = (c, x, y) => { ug.fillStyle = c; ug.fillRect(x, y, 1, 1); };
+  for (let y = 0; y <= 7; y++) for (let x = 0; x < 17; x++) {
+    const dx = x - 8, dy = 8 - y, d = Math.hypot(dx, dy * 1.1);
+    if (d > 8.4 || y === 8) continue;
+    const band = Math.floor((Math.atan2(dy, dx) / Math.PI) * 6);
+    put(d > 7.5 || y === 7 ? INK : band % 2 ? RED : CREAM, x, y);
+  }
+  for (let y = 8; y < 20; y++) { put(INK, 8, y); put(y % 2 ? CREAM : INK, 9, y); }
+  put(INK, 8, 0); put(INK, 8, -1);
+})();
+// sandcastle: bucket-molded towers and a gated wall, sand plus black only, lit from above.
+// It's solid: the crab can stand on the towers and the wall.
+const CASTLE_ART = [
+  ".........krrrr................................",
+  ".........krrr.................................",
+  ".........krr..................................",
+  ".........k....................................",
+  ".........k....................................",
+  ".........k....................................",
+  "...kkk..kkk..kkk..............................",
+  "...kwk..kwk..kwk..............................",
+  "...kyk..kyk..kyk..............................",
+  "...kyykkyyykkyyk..............................",
+  "...kyywwyyywwyyk...............kkk..kkk..kkk..",
+  "....kkkkkkkkkkk................kwk..kwk..kwk..",
+  "....kyyyyyyyyyk................kyk..kyk..kyk..",
+  "....kyyyyyyyyyk................kyykkyyykkyyk..",
+  "....kyyykkyyyyk................kyywwyyywwyyk..",
+  "....kyyykkyyyyk.................kkkkkkkkkkk...",
+  "....kyyykkyyyyk.................kyyyyyyyyyk...",
+  "....kyyykkyyyyk.................kyyyyyyyyyk...",
+  "....kwyywyywyykk...kkk...kkk...kkyyykkyyyyk...",
+  "...kykkkkkkkkkyk...kwk...kwk...kkyyykkyyyyk...",
+  "...kyyyyyyyyyyyk...kyk...kyk...kkyyykkyyyyk...",
+  "...kyyyyyyyyyyykkkkyyykkkyyykkkykyyykkyyyyk...",
+  "...kyyyyyyyyyyykwwwyyywwwyyywwwkywyywyywyyyk..",
+  "...kyyyyyyyyyyykkkkkkkkkkkkkkkkkykkkkkkkkkyk..",
+  "...kyyyyyyyyyyykyyyyyyyyyyyyyyykyyyyyyyyyyyk..",
+  "...kywyywyywyyykyyyyyyyyyyyyyyykyyyyyyyyyyyk..",
+  "...kykkkkkkkkkykyyyyyyyyyyyyyyykyyyyyyyyyyyk..",
+  "...kyyyyyyyyyyykyyyyyyyyyyyyyyykyyyyyyyyyyyk..",
+  "...kyyyyyyyyyyykyyyyykkkkkyyyyykyyyyyyyyyyyk..",
+  "...kyyyyyyyyyyykyyyykkkkkkkyyyykywyywyywyyyk..",
+  "...kyyyyyyyyyyykyyyykkkkkkkyyyykykkkkkkkkkyk..",
+  "...kyyyyyyyyyyykyyyykkkkkkkyyyykyyyyyyyyyyyk..",
+  "...kyyyyyyyyyywkyyyykkkkkkkyyyykwyyyyyyyyyyk..",
+  "...kyyyyyyyyyyykyyyykkkkkkkyyyykyyyyyyyyyyyk..",
+  "...kkykykykykykkkykykkkkkkkykykkkykykykykykk..",
+  "...kykykykykykykykykkkkkkkkkykykykykykykykyk..",
+  "...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..",
+  "..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk."
+];
+const CASTLE_W = CASTLE_ART[0].length, CASTLE_H = CASTLE_ART.length;
+const CASTLE_SOLIDS = [ { x0: 3, x1: 16, top: 9 }, { x0: 14, x1: 33, top: 21 }, { x0: 31, x1: 44, top: 13 } ];
+const [castle, cg] = mk(CASTLE_W, CASTLE_H);
+CASTLE_ART.forEach((row, y) => [...row].forEach((ch, x) => {
+  if (ch === '.') return;
+  cg.fillStyle = { k: INK, y: SAND, w: CREAM, r: RED }[ch]; cg.fillRect(x, y, 1, 1);
+}));
+const PROPS = [palm, palm, umb, castle];
+// props live in fixed slots along the beach; castles are kept away from the starting spot
+const SLOT = 90;
+function propAt(i) {
+  const r = mulberry(i * 7919 + 3);
+  if (r() < 0.3) return null;
+  let img = PROPS[r() * PROPS.length | 0];
+  const x = Math.round(i * SLOT + r() * (SLOT - (img === castle ? CASTLE_W : 26)));
+  if (img === castle && Math.abs(x + CASTLE_W / 2 - 80) < 60) img = umb;
+  return { img, x };
+}
+function solidsNear(wx, range = 120) {
+  const out = [], i0 = Math.floor((wx - range - CASTLE_W) / SLOT), i1 = Math.floor((wx + range) / SLOT);
+  for (let i = i0; i <= i1; i++) {
+    const p = propAt(i);
+    if (p && p.img === castle) for (const s of CASTLE_SOLIDS) out.push({ x0: p.x + s.x0, x1: p.x + s.x1, top: GROUND + 1 - CASTLE_H + s.top });
+  }
+  return out;
+}
+const STAR = ["..r..", "rrrrr", ".rpr.", "r...r"];
+const SUN = ["..wwww..", ".wwwwww.", "wwwwwwww", "wwwwwwww", "wwwwwwww", "wwwwwwww", ".wwwwww.", "..wwww.."];
+const BOAT = ["...k...", "...kw..", "..kkww.", "...kwww", "kkkkkkk", ".kyyyk."];
+
+function drawBackdrop(cx) {
+  // sun, far away
+  ctx.globalAlpha = 0.85; sprite(SUN, Math.round(VW * 0.72 - cx * 0.02), -Math.min(OY, 40) + 14); ctx.globalAlpha = 1;
+  // clouds on two depth layers, uneven spacing and heights, some flipped
+  if (cloudR) for (const [par, span, drift, seed] of [[0.12, 150, 0.03, 7], [0.3, 210, 0.06, 31]]) {
+    const off = cx * par + t * drift, i0 = Math.floor(off / span) - 1;
+    for (let i = i0; i < i0 + Math.ceil(VW / span) + 3; i++) {
+      const r = mulberry(i * 131 + seed);
+      if (r() < 0.25) continue;                                 // some gaps
+      const img = r() < 0.5 ? cloudR : cloudL;
+      const x = Math.round(i * span + r() * (span - 40) - off);
+      const ylo = -Math.min(OY, 120) + 2, yhi = 44;
+      const y = Math.round(ylo + r() * (yhi - ylo) * (par < 0.2 ? 0.8 : 1));
+      ctx.drawImage(img, x, y);
+    }
+  }
+  // seagulls
+  for (let g = 0; g < 3; g++) {
+    const gx = ((g * 211 + t * (0.35 + g * 0.08) - cx * 0.4) % (VW + 80) + VW + 80) % (VW + 80) - 40;
+    const gy = 30 + g * 13 + Math.round(Math.sin(t * 0.03 + g) * 3) - (g === 2 ? Math.min(OY, 40) : 0);
+    const up = ((t >> 3) + g) % 2;
+    ctx.fillStyle = INK;
+    ctx.fillRect(Math.round(gx), gy, 1, 1);
+    ctx.fillRect(Math.round(gx) - 1, gy - up, 1, 1); ctx.fillRect(Math.round(gx) + 1, gy - up, 1, 1);
+    ctx.fillRect(Math.round(gx) - 2, gy - up * 2 + (up ? 0 : 1) - 0, 1, 1); ctx.fillRect(Math.round(gx) + 2, gy - up * 2 + (up ? 0 : 1), 1, 1);
+  }
+  // city across the water
+  const co = Math.round(cx * 0.22), cxo = -(((co % CITY_W) + CITY_W) % CITY_W);
+  for (let x = cxo; x < VW; x += CITY_W) ctx.drawImage(cityC, x, HORIZON - 64);
+  // sea with shimmer and foam
+  ctx.fillStyle = SEA; ctx.fillRect(0, HORIZON, VW, GROUND - HORIZON);
+  ctx.fillStyle = SEA_DK; ctx.fillRect(0, HORIZON, VW, 1);
+  const so = Math.round(cx * 0.5);
+  for (let y = HORIZON + 3; y < GROUND - 2; y += 3) {
+    const step = 7 + (y % 5), k0 = Math.floor(so / step);
+    for (let k = k0; k <= k0 + Math.ceil(VW / step) + 1; k++) {
+      const h = mulberry(k * 53 + y * 977)();
+      const phase = (h * 8 + t / 40) % 8;                       // each glint twinkles slowly on its own clock
+      if (phase > 3) continue;
+      ctx.fillStyle = phase < 1 ? CREAM : SEA_DK;
+      ctx.fillRect(k * step - so + ((h * 5) | 0), y, 2, 1);
+    }
+  }
+  // sailboat drifting along the horizon
+  const bx = ((300 + t * 0.08 - cx * 0.35) % (VW + 300) + VW + 300) % (VW + 300) - 30;
+  sprite(BOAT, Math.round(bx), HORIZON - 3);
+  // foam lapping at the shore
+  const lap = Math.round(Math.sin(t * 0.04) * 1.5);
+  for (let x = -((cx % 6 + 6) % 6); x < VW; x += 6) { ctx.fillStyle = CREAM; ctx.fillRect(x + lap, GROUND - 2, 3, 1); ctx.fillRect(x + 3 - lap, GROUND - 1, 2, 1); }
+  // sand
+  if (ground) { const gx = -(((cx % W) + W) % W); for (let x = gx; x < VW; x += W) ctx.drawImage(ground, x, GROUND); }
+  // beach props, in the world with the crab (behind him)
+  // little shells, pebbles and the odd starfish scattered on the sand
+  const D = 23, d0 = Math.floor(cx / D) - 1;
+  for (let i = d0; i <= d0 + Math.ceil(VW / D) + 1; i++) {
+    const r = mulberry(i * 613 + 9), k = r();
+    const x = Math.round(i * D + r() * 18 - cx), y = GROUND + 3 + (r() * 10 | 0);
+    if (k < 0.35) { ctx.fillStyle = YEL_DK; ctx.fillRect(x, y, 2, 1); }
+    else if (k < 0.5) { ctx.fillStyle = CREAM; ctx.fillRect(x, y, 2, 1); ctx.fillStyle = PINK; ctx.fillRect(x, y + 1, 2, 1); }
+    else if (k < 0.54) sprite(STAR, x, y - 1);
+  }
+  const i0 = Math.floor((cx - CASTLE_W - 40) / SLOT);
+  for (let i = i0; i <= i0 + Math.ceil(VW / SLOT) + 2; i++) {
+    const p = propAt(i); if (!p) continue;
+    ctx.drawImage(p.img, p.x - cx, GROUND + 1 - p.img.height);
+  }
+}
+
+function render() {
+  const cx = camX;
+  ctx.fillStyle = SKY; ctx.fillRect(0, 0, VW, VH);
+  ctx.save();
+  ctx.translate(shake ? ((shake >> 1) % 2) : 0, OY);   // a slow 1px jolt, not a per-frame jitter
+  drawBackdrop(cx);
+
+  // things lying on the sand
+  for (const p of parts) {
+    const px = Math.round(p.x - cx);
+    if (p.kind === 'stain' || p.kind === 'scorch') {
+      if (p.life < 40 && (px + t) % 2) continue;
+      ctx.fillStyle = p.kind === 'stain' ? JUICE : INK;
+      ctx.fillRect(px - 1, GROUND - 1, p.kind === 'stain' ? p.w : 2, 1);
+    } else if (p.kind === 'puddle') {
+      const w = Math.round(p.w), x0 = px - (w >> 1);
+      for (let i = 0; i < w; i++) {
+        if (p.life < 60 && (i + t) % 2) continue;
+        ctx.fillStyle = i === 0 || i === w - 1 ? INK : (i === w >> 1 || i === (w >> 1) - 1) ? PINK : RED;
+        ctx.fillRect(x0 + i, GROUND - 2, 1, 2);
+      }
+    } else if (p.kind === 'dust') {
+      if (p.life < 5 && t % 2) continue;
+      ctx.fillStyle = CREAM; ctx.fillRect(px, Math.round(p.y), 2, 1);
+    }
+  }
+
+  for (const e of eyes) if (e.st === 'charge') drawTelegraph(e, cx);
+  for (const e of eyes) drawEye(e, cx);
+  for (const e of eyes) if (e.st === 'fire') drawBeam(e, cx);
+
+  if (sheet.complete && !(crab.dead && overT > 20) && !(crab.invuln > 0 && crab.invuln < 80 && t % 8 < 2 && !crab.dead)) {
+    const recoil = crab.recoil > 0 ? -crab.snapSide * (crab.recoil > RECOIL_FRAMES - 2 ? 2 : 1) : 0;
+    drawCrab(Math.round(crab.x) - cx - 24 + recoil, Math.round(crab.y) - 16);
+  }
+
+  for (const p of parts) {
+    const px = Math.round(p.x - cx), py = Math.round(p.y);
+    if (p.kind === 'spark') {
+      const f = p.life / p.max;
+      if (f > 0.5) sprite(SPARK, px - 1, py - 1);
+      else if (f > 0.2) sprite(SPARK, px - 1, py - 1, false, (i, j) => (i + j + t) % 2 === 0);
+      else if (t % 2) { ctx.fillStyle = YEL; ctx.fillRect(px, py, 1, 1); }
+    } else if (p.kind === 'juice') {
+      // short motion streak behind each droplet, with a flickering glint
+      ctx.fillStyle = JUICE;
+      ctx.fillRect(Math.round(p.x - p.vx * 0.7 - cx), Math.round(p.y - p.vy * 0.7), 1, 1);
+      if (p.big) sprite(DROP, px - 1, py - 1);
+      else { ctx.fillStyle = (t + p.idx) % 4 < 2 ? JUICE_HI : JUICE; ctx.fillRect(px, py, 1, 1); }
+    } else if (p.kind === 'ember') {
+      const f = p.life / p.max;
+      if (f < 0.35 && (t + px) % 2) continue;
+      ctx.fillStyle = f > 0.7 ? CREAM : f > 0.4 ? PINK : RED; ctx.fillRect(px, py, 1, 1);
+      if (f > 0.6) { ctx.fillStyle = RED; ctx.fillRect(Math.round(px - p.vx), Math.round(py - p.vy), 1, 1); }
+    } else if (p.kind === 'muzzle' || p.kind === 'ring') {
+      // expanding burst: a cream-hot disc for the muzzle, a ring of sparks at the impact
+      const k = p.max - p.life, rad = p.kind === 'muzzle' ? 3 + k : 2 + k * 1.2;
+      for (let a = 0; a < 24; a++) {
+        const ang = a / 24 * Math.PI * 2, rx = Math.round(px + Math.cos(ang) * rad), ry = Math.round(py + Math.sin(ang) * rad);
+        if (p.kind === 'ring' && ry > py) continue;
+        ctx.fillStyle = (a + k) % 2 ? INK : CREAM; ctx.fillRect(rx, ry, 1, 1);
+      }
+      if (p.kind === 'muzzle' && k < 4) { ctx.fillStyle = CREAM; ctx.fillRect(px - 2, py - 2, 5, 5); ctx.fillStyle = '#ffffff'; ctx.fillRect(px - 1, py - 1, 3, 3); }
+    } else if (p.kind === 'flash') {
+      // impact pop at the lemon tip
+      const r = p.max - p.life + 1, s = p.side;
+      ctx.fillStyle = p.life > 2 ? JUICE_HI : JUICE;
+      for (const [dx, dy] of [[0, 0], [s, 0], [0, -1], [0, 1], [s * 2, 0], [s * r, -r], [s * r, r], [s * (r + 1), 0]]) ctx.fillRect(px + dx, py + dy, 1, 1);
+    } else if (p.kind === 'seed') {
+      if (p.life < 40 && t % 2) continue;
+      ctx.fillStyle = CREAM; ctx.fillRect(px, py - 1, 2, 1);
+      ctx.fillStyle = SHADE; ctx.fillRect(px, py, 2, 1);
+    } else if (p.kind === 'pulp') {
+      ctx.fillStyle = JUICE; ctx.fillRect(px, py, 2, 2);
+      ctx.fillStyle = JUICE_HI; ctx.fillRect(px, py, 1, 1);
+    } else if (p.kind === 'mist') {
+      if ((p.life + px) % 3 === 0) continue;
+      ctx.fillStyle = p.life > 7 ? JUICE_HI : JUICE; ctx.fillRect(px, py, 1, 1);
+    } else if (p.kind === 'splash') {
+      ctx.fillStyle = p.color; ctx.fillRect(px, py, 1, 1);
+    } else if (p.kind === 'tear') {
+      ctx.fillStyle = CREAM; ctx.fillRect(px, py - 1, 1, 1);
+      ctx.fillStyle = TEAL; ctx.fillRect(px, py, 1, 1); ctx.fillRect(px - (p.vy > 1.2 ? 0 : 1), py + 1, p.vy > 1.2 ? 1 : 3, 1);
+    } else if (p.kind === 'goo') {
+      ctx.fillStyle = p.color; ctx.fillRect(px, py, 1, 2);
+    } else if (p.kind === 'charge') {
+      ctx.fillStyle = p.life % 2 ? RED : CREAM; ctx.fillRect(px, py, 1, 1);
+    }
+  }
+  ctx.restore();
+
+  // HUD: hearts (life points) and eyes melted
+  for (let i = 0; i < LIFE; i++) sprite(i < crab.hp ? HEART : HEART_EMPTY, 4 + i * 8, 4);
+  const score = String(kills);
+  const sx = VW - 4 - score.length * 4 - 10;
+  sprite(EYE_ICON, sx, 4);
+  text(score, sx + 10, 5);
+
+  if (paused) {
+    const mid = VW >> 1, my = (VH >> 1) - 10;
+    ctx.fillStyle = INK; ctx.fillRect(mid - 16, my - 4, 32, 13);
+    ctx.fillStyle = CREAM; ctx.fillRect(mid - 15, my - 3, 30, 11);
+    text('PAUSED', mid - 12, my, INK, null);
+  }
+  if (crab.dead && overT > 40) {
+    const mid = VW >> 1, my = (VH >> 1) - 10;
+    ctx.fillStyle = INK; ctx.fillRect(mid - 26, my - 4, 52, 13);
+    ctx.fillStyle = CREAM; ctx.fillRect(mid - 25, my - 3, 50, 11);
+    text('GAME OVER', mid - 18, my, RED, null);
+    if (overT > 60 && (t >> 4) % 2) text('PRESS JUMP', mid - 20, my + 14, INK, CREAM);
+  }
+}
+
+let last = performance.now(), acc = 0;
+function loop(now) {
+  acc += Math.min(100, now - last); last = now;
+  const step = 1000 / 60;
+  pollPad();
+  if (paused) { acc = 0; pressed.jump = pressed.a = pressed.b = false; }
+  while (acc >= step) { update(); acc -= step; }
+  render();
+  requestAnimationFrame(loop);
+}
+let saved = 0;
+try { saved = +localStorage.getItem('crab-zoom') || 0; } catch (e) {}
+setZoom(saved >= 0 && saved < ZOOMS.length ? saved : 0);
+requestAnimationFrame(loop);
+cv.focus({ preventScroll: true });
+})();
+</script>
+
+</body></html>
