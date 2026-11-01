@@ -2,7 +2,7 @@
 // Controller: D-pad up/down picks, left/right switches sprites, tiles and sounds, A opens, B goes up a folder.
 import { well, icon, svgRows, svgText, G, PALETTE, PALETTE_NAMES, drawText, textRows } from '../pixel.js';
 import * as S from '../store.js';
-import { A, esc, row, pager, plateBtn, iconBtn, bareBtn, stepper, pageOf, emptyRow } from '../ui.js';
+import { A, esc, row, pager, plateBtn, iconBtn, bareBtn, stepper, pageOf, emptyRow, rows } from '../ui.js';
 import * as snd from '../sound.js';
 import * as input from '../input.js';
 
@@ -90,12 +90,12 @@ export default {
   render(app) {
     const p = app.project(), L = state(app), cat = CATS.find(c => c[0] === L.cat), kind = cat[3];
     if (!p) return { right: `<span class="cap acc">Library</span><span class="title clamp2">No game yet</span><span class="sub">Make a game in the Studio first</span>`, body: emptyRow('books', 'Each game has its own Library of sprites, tiles and sounds.') };
-    const rows = rowsOf(p, L), path = L.path[L.cat], tree = p.library[L.cat], fname = S.folderNameAt(tree, path);
-    L.sel = Math.max(0, Math.min(rows.length - 1, L.sel || 0));
-    const pg = pageOf(rows, L.page ?? Math.floor(L.sel / 4)), sel = rows[L.sel];
+    const list0 = rowsOf(p, L), path = L.path[L.cat], tree = p.library[L.cat], fname = S.folderNameAt(tree, path);
+    L.sel = Math.max(0, Math.min(list0.length - 1, L.sel || 0));
+    const pg = pageOf(list0, L.page ?? Math.floor(L.sel / rows())), sel = list0[L.sel];
     const go = (np) => { L.path[L.cat] = np; L.sel = 0; L.page = 0; app.saveUI(); app.render(); };
-    const pick = (i) => { L.sel = i; L.page = Math.floor(i / 4); app.saveUI(); const r = rows[i], a = r && !r.back && p.assets[r.n]; if (a && a.kind === 'sound') snd.play(a); app.render(); };
-    const add = () => { const pp = S.loadProject(p.id) || p, id = newAsset(pp, L.cat, path); S.saveProject(pp); app.refreshProjects(); L.sel = rows.length; L.page = Math.floor(L.sel / 4); app.saveUI(); openAsset(app, pp.id, id); };
+    const pick = (i) => { L.sel = i; L.page = Math.floor(i / rows()); app.saveUI(); const r = list0[i], a = r && !r.back && p.assets[r.n]; if (a && a.kind === 'sound') snd.play(a); app.render(); };
+    const add = () => { const pp = S.loadProject(p.id) || p, id = newAsset(pp, L.cat, path); S.saveProject(pp); app.refreshProjects(); L.sel = list0.length; L.page = Math.floor(L.sel / rows()); app.saveUI(); openAsset(app, pp.id, id); };
     const open = (r) => {
       if (!r) return;
       if (r.back) go(path.slice(0, -1));
@@ -130,7 +130,7 @@ export default {
       <div class="actions">${a1}${a2}</div>`;
 
     const list = pg.slice.map((r, j) => {
-      const i = pg.p * 4 + j, on = i === L.sel, act = A(() => (on ? open(r) : pick(i)));
+      const i = pg.p * rows() + j, on = i === L.sel, act = A(() => (on ? open(r) : pick(i)));
       if (r.back) return row({ art: icon('back', '#fff'), name: fname, meta: 'Back to ' + (path.length > 1 ? 'folder' : cat[1].toLowerCase()), tag: '', selected: on, act });
       if (S.isFolder(r.n)) { const c = S.flatten(r.n.items).length; return row({ art: icon('folder', on ? PINK : '#e4e2dc'), name: r.n.folder, meta: c + ' ' + kind + (c === 1 ? '' : 's'), tag: 'Folder', selected: on, act }); }
       const a = p.assets[r.n]; if (!a) return '';
@@ -155,14 +155,14 @@ export default {
   },
   pad(app, input) {
     const p = app.project(); if (!p) return;
-    const L = state(app), rows = rowsOf(p, L), i = L.sel || 0, ci = CATS.findIndex(c => c[0] === L.cat);
+    const L = state(app), list0 = rowsOf(p, L), i = L.sel || 0, ci = CATS.findIndex(c => c[0] === L.cat);
     const set = (patch) => { Object.assign(L, patch); app.saveUI(); app.render(); };
-    if (input.pressed('down')) set({ sel: Math.min(rows.length - 1, i + 1), page: Math.floor(Math.min(rows.length - 1, i + 1) / 4) });
-    else if (input.pressed('up')) set({ sel: Math.max(0, i - 1), page: Math.floor(Math.max(0, i - 1) / 4) });
+    if (input.pressed('down')) set({ sel: Math.min(list0.length - 1, i + 1), page: Math.floor(Math.min(list0.length - 1, i + 1) / rows()) });
+    else if (input.pressed('up')) set({ sel: Math.max(0, i - 1), page: Math.floor(Math.max(0, i - 1) / rows()) });
     else if (input.pressed('right')) set({ cat: CATS[(ci + 1) % 3][0], sel: 0, page: 0 });
     else if (input.pressed('left')) set({ cat: CATS[(ci + 2) % 3][0], sel: 0, page: 0 });
     else if (input.pressed('b') && L.path[L.cat].length) set({ sel: 0, page: 0, path: { ...L.path, [L.cat]: L.path[L.cat].slice(0, -1) } });
-    else if (input.pressed('a')) { const r = rows[i]; if (!r) return; if (r.back) set({ sel: 0, page: 0, path: { ...L.path, [L.cat]: L.path[L.cat].slice(0, -1) } }); else if (S.isFolder(r.n)) set({ sel: 0, page: 0, path: { ...L.path, [L.cat]: L.path[L.cat].concat([r.i]) } }); else openAsset(app, p.id, r.n); }
+    else if (input.pressed('a')) { const r = list0[i]; if (!r) return; if (r.back) set({ sel: 0, page: 0, path: { ...L.path, [L.cat]: L.path[L.cat].slice(0, -1) } }); else if (S.isFolder(r.n)) set({ sel: 0, page: 0, path: { ...L.path, [L.cat]: L.path[L.cat].concat([r.i]) } }); else openAsset(app, p.id, r.n); }
   }
 };
 
@@ -227,12 +227,12 @@ export function openAsset(app, projectId, id) {
       const curF = folders.find(f => f.path.join('.') === here) || folders[0];
       const folderRow = folders.length > 1 ? cyc('Folder', folders, curF, f => f.name.split(' / ').pop(), f => { p.library[cat] = moveTo(p.library[cat], id, f.path); }) : '';
       const used = usesOf(p, id);
-      let rows = '';
-      if (a.kind === 'sprite') rows = cyc('Color', PALETTE_NAMES, a.color, c => c, c => { a.color = c; }) + cyc('Role', ROLES, a.role || 'decor', r => ROLE_NAMES[r], r => { a.role = r; }) + folderRow
+      let fields = '';
+      if (a.kind === 'sprite') fields = cyc('Color', PALETTE_NAMES, a.color, c => c, c => { a.color = c; }) + cyc('Role', ROLES, a.role || 'decor', r => ROLE_NAMES[r], r => { a.role = r; }) + folderRow
         + row2('Used', `<span class="sub" style="color:var(--text);margin-right:6px">${used ? used + (used === 1 ? ' place' : ' places') : 'Not placed yet'}</span>`);
-      else if (a.kind === 'tile') rows = cyc('Color', PALETTE_NAMES, a.color, c => c, c => { a.color = c; }) + cyc('Type', TILE_TYPES.map(t => t[0]), tileType(a), t => TILE_TYPES.find(x => x[0] === t)[1], t => setTileType(a, t)) + folderRow
+      else if (a.kind === 'tile') fields = cyc('Color', PALETTE_NAMES, a.color, c => c, c => { a.color = c; }) + cyc('Type', TILE_TYPES.map(t => t[0]), tileType(a), t => TILE_TYPES.find(x => x[0] === t)[1], t => setTileType(a, t)) + folderRow
         + row2('Used', `<span class="sub" style="color:var(--text);margin-right:6px">${used ? used + (used === 1 ? ' tile' : ' tiles') + ' painted' : 'Not painted yet'}</span>`);
-      else rows = cyc('Wave', WAVES, a.wave, w => w, w => { a.wave = w; }) + num('Pitch', 'pitch', 0, 9) + num('Slide', 'slide', -4, 4) + num('Length', 'len', 1, 9) + folderRow;
+      else fields = cyc('Wave', WAVES, a.wave, w => w, w => { a.wave = w; }) + num('Pitch', 'pitch', 0, 9) + num('Slide', 'slide', -4, 4) + num('Length', 'len', 1, 9) + folderRow;
       const isPx = a.kind !== 'sound';
       return `<div class="screen-tool" style="--acc:${PINK}">
         <h1 class="sr">Library · ${esc(a.name)}</h1>
@@ -252,8 +252,8 @@ export function openAsset(app, projectId, id) {
             deleteAsset(p, id); S.saveProject(p); app.toast('Deleted ' + a.name); app.close();
           }), { label: 'Delete' })}
         </div>
-        <div class="screen gap20" style="flex:none;height:${isPx ? 304 : 192}px;display:flex;align-items:center;justify-content:center">
-          <canvas class="pix" id="ped" style="width:${isPx ? 288 : 320}px;height:${isPx ? 288 : 180}px" aria-label="${isPx ? 'Pixel editor, 8 by 8' : 'Sound shape. Tap to play.'}" role="img"></canvas>
+        <div class="screen fit gap20" style="${isPx ? '' : 'flex-basis:192px;height:192px'}">
+          <canvas class="pix" id="ped" style="aspect-ratio:${isPx ? '1/1' : '16/9'}" aria-label="${isPx ? 'Pixel editor, 8 by 8' : 'Sound shape. Tap to play.'}" role="img"></canvas>
         </div>
         <div class="plate bar" role="toolbar" aria-label="Tools">
           ${isPx ? `<div style="display:flex;gap:6px">${[['draw', 'Draw'], ['erase', 'Erase'], ['fill', 'Fill']].map(([k, l]) => iconBtn(k === 'draw' ? 'paint' : k, A(() => { tool = k; app.render(); }), { on: tool === k, label: l, pressed: tool === k })).join('')}
@@ -261,7 +261,7 @@ export function openAsset(app, projectId, id) {
             : bareBtn('play', 'Play', A(() => snd.play(a)))}
           <div style="display:flex;gap:6px">${iconBtn('undo', A(() => restore(hist, fut)), { color: hist.length ? '#fff' : '#555', label: 'Undo' })}${iconBtn('redo', A(() => restore(fut, hist)), { color: fut.length ? '#fff' : '#555', label: 'Redo' })}</div>
         </div>
-        <div class="plate inspector gap20" style="overflow-y:auto">${rows}</div>
+        <div class="plate inspector gap20" style="overflow-y:auto">${fields}</div>
       </div>`;
     },
     mount(root) {

@@ -3,11 +3,11 @@ import { well, solidSvg, rasterSolid, paintSolid, icon } from './pixel.js';
 import * as S from './store.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
-import { A, resetActions, runAction, esc, bareBtn } from './ui.js';
+import { A, resetActions, getAction, esc, setRows, rows } from './ui.js';
 import arcade from './screens/arcade.js';
 import studio from './screens/studio.js';
 import library from './screens/library.js';
-import sync, { changeList, pushAll } from './screens/sync.js';
+import sync from './screens/sync.js';
 import settings from './screens/settings.js';
 
 export const SECTIONS = [
@@ -37,7 +37,7 @@ export const app = {
     this.settings = { ...this.settings, ...patch }; S.setSettings(this.settings);
     input.refreshSettings(); snd.refreshSettings(); applySettings(); this.render();
   },
-  setTab(i) { if (i === this.ui.tab) return; this.ui.tab = (i + 5) % 5; this.saveUI(); snd.click(); this.render(); },
+  setTab(i, quiet) { if (i === this.ui.tab) return; this.ui.tab = (i + 5) % 5; this.saveUI(); if (!quiet) snd.click(); this.render(); },
   open(overlay) { this.overlay = overlay; this.render(); },
   close() { const o = this.overlay; this.overlay = null; if (o && o.onClose) o.onClose(); this.refreshProjects(); this.render(); },
   toast(msg) {
@@ -55,19 +55,10 @@ function applySettings() {
   document.documentElement.classList.toggle('dots', !!app.settings.dots);
 }
 
-function statusBar(sec) {
-  const pad = input.padConnected(), n = changeList(app).length;
-  const left = `<span class="cap" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted)"><span class="status-dot${pad ? '' : ' off'}"></span>${pad ? 'Controller connected' : 'No controller'}</span>`;
-  let right;
-  if (n) right = bareBtn('up', 'Push ' + n, A(() => pushAll(app)));
-  else right = `<span class="cap" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted);padding-right:10px">${icon('check', sec.color)}${app.settings.token ? 'Synced' : 'Saved'}</span>`;
-  return `<div class="plate bar text-start">${left}${right}</div>`;
-}
-
 function tabBar() {
   return `<nav class="plate tabbar" aria-label="Sections">${SECTIONS.map((s, i) => {
     const on = i === app.ui.tab, color = on ? s.color : '#ffffff';
-    return `<button class="tab" ${A(() => app.setTab(i))} ${on ? 'aria-current="page"' : ''} style="color:${color}">
+    return `<button class="tab" ${A(() => app.setTab(i, true))} ${on ? 'aria-current="page"' : ''} style="color:${color}">
       ${well(40, (on ? '<span class="ring" style="border-color:currentColor"></span>' : '') + solidSvg(20, 30, color, `data-solid="tab${i}" style="opacity:${on ? 1 : 0.85}"`))}
       <span class="cap" style="color:${on ? 'var(--text)' : 'var(--muted)'}">${s.name}</span></button>`;
   }).join('')}</nav>`;
@@ -82,7 +73,6 @@ function render() {
   }
   const sec = SECTIONS[app.ui.tab], page = sec.page.render(app);
   root.innerHTML = `<div class="screen-tabs" style="--acc:${sec.color}">
-    ${statusBar(sec)}
     <h1 class="sr">${sec.name}</h1>
     <div class="plate emblem">${well(164, solidSvg(40, 110, sec.color, 'data-solid="hero"'))}<div class="emblem-info">${page.right}</div></div>
     ${page.body}
@@ -90,40 +80,42 @@ function render() {
   </div>`;
   if (sec.page.mount) sec.page.mount(root, app);
   paintSolids(lastT, true);
+  fitRows();
 }
 
-root.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-a]');
-  if (!el || el.disabled) return;
-  runAction(+el.dataset.a, e);
-});
+// The page never scrolls: show as many rows as fit between the top plates and the tab bar.
+let fitting = 0;
+function fitRows() {
+  if (fitting > 4) return;
+  const sc = root.querySelector('.screen-tabs'), tb = root.querySelector('.tabbar'), last = tb && tb.previousElementSibling;
+  if (!sc || !last) return;
+  const over = sc.scrollHeight - sc.clientHeight, spare = tb.getBoundingClientRect().top - last.getBoundingClientRect().bottom - parseFloat(getComputedStyle(sc).rowGap || 0);
+  let n = rows();
+  if (over > 0 && n > 1) n--;
+  else if (spare >= 72 && n < 4) n++;
+  if (n === rows()) return;
+  setRows(n); fitting++; render(); fitting--;
+}
+addEventListener('resize', () => { setRows(4); if (!app.overlay) render(); });
 
-// Press feedback: sink the button while it is held, tick on touch-down, and burst a few pixels in the section colour.
-let held = null;
-const release = () => { if (held) held.classList.remove('pressed'); held = null; };
+// Taps: one soft tick on touch-down. While held the button sinks and lights up like a selected one,
+// and it stays lit for a moment after you let go, then the action runs.
+let held = null, busyTap = false;
+const release = () => { if (held && !held._firing) held.classList.remove('pressed'); held = null; };
 root.addEventListener('pointerdown', (e) => {
   const el = e.target.closest('[data-a],.pbtn');
   if (!el || el.disabled) return;
   release(); held = el; el.classList.add('pressed');
   if (!el.classList.contains('pbtn')) snd.click();
-  if (!app.settings.reduceMotion) burst(e.clientX, e.clientY, getComputedStyle(el).getPropertyValue('--acc').trim() || '#e4e2dc');
 });
 addEventListener('pointerup', release); addEventListener('pointercancel', release);
-root.addEventListener('pointerleave', release, true);
-
-function burst(x, y, color) {
-  const b = document.createElement('div'); b.className = 'burst'; b.style.setProperty('--c', color);
-  b.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
-  const n = 8;
-  for (let i = 0; i < n; i++) {
-    const p = document.createElement('i'), a = (i / n) * Math.PI * 2 + Math.random() * 0.4, d = 14 + Math.random() * 10;
-    const dx = Math.round(Math.cos(a) * d / 3) * 3, dy = Math.round(Math.sin(a) * d / 3) * 3; // moves on a 3px grid, like pixels
-    b.appendChild(p);
-    p.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${dx}px,${dy}px)`, opacity: 0 }], { duration: 320, easing: 'steps(4, end)', fill: 'forwards' });
-  }
-  document.body.appendChild(b);
-  setTimeout(() => b.remove(), 360);
-}
+root.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-a]');
+  if (!el || el.disabled || busyTap) return;
+  const fn = getAction(+el.dataset.a); if (!fn) return;
+  el.classList.add('pressed'); el._firing = true; busyTap = true;
+  setTimeout(() => { busyTap = false; el._firing = false; el.classList.remove('pressed'); fn(e); }, 90);
+});
 
 // ---- spinning solids and controller, once a frame
 let lastT = 0, lastPaint = 0;

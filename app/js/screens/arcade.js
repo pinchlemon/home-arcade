@@ -1,6 +1,6 @@
 // Arcade: every game, code games from the repo and Studio games from this phone. Controller: D-pad picks, A plays, X edits.
 import { well, icon } from '../pixel.js';
-import { A, esc, row, digits, pager, plateBtn, bareBtn, pageOf } from '../ui.js';
+import { A, esc, row, digits, pager, plateBtn, bareBtn, pageOf, rows } from '../ui.js';
 import { newProject, saveProject, flatten } from '../store.js';
 import { openPlayer } from './player.js';
 import { openEditor } from './editor.js';
@@ -28,7 +28,7 @@ function edit(app, g) {
 function select(app, i) {
   const list = games(app);
   app.ui.sel = Math.max(0, Math.min(list.length - 1, i));
-  app.ui.page = Math.floor(app.ui.sel / 4);
+  app.ui.page = Math.floor(app.ui.sel / rows());
   app.saveUI(); app.render();
 }
 
@@ -45,8 +45,8 @@ export default {
         ${plateBtn('play', 'Play', A(() => play(app, sel)))}
         ${plateBtn(sel.studio ? 'edit' : 'code', sel.studio ? 'Edit' : 'View code', A(() => edit(app, sel)))}
       </div>`;
-    const rows = pg.slice.map((g, j) => {
-      const i = pg.p * 4 + j, on = i === app.ui.sel;
+    const rowHtml = pg.slice.map((g, j) => {
+      const i = pg.p * rows() + j, on = i === app.ui.sel;
       return row({ art: digits(i + 1, on ? 'var(--acc)' : 'var(--muted)'), name: g.name, meta: g.kind + ' · ' + g.size, tag: g.studio ? 'Studio' : 'Code',
         selected: on, tagColor: g.studio ? 'var(--acc)' : 'var(--muted)',
         act: A(() => (on ? play(app, g) : select(app, i))) });
@@ -56,11 +56,11 @@ export default {
         ${pager('Games ' + pg.range, A(() => { app.ui.page = Math.max(0, pg.p - 1); app.saveUI(); app.render(); }), A(() => { app.ui.page = Math.min(pg.pages - 1, pg.p + 1); app.saveUI(); app.render(); }))}
         ${bareBtn('plus', 'New game', A(() => {
           const p = newProject('New game ' + (app.projects.length + 1), false);
-          saveProject(p); app.refreshProjects(); app.ui.project = p.id; app.ui.sel = app.projects.findIndex(x => x.id === p.id); app.ui.page = Math.floor(app.ui.sel / 4); app.saveUI();
+          saveProject(p); app.refreshProjects(); app.ui.project = p.id; app.ui.sel = app.projects.findIndex(x => x.id === p.id); app.ui.page = Math.floor(app.ui.sel / rows()); app.saveUI();
           openEditor(app, p);
         }), 'var(--acc)')}
       </div>
-      ${rows}
+      ${rowHtml}
     </div>`;
     return { right, body };
   },
@@ -68,8 +68,8 @@ export default {
     const list = games(app);
     if (input.pressed('down')) select(app, app.ui.sel + 1);
     else if (input.pressed('up')) select(app, app.ui.sel - 1);
-    else if (input.pressed('right')) select(app, app.ui.sel + 4);
-    else if (input.pressed('left')) select(app, app.ui.sel - 4);
+    else if (input.pressed('right')) select(app, app.ui.sel + rows());
+    else if (input.pressed('left')) select(app, app.ui.sel - rows());
     else if (input.pressed('a') || input.pressed('start')) play(app, list[app.ui.sel]);
     else if (input.pressed('x')) edit(app, list[app.ui.sel]);
   }

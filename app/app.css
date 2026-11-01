@@ -7,7 +7,7 @@
   --r-btn:12px;--r-bar:20px;--r-plate:28px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Saira,system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Saira,system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior:none}
 body{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 button:focus-visible,.focus{outline:2px solid var(--text);outline-offset:2px}
@@ -17,7 +17,7 @@ body{background:transparent}
 
 /* the app is pinned to the whole screen: iOS home-screen apps report 100vh / 100dvh short, which left a black band at the bottom */
 #app{position:fixed;top:0;bottom:0;left:0;right:0;max-width:440px;margin:0 auto;display:flex;flex-direction:column}
-.screen-tabs{height:100%;display:flex;flex-direction:column;gap:20px;padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);overflow-y:auto}
+.screen-tabs{height:100%;display:flex;flex-direction:column;gap:20px;padding:calc(env(safe-area-inset-top) + 24px) 20px max(env(safe-area-inset-bottom),16px);overflow:hidden}
 .dots{background-image:radial-gradient(rgba(237,237,234,.06) 1px,transparent 1.2px);background-size:14px 14px}
 .nodots .dots{background-image:none}
 
@@ -79,24 +79,30 @@ body{background:transparent}
 .tab .cap{font-size:10px;letter-spacing:.12em}
 
 /* shorter phones: tighten the spacing so the tab bar always fits */
-@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:212px}}
+@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:208px}}
+@media (max-height:720px){.emblem{height:188px}.emblem .well-lg{transform:scale(.9)}.setrow{height:56px}}
 
-/* press feedback: the plate sinks, the well dips, then a few pixels burst from your finger */
-[data-a],.pbtn{transition:transform .08s,filter .08s}
-.pressed{transform:translateY(1px) scale(.985);filter:brightness(.82)}
-.plate.pressed{box-shadow:inset 0 2px 8px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05),0 3px 10px rgba(0,0,0,.5)}
-.pressed .mount{transform:scale(.93)}
+/* press feedback: the button sinks and lights up in the section colour, like a selected one */
+[data-a],.pbtn{transition:transform .08s}
 .mount{transition:transform .08s}
-.btn.icon.pressed,.tab.pressed,.pbtn.pressed,.tray .pressed{transform:none;filter:none}
-.tab.pressed .mount,.btn.icon.pressed .mount,.pbtn.pressed .mount,.tray .pressed .mount{transform:scale(.88)}
-.tab.pressed .well,.btn.icon.pressed .well,.pbtn.pressed .well{box-shadow:inset 0 8px 12px #000,inset -1px -1px 0 rgba(255,255,255,.08)}
-.burst{position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:50}
-.burst i{position:absolute;left:-1.5px;top:-1.5px;width:3px;height:3px;background:var(--c)}
+.pressed{transform:translateY(1px) scale(.985)}
+.plate.pressed{box-shadow:inset 0 2px 8px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05),0 3px 10px rgba(0,0,0,.5)}
+.pressed,.pressed .title,.pressed .cap,.pressed span{color:var(--acc)!important}
+.pressed svg path{fill:var(--acc)}
+.btn:not(.icon).pressed::after,.row.pressed::after,.seg.pressed::after,.itab.pressed::after,.setrow .pressed::after{content:'';position:absolute;inset:-1px;border-radius:inherit;border:1.5px solid var(--acc);pointer-events:none}
+.btn.bare:not(.icon).pressed::after{inset:2px}
+.pressed .mount{transform:scale(.93)}
+.btn.icon.pressed,.tab.pressed,.pbtn.pressed,.tray .pressed,.vscreen.pressed{transform:none}
+.btn.icon.pressed .well::after,.tab.pressed .well::after,.pbtn.pressed .well::after,.tray .pressed .well::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--acc);pointer-events:none}
+.vscreen.pressed{border-color:var(--acc)}
 
 /* full-screen tools: editor, pixel editor, player */
-.screen-tool{height:100%;display:flex;flex-direction:column;padding:max(env(safe-area-inset-top),16px) 20px max(env(safe-area-inset-bottom),16px);gap:8px}
+.screen-tool{height:100%;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 16px) 20px max(env(safe-area-inset-bottom),16px);gap:8px;overflow:hidden}
+/* the level / pixel screen gives up height first; the panel under it scrolls inside itself if it must */
+.screen-tool .screen.fit{flex:0 1 304px;height:304px;min-height:180px;display:flex;align-items:center;justify-content:center;padding:8px}
+.screen-tool .screen.fit canvas{height:100%;width:auto;max-width:100%}
 .gap20{margin-top:12px}
-.inspector{flex:1 1 auto;min-height:220px;border-radius:var(--r-plate);padding:16px;display:flex;flex-direction:column;overflow:hidden}
+.inspector{flex:1 1 0;min-height:150px;overflow-y:auto;border-radius:var(--r-plate);padding:16px;display:flex;flex-direction:column}
 .irow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;border-top:1px solid rgba(255,255,255,.06)}
 .inspector>.irow:first-child{border-top:0}
 .seg{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:12px;padding:0 8px 0 6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;color:var(--muted)}
