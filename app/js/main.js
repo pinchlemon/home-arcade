@@ -58,7 +58,7 @@ function applySettings() {
 function tabBar() {
   return `<nav class="plate tabbar" aria-label="Sections">${SECTIONS.map((s, i) => {
     const on = i === app.ui.tab, color = on ? s.color : '#ffffff';
-    return `<button class="tab" ${A(() => app.setTab(i, true))} ${on ? 'aria-current="page"' : ''} style="color:${color}">
+    return `<button class="tab" ${A(() => app.setTab(i, true))} ${on ? 'aria-current="page"' : ''} style="color:${color};--acc:${s.color}">
       ${well(40, (on ? '<span class="ring" style="border-color:currentColor"></span>' : '') + solidSvg(20, 30, color, `data-solid="tab${i}" style="opacity:${on ? 1 : 0.85}"`))}
       <span class="cap" style="color:${on ? 'var(--text)' : 'var(--muted)'}">${s.name}</span></button>`;
   }).join('')}</nav>`;
