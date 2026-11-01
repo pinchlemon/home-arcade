@@ -108,23 +108,45 @@ function fitRows() {
 }
 addEventListener('resize', () => { setRows(4); if (!app.overlay) render(); });
 
-// Taps: one soft tick on touch-down. While held the button sinks and lights up like a selected one,
-// and it stays lit for a moment after you let go, then the action runs.
-let held = null, busyTap = false;
-const release = () => { if (held && !held._firing) held.classList.remove('pressed'); held = null; };
+// Taps: one soft thud on touch-down. While held, the button sinks and lights up like a selected one,
+// and whatever was selected next to it (same list, tab bar or tool row) steps back so only one thing is lit.
+// Let go on the button and it stays lit for a beat, then acts; slide off and everything goes back.
+let held = null, dimmed = [], busyTap = false;
+const SELECTED = '[aria-pressed="true"],[aria-current="page"],[aria-selected="true"]';
+const selectable = (el) => el.hasAttribute('aria-pressed') || el.hasAttribute('aria-selected') || el.classList.contains('tab');
+function letGo() {
+  if (held && !held._firing) held.classList.remove('pressed');
+  held = null; dimmed.forEach(x => x.classList.remove('unsel')); dimmed = [];
+}
 root.addEventListener('pointerdown', (e) => {
   const el = e.target.closest('[data-a],.pbtn');
-  if (!el || el.disabled) return;
-  release(); held = el; el.classList.add('pressed');
+  if (!el || el.disabled || busyTap) return;
+  letGo(); held = el; el.classList.add('pressed');
+  if (selectable(el)) {
+    const BOX = '[role="tablist"],[role="toolbar"],nav,.tray,.group';
+    const box = el.closest(BOX) || el.parentElement;
+    dimmed = [...box.querySelectorAll(SELECTED)].filter(x => x !== el && (x.closest(BOX) || x.parentElement) === box);
+    dimmed.forEach(x => x.classList.add('unsel'));
+  }
   if (!el.classList.contains('pbtn')) snd.click();
 });
-addEventListener('pointerup', release); addEventListener('pointercancel', release);
+addEventListener('pointerup', (e) => {
+  if (!held || held.classList.contains('pbtn')) { letGo(); return; }
+  const over = document.elementFromPoint(e.clientX, e.clientY);
+  if (!over || !held.contains(over)) letGo(); // slid off: no click is coming
+});
+addEventListener('pointercancel', letGo);
 root.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]');
   if (!el || el.disabled || busyTap) return;
   const fn = getAction(+el.dataset.a); if (!fn) return;
   el.classList.add('pressed'); el._firing = true; busyTap = true;
-  setTimeout(() => { busyTap = false; el._firing = false; el.classList.remove('pressed'); fn(e); }, 90);
+  setTimeout(() => {
+    busyTap = false; el._firing = false;
+    fn(e);
+    // if the action did not redraw the screen, put the button back
+    el.classList.remove('pressed'); if (held === el) letGo();
+  }, 90);
 });
 
 // ---- spinning solids and controller, once a frame

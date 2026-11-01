@@ -173,7 +173,7 @@ export function openEditor(app, project) {
     if (tp.length) cells.push({ label: 'Back', art: icon('back', '#fff'), act: A(() => go(tp.slice(0, -1))) });
     list.forEach((n, i) => {
       if (S.isFolder(n)) cells.push({ label: n.folder, art: icon('folder'), act: A(() => go(tp.concat([i]))) });
-      else { const a = ed.p.assets[n]; if (!a) return; const on = n === chosen; cells.push({ on, label: a.name, art: svgRows(a.px, on ? GREEN : col(a.color)), act: A(() => { if (which === 'tiles') ed.tile = n; else ed.sprite = n; rerender(); }) }); }
+      else { const a = ed.p.assets[n]; if (!a) return; const on = n === chosen; cells.push({ on, label: a.name, art: on ? `<span class="art-on">${svgRows(a.px, GREEN)}</span><span class="art-off">${svgRows(a.px, col(a.color))}</span>` : svgRows(a.px, col(a.color)), act: A(() => { if (which === 'tiles') ed.tile = n; else ed.sprite = n; rerender(); }) }); }
     });
     return `<div style="display:flex;align-items:center;justify-content:space-between;height:40px">
         <span class="cap ell" style="color:var(--muted);padding-left:4px">${esc(where || (which === 'tiles' ? 'Tiles' : 'Objects'))} · <span class="acc">${esc((ed.p.assets[chosen] || {}).name || 'None')}</span></span>
