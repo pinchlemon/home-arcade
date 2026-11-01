@@ -12,10 +12,12 @@ body{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:trans
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 button:focus-visible,.focus{outline:2px solid var(--text);outline-offset:2px}
 button:disabled{cursor:default}
+body{background:transparent}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-#app{position:relative;max-width:440px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
-.screen-tabs{height:100dvh;display:flex;flex-direction:column;gap:20px;padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);overflow-y:auto}
+/* the app is pinned to the whole screen: iOS home-screen apps report 100vh / 100dvh short, which left a black band at the bottom */
+#app{position:fixed;top:0;bottom:0;left:0;right:0;max-width:440px;margin:0 auto;display:flex;flex-direction:column}
+.screen-tabs{height:100%;display:flex;flex-direction:column;gap:20px;padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);overflow-y:auto}
 .dots{background-image:radial-gradient(rgba(237,237,234,.06) 1px,transparent 1.2px);background-size:14px 14px}
 .nodots .dots{background-image:none}
 
@@ -76,8 +78,23 @@ button:disabled{cursor:default}
 .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
 .tab .cap{font-size:10px;letter-spacing:.12em}
 
+/* shorter phones: tighten the spacing so the tab bar always fits */
+@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:212px}}
+
+/* press feedback: the plate sinks, the well dips, then a few pixels burst from your finger */
+[data-a],.pbtn{transition:transform .08s,filter .08s}
+.pressed{transform:translateY(1px) scale(.985);filter:brightness(.82)}
+.plate.pressed{box-shadow:inset 0 2px 8px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05),0 3px 10px rgba(0,0,0,.5)}
+.pressed .mount{transform:scale(.93)}
+.mount{transition:transform .08s}
+.btn.icon.pressed,.tab.pressed,.pbtn.pressed,.tray .pressed{transform:none;filter:none}
+.tab.pressed .mount,.btn.icon.pressed .mount,.pbtn.pressed .mount,.tray .pressed .mount{transform:scale(.88)}
+.tab.pressed .well,.btn.icon.pressed .well,.pbtn.pressed .well{box-shadow:inset 0 8px 12px #000,inset -1px -1px 0 rgba(255,255,255,.08)}
+.burst{position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:50}
+.burst i{position:absolute;left:-1.5px;top:-1.5px;width:3px;height:3px;background:var(--c)}
+
 /* full-screen tools: editor, pixel editor, player */
-.screen-tool{height:100dvh;display:flex;flex-direction:column;padding:max(env(safe-area-inset-top),16px) 20px max(env(safe-area-inset-bottom),16px);gap:8px}
+.screen-tool{height:100%;display:flex;flex-direction:column;padding:max(env(safe-area-inset-top),16px) 20px max(env(safe-area-inset-bottom),16px);gap:8px}
 .gap20{margin-top:12px}
 .inspector{flex:1 1 auto;min-height:220px;border-radius:var(--r-plate);padding:16px;display:flex;flex-direction:column;overflow:hidden}
 .irow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;border-top:1px solid rgba(255,255,255,.06)}
