@@ -248,7 +248,7 @@ export function openEditor(app, project) {
   function scenesPanel() {
     const sp = ed.scenePath, list = S.listAt(ed.p.scenes, sp), fname = S.folderNameAt(ed.p.scenes, sp);
     const rows = (sp.length ? [{ back: true }] : []).concat(list.map((n, i) => ({ n, i })));
-    const pg = pageOf(rows, ed.scenePage);
+    const pg = pageOf(rows, ed.scenePage, 4);
     const edit = (fn) => { ed.p.scenes = S.editAt(ed.p.scenes, sp, fn); };
     const html = pg.slice.map(r => {
       let ic = 'scene', name, meta, on = false, act;
@@ -300,7 +300,7 @@ export function openEditor(app, project) {
         <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px">
           ${[['tiles', 'Tiles'], ['objects', 'Objects'], ['events', 'Events']].map(([k, l]) => `<button class="seg${ed.layer === k ? ' on' : ''}" role="tab" aria-selected="${ed.layer === k}" ${A(() => setLayer(k))}>${well(28, svgRows(G[k], ed.layer === k ? GREEN : '#e4e2dc'))}${l}${ed.layer === k ? '<span class="selring"></span>' : ''}</button>`).join('')}
         </div>
-        <div class="screen gap20" style="flex:none;height:304px;display:flex;align-items:center;justify-content:center"><canvas class="pix" id="lvl" style="width:320px;height:288px;cursor:crosshair" aria-label="Level editor canvas" role="img"></canvas></div>
+        <div class="screen fit gap20"><canvas class="pix" id="lvl" style="aspect-ratio:160/144;cursor:crosshair" aria-label="Level editor canvas" role="img"></canvas></div>
         <div class="plate bar" role="toolbar" aria-label="Tools">
           <div style="display:flex;gap:6px">${TOOLS[ed.layer].map(([k, l]) => iconBtn(k in G ? k : 'trash', A(() => setTool(k)), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('')}</div>
           <div style="display:flex;gap:6px">${iconBtn('undo', A(() => restore(ed.hist, ed.fut)), { color: ed.hist.length ? '#fff' : '#555', label: 'Undo' })}${iconBtn('redo', A(() => restore(ed.fut, ed.hist)), { color: ed.fut.length ? '#fff' : '#555', label: 'Redo' })}</div>
@@ -311,7 +311,7 @@ export function openEditor(app, project) {
     mount(root) {
       view = root.querySelector('#lvl');
       const dpr = window.devicePixelRatio || 1;
-      view.width = 320 * dpr; view.height = 288 * dpr;
+      const r = view.getBoundingClientRect(); view.width = Math.round(r.width * dpr) || 320; view.height = Math.round(r.height * dpr) || 288;
       if (!off) { off = document.createElement('canvas'); off.width = 160; off.height = 144; octx = off.getContext('2d'); }
       view.addEventListener('pointerdown', down); view.addEventListener('pointermove', move);
       view.addEventListener('pointerup', up); view.addEventListener('pointercancel', up);

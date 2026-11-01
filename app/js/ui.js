@@ -6,6 +6,12 @@ let actions = [];
 export const resetActions = () => { actions = []; };
 export const A = (fn) => { actions.push(fn); return `data-a="${actions.length - 1}"`; };
 export const runAction = (i, ev) => { const f = actions[i]; if (f) f(ev); };
+export const getAction = (i) => actions[i];
+
+// how many 64px rows fit on this screen; main.js measures and sets it
+let per = 4;
+export const rows = () => per;
+export const setRows = (n) => { per = Math.max(1, Math.min(4, n)); };
 
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -40,7 +46,8 @@ export const valScreen = (text, color = 'var(--acc)', wide = false) => `<span cl
 export const stepper = (text, dec, inc, label, wide) => `<span class="stepper">${iconBtn('minus', dec, { label: 'Less ' + label })}${valScreen(text, 'var(--acc)', wide)}${iconBtn('plus', inc, { label: 'More ' + label })}</span>`;
 export const toggle = (on, act, label) => `<button class="vscreen" role="switch" aria-checked="${on}" aria-label="${esc(label)}" ${act} style="margin-right:6px">${svgText(on ? 'ON' : 'OFF', on ? 'var(--acc)' : '#6f6d69')}</button>`;
 
-export function pageOf(items, page, per = 4) {
+export function pageOf(items, page, n) {
+  const per = n || rows();
   const pages = Math.max(1, Math.ceil(items.length / per)), p = Math.min(Math.max(0, page || 0), pages - 1);
   return { p, pages, slice: items.slice(p * per, p * per + per), range: items.length ? `${p * per + 1}–${Math.min(items.length, p * per + per)} / ${items.length}` : '0 / 0' };
 }
