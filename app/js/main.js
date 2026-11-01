@@ -52,7 +52,7 @@ window.__app = app; // handy for debugging in the browser console
 
 function applySettings() {
   document.documentElement.classList.toggle('large', app.settings.textSize === 'LARGE');
-  document.body.classList.toggle('dots', !!app.settings.dots);
+  document.documentElement.classList.toggle('dots', !!app.settings.dots);
 }
 
 function statusBar(sec) {
@@ -95,9 +95,35 @@ function render() {
 root.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]');
   if (!el || el.disabled) return;
-  snd.click();
   runAction(+el.dataset.a, e);
 });
+
+// Press feedback: sink the button while it is held, tick on touch-down, and burst a few pixels in the section colour.
+let held = null;
+const release = () => { if (held) held.classList.remove('pressed'); held = null; };
+root.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('[data-a],.pbtn');
+  if (!el || el.disabled) return;
+  release(); held = el; el.classList.add('pressed');
+  if (!el.classList.contains('pbtn')) snd.click();
+  if (!app.settings.reduceMotion) burst(e.clientX, e.clientY, getComputedStyle(el).getPropertyValue('--acc').trim() || '#e4e2dc');
+});
+addEventListener('pointerup', release); addEventListener('pointercancel', release);
+root.addEventListener('pointerleave', release, true);
+
+function burst(x, y, color) {
+  const b = document.createElement('div'); b.className = 'burst'; b.style.setProperty('--c', color);
+  b.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i'), a = (i / n) * Math.PI * 2 + Math.random() * 0.4, d = 14 + Math.random() * 10;
+    const dx = Math.round(Math.cos(a) * d / 3) * 3, dy = Math.round(Math.sin(a) * d / 3) * 3; // moves on a 3px grid, like pixels
+    b.appendChild(p);
+    p.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${dx}px,${dy}px)`, opacity: 0 }], { duration: 320, easing: 'steps(4, end)', fill: 'forwards' });
+  }
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 360);
+}
 
 // ---- spinning solids and controller, once a frame
 let lastT = 0, lastPaint = 0;

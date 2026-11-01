@@ -39,7 +39,21 @@ export function play(sound, volScale = 1) {
   }
 }
 
+// Menu tick: a tiny filtered click with a soft low body, quiet and short, like a good switch.
+let lastClick = 0;
 export function click() {
-  if (!settings.menuSounds) return;
-  play({ wave: 'square', pitch: 7, slide: 1, len: 0 }, 0.35);
+  if (!settings.menuSounds || !ctx || settings.sfx <= 0) return;
+  const t = ctx.currentTime; if (t - lastClick < 0.03) return; lastClick = t;
+  const v = 0.35 + (settings.sfx / 9) * 0.65;
+  const out = ctx.createGain(); out.gain.value = v; out.connect(ctx.destination);
+  // the click: 12 ms of noise through a narrow band around 2.4 kHz
+  const n = ctx.createBufferSource(); n.buffer = noise();
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 2.5;
+  const ng = ctx.createGain(); ng.gain.setValueAtTime(0.09, t); ng.gain.exponentialRampToValueAtTime(0.0005, t + 0.012);
+  n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t, Math.random() * 0.5); n.stop(t + 0.02);
+  // the body: a quick sine drop from 520 to 260 Hz
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(520, t); o.frequency.exponentialRampToValueAtTime(260, t + 0.04);
+  const og = ctx.createGain(); og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.06, t + 0.003); og.gain.exponentialRampToValueAtTime(0.0005, t + 0.05);
+  o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.06);
 }
