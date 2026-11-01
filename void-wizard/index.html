@@ -63,6 +63,11 @@ body{
 .bud{bottom:calc(112px + env(safe-area-inset-bottom,0px));width:60px;height:60px;font-size:9px;color:#ff8f7a}
 .cast{right:max(106px, calc(env(safe-area-inset-right,0px) + 106px));bottom:calc(52px + env(safe-area-inset-bottom,0px));color:#6ff2e0}
 @media (pointer:fine){ .hop{display:none} }
+/* with a controller connected, the screen is just the game */
+body.pad .hop, body.pad .stick, body.pad #tip, body.pad #hint{display:none!important}
+.fs{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:calc(max(16px, env(safe-area-inset-right,0px)) + 92px);
+  font:inherit;font-size:10px;letter-spacing:.08em;color:var(--ink);background:var(--panel);border:1px solid var(--line);padding:7px 10px;cursor:pointer}
+.fs:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 </style>
 
 <canvas id="c" aria-label="Two small wizards tossing a glowing octahedron in a black void"></canvas>
@@ -74,6 +79,7 @@ body{
   <p id="tip">Standing throws lob where you face (hold longer to throw farther). Jump-throw for a fastball that bends onto the demon if you're facing it. Crouch-throw to bowl. Pass back and forth to build resonance. Catch a lob mid-jump and throw before you land for an alley-oop. Plug in a second controller to play the red wizard.</p>
 </div>
 <button class="px" id="pxBtn" type="button">PIXEL 2×</button>
+<button class="fs" id="fsBtn" type="button" hidden>FULLSCREEN</button>
 <button class="hop" id="hopBtn" type="button">HOP</button>
 <button class="hop cast" id="castBtn" type="button">THROW</button>
 <button class="hop bud" id="budBtn" type="button">FOLLOW</button>
@@ -735,9 +741,32 @@ function setP2(on){
   if(on){modeEl.textContent='PLAYER 2: RED';budBtn.hidden=true;popup('PLAYER 2 JOINED',buddy.pos,'#ff8f7a');}
   else{budBtn.hidden=false;setMode(bud.mode);popup('BUDDY TAKES OVER',buddy.pos,'#ff8f7a');}
 }
+// fullscreen: only offered where the browser supports it; it keeps the screen's own shape (the game just fills it)
+const fsBtn=document.getElementById('fsBtn');
+const fsEl=document.documentElement;
+const canFs=!!(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen);
+const isFs=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function goFullscreen(){
+  try{const r=(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen).call(fsEl,{navigationUI:'hide'});if(r&&r.catch)r.catch(()=>{});}catch(_){}
+}
+function exitFullscreen(){try{const r=(document.exitFullscreen||document.webkitExitFullscreen).call(document);if(r&&r.catch)r.catch(()=>{});}catch(_){}}
+fsBtn.addEventListener('click',()=>{isFs()?exitFullscreen():goFullscreen();});
+const syncFs=()=>{fsBtn.textContent=isFs()?'EXIT FULL':'FULLSCREEN';setTimeout(resize,60);};
+document.addEventListener('fullscreenchange',syncFs);document.addEventListener('webkitfullscreenchange',syncFs);
+// a tap anywhere also goes fullscreen while a controller is connected (browsers only allow it from a tap or click)
+addEventListener('pointerdown',()=>{if(document.body.classList.contains('pad')&&canFs&&!isFs())goFullscreen();},{capture:true});
+let padMode=false;
+function setPadMode(on){
+  if(on===padMode)return;padMode=on;
+  document.body.classList.toggle('pad',on);
+  fsBtn.hidden=!(on&&canFs);
+  if(on){stick.hidden=true;joy.id=null;joy.x=joy.y=0;if(canFs&&!isFs())goFullscreen();} // most browsers want a tap first; then a tap anywhere does it
+  else if(isFs())exitFullscreen();
+}
 function readPads(){
   const list=[...(navigator.getGamepads?navigator.getGamepads():[])].filter(g=>g&&g.connected).sort((a,b)=>a.index-b.index);
   if(list.length&&!padOn){padOn=true;document.getElementById('hint').textContent=PAD_HINT;}
+  setPadMode(list.length>0);
   let p1=null,p2=null;
   if(list.length>=2){p1=list[0];p2=list[1];}else if(list.length===1){if(padToP2)p2=list[0];else p1=list[0];}
   setP2(!!p2);
