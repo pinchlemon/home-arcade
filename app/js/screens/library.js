@@ -132,10 +132,10 @@ export default {
     const list = pg.slice.map((r, j) => {
       const i = pg.p * rows() + j, on = i === L.sel, act = A(() => (on ? open(r) : pick(i)));
       if (r.back) return row({ art: icon('back', '#fff'), name: fname, meta: 'Back to ' + (path.length > 1 ? 'folder' : cat[1].toLowerCase()), tag: '', selected: on, act });
-      if (S.isFolder(r.n)) { const c = S.flatten(r.n.items).length; return row({ art: icon('folder', on ? PINK : '#e4e2dc'), name: r.n.folder, meta: c + ' ' + kind + (c === 1 ? '' : 's'), tag: 'Folder', selected: on, act }); }
+      if (S.isFolder(r.n)) { const c = S.flatten(r.n.items).length; return row({ art: icon('folder', on ? PINK : '#e4e2dc'), artOff: icon('folder', '#e4e2dc'), name: r.n.folder, meta: c + ' ' + kind + (c === 1 ? '' : 's'), tag: 'Folder', selected: on, act }); }
       const a = p.assets[r.n]; if (!a) return '';
       const used = usesOf(p, r.n);
-      return row({ art: artOf(a, on ? PINK : null), name: a.name, meta: metaOf(a), tag: used ? 'Used' : 'Unused', tagColor: on ? PINK : used ? 'var(--muted)' : '#8f8d88', selected: on, act });
+      return row({ art: artOf(a, on ? PINK : null), artOff: artOf(a, null), name: a.name, meta: metaOf(a), tag: used ? 'Used' : 'Unused', tagColor: on ? PINK : used ? 'var(--muted)' : '#8f8d88', selected: on, act });
     }).join('');
     const body = `<div class="group">
       <div class="plate bar">

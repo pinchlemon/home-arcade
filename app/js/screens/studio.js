@@ -47,7 +47,7 @@ export default {
       </div>`;
     const rowHtml = pg.slice.map((q, j) => {
       const on = q.id === p.id, n = S.flatten(q.scenes).length;
-      return row({ art: icon('scene', on ? 'var(--acc)' : '#e4e2dc'), name: q.name, meta: n + (n === 1 ? ' scene · ' : ' scenes · ') + ago(q.updated), tag: on ? 'Open' : '', selected: on,
+      return row({ art: icon('scene', on ? 'var(--acc)' : '#e4e2dc'), artOff: icon('scene', '#e4e2dc'), name: q.name, meta: n + (n === 1 ? ' scene · ' : ' scenes · ') + ago(q.updated), tag: on ? 'Open' : '', selected: on,
         act: A(() => (on ? openEditor(app, q) : pick(app, pg.p * per() + j))) });
     }).join('');
     const body = `<div class="group">

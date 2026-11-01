@@ -31,7 +31,8 @@ export function digits(n, color) {
 
 export const pager = (range, prev, next) => `<div style="display:flex;align-items:center;gap:2px">${iconBtn('left', prev, { color: '#fff', label: 'Previous page' })}<span class="cap acc" style="min-width:56px;text-align:center">${esc(range)}</span>${iconBtn('right', next, { color: '#fff', label: 'Next page' })}</div>`;
 
-export function row({ art, name, meta, tag, selected, act, tagColor, nameColor, still }) {
+export function row({ art, artOff, name, meta, tag, selected, act, tagColor, nameColor, still }) {
+  if (selected && artOff) art = `<span class="art-on">${art}</span><span class="art-off">${artOff}</span>`;
   const el = still ? 'div' : 'button';
   return `<${el} class="plate row" ${still ? '' : (act || '') + ` aria-pressed="${!!selected}"`}>
     ${well(40, art)}

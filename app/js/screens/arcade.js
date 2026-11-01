@@ -47,7 +47,7 @@ export default {
       </div>`;
     const rowHtml = pg.slice.map((g, j) => {
       const i = pg.p * rows() + j, on = i === app.ui.sel;
-      return row({ art: digits(i + 1, on ? 'var(--acc)' : 'var(--muted)'), name: g.name, meta: g.kind + ' · ' + g.size, tag: g.studio ? 'Studio' : 'Code',
+      return row({ art: digits(i + 1, on ? 'var(--acc)' : 'var(--muted)'), artOff: digits(i + 1, 'var(--muted)'), name: g.name, meta: g.kind + ' · ' + g.size, tag: g.studio ? 'Studio' : 'Code',
         selected: on, tagColor: g.studio ? 'var(--acc)' : 'var(--muted)',
         act: A(() => (on ? play(app, g) : select(app, i))) });
     }).join('');
