@@ -49,6 +49,13 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
 .ab button{height:56px;border-radius:50%}
 .ab button[data-b="b"]{transform:translateY(16px)}
 @media (pointer:coarse){.pad{display:grid}.legend{display:none}}
+/* with a controller connected, the screen is just the game: no touch pad, no legend, no frame */
+body.console{padding:0;gap:0}
+body.console .pad, body.console .legend{display:none!important}
+body.console .shell{border:0;border-radius:0;padding:0;box-shadow:none;background:none}
+.fs{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));
+  font:600 10px var(--mono);letter-spacing:.08em;color:var(--ink);background:var(--btn);border:1px solid var(--shell-edge);border-radius:6px;padding:7px 10px;cursor:pointer;opacity:.8}
+.fs:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 </style>
 
 <div class="shell"><canvas id="screen" tabindex="0" aria-label="Phosphor game screen"></canvas></div>
@@ -66,6 +73,7 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;backg
   <div class="mid"><button data-b="x">CH &#9664;</button><button data-b="y">CH &#9654;</button><button data-b="start">START</button></div>
   <div class="ab"><button data-b="b">B</button><button data-b="a">A</button></div>
 </div>
+<button class="fs" id="fsBtn" type="button" hidden>FULLSCREEN</button>
 
 <script>
 (() => {
@@ -87,6 +95,13 @@ function vnoise(x, y, s){const fx=x/s,fy=y/s,x0=Math.floor(fx),y0=Math.floor(fy)
 function wrapAng(a){while(a>Math.PI)a-=TAU;while(a<-Math.PI)a+=TAU;return a;}
 
 function fit(){
+  if (document.body.classList.contains('console')) {
+    // console mode: as large as the screen allows, keeping the game's own 4:3 shape
+    const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+    cv.style.width = Math.floor(W * s) + 'px';
+    cv.style.height = Math.floor(H * s) + 'px';
+    return;
+  }
   const coarse = matchMedia('(pointer:coarse)').matches;
   const aw = window.innerWidth - 32 - 22;
   const ah = window.innerHeight - 24 - 22 - (coarse ? 240 : 40);
@@ -272,9 +287,30 @@ document.querySelectorAll('.pad button').forEach(el=>{
   ['pointerup','pointercancel','lostpointercapture'].forEach(t=>el.addEventListener(t,off));
   el.addEventListener('contextmenu',e=>e.preventDefault());
 });
+// fullscreen: only offered where the browser supports it; the game keeps its shape and just fills the screen
+const fsBtn=document.getElementById('fsBtn');
+const fsEl=document.documentElement;
+const canFs=!!(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen);
+const isFs=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function goFullscreen(){try{const r=(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen).call(fsEl,{navigationUI:'hide'});if(r&&r.catch)r.catch(()=>{});}catch(_){}}
+function exitFullscreen(){try{const r=(document.exitFullscreen||document.webkitExitFullscreen).call(document);if(r&&r.catch)r.catch(()=>{});}catch(_){}}
+let consoleMode=false;
+const syncFs=()=>{fsBtn.hidden=!(consoleMode&&canFs&&!isFs());fit();setTimeout(fit,80);};
+fsBtn.addEventListener('click',goFullscreen);
+document.addEventListener('fullscreenchange',syncFs);document.addEventListener('webkitfullscreenchange',syncFs);
+// browsers only allow fullscreen from a tap, so a tap anywhere does it while a controller is connected
+addEventListener('pointerdown',()=>{if(consoleMode&&canFs&&!isFs())goFullscreen();},{capture:true});
+function setConsoleMode(on){
+  if(on===consoleMode)return;consoleMode=on;
+  document.body.classList.toggle('console',on);
+  if(on){for(const k in tc)tc[k]=false;document.querySelectorAll('.pad button.on').forEach(el=>el.classList.remove('on'));if(canFs&&!isFs())goFullscreen();}
+  else if(isFs())exitFullscreen();
+  syncFs();
+}
 function pollPad(){
   gp={};
   let pads=[];try{pads=navigator.getGamepads?navigator.getGamepads():[];}catch(e){return;}
+  setConsoleMode([...pads].some(p=>p&&p.connected));
   for(const p of pads){
     if(!p)continue;
     const b=i=>p.buttons[i]&&p.buttons[i].pressed;
