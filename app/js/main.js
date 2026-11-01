@@ -83,18 +83,28 @@ function render() {
   fitRows();
 }
 
-// The page never scrolls: show as many rows as fit between the top plates and the tab bar.
+// The page never scrolls, and sits in the middle of the phone's screen: the gap above the top plate
+// matches the gap below the tab bar. iOS can give home-screen apps less height than the screen
+// (a black band at the bottom), so we centre on the whole screen when that still fits, and
+// show as many list rows (1 to 4) as there is room for. The list area is the same height on every tab.
+const probe = document.createElement('div'); probe.className = 'safe-probe'; document.body.appendChild(probe);
+const listH = (n) => 52 + 8 + n * 64 + (n - 1) * 8;
 let fitting = 0;
 function fitRows() {
-  if (fitting > 4) return;
-  const sc = root.querySelector('.screen-tabs'), tb = root.querySelector('.tabbar'), last = tb && tb.previousElementSibling;
-  if (!sc || !last) return;
-  const over = sc.scrollHeight - sc.clientHeight, spare = tb.getBoundingClientRect().top - last.getBoundingClientRect().bottom - parseFloat(getComputedStyle(sc).rowGap || 0);
-  let n = rows();
-  if (over > 0 && n > 1) n--;
-  else if (spare >= 72 && n < 4) n++;
-  if (n === rows()) return;
-  setRows(n); fitting++; render(); fitting--;
+  const sc = root.querySelector('.screen-tabs'), em = sc && sc.querySelector('.emblem'), tb = sc && sc.querySelector('.tabbar');
+  if (!em || !tb) return;
+  const gap = parseFloat(getComputedStyle(sc).rowGap) || 20, safeTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  const minTop = safeTop + 16, minBottom = 12, fixed = em.offsetHeight + tb.offsetHeight + gap * 2;
+  let n = 4; while (n > 1 && fixed + listH(n) > innerHeight - minTop - minBottom) n--;
+  if (n !== rows() && fitting < 3) { setRows(n); fitting++; render(); fitting--; return; }
+  const H = fixed + listH(rows());
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const screenH = innerHeight > innerWidth ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const full = standalone ? Math.max(innerHeight, screenH) : innerHeight;
+  let top = Math.round((full - H) / 2);
+  top = Math.max(minTop, Math.min(top, innerHeight - minBottom - H));
+  sc.style.setProperty('--list-h', listH(rows()) + 'px');
+  sc.style.paddingTop = top + 'px'; sc.style.paddingBottom = '0px';
 }
 addEventListener('resize', () => { setRows(4); if (!app.overlay) render(); });
 

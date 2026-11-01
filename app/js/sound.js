@@ -39,21 +39,22 @@ export function play(sound, volScale = 1) {
   }
 }
 
-// Menu tick: a tiny filtered click with a soft low body, quiet and short, like a good switch.
+// Menu sound: one soft, low thud. A sine that drops in pitch, through a gentle low-pass, quick to fade.
 let lastClick = 0;
 export function click() {
   if (!settings.menuSounds || !ctx || settings.sfx <= 0) return;
-  const t = ctx.currentTime; if (t - lastClick < 0.03) return; lastClick = t;
-  const v = 0.35 + (settings.sfx / 9) * 0.65;
-  const out = ctx.createGain(); out.gain.value = v; out.connect(ctx.destination);
-  // the click: 12 ms of noise through a narrow band around 2.4 kHz
-  const n = ctx.createBufferSource(); n.buffer = noise();
-  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 2.5;
-  const ng = ctx.createGain(); ng.gain.setValueAtTime(0.09, t); ng.gain.exponentialRampToValueAtTime(0.0005, t + 0.012);
-  n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t, Math.random() * 0.5); n.stop(t + 0.02);
-  // the body: a quick sine drop from 520 to 260 Hz
+  const t = ctx.currentTime; if (t - lastClick < 0.05) return; lastClick = t;
+  const v = 0.08 + (settings.sfx / 9) * 0.14;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+  lp.connect(g); g.connect(ctx.destination);
   const o = ctx.createOscillator(); o.type = 'sine';
-  o.frequency.setValueAtTime(520, t); o.frequency.exponentialRampToValueAtTime(260, t + 0.04);
-  const og = ctx.createGain(); og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.06, t + 0.003); og.gain.exponentialRampToValueAtTime(0.0005, t + 0.05);
-  o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.06);
+  o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(85, t + 0.07);
+  o.connect(lp); o.start(t); o.stop(t + 0.1);
+  // a quiet octave above, so phone speakers (which drop the lowest notes) still carry it
+  const o2 = ctx.createOscillator(); o2.type = 'sine'; const g2 = ctx.createGain(); g2.gain.value = 0.35;
+  o2.frequency.setValueAtTime(380, t); o2.frequency.exponentialRampToValueAtTime(170, t + 0.05);
+  o2.connect(g2); g2.connect(lp); o2.start(t); o2.stop(t + 0.08);
 }
+
