@@ -89,6 +89,16 @@ canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
   .padstat { grid-area: stat; }
   .tip, .legend { display: none; }
 }
+/* Controller connected: console mode. Just the game screen, as big as the display allows at its own aspect ratio, black bars around it. */
+html:has(body.console) { background: #000; padding: 0; overflow: hidden; }
+body.console {
+  display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; overscroll-behavior: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: #000; cursor: none;
+}
+body.console .titlebar, body.console .zoom, body.console .padstat, body.console .pad, body.console .tip, body.console .legend { display: none !important; }
+body.console .window { background: none; border-radius: 0; box-shadow: none; }
+body.console canvas { max-width: none; outline: none !important; }
 </style>
 
 <div class="window">
@@ -150,6 +160,13 @@ function fitCanvas() {
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
   const bar = document.querySelector('.titlebar').offsetHeight;
   let availW, availH;
+  if (document.body.classList.contains('console')) {
+    // console mode: fill the display, keep the aspect ratio
+    const s = Math.min((document.body.clientWidth - padX) / VW, (document.body.clientHeight - padY) / VH);
+    cv.style.width = VW * s + 'px'; cv.style.height = VH * s + 'px';
+    document.querySelector('.window').style.width = VW * s + 'px';
+    return;
+  }
   if (LANDSCAPE.matches) {
     // the screen gets the middle; each side column keeps ~140px for the buttons
     availW = document.documentElement.clientWidth - padX - 2 * 140 - 2 * 20;
@@ -278,8 +295,30 @@ function showPad(on, name) {
   padStatus.hidden = !on;
   if (on) padStatus.textContent = /dualsense|054c|playstation|wireless controller/i.test(name) ? 'PS5 controller connected' : 'Controller connected';
 }
-addEventListener('gamepadconnected', e => showPad(true, e.gamepad.id));
-addEventListener('gamepaddisconnected', () => showPad(false));
+function goFull() {
+  try {
+    const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (rq && !document.fullscreenElement && !document.webkitFullscreenElement) { const p = rq.call(el); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) {}
+}
+// a connected controller switches to console mode: full-screen game, no touch buttons
+function setConsole(on) {
+  if (document.body.classList.contains('console') === on) return;
+  document.body.classList.toggle('console', on);
+  fitCanvas();
+  if (on) goFull();
+  else {
+    paused = true;   // controller dropped mid-game: hold the action until it's back
+    try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+  }
+}
+function anyPad() { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(g => g && g.connected); } catch (e) { return false; } }
+addEventListener('gamepadconnected', e => { showPad(true, e.gamepad.id); setConsole(true); });
+addEventListener('gamepaddisconnected', () => { const on = anyPad(); showPad(on); setConsole(on); });
+// some browsers only report a controller once a button is pressed; catch one that's already awake
+if (anyPad()) setTimeout(() => setConsole(true), 0);
+// fullscreen needs a tap in most browsers; one tap on the screen in console mode asks for it
+document.addEventListener('pointerdown', () => { if (document.body.classList.contains('console')) goFull(); }, { passive: true });
 
 // ---- sound: tiny chiptune-style blips and noise ----
 let actx = null, muted = false, noiseBuf = null;
