@@ -1,7 +1,7 @@
 // Home Arcade offline support: keeps the launcher, games, libraries and fonts on the phone.
-const CACHE='arcade-1792956441';
-const PRE=["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "lib/three.min.js", "lib/OrbitControls.js", "lib/cannon.min.js", "void-wizard/", "purgatory-bowl/", "phosphor/", "crab-platformer/"];
-const FONTS=["https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap", "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap", "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Silkscreen&family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@600&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&display=swap"];
+const CACHE='arcade-1793545104';
+const PRE=["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "lib/three.min.js", "lib/OrbitControls.js", "lib/cannon.min.js", "void-wizard/", "purgatory-bowl/", "phosphor/", "crab-platformer/", "app/", "app/index.html", "app/app.css", "app/manifest.webmanifest", "app/js/input.js", "app/js/main.js", "app/js/pixel.js", "app/js/sound.js", "app/js/store.js", "app/js/ui.js", "app/js/screens/arcade.js", "app/js/screens/editor.js", "app/js/screens/library.js", "app/js/screens/player.js", "app/js/screens/settings.js", "app/js/screens/studio.js", "app/js/screens/sync.js"];
+const FONTS=["https://fonts.googleapis.com/css2?family=Saira:wght@400;600;700&display=swap", "https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap", "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap", "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Silkscreen&family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@600&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&display=swap"];
 
 async function cacheFonts(cache){
   for(const url of FONTS){
@@ -40,7 +40,8 @@ self.addEventListener('fetch',e=>{
   const isFont=url.hostname==='fonts.googleapis.com'||url.hostname==='fonts.gstatic.com';
   const same=url.origin===self.location.origin;
   if(!same&&!isFont)return;
-  const fresh=same&&(req.mode==='navigate'||url.pathname.endsWith('.html')||url.pathname.endsWith('/')||url.pathname.endsWith('version.json'));
+  // the Studio app's modules count as pages too, so a new version arrives on the next open
+  const fresh=same&&(req.mode==='navigate'||url.pathname.endsWith('.html')||url.pathname.endsWith('/')||url.pathname.endsWith('version.json')||url.pathname.includes('/app/'));
   e.respondWith((async()=>{
     const cache=await caches.open(CACHE);
     if(fresh){

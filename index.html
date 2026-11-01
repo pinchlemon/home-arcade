@@ -1,4 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
+<script>try{var r=sessionStorage.getItem('ha.return');if(r){sessionStorage.removeItem('ha.return');location.replace(r);}}catch(e){}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -253,7 +254,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>frame(2400
 reduce?frame(2400):requestAnimationFrame(frame);
 })();
 </script>
-<script>(function(){var BUILD="1792956441";
+<script>(function(){var BUILD="1793545104";
 function check(){fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
   if(j.v&&j.v!==BUILD)location.replace('./?v='+j.v);}).catch(function(){});}
 check();document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
