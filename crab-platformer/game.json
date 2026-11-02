@@ -1,0 +1,170 @@
+{
+  "title": "Crab Platformer",
+  "about": "Settings for Crab Platformer. Distances are in game pixels, speeds in pixels per frame, times in frames (60 a second). The Studio reads and writes this file.",
+  "load": [
+    "engine/screen",
+    "art",
+    "settings",
+    "engine/input",
+    "engine/audio",
+    "sounds",
+    "music",
+    "state",
+    "juice",
+    "eyes",
+    "crab",
+    "particles",
+    "engine/pixels",
+    "crab-look",
+    "juice-look",
+    "eye-look",
+    "beach",
+    "render",
+    "engine/loop"
+  ],
+  "screen": {
+    "width": 160,
+    "height": 144,
+    "ground": 128,
+    "zooms": [
+      [
+        160,
+        144
+      ],
+      [
+        240,
+        216
+      ],
+      [
+        320,
+        288
+      ]
+    ]
+  },
+  "player": {
+    "walkAccel": 0.22832031249999998,
+    "stopDecel": 0.276953125,
+    "walkMax": 1.5,
+    "gravity": 0.320068359375,
+    "holdJumpGravity": 0.183837890625,
+    "jumpSpeed": 3.7841796875,
+    "maxFall": 3.46728515625,
+    "coyoteFrames": 6,
+    "jumpBufferFrames": 7,
+    "idleFrameTicks": 10,
+    "walkFrameTicks": 5,
+    "lives": 4,
+    "startX": 80,
+    "hurtInvulnFrames": 100,
+    "hurtStunFrames": 14,
+    "knockback": 2.2,
+    "knockbackUp": 2.2
+  },
+  "squirt": {
+    "snapFrames": 14,
+    "cooldownFrames": 8,
+    "recoilFrames": 6,
+    "drops": 10,
+    "dropSpeed": 3.9,
+    "seedChance": 0.4
+  },
+  "eyes": {
+    "hp": 9,
+    "chargeFrames": 62,
+    "aimLockFrames": 46,
+    "fireFrames": 18,
+    "firstShotFrames": [
+      70,
+      150
+    ],
+    "restFrames": [
+      110,
+      220
+    ],
+    "hoverHeight": [
+      30,
+      74
+    ],
+    "spawnHeight": [
+      40,
+      80
+    ],
+    "driftPull": 0.0016,
+    "driftDamping": 0.955,
+    "contactRadius": 11,
+    "beamRadius": 7
+  },
+  "spawning": {
+    "startDelay": 100,
+    "intervalFrames": [
+      90,
+      170
+    ],
+    "maxAlive": 4,
+    "oneMorePerKills": 3,
+    "aheadChance": 0.7
+  },
+  "camera": {
+    "lookAhead": 12,
+    "lookEase": 0.08
+  },
+  "beach": {
+    "propSpacing": 90,
+    "emptyChance": 0.3,
+    "castleKeepAway": 60,
+    "castle": {
+      "width": 46,
+      "height": 38,
+      "solids": [
+        {
+          "x0": 3,
+          "x1": 16,
+          "top": 9
+        },
+        {
+          "x0": 14,
+          "x1": 33,
+          "top": 21
+        },
+        {
+          "x0": 31,
+          "x1": 44,
+          "top": 13
+        }
+      ]
+    }
+  },
+  "backdrop": {
+    "sun": {
+      "parallax": 0.02
+    },
+    "clouds": [
+      {
+        "parallax": 0.12,
+        "spacing": 150,
+        "drift": 0.03,
+        "seed": 7
+      },
+      {
+        "parallax": 0.3,
+        "spacing": 210,
+        "drift": 0.06,
+        "seed": 31
+      }
+    ],
+    "gulls": {
+      "count": 3,
+      "parallax": 0.4
+    },
+    "city": {
+      "parallax": 0.22
+    },
+    "sea": {
+      "parallax": 0.5
+    },
+    "boat": {
+      "parallax": 0.35,
+      "drift": 0.08
+    }
+  }
+}
