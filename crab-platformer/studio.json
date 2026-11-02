@@ -1,0 +1,656 @@
+{
+ "about": "How the Studio shows this game's settings. Each field points into game.json. show: 'seconds' shows frames as seconds, 'percent' shows a 0-1 chance as a percent.",
+ "groups": [
+  {
+   "id": "movement",
+   "name": "Movement",
+   "scope": "universal",
+   "fields": [
+    {
+     "path": "player.walkMax",
+     "label": "Top speed",
+     "help": "How fast he scuttles",
+     "min": 0.5,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "player.walkAccel",
+     "label": "Speed up",
+     "help": "How quickly he gets to top speed",
+     "min": 0.02,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.stopDecel",
+     "label": "Slow down",
+     "help": "How quickly he stops",
+     "min": 0.02,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.walkFrameTicks",
+     "label": "Walk animation",
+     "help": "Frames per step of the walk",
+     "min": 1,
+     "max": 20,
+     "step": 1
+    },
+    {
+     "path": "player.idleFrameTicks",
+     "label": "Idle animation",
+     "help": "Frames per step standing still",
+     "min": 1,
+     "max": 30,
+     "step": 1
+    }
+   ]
+  },
+  {
+   "id": "jump",
+   "name": "Jump",
+   "scope": "universal",
+   "fields": [
+    {
+     "path": "player.jumpSpeed",
+     "label": "Jump strength",
+     "help": "Higher jumps",
+     "min": 1,
+     "max": 8,
+     "step": 0.05
+    },
+    {
+     "path": "player.gravity",
+     "label": "Gravity",
+     "help": "Pull down when falling",
+     "min": 0.05,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.holdJumpGravity",
+     "label": "Hold-jump gravity",
+     "help": "Pull while you hold jump: lower floats longer",
+     "min": 0.02,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.maxFall",
+     "label": "Max fall speed",
+     "help": "Fastest he can fall",
+     "min": 1,
+     "max": 8,
+     "step": 0.05
+    },
+    {
+     "path": "player.coyoteFrames",
+     "label": "Coyote time",
+     "help": "Jump allowed just after leaving a ledge",
+     "min": 0,
+     "max": 30,
+     "step": 1,
+     "show": "seconds"
+    },
+    {
+     "path": "player.jumpBufferFrames",
+     "label": "Jump buffer",
+     "help": "Jump pressed a little early still counts",
+     "min": 0,
+     "max": 30,
+     "step": 1,
+     "show": "seconds"
+    }
+   ]
+  },
+  {
+   "id": "health",
+   "name": "Health",
+   "scope": "universal",
+   "fields": [
+    {
+     "path": "player.lives",
+     "label": "Hearts",
+     "help": "Hits before game over",
+     "min": 1,
+     "max": 9,
+     "step": 1
+    },
+    {
+     "path": "player.hurtInvulnFrames",
+     "label": "Safe after a hit",
+     "help": "Time he flashes and can't be hurt",
+     "min": 0,
+     "max": 300,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "player.hurtStunFrames",
+     "label": "Stun after a hit",
+     "help": "Time the controls freeze",
+     "min": 0,
+     "max": 60,
+     "step": 1,
+     "show": "seconds"
+    },
+    {
+     "path": "player.knockback",
+     "label": "Knockback",
+     "help": "Push away from what hit him",
+     "min": 0,
+     "max": 6,
+     "step": 0.1
+    },
+    {
+     "path": "player.knockbackUp",
+     "label": "Knockback up",
+     "help": "Pop up into the air when hit",
+     "min": 0,
+     "max": 6,
+     "step": 0.1
+    }
+   ]
+  },
+  {
+   "id": "camera",
+   "name": "Camera",
+   "scope": "universal",
+   "fields": [
+    {
+     "path": "camera.lookAhead",
+     "label": "Look ahead",
+     "help": "Pixels the view leads where he faces",
+     "min": 0,
+     "max": 60,
+     "step": 1
+    },
+    {
+     "path": "camera.lookEase",
+     "label": "Look ease",
+     "help": "How fast it swings when he turns",
+     "min": 0.01,
+     "max": 1,
+     "step": 0.01
+    }
+   ]
+  },
+  {
+   "id": "spawning",
+   "name": "Waves",
+   "scope": "universal",
+   "fields": [
+    {
+     "path": "spawning.startDelay",
+     "label": "First enemy after",
+     "help": "Wait at the start",
+     "min": 0,
+     "max": 600,
+     "step": 10,
+     "show": "seconds"
+    },
+    {
+     "path": "spawning.intervalFrames.0",
+     "label": "Next enemy, soonest",
+     "help": "Shortest wait between enemies",
+     "min": 10,
+     "max": 600,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "spawning.intervalFrames.1",
+     "label": "Next enemy, latest",
+     "help": "Longest wait between enemies",
+     "min": 10,
+     "max": 600,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "spawning.maxAlive",
+     "label": "Most at once",
+     "help": "Cap on enemies out together",
+     "min": 1,
+     "max": 9,
+     "step": 1
+    },
+    {
+     "path": "spawning.oneMorePerKills",
+     "label": "One more every",
+     "help": "Melts before another can join",
+     "min": 1,
+     "max": 20,
+     "step": 1
+    },
+    {
+     "path": "spawning.aheadChance",
+     "label": "From the front",
+     "help": "Chance they come from the side he faces",
+     "min": 0,
+     "max": 1,
+     "step": 0.05,
+     "show": "percent"
+    }
+   ]
+  },
+  {
+   "id": "squirt",
+   "name": "Lemon squirt",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "squirt.drops",
+     "label": "Drops",
+     "help": "Juice drops per squirt",
+     "min": 1,
+     "max": 30,
+     "step": 1
+    },
+    {
+     "path": "squirt.dropSpeed",
+     "label": "Drop speed",
+     "help": "How hard the juice shoots",
+     "min": 1,
+     "max": 8,
+     "step": 0.1
+    },
+    {
+     "path": "squirt.snapFrames",
+     "label": "Squeeze time",
+     "help": "How long a squeeze lasts",
+     "min": 4,
+     "max": 40,
+     "step": 1,
+     "show": "seconds"
+    },
+    {
+     "path": "squirt.cooldownFrames",
+     "label": "Cooldown",
+     "help": "Gap before the next squeeze",
+     "min": 0,
+     "max": 30,
+     "step": 1,
+     "show": "seconds"
+    },
+    {
+     "path": "squirt.recoilFrames",
+     "label": "Recoil",
+     "help": "Kick back after squeezing",
+     "min": 0,
+     "max": 20,
+     "step": 1,
+     "show": "seconds"
+    },
+    {
+     "path": "squirt.seedChance",
+     "label": "Seeds",
+     "help": "Chance a lemon seed pops out",
+     "min": 0,
+     "max": 1,
+     "step": 0.05,
+     "show": "percent"
+    }
+   ]
+  },
+  {
+   "id": "eyes",
+   "name": "Eyes",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "eyes.hp",
+     "label": "Hit points",
+     "help": "Juice drops to melt one",
+     "min": 1,
+     "max": 40,
+     "step": 1
+    },
+    {
+     "path": "eyes.chargeFrames",
+     "label": "Charge",
+     "help": "Time charging before the laser",
+     "min": 10,
+     "max": 200,
+     "step": 2,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.aimLockFrames",
+     "label": "Aim locks",
+     "help": "When the aim stops following him",
+     "min": 0,
+     "max": 200,
+     "step": 2,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.fireFrames",
+     "label": "Laser time",
+     "help": "How long the laser lasts",
+     "min": 4,
+     "max": 80,
+     "step": 1,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.firstShotFrames.0",
+     "label": "First shot, soonest",
+     "help": "After it arrives",
+     "min": 10,
+     "max": 400,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.firstShotFrames.1",
+     "label": "First shot, latest",
+     "help": "After it arrives",
+     "min": 10,
+     "max": 400,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.restFrames.0",
+     "label": "Rest, shortest",
+     "help": "Between shots",
+     "min": 10,
+     "max": 600,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.restFrames.1",
+     "label": "Rest, longest",
+     "help": "Between shots",
+     "min": 10,
+     "max": 600,
+     "step": 5,
+     "show": "seconds"
+    },
+    {
+     "path": "eyes.hoverHeight.0",
+     "label": "Hover, lowest",
+     "help": "Pixels above the sand",
+     "min": 8,
+     "max": 120,
+     "step": 1
+    },
+    {
+     "path": "eyes.hoverHeight.1",
+     "label": "Hover, highest",
+     "help": "Pixels above the sand",
+     "min": 8,
+     "max": 120,
+     "step": 1
+    },
+    {
+     "path": "eyes.driftPull",
+     "label": "Drift pull",
+     "help": "How eagerly they follow him",
+     "min": 0.0002,
+     "max": 0.01,
+     "step": 0.0002
+    },
+    {
+     "path": "eyes.driftDamping",
+     "label": "Drift glide",
+     "help": "Higher keeps them gliding longer",
+     "min": 0.8,
+     "max": 0.995,
+     "step": 0.005
+    },
+    {
+     "path": "eyes.contactRadius",
+     "label": "Touch reach",
+     "help": "Bumping into one hurts within this",
+     "min": 2,
+     "max": 30,
+     "step": 1
+    },
+    {
+     "path": "eyes.beamRadius",
+     "label": "Laser width",
+     "help": "How close to the beam counts as hit",
+     "min": 1,
+     "max": 20,
+     "step": 1
+    }
+   ]
+  },
+  {
+   "id": "beach",
+   "name": "Beach",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "player.startX",
+     "label": "Crab starts at",
+     "help": "Pixels from the left",
+     "min": 0,
+     "max": 400,
+     "step": 4
+    },
+    {
+     "path": "beach.propSpacing",
+     "label": "Prop spacing",
+     "help": "One prop slot every this many pixels",
+     "min": 40,
+     "max": 240,
+     "step": 5
+    },
+    {
+     "path": "beach.emptyChance",
+     "label": "Empty slots",
+     "help": "Chance a slot stays empty",
+     "min": 0,
+     "max": 1,
+     "step": 0.05,
+     "show": "percent"
+    },
+    {
+     "path": "beach.castleKeepAway",
+     "label": "Castle clearance",
+     "help": "No castle this close to the start",
+     "min": 0,
+     "max": 200,
+     "step": 5
+    }
+   ]
+  }
+ ],
+ "scene": {
+  "kind": "waves",
+  "world": "endless beach",
+  "props": [
+   {
+    "name": "Palm",
+    "file": "palm.png",
+    "w": 72,
+    "h": 98,
+    "glyph": "palm"
+   },
+   {
+    "name": "Palm",
+    "file": "palm.png",
+    "w": 72,
+    "h": 98,
+    "glyph": "palm"
+   },
+   {
+    "name": "Umbrella",
+    "file": "umbrella.png",
+    "w": 17,
+    "h": 20,
+    "glyph": "umbrella"
+   },
+   {
+    "name": "Sandcastle",
+    "file": "castle.png",
+    "w": 46,
+    "h": 38,
+    "glyph": "castle",
+    "solid": true
+   }
+  ],
+  "seedMul": 7919,
+  "seedAdd": 3,
+  "slotWidth": 26
+ },
+ "background": [
+  {
+   "id": "sun",
+   "name": "Sun",
+   "fields": [
+    {
+     "path": "backdrop.sun.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed: 0 is fixed, 1 moves with the world",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    }
+   ]
+  },
+  {
+   "id": "cloudsFar",
+   "name": "Far clouds",
+   "fields": [
+    {
+     "path": "backdrop.clouds.0.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    },
+    {
+     "path": "backdrop.clouds.0.drift",
+     "label": "Drift",
+     "help": "Pixels a frame on their own",
+     "min": 0,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "backdrop.clouds.0.spacing",
+     "label": "Spacing",
+     "help": "One cloud slot every",
+     "min": 40,
+     "max": 400,
+     "step": 10
+    }
+   ]
+  },
+  {
+   "id": "cloudsNear",
+   "name": "Near clouds",
+   "fields": [
+    {
+     "path": "backdrop.clouds.1.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    },
+    {
+     "path": "backdrop.clouds.1.drift",
+     "label": "Drift",
+     "help": "Pixels a frame on their own",
+     "min": 0,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "backdrop.clouds.1.spacing",
+     "label": "Spacing",
+     "help": "One cloud slot every",
+     "min": 40,
+     "max": 400,
+     "step": 10
+    }
+   ]
+  },
+  {
+   "id": "gulls",
+   "name": "Seagulls",
+   "fields": [
+    {
+     "path": "backdrop.gulls.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    },
+    {
+     "path": "backdrop.gulls.count",
+     "label": "Count",
+     "help": "How many",
+     "min": 0,
+     "max": 9,
+     "step": 1
+    }
+   ]
+  },
+  {
+   "id": "city",
+   "name": "City",
+   "fields": [
+    {
+     "path": "backdrop.city.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    }
+   ]
+  },
+  {
+   "id": "sea",
+   "name": "Sea",
+   "fields": [
+    {
+     "path": "backdrop.sea.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed of the glints",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    }
+   ]
+  },
+  {
+   "id": "boat",
+   "name": "Boat",
+   "fields": [
+    {
+     "path": "backdrop.boat.parallax",
+     "label": "Parallax",
+     "help": "Scroll speed",
+     "min": 0,
+     "max": 1.5,
+     "step": 0.01
+    },
+    {
+     "path": "backdrop.boat.drift",
+     "label": "Drift",
+     "help": "Sails on its own",
+     "min": 0,
+     "max": 1,
+     "step": 0.01
+    }
+   ]
+  },
+  {
+   "id": "sand",
+   "name": "Sand",
+   "fields": []
+  }
+ ]
+}

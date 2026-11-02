@@ -5,12 +5,8 @@ import { newProject, saveProject, flatten } from '../store.js';
 import { openPlayer } from './player.js';
 import { openEditor } from './editor.js';
 
-const CODE_GAMES = [
-  { name: 'Crab Platformer', path: '../crab-platformer/', kind: '2D · Canvas', size: '97 KB', file: 'crab-platformer' },
-  { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard' },
-  { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor' },
-  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' }
-];
+import { CODE_GAMES, launch } from '../games.js';
+import { openGameEditor } from './gameEditor.js';
 
 export function games(app) {
   const studio = app.projects.map(p => ({ name: p.name, studio: true, id: p.id, kind: 'Studio', size: flatten(p.scenes).length + ' scenes' }));
@@ -19,10 +15,11 @@ export function games(app) {
 
 function play(app, g) {
   if (g.studio) { const p = app.projects.find(x => x.id === g.id); if (p) openPlayer(app, p, null, null); }
-  else { try { sessionStorage.setItem('ha.return', 'app/'); } catch (e) {} location.href = g.path; }
+  else launch(g);
 }
 function edit(app, g) {
   if (g.studio) { app.ui.project = g.id; app.saveUI(); const p = app.projects.find(x => x.id === g.id); if (p) openEditor(app, p); }
+  else if (g.editable) openGameEditor(app, g);
   else window.open(`https://github.com/${app.settings.repo}/blob/${app.settings.branch}/${g.file}/index.html`, '_blank');
 }
 function select(app, i) {
@@ -43,7 +40,7 @@ export default {
       <span class="sub">${esc(sel.kind + ' · ' + sel.size)}</span>
       <div class="actions">
         ${plateBtn('play', 'Play', A(() => play(app, sel)))}
-        ${plateBtn(sel.studio ? 'edit' : 'code', sel.studio ? 'Edit' : 'View code', A(() => edit(app, sel)))}
+        ${plateBtn(sel.studio || sel.editable ? 'edit' : 'code', sel.studio || sel.editable ? 'Edit' : 'View code', A(() => edit(app, sel)))}
       </div>`;
     const rowHtml = pg.slice.map((g, j) => {
       const i = pg.p * rows() + j, on = i === app.ui.sel;

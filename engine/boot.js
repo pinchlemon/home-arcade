@@ -1,10 +1,22 @@
 // Starts a Studio game: reads the game's settings (game.json, next to the page), then runs the engine
 // modules and the game's own scripts in the order the settings list them. Everything shares one scope,
 // so a game script can use the engine's helpers and the engine can call the game's update and render.
+// Settings changed in the Studio on this phone are applied on top of game.json (only the ones you changed).
 (function () {
   const here = document.currentScript.src.replace(/boot\.js(\?.*)?$/, '');   // the engine folder
+  const folder = location.pathname.replace(/\/(index\.html)?$/, '').split('/').pop();
+  function phoneEdits() {
+    try { const e = JSON.parse(localStorage.getItem('ha.game.' + folder) || 'null'); return (e && e.overrides) || {}; } catch (err) { return {}; }
+  }
+  function apply(game, overrides) {
+    for (const path in overrides) {
+      const ks = path.split('.'); let o = game;
+      try { for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; if (o && ks[ks.length - 1] in o) o[ks[ks.length - 1]] = overrides[path]; } catch (err) {}
+    }
+    return game;
+  }
   fetch('game.json', { cache: 'no-cache' }).then(r => r.json()).then(game => {
-    window.GAME = game;
+    window.GAME = apply(game, phoneEdits());
     for (const name of game.load) {
       const s = document.createElement('script');
       s.src = name.startsWith('engine/') ? here + name.slice(7) + '.js' : 'scripts/' + name + '.js';

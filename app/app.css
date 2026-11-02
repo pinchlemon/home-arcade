@@ -131,6 +131,21 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .center-note{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 12px}
 .center-note .sub{white-space:normal}
 
+/* repo game editor: settings rows, and the background as a stack of planes */
+.grow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;border-top:1px solid rgba(255,255,255,.06)}
+.inspector>.grow:first-child,.ihead+.grow{border-top:0}
+.grow .t,.ihead .t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.grow .sub{white-space:normal;font-size:11px;line-height:14px}
+.ihead{display:flex;align-items:center;gap:12px;min-height:44px;margin-bottom:6px}
+.stack{overflow:hidden}
+.rig{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.22,1,.36,1)}
+.plane{position:absolute;left:-120px;top:-64px;width:240px;height:128px;padding:0;margin:0;box-sizing:border-box;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,.2);background-color:rgba(255,255,255,.025);background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:16px 16px;transition:transform .7s cubic-bezier(.22,1,.36,1),opacity .45s ease,background-color .3s ease,border-color .3s ease}
+.plane.on{border:1.5px solid var(--acc);background-color:rgba(125,255,106,.07)}
+.plane .pc canvas{display:block;width:240px;height:128px;image-rendering:pixelated;opacity:.55;transition:opacity .3s ease}
+.plane.on .pc canvas{opacity:1}
+.ptab{position:absolute;left:-1px;bottom:100%;margin-bottom:4px;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;color:#8f8d88;pointer-events:none;transition:color .3s ease}
+.plane.on .ptab{color:var(--acc)}
+
 /* game player */
 .player{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:10;padding:max(env(safe-area-inset-top),12px) 12px max(env(safe-area-inset-bottom),12px)}
 .player .topbar{position:absolute;top:max(env(safe-area-inset-top),12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center}

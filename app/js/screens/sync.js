@@ -3,6 +3,7 @@
 import { icon } from '../pixel.js';
 import * as S from '../store.js';
 import { A, esc, row, pager, plateBtn, iconBtn, pageOf, emptyRow } from '../ui.js';
+import * as games from '../games.js';
 
 const BLUE = '#4d7cff', DIR = 'studio/projects';
 let busy = false, remoteLog = null, remoteAt = 0;
@@ -25,6 +26,11 @@ export function changeList(app) {
     else if (sy.pushed[p.id] !== p.updated) out.push({ id: p.id, name: p.name, meta, act: 'Changed' });
   }
   for (const id of sy.deleted || []) out.push({ id, name: (sy.names || {})[id] || 'Deleted game', meta: 'Studio game', act: 'Deleted' });
+  // repo games whose settings were adjusted in the Studio
+  for (const g of games.editableGames()) {
+    const e = games.getEdits(g.file), n = Object.keys(e.overrides).length;
+    if (e.dirty && n) out.push({ id: 'g:' + g.file, game: g, name: g.name, meta: 'Game settings · ' + n + (n === 1 ? ' change' : ' changes'), act: 'Changed' });
+  }
   return out;
 }
 
@@ -60,7 +66,15 @@ export async function pushAll(app) {
     const branch = app.settings.branch, ref = await gh(app, `git/ref/heads/${encodeURIComponent(branch)}`), head = ref.object.sha;
     const base = await gh(app, `git/commits/${head}`), have = new Set((await remoteFiles(app)).map(f => f.name));
     const tree = [], sent = {};
+    const pushedGames = [];
     for (const it of items) {
+      if (it.game) {
+        // apply the phone's changes on top of the game.json that is on GitHub right now, so nothing made elsewhere is lost
+        const path = `${it.game.file}/game.json`, cur = await gh(app, `contents/${path}?ref=${encodeURIComponent(branch)}`);
+        const merged = games.applyOverrides(JSON.parse(b64decode(cur.content)), games.getEdits(it.game.file).overrides);
+        tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(merged, null, 2) + '\n' }); pushedGames.push(it.game.file);
+        continue;
+      }
       const path = `${DIR}/${it.id}.json`;
       if (it.act === 'Deleted') { if (have.has(it.id + '.json')) tree.push({ path, mode: '100644', type: 'blob', sha: null }); continue; }
       const p = app.projects.find(x => x.id === it.id); if (!p) continue;
@@ -75,6 +89,7 @@ export async function pushAll(app) {
       await gh(app, `git/refs/heads/${encodeURIComponent(branch)}`, { sha: c.sha }, 'PATCH');
       sy.history = [{ msg: message, files: tree.length, hash: c.sha.slice(0, 7), when: Date.now() }, ...(sy.history || [])].slice(0, 30);
     }
+    for (const f of pushedGames) { const e = games.getEdits(f); e.dirty = false; games.setEdits(f, e); games.forgetGame(f); }
     Object.assign(sy.pushed, sent); sy.deleted = []; sy.lastSync = 'Pushed ' + new Date().toISOString(); sy.lastAt = Date.now();
     S.setSync(sy); remoteAt = 0;
     app.toast(tree.length ? 'Pushed to GitHub' : 'Up to date');
@@ -140,7 +155,7 @@ export default {
         ${plateBtn('down', 'Pull', A(() => pullAll(app)))}
       </div>`;
     let items;
-    if (view === 'changes') items = changes.map(c => ({ art: icon(c.act === 'Deleted' ? 'trash' : 'scene', '#e4e2dc'), name: c.name, meta: c.meta, tag: c.act, tagColor: c.act === 'Added' ? BLUE : 'var(--muted)' }));
+    if (view === 'changes') items = changes.map(c => ({ art: icon(c.act === 'Deleted' ? 'trash' : c.game ? 'code' : 'scene', '#e4e2dc'), name: c.name, meta: c.meta, tag: c.act, tagColor: c.act === 'Added' ? BLUE : 'var(--muted)' }));
     else {
       if (st.repo) loadLog(app);
       const seen = new Set(), log = [];
