@@ -12,12 +12,15 @@ const ICON_STOPS = [[0, '#86c94a'], [.12, '#3f9fa8'], [.25, '#5a5cf0'], [.4, '#c
 // seconds. Between `row` (the last pixel lands) and `drop` the finished solids just spin, with nothing flying.
 // The spin picks up speed until `fast`, then keeps going flat out. At `leave` pixels begin to leave the dodecahedron, one by one,
 // until `gone`; each takes FLIGHT seconds to reach the row, so the row is complete at `row`. Then the row drops to the tabs.
-const FLIGHT = 0.9, ROW_N = 44, TAB_N = 20, DROP_DUR = 0.7, DROP_STAGGER = 0.07;
-const T = { hold: 0.45, fast: 2.65, pix: 2.2, pixIn: 0.6, leave: 3.0, gone: 5.4, row: 5.4 + FLIGHT, drop: 6.8, end: 6.8 + 4 * DROP_STAGGER + DROP_DUR };
+const FLIGHT = 1.0, ROW_N = 44, TAB_N = 20, DROP_DUR = 0.7, DROP_STAGGER = 0.07;
+const T = { hold: 0.45, fast: 2.65, pix: 2.2, pixIn: 0.6, leave: 3.0, gone: 6.4, row: 6.4 + FLIGHT, drop: 7.9, end: 7.9 + 4 * DROP_STAGGER + DROP_DUR };
 const OMEGA = 32; // radians per second at full speed (about 5 turns a second)
 const KINDS = ['dodeca', 'cube', 'icosa', 'octa', 'tetra'];
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+// share of the dodecahedron's pixels that have left by time t (gentle at both ends), and its inverse (when the share-th pixel leaves)
+const leftBy = t => { const x = clamp((t - T.leave) / (T.gone - T.leave)); return x * x * (3 - 2 * x); };
+const leaveAt = r => T.leave + (0.5 - Math.sin(Math.asin(1 - 2 * clamp(r)) / 3)) * (T.gone - T.leave);
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const easeOut = t => 1 - Math.pow(1 - t, 3);
@@ -230,7 +233,7 @@ export function play({ root, input, tabSolids, preview }) {
     const owners = []; counts.forEach((n, i) => { for (let k = 0; k < n; k++) owners.push(i); });
     for (let k = owners.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [owners[k], owners[j]] = [owners[j], owners[k]]; }
     const M = owners.length;
-    particles = owners.map((i, k) => ({ i, tl: T.leave + (k + Math.random()) / M * (T.gone - T.leave), on: false, bx: (Math.random() - .5) * 18, by: (Math.random() - .5) * 18 }));
+    particles = owners.map((i, k) => ({ i, tl: leaveAt((k + Math.random()) / M), on: false, bx: (Math.random() - .5) * 18, by: (Math.random() - .5) * 18 }));
   }
   // the lit pixels of the dodecahedron this frame (screen px), left to right, so its left side feeds the left solids
   let lit = [];
@@ -295,8 +298,9 @@ export function play({ root, input, tabSolids, preview }) {
         const px = pixelate(renderSmooth(t, true), PN, tmp);
         if (t >= T.leave) { readLit(px.data); launchDue(t, now); }
         // as pixels leave, the dodecahedron thins out, pixel by pixel
-        const keep = t < T.leave ? 1 : 1 - (t - T.leave) / (T.gone - T.leave);
-        if (keep < 1) for (let y = 0; y < PN; y++) for (let x = 0; x < PN; x++) if (hash(x, y, 7) >= keep) px.data[(y * PN + x) * 4 + 3] = 0;
+        // as pixels leave, the dodecahedron thins out pixel by pixel, and what is left fades a little, so it dissipates rather than vanishes
+        const keep = 1 - leftBy(t), dim = 0.45 + 0.55 * keep;
+        if (keep < 1) for (let y = 0; y < PN; y++) for (let x = 0; x < PN; x++) { const k = (y * PN + x) * 4 + 3; px.data[k] = hash(x, y, 7) >= keep ? 0 : px.data[k] * dim; }
         px.ctx.putImageData(px.img, 0, 0);
         ctx.globalAlpha = mm; ctx.imageSmoothingEnabled = false; ctx.drawImage(px.canvas, cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1;
       }
