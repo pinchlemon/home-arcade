@@ -388,7 +388,8 @@ export function openGameEditor(app, g) {
   // the Backdrop is a second view of the Scene tab (the switch is in the corner of the screen)
   const TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
   const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
-  const viewSwitch = (toBg) => `<button class="btn bare viewsw" aria-label="${toBg ? 'Show the backdrop layers' : 'Show the scene'}" ${A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); })}>${well(28, svgRows(G[toBg ? 'display' : 'scene'], BONE))}<span>${toBg ? 'Backdrop' : 'Scene'}</span></button>`;
+  // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
+  const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
   const ov = {
     render() {
       if (!ed.game) return `<div class="screen-tool" style="--acc:${GREEN}"><div class="plate bar">${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}<span class="title" style="flex:1">${esc(g.name)}</span></div>
@@ -398,9 +399,9 @@ export function openGameEditor(app, g) {
       if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas>${viewSwitch(true)}</div>`;
+        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
         const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
-          <div style="display:flex;gap:6px">${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:10px">Waves · props by rule</span>`}</div>
+          <div style="display:flex;gap:6px;align-items:center">${viewSwitch(true)}<span class="vsep"></span>${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:4px">Waves · props by rule</span>`}</div>
           <div style="display:flex;align-items:center;gap:2px">
             ${iconBtn('left', A(() => go(-1)), { color: '#fff', label: 'Previous scene' })}<span class="cap acc" style="min-width:34px;text-align:center" aria-label="Scene ${si + 1} of ${list.length}">${si + 1}/${list.length}</span>${iconBtn('right', A(() => go(1)), { color: '#fff', label: 'Next scene' })}
             ${iconBtn('plus', A(() => {
@@ -446,8 +447,9 @@ export function openGameEditor(app, g) {
       } else if (ed.tab === 'background') {
         screen = `<div class="screen fit gap20 stack" id="stk" style="perspective:1100px;touch-action:none;cursor:grab"><div class="rig${ed.combined ? ' flat' : ''}" style="transform:${ed.combined ? 'rotateX(0deg) rotateZ(0deg) scale(1.3)' : `rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)`}">${bgHtml()}</div>
           <span class="cap" id="stkhint" style="position:absolute;left:18px;top:14px;font-size:9px;color:#6f6d69;pointer-events:none">${ed.combined ? 'All layers together, facing forward' : 'Drag to tilt · tap a layer'}</span>
-          <button class="btn bare" id="combine" aria-pressed="${!!ed.combined}" style="position:absolute;right:8px;bottom:6px" ${A(() => { ed.combined = !ed.combined; refreshBg(); })}>${well(28, svgRows(G.grid, BONE))}<span class="lbl">${ed.combined ? 'Spread' : 'Combine'}</span></button>${viewSwitch(false)}</div>`;
-        panel = bgPanel();
+          <button class="btn bare" id="combine" aria-pressed="${!!ed.combined}" style="position:absolute;right:8px;bottom:6px" ${A(() => { ed.combined = !ed.combined; refreshBg(); })}>${well(28, svgRows(G.grid, BONE))}<span class="lbl">${ed.combined ? 'Spread' : 'Combine'}</span></button></div>`;
+        panel = `<div class="plate bar" role="toolbar" aria-label="Backdrop">
+          <div style="display:flex;gap:6px;align-items:center">${viewSwitch(false)}<span class="vsep"></span><span class="cap acc" style="padding-left:4px">Backdrop · ${schema.background.length} layers</span></div></div>${bgPanel()}`;
       } else {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
         panel = `<div class="plate bar gap20" style="flex:none">

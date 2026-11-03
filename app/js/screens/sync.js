@@ -6,6 +6,7 @@ import { icon } from '../pixel.js';
 import * as S from '../store.js';
 import { row } from '../ui.js';
 import * as games from '../games.js';
+import { openReview } from './review.js';
 
 const BLUE = '#4d7cff';
 let busy = false, remoteLog = null, remoteAt = 0;
@@ -98,15 +99,16 @@ export function syncGroup(app, plateBtn, A, n) {
   const a = plateBtn('up', k ? 'Push ' + k : 'Pushed', A(() => pushAll(app)));
   const b = plateBtn(view === 'changes' ? 'history' : 'changes', view === 'changes' ? 'History' : 'Changes', A(() => { app.ui.syncView = view === 'changes' ? 'history' : 'changes'; app.saveUI(); app.render(); }));
   let items;
-  if (view === 'changes') items = changes.map(c => ({ art: icon('code', '#e4e2dc'), name: c.name, meta: c.meta, tag: 'Changed', tagColor: BLUE }));
+  if (view === 'changes') items = changes.map(c => ({ art: icon('code', '#e4e2dc'), name: c.name, meta: c.meta, tag: 'Review', tagColor: BLUE, act: A(() => openReview(app, c.game)) }));
   else {
     if (st.repo) loadLog(app);
     const seen = new Set(), log = [];
     for (const h of [...(sy.history || []), ...(remoteLog || [])].sort((x, y) => y.when - x.when)) { if (seen.has(h.hash)) continue; seen.add(h.hash); log.push(h); }
     items = log.map((h, j) => ({ art: icon('history', j === 0 ? BLUE : '#e4e2dc'), name: h.msg.replace(/^Studio: /, ''), meta: when(h.when) + (h.who ? ' · ' + h.who : ''), tag: h.hash, tagColor: 'var(--muted)' }));
   }
-  let rows = items.slice(0, n).map(it => row({ ...it, still: true })).join('');
-  if (items.length > n) rows = items.slice(0, n - 1).map(it => row({ ...it, still: true })).join('') + `<div class="plate row-empty"><span class="sub">And ${items.length - n + 1} more</span></div>`;
-  if (!items.length) rows = `<div class="plate row-empty"><span class="sub" style="white-space:normal">${view === 'changes' ? 'Nothing to push. Changes you make in the Studio show up here.' : 'No history yet.'}</span></div>`;
+  const one = (it) => row({ ...it, still: !it.act });
+  let rows = items.slice(0, n).map(one).join('');
+  if (items.length > n) rows = items.slice(0, n - 1).map(one).join('') + `<div class="plate row-empty"><span class="sub">And ${items.length - n + 1} more</span></div>`;
+  if (!items.length) rows = `<div class="plate row-empty"><span class="sub" style="white-space:normal">${view === 'changes' ? 'Nothing to push. Changes you make in the Studio show up here; tap one to review it.' : 'No history yet.'}</span></div>`;
   return { title, sub, a, b, rows };
 }

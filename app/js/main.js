@@ -56,6 +56,9 @@ if (!SECTIONS[app.ui.tab]) app.ui.tab = 0;
 function applySettings() {
   document.documentElement.classList.toggle('large', app.settings.textSize === 'LARGE');
   document.documentElement.classList.toggle('dots', !!app.settings.dots);
+  // the color behind sprites in the Art tab (Settings › Display)
+  const bg = { CHECKER: '#000 repeating-conic-gradient(#141414 0 25%,#000 0 50%) 0 0/16px 16px', BLACK: '#000', GRAY: '#5a5a5a', LIGHT: '#e8e6df', SKY: '#9dd4cf', GRASS: '#5d8a4e' }[app.settings.spriteBg] || '#000';
+  document.documentElement.style.setProperty('--spritebg', bg);
 }
 
 function tabBar() {
