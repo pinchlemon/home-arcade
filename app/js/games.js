@@ -4,20 +4,20 @@
 // GitHub from Sync. Changing only what you touched means updates made on GitHub still come through.
 
 export const CODE_GAMES = [
-  { name: 'Crab Platformer', path: '../crab-platformer/', kind: '2D · Canvas', size: '97 KB', file: 'crab-platformer', editable: true, mode: 'Waves',
-    about: 'A crab with lemon claws squirts juice at eyes on the beach.' },
-  { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard', about: 'A wizard adrift in the void.' },
-  { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor', about: 'A glowing-screen arcade game.' },
-  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl', about: 'Bowling, with physics, in purgatory.' }
+  { name: 'Crab Platformer', path: '../crab-platformer/', kind: '2D · Canvas', size: '97 KB', file: 'crab-platformer', editable: true, mode: 'Waves' },
+  { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard' },
+  { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor' },
+  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' }
 ];
 export const editableGames = () => CODE_GAMES.filter(g => g.editable);
 
-// The game you're working on, shared by the Studio, Art and Sound tabs (and set by Edit in the Arcade)
-export function currentGame(app) {
-  const list = editableGames();
-  return list.find(g => g.file === app.ui.game) || list[0] || null;
+// The game you're working on is the one selected in the Arcade; the Studio, Art and Sound tabs all show it.
+// Only games with a game.json (editable) can be opened there; the others say so.
+export function currentGame(app) { return CODE_GAMES[app.ui.sel] || CODE_GAMES[0] || null; }
+export function setCurrentGame(app, g) {
+  const i = CODE_GAMES.indexOf(g); if (i < 0) return;
+  app.ui.sel = i; app.ui.page = null; app.saveUI();
 }
-export function setCurrentGame(app, g) { if (g && g.editable) { app.ui.game = g.file; app.saveUI(); } }
 
 export const ago = (t) => {
   const s = (Date.now() - t) / 1000;

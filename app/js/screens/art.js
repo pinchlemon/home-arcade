@@ -5,6 +5,7 @@
 import { well, icon, svgRows, svgText } from '../pixel.js';
 import { A, esc, row, pager, plateBtn, iconBtn, pageOf, emptyRow, rows, stepper } from '../ui.js';
 import * as games from '../games.js';
+import { notReady } from './studio.js';
 import { openGameEditor } from './gameEditor.js';
 import * as input from '../input.js';
 
@@ -59,7 +60,7 @@ function jump(app, g, it) {
 }
 
 function state(app) {
-  const g = games.currentGame(app); if (!g) return null;
+  const g = games.currentGame(app); if (!g || !g.editable) return { g, off: true };
   const F = folders(app, g); if (!F) return { g };
   let fi = Math.max(0, F.list.findIndex(f => f.id === app.ui.artFolder)); if (fi < 0) fi = 0;
   const f = F.list[fi], si = Math.max(0, Math.min(f.items.length - 1, f.items.findIndex(it => it.id === app.ui.artSel)));
@@ -71,16 +72,16 @@ function setSel(app, i) { const s = state(app); const it = s.f.items[Math.max(0,
 export default {
   render(app) {
     const s = state(app);
-    if (!s) return { right: `<span class="cap acc">Art</span><span class="title clamp2">No game</span><span class="sub">Pick a game in the Studio</span>`, body: `<div class="group">${emptyRow('sprites', 'Art shows the pictures of the game you pick in the Studio.')}</div>` };
+    if (s.off) return notReady(app, s.g, 'sprites', 'Art');
     if (!s.F) return { right: `<span class="cap acc">Art</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sprites', 'Loading the art…')}</div>` };
     const { g, F, fi, f, si, it } = s, size = it && it.kind === 'image' ? sizeOf(app, g, it) : null;
     const right = it ? `
-      <span class="cap acc">${esc(f.name)} · ${String(si + 1).padStart(2, '0')}/${String(f.items.length).padStart(2, '0')}</span>
+      <span class="cap acc ell">${esc(g.name)}</span>
       <span class="title clamp2">${esc(it.name)}</span>
-      <span class="sub clamp2" style="white-space:normal">${esc(meta(it, size))}</span>
+      <span class="sub clamp2" style="white-space:normal">${esc(f.name + ' · ' + meta(it, size))}</span>
       <div class="actions">
         ${plateBtn(it.cell ? 'play' : 'select', it.cell ? 'Animate' : 'View', A(() => openViewer(app, g, it, F)))}
-        ${plateBtn('edit', it.object ? 'Its object' : it.kind === 'symbol' ? 'Objects' : it.layer ? 'Its layer' : 'Its settings', A(() => jump(app, g, it)))}
+        ${plateBtn('edit', it.object ? 'Object' : it.kind === 'symbol' ? 'Objects' : it.layer ? 'Layer' : 'Settings', A(() => jump(app, g, it)))}
       </div>` : `<span class="cap acc">${esc(g.name)}</span><span class="title clamp2">${esc(f.name)}</span><span class="sub">Empty folder</span>`;
     const per = rows(), pg = pageOf(f.items, Math.floor(si / per));
     const rowHtml = pg.slice.map((x, j) => {
@@ -100,7 +101,7 @@ export default {
     return { right, body };
   },
   pad(app, input) {
-    const s = state(app); if (!s || !s.F) return;
+    const s = state(app); if (!s || s.off || !s.F) return;
     if (input.pressed('down')) setSel(app, s.si + 1);
     else if (input.pressed('up')) setSel(app, s.si - 1);
     else if (input.pressed('right')) setFolder(app, s.fi + 1);

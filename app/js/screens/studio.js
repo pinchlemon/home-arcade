@@ -1,8 +1,8 @@
-// Studio: the game you're working on (shared with the Art and Sound tabs). Its parts are listed below;
-// tap one to open it: Scenes, Objects and Settings open the editor there, Art and Sound jump to those tabs.
-// Controller: D-pad picks a part, left and right switch games, A opens, X plays.
+// Studio: the game selected in the Arcade (the Art and Sound tabs show the same one), and its parts.
+// Tap a part to open the editor there. Change game goes back to the Arcade to pick another.
+// Controller: D-pad picks a part, A opens, X plays.
 import { icon } from '../pixel.js';
-import { A, esc, row, plateBtn, iconBtn, pager, pageOf, emptyRow, rows } from '../ui.js';
+import { A, esc, row, plateBtn, bareBtn, pager, pageOf, emptyRow, rows } from '../ui.js';
 import * as games from '../games.js';
 import { openGameEditor } from './gameEditor.js';
 
@@ -15,8 +15,7 @@ function info(app, g) {
   const x = loaded[g.file];
   if (!x || x === 'loading') return null;
   const D = games.applyOverrides(x.data, games.getEdits(g.file).overrides), sc = D.scenes || [];
-  return { scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length,
-    art: ((x.schema.art || {}).folders || []).reduce((n, f) => n + f.items.length, 0), sounds: ((x.schema.sound || {}).effects || []).length, music: ((x.schema.sound || {}).music || []).length };
+  return { scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length };
 }
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
@@ -25,24 +24,20 @@ function parts(app, g, k) {
   return [
     { id: 'scene', icon: 'scene', name: 'Scenes', meta: k ? plural(k.scenes, 'scene', 'scenes') + (k.levels ? ' · ' + plural(k.levels, 'level', 'levels') : '') + ' · backdrop' : '…', tag: 'Edit', go: edit('scene') },
     { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' and their behaviors' : '…', tag: 'Edit', go: edit('objects') },
-    { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump and more' : '…', tag: 'Edit', go: edit('settings') },
-    { id: 'art', icon: 'sprites', name: 'Art', meta: k ? plural(k.art, 'picture', 'pictures') + ' · sprites, props, backdrop' : '…', tag: 'Art', go: () => app.setTab(2) },
-    { id: 'sound', icon: 'sounds', name: 'Sound', meta: k ? plural(k.sounds, 'effect', 'effects') + ' · ' + plural(k.music, 'song', 'songs') : '…', tag: 'Sound', go: () => app.setTab(3) }
+    { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump and more' : '…', tag: 'Edit', go: edit('settings') }
   ];
 }
-function switchGame(app, d) {
-  const list = games.editableGames(), cur = games.currentGame(app); if (!cur) return;
-  games.setCurrentGame(app, list[(list.indexOf(cur) + d + list.length) % list.length]); app.render();
-}
+// the way to pick another game: back to the Arcade, where the selected game is the one being edited
+export const changeGame = (app) => bareBtn('left', 'Change game', A(() => app.setTab(0)));
 
 export default {
   render(app) {
     const g = games.currentGame(app);
-    if (!g) return { right: `<span class="cap acc">Studio</span><span class="title clamp2">No games to edit</span><span class="sub">A game needs a game.json to open here</span>`, body: `<div class="group">${emptyRow('code', 'No game in the repo has Studio settings yet.')}</div>` };
-    const list = games.editableGames(), gi = list.indexOf(g), k = info(app, g), all = parts(app, g, k);
+    if (!g || !g.editable) return notReady(app, g, 'code', 'The Studio');
+    const k = info(app, g), all = parts(app, g, k);
     const sel = Math.max(0, Math.min(all.length - 1, app.ui.studioSel | 0)), pg = pageOf(all, Math.floor(sel / rows()));
     const right = `
-      <span class="cap acc">Game · ${String(gi + 1).padStart(2, '0')}/${String(list.length).padStart(2, '0')}</span>
+      <span class="cap acc">Editing</span>
       <span class="title clamp2">${esc(g.name)}</span>
       <span class="sub">${esc(games.editLine(g))}</span>
       <div class="actions">
@@ -58,21 +53,29 @@ export default {
     const body = `<div class="group">
       <div class="plate bar">
         ${pager('Parts ' + pg.range, A(() => pick(Math.max(0, pg.p - 1) * rows())), A(() => pick(Math.min(pg.pages - 1, pg.p + 1) * rows())))}
-        ${list.length > 1 ? `<div style="display:flex;align-items:center;gap:2px">${iconBtn('left', A(() => switchGame(app, -1)), { color: '#fff', label: 'Previous game' })}<span class="cap" style="color:var(--muted)">Game</span>${iconBtn('right', A(() => switchGame(app, 1)), { color: '#fff', label: 'Next game' })}</div>` : '<span class="cap" style="color:var(--muted);padding-right:10px">Tap again to open</span>'}
+        ${changeGame(app)}
       </div>
       ${rowHtml}
     </div>`;
     return { right, body };
   },
   pad(app, input) {
-    const g = games.currentGame(app); if (!g) return;
+    const g = games.currentGame(app); if (!g || !g.editable) return;
     const all = parts(app, g, info(app, g)), i = app.ui.studioSel | 0;
     const pick = (n) => { app.ui.studioSel = Math.max(0, Math.min(all.length - 1, n)); app.saveUI(); app.render(); };
     if (input.pressed('down')) pick(i + 1);
     else if (input.pressed('up')) pick(i - 1);
-    else if (input.pressed('left')) switchGame(app, -1);
-    else if (input.pressed('right')) switchGame(app, 1);
     else if (input.pressed('a')) all[Math.min(i, all.length - 1)].go();
     else if (input.pressed('x') || input.pressed('start')) games.launch(g);
   }
 };
+
+// what the Studio, Art and Sound tabs show when the game selected in the Arcade can't be edited here (yet)
+export function notReady(app, g, iconName, what) {
+  const name = g ? g.name : 'No game';
+  return {
+    right: `<span class="cap acc">Selected</span><span class="title clamp2">${esc(name)}</span><span class="sub">Not in the Studio yet</span>
+      <div class="actions">${g ? plateBtn('play', 'Play', A(() => games.launch(g))) : ''}${plateBtn('left', 'Change game', A(() => app.setTab(0)))}</div>`,
+    body: `<div class="group">${emptyRow(iconName, what + ' works with games that have a game.json, like Crab Platformer. Pick one in the Arcade.')}</div>`
+  };
+}
