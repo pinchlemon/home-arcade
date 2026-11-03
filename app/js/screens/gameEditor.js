@@ -8,7 +8,7 @@ import { A, esc, iconBtn, bareBtn, stepper } from '../ui.js';
 import * as games from '../games.js';
 import { pushAll } from './sync.js';
 import * as input from '../input.js';
-import { makeNav, padFrame, clearNav } from '../padnav.js';
+import { makeNav, padFrame, clearNav, navEpoch } from '../padnav.js';
 
 const GREEN = '#7dff6a', BONE = '#e4e2dc', DIM = '#3a3a3f';
 const VW = 160, VH = 144;
@@ -51,6 +51,7 @@ export function openGameEditor(app, g) {
   delete app.ui.geObj; delete app.ui.geLayer; app.saveUI(); // a jump from the Art tab picks these once
   let view = null, off = null, octx = null, drag = null, dragged = false;
   const nav = makeNav();   // where the controller's ring is
+  window.__ed = ed;   // handy for debugging in the browser console
   const folder = g.file;
   games.setCurrentGame(app, g);
   games.loadGame(folder).then(x => { ed.game = x; rerender(); }).catch(e => { ed.error = e.message; rerender(); });
@@ -386,6 +387,71 @@ export function openGameEditor(app, g) {
       <div class="plate inspector" style="margin-top:8px">${rows}</div>`;
   }
 
+  // ---------------------------------------------------------------- the scene by controller
+  // A on the scene hands the controller to it: the stick (or D-pad) moves a cross over the scene, and the scene slides when the
+  // cross reaches an edge. A uses the tool where the cross is (select, place or erase); on a selected thing, A picks it up, the
+  // stick carries it, and A puts it down. X changes tool, LB and RB change what Place puts down, B steps back out.
+  const TOOLS = ['select', 'place', 'erase'];
+  function padHint() {
+    const el = document.querySelector('.padhint'); if (!el) return;
+    const L = scene().kind === 'level';
+    const what = !L ? 'Look' : ed.tool === 'place' ? 'Place · ' + ((placeDef(ed.placeType) || {}).name || '') : ed.tool === 'erase' ? 'Erase' : ed.pad && ed.pad.grab ? 'Moving' : 'Select';
+    el.textContent = what + (L ? '  ·  A use  X tool  B done' : '  ·  B done');
+  }
+  function placeCursor() {
+    const x = document.querySelector('.xhair'), h = document.querySelector('.padhint'), live = !!(ed.pad && view);
+    if (x) x.classList.toggle('live', live); if (h) h.classList.toggle('live', live);
+    if (!live || !x) return;
+    const scr = x.parentElement.getBoundingClientRect(), r = view.getBoundingClientRect();
+    x.style.left = (r.left - scr.left + ed.pad.fx * r.width) + 'px'; x.style.top = (r.top - scr.top + ed.pad.fy * r.height) + 'px';
+    padHint();
+  }
+  const padClient = () => { const r = view.getBoundingClientRect(); return { clientX: r.left + ed.pad.fx * r.width, clientY: r.top + ed.pad.fy * r.height }; };
+  function enterPad() { if (!ed.game || !view) return; ed.pad = { fx: 0.5, fy: 0.5, grab: null, t: 0, epoch: navEpoch() }; placeCursor(); }
+  function exitPad() { ed.pad = null; if (view) drawScene(); placeCursor(); }
+  function previewGrab() {
+    const P = ed.pad, L = structuredClone(scene()), { wx, wy } = toWorld(padClient()), g = P.grab, it = g.it, d = it.def;
+    g.nx = Math.max(0, Math.min(L.width - 1, Math.round(g.x0 + wx - g.wx0)));
+    g.nh = d.height ? Math.max(d.height[0], Math.min(d.height[1], Math.round(g.h0 - (wy - g.wy0)))) : undefined;
+    if (it.list === 'start' || it.list === 'exit') L[it.list].x = g.nx;
+    else { const arr = it.list === 'things' ? thingsOf(L) : L[it.list]; if (!arr[it.index]) return; arr[it.index].x = g.nx; if (g.nh !== undefined) arr[it.index].h = g.nh; if (it.list === 'things' && !L.things) L.things = arr; }
+    drawLevel(L);
+  }
+  function capturePad(input2) {
+    const P = ed.pad, L = scene(), isLevel = L.kind === 'level';
+    if (input2.pressed('b')) { if (P.grab) { P.grab = null; drawScene(); padHint(); } else exitPad(); return; }
+    if (input2.pressed('start')) { games.launch(g, scene().id); return; }
+    if (isLevel && input2.pressed('x')) { ed.tool = TOOLS[(TOOLS.indexOf(ed.tool) + 1) % TOOLS.length]; ed.lsel = null; P.grab = null; rerender(); return; }
+    if (isLevel && ed.tool === 'place' && (input2.pressed('lb') || input2.pressed('rb'))) {
+      const list = placeList(), i = Math.max(0, list.findIndex(d => d.type === ed.placeType)), d = input2.pressed('rb') ? 1 : -1;
+      ed.placeType = list[(i + d + list.length) % list.length].type; rerender(); return;
+    }
+    const dx = (input2.isHeld('right') ? 1 : 0) - (input2.isHeld('left') ? 1 : 0), dy = (input2.isHeld('down') ? 1 : 0) - (input2.isHeld('up') ? 1 : 0);
+    let moved = false;
+    if (dx || dy) {
+      P.t++; const sp = 1.2 + Math.min(3, P.t / 20);
+      let vx = P.fx * VW + dx * sp, vy = P.fy * VH + dy * sp;
+      // at the left or right edge the scene itself slides
+      if (vx < 10) { ed.camX += vx - 10; vx = 10; } else if (vx > VW - 10) { ed.camX += vx - (VW - 10); vx = VW - 10; }
+      if (isLevel) ed.camX = Math.max(-16, Math.min(L.width - VW + 16, ed.camX));
+      P.fx = vx / VW; P.fy = Math.max(0, Math.min(1, vy / VH)); moved = true;
+    } else P.t = 0;
+    if (input2.pressed('a')) {
+      const c = padClient();
+      if (P.grab) {
+        const g2 = P.grab, it = g2.it;
+        if (g2.nx !== undefined) changeLevel(L2 => { if (it.list === 'start' || it.list === 'exit') L2[it.list].x = g2.nx; else { L2[it.list][it.index].x = g2.nx; if (g2.nh !== undefined) L2[it.list][it.index].h = g2.nh; if (it.list === 'checkpoints') L2.checkpoints.sort((a, b) => a.x - b.x); } });
+        P.grab = null; ed.lsel = null; rerender(); return;
+      }
+      if (isLevel && ed.tool === 'select') {
+        const { wx, wy } = toWorld(c), hit = hitItem(L, wx, wy, data().screen.ground);
+        if (hit && sameItem(hit, ed.lsel)) { P.grab = { it: hit, x0: hit.x, h0: hit.h || 0, wx0: wx, wy0: wy }; padHint(); return; }
+      }
+      sceneTap(c); return;
+    }
+    if (moved) { if (P.grab) previewGrab(); else drawScene(); placeCursor(); }
+  }
+
   // ---------------------------------------------------------------- the screen
   // the Backdrop is a second view of the Scene tab (the switch is in the corner of the screen)
   const TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
@@ -401,7 +467,7 @@ export function openGameEditor(app, g) {
       if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas><span class="xhair" aria-hidden="true"></span></div>`;
+        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas><span class="xhair" aria-hidden="true"></span><span class="padhint cap" aria-hidden="true"></span></div>`;
         const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
           <div style="display:flex;gap:0;align-items:center;min-width:0">${viewSwitch(true)}<span class="vsep" style="margin:0 3px"></span>${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:4px">Waves</span>`}</div>
           <div style="display:flex;align-items:center;gap:2px">
@@ -511,7 +577,7 @@ export function openGameEditor(app, g) {
           }
           if (drag && !dragged) sceneTap(e); drag = null; setTimeout(() => { dragged = false; }, 0);
         });
-        drawScene();
+        drawScene(); placeCursor();
       }
       if (ed.tab === 'background') {
         const D = data();
@@ -533,6 +599,8 @@ export function openGameEditor(app, g) {
     // Controller: B steps back (out of an object, then out of the editor), Start plays, LB and RB switch tabs,
     // and the D-pad moves a ring around the screen (see padnav.js)
     frame() {
+      if (ed.pad && (ed.tab !== 'scene' || ed.pad.epoch !== navEpoch())) { ed.pad = null; placeCursor(); }
+      if (ed.pad) { if (ed.game && view) capturePad(input); return; }
       if (input.pressed('b')) { if (ed.obj && ed.tab === 'objects') { ed.obj = null; ed.addingBehavior = false; clearNav(nav); rerender(); } else app.close(); return; }
       if (input.pressed('start')) { games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null); return; }
       if (input.pressed('lb') || input.pressed('rb')) {
@@ -540,10 +608,7 @@ export function openGameEditor(app, g) {
         ed.tab = keys[(i + d + keys.length) % keys.length]; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); clearNav(nav); rerender(); return;
       }
       if (!ed.game) return;
-      padFrame(document.getElementById('app'), nav, input, {
-        pan: (dx) => { if (view && ed.camX != null) { ed.camX += dx; drawScene(); } },
-        tap: () => { if (view) { const r = view.getBoundingClientRect(); sceneTap({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }); } }
-      });
+      padFrame(document.getElementById('app'), nav, input, { tap: enterPad });
     }
   };
   ov.onClose = () => { if (app.settings.autoPush && games.getEdits(folder).dirty) pushAll(app, true); };
