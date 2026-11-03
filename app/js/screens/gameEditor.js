@@ -454,7 +454,7 @@ export function openGameEditor(app, g) {
           <div style="display:flex;gap:6px;align-items:center">${viewSwitch(false)}<span class="vsep"></span><span class="cap acc" style="padding-left:4px">Backdrop · ${schema.background.length} layers</span></div></div>${bgPanel()}`;
       } else {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
-        panel = `<div class="plate bar gap20" style="flex:none">
+        panel = `<div class="plate bar gap20" style="flex:none" data-pad="pager">
             ${iconBtn('left', A(() => { ed.group = (k + groups.length - 1) % groups.length; rerender(); }), { color: '#fff', label: 'Previous group' })}
             <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center"><span class="cap acc">${esc(gr.name)}</span><span class="sub" style="font-size:11px">${gr.scope === 'universal' ? 'Every game has these' : esc(g.name) + ' extras'} · ${k + 1}/${groups.length}</span></span>
             ${iconBtn('right', A(() => { ed.group = (k + 1) % groups.length; rerender(); }), { color: '#fff', label: 'Next group' })}
