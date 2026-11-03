@@ -6,6 +6,8 @@ import * as input from './input.js';
 import * as snd from './sound.js';
 import * as games from './games.js';
 import { clearAllNav } from './padnav.js';
+import { BUILD } from './build.js';
+import { hardUpdate } from './update.js';
 import { A, resetActions, getAction, esc, setRows, rows } from './ui.js';
 import arcade from './screens/arcade.js';
 import studio from './screens/studio.js';
@@ -42,7 +44,7 @@ export const app = {
     if (!quiet) snd.click(); this.render();
   },
   open(overlay) { this.overlay = overlay; this.render(); },
-  close() { const o = this.overlay; this.overlay = null; if (o && o.onClose) o.onClose(); this.render(); },
+  close() { const o = this.overlay; this.overlay = null; if (o && o.onClose) o.onClose(); this.render(); if (this.updateReady) { this.updateReady = false; warned = false; checkVersion(); } },
   toast(msg) {
     let t = document.querySelector('.toast');
     if (!t) { t = document.createElement('div'); t.className = 'toast plate'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
@@ -223,13 +225,15 @@ function frame(ms) {
 input.onConnection(() => { if (!app.overlay) render(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); else if (!app.overlay) render(); });
 
-// a new version on GitHub reloads the app the next time you come back to it (never mid-edit or mid-game)
-let version = null;
+// A newer version on GitHub: the app compares its own build with the version.json there, and updates itself the next time you
+// come back to it. If a full-screen tool (the editor, say) is open it waits until you leave it, and says so.
+let warned = false;
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-    if (!j.v) return;
-    if (version === null) version = j.v;
-    else if (j.v !== version && !app.overlay) location.reload();
+    if (!j.v || j.v === BUILD) { try { sessionStorage.removeItem('ha.upd'); } catch (e) {} return; }
+    if (app.overlay) { app.updateReady = true; if (!warned) { warned = true; app.toast('A new version is ready. It installs when you leave this screen.'); } return; }
+    let n = 0; try { n = +sessionStorage.getItem('ha.upd') || 0; sessionStorage.setItem('ha.upd', n + 1); } catch (e) {}
+    if (n < 2) hardUpdate();   // (twice at most, so a slow deploy can't make it loop)
   }).catch(() => {});
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });

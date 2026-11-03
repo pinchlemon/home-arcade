@@ -5,6 +5,8 @@ import { A, esc, plateBtn, iconBtn, stepper, toggle, rows as rowCount } from '..
 import { syncGroup, changeList, pushAll } from './sync.js';
 import * as input from '../input.js';
 import * as snd from '../sound.js';
+import { hardUpdate, buildDate } from '../update.js';
+import { BUILD as CODE_BUILD } from '../build.js';
 
 const YELLOW = '#ffd23f';
 export const BUILD = '0.1';
@@ -56,11 +58,8 @@ export default {
       b = plateBtn('mute', st.sfx ? 'Mute all' : 'Unmute', A(() => (st.sfx ? put({ sfx: 0, lastSfx: st.sfx }) : put({ sfx: st.lastSfx || 7 }))));
       rows = num('sfx', 'Sound effects', 'Game and editor sounds', 0, 9) + tog('menuSounds', 'Menu sounds', 'Clicks as you move around');
     } else {
-      title = 'Display'; sub = 'Version ' + BUILD + ' · ' + (navigator.onLine ? 'online' : 'offline');
-      a = plateBtn('reset', 'Update', A(async () => {
-        try { const r = await navigator.serviceWorker?.getRegistration(); if (r) await r.update(); } catch (e) {}
-        app.toast('Reloading with the newest version'); setTimeout(() => location.reload(), 600);
-      }));
+      title = 'Display'; sub = 'Build ' + buildDate(CODE_BUILD) + (navigator.onLine ? '' : ' · offline');
+      a = plateBtn('reset', 'Update', A(() => { app.toast('Getting the newest version…'); setTimeout(hardUpdate, 400); }));
       b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER' })));
       rows = tog('reduceMotion', 'Reduce motion', 'Stop the solids spinning') + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
         + cyc('spriteBg', 'Art background', 'Behind sprites, to see them', SPRITE_BGS);
