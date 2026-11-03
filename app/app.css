@@ -93,12 +93,14 @@ body{background:transparent}
   .screen-tabs{display:grid;grid-template-columns:76px 244px minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"nav emblem body";gap:14px;align-items:stretch;
     padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
   .tabbar{grid-area:nav;height:auto;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));padding:4px 0}
-  /* the shape on top, the text and buttons under it: a narrow panel leaves the width to the list */
-  .emblem{grid-area:emblem;height:auto;flex-direction:column;justify-content:center;gap:12px;padding:0 14px}
-  .emblem>.mount:first-child{transform:scale(.62);margin:-67px!important;align-self:center}
+  /* the text and buttons sit at the bottom of the panel; the shape sits exactly halfway between the top edge and the text */
+  .emblem{grid-area:emblem;height:auto;flex-direction:column;justify-content:flex-end;gap:0;padding:0 14px 16px}
+  .emblem>.mount:first-child{zoom:var(--hz,.82);margin:auto -36px!important;flex:none;align-self:center}
   .emblem-info{align-self:stretch;flex:none;padding:0;gap:3px}
   .emblem-info .actions{gap:6px;margin-top:8px}
   .emblem-info .btn{height:36px}
+  .emblem-info>.sub{white-space:nowrap!important;display:block!important;overflow:hidden;text-overflow:ellipsis}
+  .emblem-info>.title{-webkit-line-clamp:1}
   .group>.bar .cap{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* the tab bar shows just the shapes (the names stay for screen readers) */
   .tab .cap{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
