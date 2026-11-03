@@ -61,7 +61,10 @@ export default {
       title = 'Display'; sub = 'Build ' + buildDate(CODE_BUILD) + (navigator.onLine ? '' : ' · offline');
       a = plateBtn('reset', 'Update', A(() => { app.toast('Getting the newest version…'); setTimeout(hardUpdate, 400); }));
       b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, launchAnim: true, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER' })));
-      rows = tog('reduceMotion', 'Reduce motion', 'Stop the solids spinning') + tog('launchAnim', 'Launch animation', 'The solid that splits into the tabs') + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
+      // one row for both motion settings, so this page stays at four rows (more is cut off on the phone)
+      const MOTION = ['FULL', 'NO LAUNCH', 'REDUCED'], mi = st.reduceMotion ? 2 : (st.launchAnim === false ? 1 : 0);
+      const setMotion = (m) => put(m === 2 ? { reduceMotion: true } : { reduceMotion: false, launchAnim: m === 0 });
+      rows = srow('Motion', 'Launch and spin', stepper(MOTION[mi], A(() => setMotion((mi + 2) % 3)), A(() => setMotion((mi + 1) % 3)), 'motion', true)) + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
         + cyc('spriteBg', 'Art background', 'Behind sprites, to see them', SPRITE_BGS);
     }
     const name = (GROUPS.find(x => x[0] === g) || GROUPS[0])[1];
