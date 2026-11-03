@@ -1,6 +1,6 @@
 {
- "name": "Home Arcade",
- "short_name": "Arcade",
+ "name": "Hedron",
+ "short_name": "Hedron",
  "start_url": "./",
  "scope": "./",
  "display": "fullscreen",

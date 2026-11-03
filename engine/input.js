@@ -83,7 +83,7 @@ addEventListener('gamepadconnected', e => { showPad(true, e.gamepad.id); setCons
 addEventListener('gamepaddisconnected', () => { const on = anyPad(); showPad(on); setConsole(on); });
 // some browsers only report a controller once a button is pressed; catch one that's already awake
 if (anyPad()) setTimeout(() => setConsole(true), 0);
-// Browsers hide a controller from a freshly opened page until a button is pressed on it. When the Home Arcade app opened this game it
+// Browsers hide a controller from a freshly opened page until a button is pressed on it. When the Hedron app opened this game it
 // said whether a controller was in use (sessionStorage), so start in console mode right away instead of waiting for that first press.
 // A touch on the screen before the controller shows up goes back to the touch buttons.
 let hinted = false;

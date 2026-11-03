@@ -1,4 +1,4 @@
-// Home Arcade: app shell. Tabs (Arcade, Studio, Art, Sound, Settings) and full-screen tools (the game editor, the art viewer).
+// Hedron: app shell. Tabs (Arcade, Studio, Art, Sound, Settings) and full-screen tools (the game editor, the art viewer).
 // Studio, Art and Sound all work on one game at a time: the one selected in the Arcade (see games.js).
 import { well, solidSvg, rasterSolid, paintSolid, icon } from './pixel.js';
 import * as S from './store.js';
