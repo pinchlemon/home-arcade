@@ -90,14 +90,16 @@ body{background:transparent}
 /* landscape phone: the tab bar becomes a column on the left, the top panel sits beside the list */
 @media (orientation:landscape) and (max-height:520px){
   #app{max-width:none}
-  .screen-tabs{display:grid;grid-template-columns:84px 360px minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"nav emblem body";gap:16px;align-items:stretch;
+  .screen-tabs{display:grid;grid-template-columns:76px 244px minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"nav emblem body";gap:14px;align-items:stretch;
     padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
   .tabbar{grid-area:nav;height:auto;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));padding:4px 0}
-  .emblem{grid-area:emblem;height:auto;gap:16px;padding:0 16px}
-  .emblem>.mount:first-child{transform:scale(.7);margin:-36px -61px!important}
-  .emblem-info{padding:10px 0}
-  .emblem-info .actions{gap:6px;margin-top:4px}
+  /* the shape on top, the text and buttons under it: a narrow panel leaves the width to the list */
+  .emblem{grid-area:emblem;height:auto;flex-direction:column;justify-content:center;gap:2px;padding:0 14px}
+  .emblem>.mount:first-child{transform:scale(.62);margin:-67px!important;align-self:center}
+  .emblem-info{align-self:stretch;flex:none;padding:0;gap:3px}
+  .emblem-info .actions{gap:6px;margin-top:6px}
   .emblem-info .btn{height:36px}
+  .group>.bar .cap{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .screen-tabs>.emblem+*{grid-area:body;align-self:center}
   /* editors: the picture or scene fills the left side; the bars and panel stack on the right */
   .screen-tool{padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
