@@ -15,6 +15,7 @@ import art from './screens/art.js';
 import sound from './screens/soundTab.js';
 import settings from './screens/settings.js';
 import { unseenCount } from './screens/sync.js';
+import * as launch from './launch.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -33,8 +34,9 @@ export const app = {
 
   saveUI() { S.setUI(this.ui); },
   setSettings(patch) {
-    this.settings = { ...this.settings, ...patch }; S.setSettings(this.settings);
+    const was = this.settings.launchAnim; this.settings = { ...this.settings, ...patch }; S.setSettings(this.settings);
     input.refreshSettings(); snd.refreshSettings(); applySettings(); this.render();
+    if (patch.launchAnim === true && was === false && !this.overlay) setTimeout(() => playLaunch(true), 150); // turning it on shows it once
   },
   setTab(i, quiet) {
     i = (i + SECTIONS.length) % SECTIONS.length;
@@ -212,6 +214,7 @@ function paintSolids(t, force) {
 function frame(ms) {
   const t = ms / 1000;
   input.poll();
+  if (launch.launching()) { lastT = t; requestAnimationFrame(frame); return; } // the launch animation has the controller
   if (app.overlay) { if (app.overlay.frame) app.overlay.frame(t, app); }
   else {
     if (input.pressed('lb')) app.setTab(app.ui.tab - 1);
@@ -221,6 +224,10 @@ function frame(ms) {
   }
   lastT = t;
   requestAnimationFrame(frame);
+function playLaunch(preview) {
+  launch.play({ root, input, preview, tabSolids: () => SECTIONS.map((s, i) => root.querySelector(`[data-solid="tab${i}"]`)).filter(Boolean) });
+}
+if (launch.shouldPlay(app)) playLaunch(false);
 }
 input.onConnection(() => { if (!app.overlay) render(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); else if (!app.overlay) render(); });
@@ -243,3 +250,7 @@ render();
 games.preload(() => { if (!app.overlay) render(); });
 checkVersion();
 requestAnimationFrame(frame);
+function playLaunch(preview) {
+  launch.play({ root, input, preview, tabSolids: () => SECTIONS.map((s, i) => root.querySelector(`[data-solid="tab${i}"]`)).filter(Boolean) });
+}
+if (launch.shouldPlay(app)) playLaunch(false);

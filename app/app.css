@@ -269,3 +269,6 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .padhint{display:none;position:absolute;left:10px;bottom:8px;right:10px;font-size:9px;letter-spacing:.08em;color:var(--acc);background:rgba(0,0,0,.7);padding:3px 6px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .padhint.live{display:block}
 #scn.pf{outline-width:2px}
+
+/* launch animation: the real tab solids stay hidden until the pixels land on them */
+.launching [data-solid^="tab"]{visibility:hidden}

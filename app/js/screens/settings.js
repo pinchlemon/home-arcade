@@ -60,8 +60,8 @@ export default {
     } else {
       title = 'Display'; sub = 'Build ' + buildDate(CODE_BUILD) + (navigator.onLine ? '' : ' · offline');
       a = plateBtn('reset', 'Update', A(() => { app.toast('Getting the newest version…'); setTimeout(hardUpdate, 400); }));
-      b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER' })));
-      rows = tog('reduceMotion', 'Reduce motion', 'Stop the solids spinning') + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
+      b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, launchAnim: true, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER' })));
+      rows = tog('reduceMotion', 'Reduce motion', 'Stop the solids spinning') + tog('launchAnim', 'Launch animation', 'The solid that splits into the tabs') + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
         + cyc('spriteBg', 'Art background', 'Behind sprites, to see them', SPRITE_BGS);
     }
     const name = (GROUPS.find(x => x[0] === g) || GROUPS[0])[1];

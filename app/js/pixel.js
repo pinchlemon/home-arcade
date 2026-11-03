@@ -101,7 +101,7 @@ export function well(size, inner = '', extraClass = '') {
 
 // ---- Platonic solids, drawn as pixels on an N x N grid with three brightness levels by depth
 const solids = {};
-function solid(kind) {
+export function solid(kind) {
   if (solids[kind]) return solids[kind];
   const P = (1 + Math.sqrt(5)) / 2, I = 1 / P, pm = [1, -1];
   let v = [];
@@ -119,11 +119,13 @@ function solid(kind) {
   for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) if (d(v[i], v[j]) < min * 1.01) e.push([i, j]);
   return (solids[kind] = { v, e });
 }
-export function rasterSolid(kind, ay, ax, N) {
-  const s = solid(kind), cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax);
+// The lit cells of a solid as [x, y, level] (level 0 to 2 by depth). roll turns the picture in its own plane (the launch animation uses it).
+export function cellsSolid(kind, ay, ax, N, roll = 0) {
+  const s = solid(kind), cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax), cr = Math.cos(roll), sr = Math.sin(roll);
   const P = s.v.map(q => {
     const x1 = q[0] * cy + q[2] * sy, z1 = -q[0] * sy + q[2] * cy, y2 = q[1] * cx - z1 * sx, z2 = q[1] * sx + z1 * cx, k = 0.95 * 4 / (4 - z2);
-    return [x1 * k, -y2 * k, z2];
+    const px = x1 * k, py = -y2 * k;
+    return [px * cr - py * sr, px * sr + py * cr, z2];
   });
   const cells = {}, toG = x => (x + 1.25) / 2.5 * N;
   s.e.forEach(([i, j]) => {
@@ -136,8 +138,11 @@ export function rasterSolid(kind, ay, ax, N) {
       if (cells[key] === undefined || cells[key] < l) cells[key] = l;
     }
   });
+  return Object.keys(cells).map(key => { const [x, y] = key.split(','); return [+x, +y, cells[key]]; });
+}
+export function rasterSolid(kind, ay, ax, N) {
   const out = ['', '', ''];
-  for (const key in cells) { const [x, y] = key.split(','); out[cells[key]] += sq(+x, +y); }
+  cellsSolid(kind, ay, ax, N).forEach(([x, y, l]) => { out[l] += sq(x, y); });
   return out;
 }
 export function solidSvg(N, size, color, attrs = '') {
