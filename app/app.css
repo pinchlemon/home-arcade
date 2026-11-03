@@ -65,7 +65,10 @@ body{background:transparent}
 .emblem{flex:none;position:relative;height:236px;border-radius:var(--r-plate);overflow:hidden;display:flex;align-items:center;gap:20px;padding:0 20px}
 .emblem-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding:14px 0}
 .emblem-info>.sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.emblem-info .actions{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.emblem-info .actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+
+/* plate buttons: room around the round icon so it never touches the edge */
+.plate.btn{height:46px;padding-left:8px}
 
 /* rows */
 .row{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:14px;height:64px;padding:0 18px 0 12px;border-radius:var(--r-bar);text-align:left;width:100%}
@@ -84,8 +87,8 @@ body{background:transparent}
 .safe-probe{position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none}
 
 /* shorter phones: tighten the spacing so the tab bar always fits */
-@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:208px}.emblem-info{padding:10px 0}.emblem-info .actions{gap:6px;margin-top:4px}.emblem-info .btn{height:36px}}
-@media (max-height:720px){.emblem{height:188px}.emblem .well-lg{transform:scale(.9)}.setrow{height:56px}}
+@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:208px}.emblem-info{padding:10px 0}.emblem-info .actions{gap:6px;margin-top:4px}.emblem-info .btn{height:42px}}
+@media (max-height:720px){.emblem{height:198px}.emblem .well-lg{transform:scale(.9)}.setrow{height:56px}}
 
 /* landscape phone: the tab bar becomes a column on the left, the top panel sits beside the list */
 @media (orientation:landscape) and (max-height:520px){
@@ -98,7 +101,7 @@ body{background:transparent}
   .emblem>.mount:first-child{zoom:var(--hz,.8);margin:var(--hm,0px) -36px!important;flex:none;align-self:center}
   .emblem-info{align-self:stretch;flex:none;padding:0;gap:3px}
   .emblem-info .actions{gap:6px;margin-top:8px}
-  .emblem-info .btn{height:36px}
+  .emblem-info .btn{height:42px}
   .emblem-info>.sub{white-space:nowrap!important;display:block!important;overflow:hidden;text-overflow:ellipsis}
   .emblem-info>.title{-webkit-line-clamp:1}
   .group>.bar .cap{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
