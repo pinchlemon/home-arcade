@@ -1,7 +1,7 @@
 // Controller navigation for the full-screen tools (the game editor, the art viewer, the changes screen).
 // The D-pad (or stick) moves a ring between things you can press, towards where you push it. On a row with a
 // stepper or a switch, left and right change its value instead. A presses the thing the ring is on.
-// The scene can be focused too: left and right slide along it, and A taps its middle (where the cross is).
+// The scene can be focused too; A on it hands the controller over to the scene (see gameEditor.js).
 
 // A pager bar (data-pad="pager": previous, a title, next) is one thing to aim at: left and right turn it, so going down
 // from the top bar lands on it first, and down again goes on to the rows under it.
@@ -28,6 +28,7 @@ const center = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 
 // every ring is cleared when this number goes up (the phone turning back upright, say)
 let epoch = 0;
+export const navEpoch = () => epoch;
 export const clearAllNav = () => { epoch++; document.querySelectorAll('.pf').forEach(e => e.classList.remove('pf')); };
 export const makeNav = () => ({ i: -1, epoch });
 export const clearNav = (nav) => { nav.i = -1; };
@@ -62,7 +63,7 @@ function pick(list, from, dir) {
   return best;
 }
 
-// Call every frame. hooks: { pan(dx) slides the scene, tap() taps the scene's middle }.
+// Call every frame. hooks: { tap() is A on the scene }.
 // Returns true when it used the press.
 export function padFrame(root, nav, input, hooks = {}) {
   if (nav.epoch !== epoch) { nav.epoch = epoch; nav.i = -1; }
@@ -70,8 +71,6 @@ export function padFrame(root, nav, input, hooks = {}) {
   const list = targets(root);
   let cur = nav.i >= 0 ? mark(root, nav) : null;
   if (nav.i >= 0 && !cur) nav.i = -1;
-  // holding left or right slides the scene while it is the thing in focus
-  if (cur && cur.id === 'scn' && hooks.pan) { if (input.isHeld('left')) hooks.pan(-3); else if (input.isHeld('right')) hooks.pan(3); }
   if (!dirs.length && !input.pressed('a')) return false;
   if (!list.length) return false;
   if (!cur) {
@@ -89,7 +88,6 @@ export function padFrame(root, nav, input, hooks = {}) {
     return true;
   }
   const d = dirs[0];
-  if (cur.id === 'scn' && (d === 'left' || d === 'right')) return true;   // those slide the scene
   if (pager && (d === 'left' || d === 'right')) {
     const extra = cur.querySelector('.btn.bare:not(.icon)'), m = /(\d+)\s*\/\s*(\d+)/.exec(cur.innerText || '');
     if (d === 'right' && extra && m && +m[1] >= +m[2]) { nav.i = list.indexOf(extra); mark(root, nav); return true; }   // last page: on to New

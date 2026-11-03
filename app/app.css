@@ -240,7 +240,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 #scn.pf::after{display:none}
 #scn.pf{outline:1.5px solid var(--acc);outline-offset:2px}
 .xhair{display:none;position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;background:linear-gradient(var(--acc),var(--acc)) center/2px 100% no-repeat,linear-gradient(var(--acc),var(--acc)) center/100% 2px no-repeat}
-#scn.pf~.xhair{display:block}
+
 
 /* the ring on a setting row matches the one on the tabs: rounded, with room around the text */
 .grow.pf::after{inset:3px -10px;border-radius:var(--r-btn)}
@@ -263,3 +263,9 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .seg.pf .selring{display:none}
 
 .orow.pf::after{inset:2px -6px}
+
+/* the scene by controller: a cross that follows the stick, and a one-line reminder */
+.xhair.live{display:block}
+.padhint{display:none;position:absolute;left:10px;bottom:8px;right:10px;font-size:9px;letter-spacing:.08em;color:var(--acc);background:rgba(0,0,0,.7);padding:3px 6px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.padhint.live{display:block}
+#scn.pf{outline-width:2px}
