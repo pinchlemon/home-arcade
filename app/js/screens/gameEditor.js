@@ -52,9 +52,30 @@ export function openGameEditor(app, g) {
   const edits = () => games.getEdits(folder);
   const data = () => games.applyOverrides(ed.game.data, edits().overrides);
   const val = (path) => games.getPath(data(), path);
-  const set = (path, v) => { games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
+  // Undo and redo, one change at a time. Each entry is how the edits looked just before a change.
+  const hist = [], fut = [];
+  const record = () => { hist.push(JSON.stringify(edits())); if (hist.length > 200) hist.shift(); fut.length = 0; };
+  function restore(from, to) {
+    if (!from.length) return;
+    to.push(JSON.stringify(edits()));
+    games.setEdits(folder, JSON.parse(from.pop()));
+    ed.lsel = null; ed.sel = null;
+    if (!scenes().some(x => x.id === ed.scene)) { ed.scene = null; ed.camX = null; }
+    if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender();
+  }
+  const set = (path, v) => { record(); games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
   const sceneLabel = () => { const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' ? 'Level' : 'Waves'); };
-  const refreshTitle = () => { const n = games.editCount(folder), el = document.querySelector('.screen-tool .ge-sub'); if (el) el.textContent = sceneLabel() + (n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''); };
+  function topBar() {
+    const n = games.editCount(folder);
+    return `<div class="plate bar ge-top">
+          ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(g.name)}</span><span class="sub ge-sub">${esc(sceneLabel())}${n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''}</span></span>
+          ${iconBtn('undo', A(() => restore(hist, fut)), { color: hist.length ? '#fff' : '#555', label: 'Undo' })}
+          ${iconBtn('redo', A(() => restore(fut, hist)), { color: fut.length ? '#fff' : '#555', label: 'Redo' })}
+          ${iconBtn('play', A(() => games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null)), { color: '#fff', label: 'Play' })}
+        </div>`;
+  }
+  const refreshTitle = () => { const el = document.querySelector('.screen-tool .ge-top'); if (el) el.outerHTML = topBar(); };
 
   // one adjustable setting: its name and what it does, and a stepper
   function field(f) {
@@ -94,7 +115,7 @@ export function openGameEditor(app, g) {
     const y1 = d.list === 'enemies' ? GROUND - it.h + d.h / 2 : GROUND;
     return { x0, y0: y1 - d.h, x1: x0 + d.w, y1 };
   }
-  function changeScenes(fn) { const list = structuredClone(scenes()); fn(list); games.setValue(folder, 'scenes', list); }
+  function changeScenes(fn) { const list = structuredClone(scenes()); fn(list); record(); games.setValue(folder, 'scenes', list); }
   function changeLevel(fn) { changeScenes(list => { const L = list.find(x => x.id === scene().id); if (L) fn(L); }); }
   const sameItem = (a, b) => a && b && a.list === b.list && a.index === b.index;
   function hitItem(L, wx, wy, GROUND) {
@@ -311,16 +332,12 @@ export function openGameEditor(app, g) {
             <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center"><span class="cap acc">${esc(gr.name)}</span><span class="sub" style="font-size:11px">${gr.scope === 'universal' ? 'Every game has these' : esc(g.name) + ' extras'} · ${k + 1}/${groups.length}</span></span>
             ${iconBtn('right', A(() => { ed.group = (k + 1) % groups.length; rerender(); }), { color: '#fff', label: 'Next group' })}
           </div>
-          <div class="plate inspector" style="margin-top:8px">${gr.fields.map(field).join('')}</div>`;
+          <div class="plate inspector" style="margin-top:8px">${gr.fields.map(field).join('')}
+            ${n ? `<div class="grow"><span class="t"><span class="cap">Start over</span><span class="sub">Put all ${n} changes back to the version on GitHub</span></span>${bareBtn('reset', 'Reset', A(() => { if (confirm('Put all ' + n + ' changes to ' + g.name + ' back to the GitHub version? Undo can bring them back.')) { record(); games.resetEdits(folder); rerender(); } }))}</div>` : ''}</div>`;
       }
       return `<div class="screen-tool" style="--acc:${GREEN}">
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
-        <div class="plate bar">
-          ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}
-          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(g.name)}</span><span class="sub ge-sub">${esc(sceneLabel())}${n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''}</span></span>
-          ${n ? iconBtn('reset', A(() => { if (confirm('Undo all ' + n + ' changes to ' + g.name + ' on this phone?')) { games.resetEdits(folder); rerender(); } }), { label: 'Undo all changes' }) : ''}
-          ${bareBtn('play', 'Play', A(() => games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null)))}
-        </div>
+        ${topBar()}
         <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px">
           ${TABS.map(([k2, l2, ic]) => `<button class="seg${ed.tab === k2 ? ' on' : ''}" role="tab" aria-selected="${ed.tab === k2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], ed.tab === k2 ? GREEN : BONE))}${l2}${ed.tab === k2 ? '<span class="selring"></span>' : ''}</button>`).join('')}
         </div>
