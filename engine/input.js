@@ -68,12 +68,12 @@ function goFull() {
   } catch (e) {}
 }
 // a connected controller switches to console mode: full-screen game, no touch buttons
-function setConsole(on) {
+function setConsole(on, quiet) {
   if (document.body.classList.contains('console') === on) return;
   document.body.classList.toggle('console', on);
   fitCanvas();
   if (on) goFull();
-  else {
+  else if (!quiet) {
     paused = true;   // controller dropped mid-game: hold the action until it's back
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
   }
@@ -83,5 +83,12 @@ addEventListener('gamepadconnected', e => { showPad(true, e.gamepad.id); setCons
 addEventListener('gamepaddisconnected', () => { const on = anyPad(); showPad(on); setConsole(on); });
 // some browsers only report a controller once a button is pressed; catch one that's already awake
 if (anyPad()) setTimeout(() => setConsole(true), 0);
+// Browsers hide a controller from a freshly opened page until a button is pressed on it. When the Home Arcade app opened this game it
+// said whether a controller was in use (sessionStorage), so start in console mode right away instead of waiting for that first press.
+// A touch on the screen before the controller shows up goes back to the touch buttons.
+let hinted = false;
+try { hinted = sessionStorage.getItem('ha.pad') === '1'; } catch (e) {}
+if (hinted) setTimeout(() => setConsole(true, true), 0);
+document.addEventListener('pointerdown', e => { if (hinted && e.pointerType === 'touch' && !anyPad()) { hinted = false; setConsole(false, true); } }, { passive: true });
 // fullscreen needs a tap in most browsers; one tap on the screen in console mode asks for it
 document.addEventListener('pointerdown', () => { if (document.body.classList.contains('console')) goFull(); }, { passive: true });

@@ -84,4 +84,6 @@ export async function loadGame(folder) {
 export const forgetGame = (folder) => { delete cache[folder]; delete bases[folder]; };
 
 // open a code game; swiping back from it returns to the app
-export function launch(g, scene) { try { sessionStorage.setItem('ha.return', 'app/'); } catch (e) {} location.href = g.path + (scene ? '?scene=' + encodeURIComponent(scene) : ''); }
+// (and it tells the game whether a controller is in use, so the game doesn't wait for the browser to notice it)
+export function launch(g, scene) {
+  try { sessionStorage.setItem('ha.return', 'app/'); sessionStorage.setItem('ha.pad', [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(x => x && x.connected) ? '1' : '0'); } catch (e) {} location.href = g.path + (scene ? '?scene=' + encodeURIComponent(scene) : ''); }
