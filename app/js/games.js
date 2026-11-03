@@ -31,8 +31,8 @@ export const ago = (t) => {
 export function editLine(g) {
   if (!g.editable) return g.kind;
   const e = getEdits(g.file), n = realChanges(g.file).length;
-  if (!n) return 'No changes on this phone';
-  return n + (n === 1 ? ' change · ' : ' changes · ') + 'edited ' + ago(e.edited) + (e.dirty ? '' : ' · pushed');
+  if (!n) return 'No changes';
+  return n + (n === 1 ? ' change' : ' changes') + (e.dirty ? ' · not pushed' : ' · pushed');
 }
 
 const KEY = (folder) => 'ha.game.' + folder;

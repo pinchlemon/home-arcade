@@ -63,7 +63,8 @@ body{background:transparent}
 
 /* emblem plate */
 .emblem{flex:none;position:relative;height:236px;border-radius:var(--r-plate);overflow:hidden;display:flex;align-items:center;gap:20px;padding:0 20px}
-.emblem-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.emblem-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding:14px 0}
+.emblem-info>.sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .emblem-info .actions{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 
 /* rows */
@@ -83,7 +84,7 @@ body{background:transparent}
 .safe-probe{position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none}
 
 /* shorter phones: tighten the spacing so the tab bar always fits */
-@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:208px}}
+@media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:208px}.emblem-info{padding:10px 0}.emblem-info .actions{gap:6px;margin-top:4px}.emblem-info .btn{height:36px}}
 @media (max-height:720px){.emblem{height:188px}.emblem .well-lg{transform:scale(.9)}.setrow{height:56px}}
 
 /* press feedback: the button sinks and lights up in the section colour, like a selected one */
