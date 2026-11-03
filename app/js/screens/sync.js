@@ -74,7 +74,7 @@ export async function pushAll(app, quiet) {
     }
     const t = await gh(app, 'git/trees', { base_tree: base.tree.sha, tree });
     const message = items.length === 1 ? `Studio: update ${items[0].name}` : `Studio: update ${items.length} games (${items.slice(0, 3).map(i => i.name).join(', ')}${items.length > 3 ? '…' : ''})`;
-    const c = await gh(app, 'git/commits', { message: message + '\n\nPushed from Home Arcade on the phone.', tree: t.sha, parents: [head] });
+    const c = await gh(app, 'git/commits', { message: message + '\n\nPushed from Hedron on the phone.', tree: t.sha, parents: [head] });
     await gh(app, `git/refs/heads/${encodeURIComponent(branch)}`, { sha: c.sha }, 'PATCH');
     for (const f of pushed) { const e = games.getEdits(f); e.dirty = false; games.setEdits(f, e); games.forgetGame(f); }
     const sy = S.getSync();

@@ -1,8 +1,8 @@
 # home-arcade
 
-## Home Arcade app (`app/`)
+## Hedron app (`app/`)
 
-The new Home Arcade: play every game with a controller, and make small games on the phone with the touchscreen. Open https://pinchlemon.github.io/home-arcade/app/ in Safari and use Add to Home Screen. It works offline.
+Hedron (the repo is still called home-arcade, so the web address is unchanged): play every game with a controller, and make small games on the phone with the touchscreen. Open https://pinchlemon.github.io/home-arcade/app/ in Safari and use Add to Home Screen. It works offline.
 
 - **Arcade**: every game in this repo. The game you select here is the one the Studio, Art and Sound tabs work on (marked Editing). D-pad picks, A plays, X edits.
 - **Studio**: the selected game and its parts (Change game goes back to the Arcade). Edit opens the game editor: Scene (with a Backdrop view of the background layers), Objects (reusable templates and their behaviors) and Settings.
