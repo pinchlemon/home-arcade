@@ -247,3 +247,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .grow.pf{margin-left:0}
 
 [data-pad=pager]{position:relative}
+
+/* the controller ring needs something to hang on: any focused button, and the object rows */
+.screen-tool button.pf{position:relative}
+.orow.pf::after{inset:3px -10px;border-radius:var(--r-btn)}
