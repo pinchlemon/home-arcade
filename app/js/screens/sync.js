@@ -31,6 +31,11 @@ export function changeList() {
   return out;
 }
 
+// The dot on the Settings tab and the Sync group: changes you haven't looked at yet. Opening a game's changes (Review) marks
+// what is there as seen; a new change brings the dot back. (The changes themselves stay listed until pushed or discarded.)
+export const unseenCount = () => { const seen = S.getSync().seen || {}; return changeList().filter(c => seen[c.game.file] !== games.getEdits(c.game.file).edited).length; };
+export function markSeen(g) { const sy = S.getSync(); sy.seen = { ...(sy.seen || {}), [g.file]: games.getEdits(g.file).edited }; S.setSync(sy); }
+
 // ---------------------------------------------------------------- GitHub REST
 async function gh(app, path, body, method) {
   const st = app.settings, headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
