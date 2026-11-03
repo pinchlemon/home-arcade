@@ -12,8 +12,8 @@ const ICON_STOPS = [[0, '#86c94a'], [.12, '#3f9fa8'], [.25, '#5a5cf0'], [.4, '#c
 // seconds. The spin picks up speed until `fast`, then keeps going flat out. At `leave` pixels begin to leave the dodecahedron, one by one,
 // until `gone`; each takes FLIGHT seconds to reach the row, so the row is complete at `row`. Then the row drops to the tabs.
 const FLIGHT = 0.8, ROW_N = 44, TAB_N = 20, DROP_DUR = 0.7, DROP_STAGGER = 0.07;
-const T = { hold: 0.45, fast: 2.65, pix: 2.3, leave: 3.2, gone: 4.2, row: 4.2 + FLIGHT, drop: 5.3, end: 5.3 + 4 * DROP_STAGGER + DROP_DUR };
-const OMEGA = 45; // radians per second at full speed (about 7 turns a second)
+const T = { hold: 0.45, fast: 2.65, pix: 2.2, pixIn: 0.6, leave: 3.2, gone: 4.2, row: 4.2 + FLIGHT, drop: 5.3, end: 5.3 + 4 * DROP_STAGGER + DROP_DUR };
+const OMEGA = 32; // radians per second at full speed (about 5 turns a second)
 const KINDS = ['dodeca', 'cube', 'icosa', 'octa', 'tetra'];
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -82,27 +82,39 @@ function drawScene(ctx, Q, st) {
   ctx.clearRect(0, 0, Q, Q);
   const P = project(g.s.v, st.ay, st.ax, st.roll, st.persp).map(p => [c + p[0] * u, c + p[1] * u, p[2]]);
   const fn = g.faces.map(f => rotN(f.n, st.ay, st.ax, st.roll));
-  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const front = g.s.e.map((_, k) => g.edgeFaces[k].some(f => fn[f][2] > 0.001));
-  // each bar is coloured by where it is around the centre, so the rainbow stays put as the solid turns
+  // each bar is coloured by where it is around the centre, so the rainbow stays put as the solid turns (and meets its neighbours in the same colour)
   const edgeGrad = (a, b) => {
     const gr = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
     for (let s = 0; s <= 4; s++) { const f = s / 4; gr.addColorStop(f, iconColor(Math.atan2(a[1] + (b[1] - a[1]) * f - c, a[0] + (b[0] - a[0]) * f - c) / TAU)); }
     return gr;
   };
-  const line = (a, b, dx, dy) => { ctx.beginPath(); ctx.moveTo(a[0] + dx, a[1] + dy); ctx.lineTo(b[0] + dx, b[1] + dy); ctx.stroke(); };
+  const line = (a, b) => { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
   // far edges, faint, show the solid behind (a skeleton: no faces)
   if (st.back > 0.01) {
-    ctx.lineWidth = u * 0.035;
-    g.s.e.forEach(([i, j], k) => { if (!front[k]) { ctx.globalAlpha = st.back * (0.12 + 0.22 * clamp(0.5 - (P[i][2] + P[j][2]) / 2)); ctx.strokeStyle = edgeGrad(P[i], P[j]); line(P[i], P[j], 0, 0); } });
+    ctx.lineWidth = u * 0.03;
+    g.s.e.forEach(([i, j], k) => { if (!front[k]) { ctx.globalAlpha = st.back * (0.1 + 0.2 * clamp(0.5 - (P[i][2] + P[j][2]) / 2)); ctx.strokeStyle = edgeGrad(P[i], P[j]); line(P[i], P[j]); } });
   }
-  // near edges, like the logo: a slim bar with a violet-blue fringe on its upper left and a green one on its lower right
-  const w = u * 0.07, d = u * 0.013;
+  const w = u * 0.07, near = [];
+  g.s.e.forEach(([i, j], k) => { if (front[k]) near.push([P[i], P[j]]); });
+  ctx.globalAlpha = 1; ctx.lineWidth = w;
+  near.forEach(([a, b]) => { ctx.strokeStyle = edgeGrad(a, b); line(a, b); });
+  // bevel, like the logo: a light strip along the upper-left side of each bar and a shade along the lower-right.
+  // Each is one path, so where bars meet nothing doubles up.
+  const strip = (side, style, alpha) => {
+    ctx.beginPath();
+    near.forEach(([a, b]) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; let nx = -dy / l, ny = dx / l;
+      if (nx + ny > 0) { nx = -nx; ny = -ny; }
+      const o = side * w * 0.3;
+      ctx.moveTo(a[0] + nx * o, a[1] + ny * o); ctx.lineTo(b[0] + nx * o, b[1] + ny * o);
+    });
+    ctx.globalAlpha = alpha; ctx.strokeStyle = style; ctx.lineWidth = w * 0.18; ctx.stroke();
+  };
+  strip(1, '#ffffff', 0.3);
+  strip(-1, '#000000', 0.1);
   ctx.globalAlpha = 1;
-  const each = fn => g.s.e.forEach(([i, j], k) => { if (front[k]) fn(P[i], P[j]); });
-  ctx.strokeStyle = 'rgba(120,130,255,.95)'; ctx.lineWidth = w * 1.02; each((a, b) => line(a, b, -d, -d));
-  ctx.strokeStyle = 'rgba(130,235,110,.9)'; ctx.lineWidth = w * 1.02; each((a, b) => line(a, b, d, d));
-  ctx.lineWidth = w; each((a, b) => { ctx.strokeStyle = edgeGrad(a, b); line(a, b, 0, 0); });
   // fading to white tints everything drawn so far
   if (st.white > 0.01) { ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = `rgba(255,255,255,${st.white})`; ctx.fillRect(0, 0, Q, Q); ctx.globalCompositeOperation = 'source-over'; }
 }
@@ -118,8 +130,7 @@ function pixelate(src, n, tmp) {
   x.clearRect(0, 0, n, n); x.imageSmoothingEnabled = true; x.drawImage(cur, 0, 0, n, n);
   const d = x.getImageData(0, 0, n, n), a = d.data;
   for (let i = 0; i < a.length; i += 4) a[i + 3] = a[i + 3] > 110 ? 255 : (a[i + 3] > 45 ? 120 : 0);
-  x.putImageData(d, 0, 0);
-  return { canvas: out, data: a };
+  return { canvas: out, ctx: x, img: d, data: a }; // the caller puts the image back (after thinning it out)
 }
 
 let playing = false;
@@ -184,10 +195,9 @@ export function play({ root, input, tabSolids, preview }) {
   addEventListener('pointerdown', skip, true); addEventListener('keydown', skip, true); addEventListener('resize', resized);
 
   const alphaOf = l => [.3, .6, 1][l];
-  let rects = null, tcs = 1.5, slots = null, landing = null, particles = null, nextP = 0, counts = null;
+  let rects = null, tcs = 1.5, slots = null, landing = null, particles = null, nextP = 0, counts = null, sent = null;
 
   // where the five solids stand in a row (where the dodecahedron was) and where their circles on the tab bar are.
-  // Every pixel from here on is the size of a pixel in the tab icons.
   function layout() {
     const els = tabSolids(); rects = els.map(e => e.getBoundingClientRect());
     // the colour each real tab icon has right now (the chosen tab in its colour, the others white), where the white solids land
@@ -196,33 +206,41 @@ export function play({ root, input, tabSolids, preview }) {
     const gap = Math.min(W * 0.2, ROW_N * tcs + 12);
     slots = KINDS.map((_, i) => ({ x: cx + (i - 2) * gap, y: cy }));
   }
+  layout();
+  // the dodecahedron's pixels are only a little bigger than the tab-icon pixels, so the ones that fly off shrink just a touch on the way
+  const PN = Math.max(60, Math.round(Dg / (tcs * 1.6))), pcs = Dg / PN;
+
   // one little pixel for every pixel of the five solids, each given a moment to leave the dodecahedron (spread evenly, solids mixed together)
   function makeParticles() {
     counts = KINDS.map((kind, i) => { const q = tabPose(i, t0 + T.row); return cellsSolid(kind, q.ay, q.ax, ROW_N).length; });
+    sent = [0, 0, 0, 0, 0];
     const owners = []; counts.forEach((n, i) => { for (let k = 0; k < n; k++) owners.push(i); });
     for (let k = owners.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [owners[k], owners[j]] = [owners[j], owners[k]]; }
     const M = owners.length;
-    particles = owners.map((i, k) => ({ i, tl: T.leave + (k + Math.random()) / M * (T.gone - T.leave), on: false, bx: (Math.random() - .5) * 20, by: (Math.random() - .5) * 20 }));
+    particles = owners.map((i, k) => ({ i, tl: T.leave + (k + Math.random()) / M * (T.gone - T.leave), on: false, bx: (Math.random() - .5) * 18, by: (Math.random() - .5) * 18 }));
   }
-  // lit cells of the pixelated dodecahedron, in screen px
-  let cells = [], cellsT = -1, sorted = null;
-  function readCells(data, n, t) {
-    const cs = Dg / n; cells = []; sorted = null; cellsT = t;
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-      const i = (y * n + x) * 4; if (data[i + 3]) cells.push({ gx: x, gy: y, x: cx + (x + .5 - n / 2) * cs, y: cy + (y + .5 - n / 2) * cs, a: data[i + 3] / 255, c: [data[i], data[i + 1], data[i + 2]] });
+  // the lit pixels of the dodecahedron this frame (screen px), left to right, so its left side feeds the left solids
+  let lit = [];
+  function readLit(data) {
+    lit = [];
+    for (let y = 0; y < PN; y++) for (let x = 0; x < PN; x++) {
+      const k = (y * PN + x) * 4; if (data[k + 3]) lit.push({ x: cx + (x + .5 - PN / 2) * pcs, y: cy + (y + .5 - PN / 2) * pcs, a: data[k + 3] / 255, c: [data[k], data[k + 1], data[k + 2]] });
     }
+    lit.sort((a, b) => a.x - b.x);
   }
-  // send off the pixels whose moment has come: each leaves a place on the dodecahedron (its left side feeds the left solids) for a spot on its solid
+  // send off the pixels whose moment has come. A solid's pixels appear in a set order (by hash, see drawSolids), so each flying pixel
+  // is aimed at exactly the spot that will light up when it lands: it lands, and that pixel of the solid is there.
   function launchDue(t, now) {
-    if (nextP >= particles.length || particles[nextP].tl > t || !cells.length) return;
-    if (!sorted) sorted = cells.slice().sort((a, b) => a.x - b.x);
+    if (nextP >= particles.length || particles[nextP].tl > t || !lit.length) return;
     const tgt = {};
     while (nextP < particles.length && particles[nextP].tl <= t) {
-      const p = particles[nextP++], slice = Math.max(1, Math.floor(sorted.length / 5));
-      const src = sorted[Math.min(sorted.length - 1, p.i * slice + Math.floor(Math.random() * slice))];
+      const p = particles[nextP++], slice = Math.max(1, Math.floor(lit.length / 5));
+      const src = lit[Math.min(lit.length - 1, p.i * slice + Math.floor(Math.random() * slice))];
       if (!tgt[p.i]) { const q = tabPose(p.i, now + FLIGHT - (t - p.tl)); tgt[p.i] = cellsSolid(KINDS[p.i], q.ay, q.ax, ROW_N); }
-      const tc = tgt[p.i][Math.floor(Math.random() * tgt[p.i].length)];
-      p.on = true; p.x0 = src.x + (Math.random() - .5) * Dg / 40; p.y0 = src.y + (Math.random() - .5) * Dg / 40; p.a0 = src.a; p.c0 = src.c;
+      const want = (sent[p.i]++ + 0.5) / counts[p.i];
+      let tc = tgt[p.i][0], bd = 9;
+      tgt[p.i].forEach(c => { const d = Math.abs(hash(c[0], c[1], p.i) - want); if (d < bd) { bd = d; tc = c; } });
+      p.on = true; p.x0 = src.x; p.y0 = src.y; p.a0 = src.a; p.c0 = src.c;
       p.x1 = slots[p.i].x + (tc[0] + .5 - ROW_N / 2) * tcs; p.y1 = slots[p.i].y + (tc[1] + .5 - ROW_N / 2) * tcs; p.a1 = alphaOf(tc[2]);
     }
   }
@@ -230,7 +248,7 @@ export function play({ root, input, tabSolids, preview }) {
   // later each drops to its circle, getting smaller pixel by pixel and taking on the tab's colour.
   function drawSolids(t, now) {
     const arrived = [0, 0, 0, 0, 0];
-    if (t < T.row) particles.forEach(p => { if (t >= p.tl + FLIGHT) arrived[p.i]++; });
+    if (t < T.row) particles.forEach(p => { if (p.on && t >= p.tl + FLIGHT) arrived[p.i]++; });
     KINDS.forEach((kind, i) => {
       const q = tabPose(i, now), e = ease(clamp((t - T.drop - i * DROP_STAGGER) / DROP_DUR)), N = Math.round(lerp(ROW_N, TAB_N, e)), r = rects[i];
       const share = t >= T.row ? 1 : arrived[i] / counts[i];
@@ -255,33 +273,29 @@ export function play({ root, input, tabSolids, preview }) {
     // the dark gives way to the app as the solids start to drop
     wrap.style.background = `rgba(6,6,7,${clamp(1 - (t - (T.drop - 0.1)) / 0.5)})`;
 
-    if (t < T.pix) {
-      ctx.globalAlpha = clamp(t / 0.35); // the icon fades in
-      ctx.drawImage(renderSmooth(t), cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1;
-    } else if (t < T.gone) {
-      if (!particles) { layout(); makeParticles(); }
-      // coarser and coarser pixels (128, 64, then 40 across), still spinning flat out
-      const n = t < T.pix + 0.2 ? 128 : (t < T.pix + 0.4 ? 64 : 40), px = pixelate(renderSmooth(t, true), n, tmp);
-      if (n > 40) { ctx.imageSmoothingEnabled = false; ctx.drawImage(px.canvas, cx - Dg / 2, cy - Dg / 2, Dg, Dg); }
-      else {
-        readCells(px.data, 40, t);
-        launchDue(t, now);
+    if (t < T.gone) {
+      const m = clamp((t - T.pix) / T.pixIn), mm = ease(m), smooth = mm < 1 ? renderSmooth(t) : null;
+      // the smooth wireframe, which melts into its pixel version
+      if (mm < 1) { ctx.globalAlpha = clamp(t / 0.35) * (1 - mm); ctx.drawImage(smooth, cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1; }
+      if (m > 0) {
+        if (!particles) makeParticles();
+        const px = pixelate(renderSmooth(t, true), PN, tmp);
+        if (t >= T.leave) { readLit(px.data); launchDue(t, now); }
         // as pixels leave, the dodecahedron thins out, pixel by pixel
-        const keep = t < T.leave ? 1 : 1 - (t - T.leave) / (T.gone - T.leave), cs = Dg / 40;
-        cells.forEach(c => {
-          if (keep < 1 && hash(c.gx, c.gy, 7) >= keep) return;
-          ctx.fillStyle = `rgba(${c.c[0]},${c.c[1]},${c.c[2]},${c.a})`; ctx.fillRect(cx + (c.gx - 20) * cs, cy + (c.gy - 20) * cs, cs, cs);
-        });
+        const keep = t < T.leave ? 1 : 1 - (t - T.leave) / (T.gone - T.leave);
+        if (keep < 1) for (let y = 0; y < PN; y++) for (let x = 0; x < PN; x++) if (hash(x, y, 7) >= keep) px.data[(y * PN + x) * 4 + 3] = 0;
+        px.ctx.putImageData(px.img, 0, 0);
+        ctx.globalAlpha = mm; ctx.imageSmoothingEnabled = false; ctx.drawImage(px.canvas, cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1;
       }
     } else if (!particles) { finish(); return; }
     if (particles && t >= T.leave) {
       launchDue(t, now);
-      // pixels in flight
+      // pixels in flight, shrinking a little from the dodecahedron's pixel size to the tab icons'
       particles.forEach(p => {
         if (!p.on || t >= p.tl + FLIGHT) return;
-        const e = clamp((t - p.tl) / FLIGHT), m = ease(e), bump = Math.sin(Math.PI * easeOut(e));
+        const e = clamp((t - p.tl) / FLIGHT), m = ease(e), bump = Math.sin(Math.PI * easeOut(e)), sz = lerp(pcs, tcs, m);
         ctx.fillStyle = `rgba(${p.c0[0]},${p.c0[1]},${p.c0[2]},${lerp(p.a0, p.a1, m)})`;
-        ctx.fillRect(lerp(p.x0, p.x1, m) + p.bx * bump - tcs / 2, lerp(p.y0, p.y1, m) + p.by * bump - tcs / 2, tcs, tcs);
+        ctx.fillRect(lerp(p.x0, p.x1, m) + p.bx * bump - sz / 2, lerp(p.y0, p.y1, m) + p.by * bump - sz / 2, sz, sz);
       });
       drawSolids(t, now);
     }
