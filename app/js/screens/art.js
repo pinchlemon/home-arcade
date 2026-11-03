@@ -8,6 +8,7 @@ import * as games from '../games.js';
 import { notReady } from './studio.js';
 import { openGameEditor } from './gameEditor.js';
 import * as input from '../input.js';
+import { makeNav, padFrame } from '../padnav.js';
 
 const PINK = '#ff4fd8';
 const loaded = {}, sizes = {};
@@ -115,6 +116,7 @@ export default {
 function openViewer(app, g, it, F) {
   const v = { scale: 0, fit: 1, anim: 0, frame: 0, playing: true, img: null, t: 0 };
   let cv = null, ctx2 = null, last = 0;
+  const nav = makeNav();
   const anims = it.anims || [];
   const ticks = (a) => (typeof a.ticks === 'string' ? +games.getPath(F.data, a.ticks) : a.ticks) || 8;
   if (it.kind === 'image') { v.img = new Image(); v.img.onload = () => draw(); v.img.src = src(g, it); }
@@ -172,6 +174,7 @@ function openViewer(app, g, it, F) {
         if (t - last >= step) { last = t; v.frame = (v.frame + 1) % anims[v.anim].count; draw(); const el = document.querySelectorAll('.screen-tool .stepper .vscreen')[1]; if (el) el.innerHTML = svgText(String(v.frame + 1), 'var(--acc)'); }
       }
       if (input.pressed('b')) app.close();
+      else if (padFrame(document.getElementById('app'), nav, input)) { /* the ring took it */ }
       else if (it.cell && input.pressed('a')) { v.playing = !v.playing; rer(); }
     }
   };

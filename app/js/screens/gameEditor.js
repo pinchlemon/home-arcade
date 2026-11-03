@@ -8,6 +8,7 @@ import { A, esc, iconBtn, bareBtn, stepper } from '../ui.js';
 import * as games from '../games.js';
 import { pushAll } from './sync.js';
 import * as input from '../input.js';
+import { makeNav, padFrame, clearNav } from '../padnav.js';
 
 const GREEN = '#7dff6a', BONE = '#e4e2dc', DIM = '#3a3a3f';
 const VW = 160, VH = 144;
@@ -49,6 +50,7 @@ export function openGameEditor(app, g) {
   const ed = { tab: app.ui.geTab || 'scene', obj: app.ui.geObj || null, objPage: 0, addingBehavior: false, scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: app.ui.geLayer || 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
   delete app.ui.geObj; delete app.ui.geLayer; app.saveUI(); // a jump from the Art tab picks these once
   let view = null, off = null, octx = null, drag = null, dragged = false;
+  const nav = makeNav();   // where the controller's ring is
   const folder = g.file;
   games.setCurrentGame(app, g);
   games.loadGame(folder).then(x => { ed.game = x; rerender(); }).catch(e => { ed.error = e.message; rerender(); });
@@ -399,7 +401,7 @@ export function openGameEditor(app, g) {
       if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
+        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas><span class="xhair" aria-hidden="true"></span></div>`;
         const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
           <div style="display:flex;gap:0;align-items:center;min-width:0">${viewSwitch(true)}<span class="vsep" style="margin:0 3px"></span>${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:4px">Waves</span>`}</div>
           <div style="display:flex;align-items:center;gap:2px">
@@ -528,7 +530,21 @@ export function openGameEditor(app, g) {
         stk.addEventListener('pointerup', up); stk.addEventListener('pointercancel', up); stk.addEventListener('pointerleave', up);
       }
     },
-    frame() { if (input.pressed('b')) app.close(); else if (input.pressed('start')) games.launch(g); }
+    // Controller: B steps back (out of an object, then out of the editor), Start plays, LB and RB switch tabs,
+    // and the D-pad moves a ring around the screen (see padnav.js)
+    frame() {
+      if (input.pressed('b')) { if (ed.obj && ed.tab === 'objects') { ed.obj = null; ed.addingBehavior = false; clearNav(nav); rerender(); } else app.close(); return; }
+      if (input.pressed('start')) { games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null); return; }
+      if (input.pressed('lb') || input.pressed('rb')) {
+        const keys = TABS.map(t => t[0]), i = keys.indexOf(tabOf()), d = input.pressed('rb') ? 1 : -1;
+        ed.tab = keys[(i + d + keys.length) % keys.length]; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); clearNav(nav); rerender(); return;
+      }
+      if (!ed.game) return;
+      padFrame(document.getElementById('app'), nav, input, {
+        pan: (dx) => { if (view && ed.camX != null) { ed.camX += dx; drawScene(); } },
+        tap: () => { if (view) { const r = view.getBoundingClientRect(); sceneTap({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }); } }
+      });
+    }
   };
   ov.onClose = () => { if (app.settings.autoPush && games.getEdits(folder).dirty) pushAll(app, true); };
   app.open(ov);
