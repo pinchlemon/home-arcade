@@ -4,6 +4,7 @@ import { well, icon } from '../pixel.js';
 import { A, esc, iconBtn, bareBtn } from '../ui.js';
 import * as games from '../games.js';
 import * as input from '../input.js';
+import { makeNav, padFrame } from '../padnav.js';
 import { fmt } from './gameEditor.js';
 import { pushAll } from './sync.js';
 
@@ -44,6 +45,7 @@ export function openReview(app, g) {
     if (!list().length) { e.dirty = false; games.setEdits(g.file, e); }
     rer();
   }
+  const nav = makeNav();
   const ov = {
     render() {
       const items = game ? list() : [], n = items.length;
@@ -64,7 +66,7 @@ export function openReview(app, g) {
         </div>
       </div>`;
     },
-    frame() { if (input.pressed('b')) app.close(); }
+    frame() { if (input.pressed('b')) app.close(); else padFrame(document.getElementById('app'), nav, input); }
   };
   app.open(ov);
 }

@@ -231,3 +231,13 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .screen.checker canvas{image-rendering:pixelated}
 /* the Scene / Backdrop switch at the start of the editor's bar: a thin divider after it */
 .vsep{width:1px;height:24px;background:rgba(255,255,255,.12);flex:none}
+
+/* controller ring (see padnav.js) */
+.screen-tool .grow{position:relative}
+.pf::after{content:'';position:absolute;inset:-2px;border-radius:inherit;border:1.5px solid var(--acc);pointer-events:none}
+.btn.icon.pf::after{display:none}
+.btn.icon.pf .well::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--acc);pointer-events:none}
+#scn.pf::after{display:none}
+#scn.pf{outline:1.5px solid var(--acc);outline-offset:2px}
+.xhair{display:none;position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;background:linear-gradient(var(--acc),var(--acc)) center/2px 100% no-repeat,linear-gradient(var(--acc),var(--acc)) center/100% 2px no-repeat}
+#scn.pf~.xhair{display:block}
