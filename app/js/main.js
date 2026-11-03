@@ -72,7 +72,18 @@ function tabBar() {
   }).join('')}</nav>`;
 }
 
+// iOS can give a home-screen app less height than the screen (a black band). Sideways, we stretch the app
+// over the whole screen height so nothing is left sitting in the top part with black under it.
+function sizeApp() {
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (LANDSCAPE.matches && standalone) {
+    const full = Math.max(innerHeight, Math.min(screen.width, screen.height));
+    root.style.bottom = 'auto'; root.style.height = full + 'px';
+  } else { root.style.bottom = ''; root.style.height = ''; }
+}
+function viewH() { return parseFloat(root.style.height) || innerHeight; }
 function render() {
+  sizeApp();
   resetActions();
   if (app.overlay) {
     root.innerHTML = app.overlay.render(app);
@@ -104,7 +115,7 @@ function fitRows() {
   if (!em || !tb) return;
   if (LANDSCAPE.matches) {
     // the top panel and tab bar sit beside the list, so the list can use the whole height
-    const avail = innerHeight - Math.max(parseFloat(getComputedStyle(probe).paddingTop) || 0, 16) - 16;
+    const avail = viewH() - Math.max(parseFloat(getComputedStyle(probe).paddingTop) || 0, 16) - 16;
     let k = 4; while (k > 1 && listH(k) > avail) k--;
     if (k !== rows() && fitting < 3) { setRows(k); fitting++; render(); fitting--; return; }
     sc.style.paddingTop = ''; sc.style.paddingBottom = ''; sc.style.setProperty('--list-h', listH(rows()) + 'px');
