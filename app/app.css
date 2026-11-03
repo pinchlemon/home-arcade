@@ -245,3 +245,5 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 /* the ring on a setting row matches the one on the tabs: rounded, with room around the text */
 .grow.pf::after{inset:3px -10px;border-radius:var(--r-btn)}
 .grow.pf{margin-left:0}
+
+[data-pad=pager]{position:relative}
