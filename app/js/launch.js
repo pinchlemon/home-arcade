@@ -1,14 +1,16 @@
-// Launch animation: the app icon's dodecahedron turns 3D, pixelates, then splits into the five solids on the tab bar.
-// It plays over the finished app (the real tab icons are hidden until the pixels land on them), once per app session.
+// Launch animation: the app icon's wireframe dodecahedron spins faster and faster, pixelates, then its pixels (the same small size
+// as in the tab icons) separate into the five solids in a row, which drop down into their circles on the tab bar.
+// It plays over the finished app (the real tab icons are hidden until the solids land on them), once per app session.
 // Tap, any key or a controller button skips it. Turned off by Settings > Display > Launch animation or Reduce motion.
 import { solid, cellsSolid } from './pixel.js';
 
 const PHI = (1 + Math.sqrt(5)) / 2, TAU = Math.PI * 2;
 const ORANGE = [255, 90, 31];
 const ICON_STOPS = [[0, '#86c94a'], [.12, '#3f9fa8'], [.25, '#5a5cf0'], [.4, '#c04fd0'], [.5, '#ff4fa0'], [.62, '#ff7a2a'], [.75, '#ff9a2a'], [.88, '#c8c83a'], [1, '#86c94a']];
-// seconds: icon (hold), turn to 3D, pixelate, hold, split, done
-const T = { hold: 0.5, turn: 1.8, pix: 2.4, snap: 2.8, split: 3.0, end: 4.0 };
-const SPLIT_DUR = 0.7;
+// seconds: icon (hold), spin and pixelate, separate into small pixels, solids in a row, drop to the tabs
+const T = { hold: 0.45, pix: 1.25, snap: 1.85, split: 2.2, row: 3.1, drop: 3.5, end: 4.55 };
+const SPLIT_DUR = 0.6, ROW_N = 44, TAB_N = 20, DROP_DUR = 0.7, DROP_STAGGER = 0.07;
+const KINDS = ['dodeca', 'cube', 'icosa', 'octa', 'tetra'], COLORS = ['#ff5a1f', '#7dff6a', '#ff4fd8', '#4d7cff', '#ffd23f'];
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -55,13 +57,13 @@ function rotN(nv, ay, ax, roll) {
   return [x1 * cr - py * sr, x1 * sr + py * cr, z2];
 }
 
-// What the animation looks like at time t: the pose of the solid, how solid it is, and how coarse its pixels are.
+// The wireframe's pose at time t: still for a beat, then spinning faster and faster.
 function pose(t) {
-  const g = geo(), turn = clamp((t - T.hold) / (T.turn - T.hold)), e = ease(turn);
-  const spin = turn > 0 ? Math.pow(turn, 1.6) * 5.2 + (t > T.turn ? (t - T.turn) * 1.9 : 0) : 0;
-  const ay = g.ay0 + spin, ax = lerp(g.ax0, 0.42 + Math.sin(t * 0.8) * 0.12 * e, e);
-  return { ay, ax, roll: g.roll0 * (1 - e), solidity: e, back: e, persp: e };
+  const g = geo(), sp = Math.max(0, t - T.hold), e = ease(clamp(sp / 1.2));
+  return { ay: g.ay0 + 2.4 * sp * sp, ax: lerp(g.ax0, 0.42 + Math.sin(t * 0.8) * 0.1 * e, e), roll: g.roll0 * (1 - e), back: ease(clamp(sp / 1.0)), persp: e };
 }
+// how the real tab icons are turned at time tt (seconds), see paintSolids in main.js
+const tabPose = (i, tt) => ({ ay: tt * (0.55 + i * 0.08) + i * 1.3, ax: 0.45 + Math.sin(tt * 0.3 + i) * 0.15 });
 
 // ---- drawing the smooth wireframe
 function drawScene(ctx, Q, st, grad) {
@@ -72,21 +74,10 @@ function drawScene(ctx, Q, st, grad) {
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const path = (i, j) => { ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); };
   const front = g.s.e.map((_, k) => g.edgeFaces[k].some(f => fn[f][2] > 0.001));
-  // far edges, faint, show the solid behind
+  // far edges, faint, show the solid behind (a skeleton: no faces)
   if (st.back > 0.01) {
     ctx.strokeStyle = grad; ctx.lineWidth = u * 0.035;
     g.s.e.forEach(([i, j], k) => { if (!front[k]) { ctx.globalAlpha = st.back * (0.12 + 0.22 * clamp(0.5 - (P[i][2] + P[j][2]) / 2)); path(i, j); } });
-  }
-  // lit faces
-  if (st.solidity > 0.01) {
-    const L = [-0.4, 0.6, 0.69];
-    g.faces.forEach((f, k) => {
-      if (fn[k][2] <= 0.001) return;
-      const lit = Math.max(0, fn[k][0] * L[0] - fn[k][1] * L[1] + fn[k][2] * L[2]);
-      ctx.globalAlpha = st.solidity * (0.07 + 0.36 * lit);
-      ctx.fillStyle = grad; ctx.beginPath();
-      f.idx.forEach((i, m) => (m ? ctx.lineTo(P[i][0], P[i][1]) : ctx.moveTo(P[i][0], P[i][1]))); ctx.closePath(); ctx.fill();
-    });
   }
   // near edges: a coloured bar with a bright sliver along it, like the icon
   g.s.e.forEach(([i, j], k) => {
@@ -146,7 +137,7 @@ export function play({ root, input, tabSolids, preview }) {
   const pool = {}; const tmp = (w, key) => { const k = key ? 'px' + w : 'm' + w; if (!pool[k]) { pool[k] = document.createElement('canvas'); pool[k].width = pool[k].height = w; } return pool[k]; };
 
   const t0 = performance.now() / 1000;
-  let particles = null, done = false, raf = 0, grid = null;
+  let particles = null, done = false, raf = 0;
 
   function finish() {
     if (done) return; done = true;
@@ -161,26 +152,41 @@ export function play({ root, input, tabSolids, preview }) {
   function resized() { if (Math.abs(innerWidth - W) > 40 || Math.abs(innerHeight - H) > 80) finish(); }
   addEventListener('pointerdown', skip, true); addEventListener('keydown', skip, true); addEventListener('resize', resized);
 
-  // targets: where each solid will be on the tab bar when the pixels land, and what it will look like then (same spin as the real tab icons)
-  function buildParticles(cells, srcN, tLand) {
-    const kinds = ['dodeca', 'cube', 'icosa', 'octa', 'tetra'], colors = ['#ff5a1f', '#7dff6a', '#ff4fd8', '#4d7cff', '#ffd23f'].map(hex);
-    const rects = tabSolids().map(e => e.getBoundingClientRect());
-    const ax0 = (rects[4].left + rects[4].width / 2) - (rects[0].left + rects[0].width / 2), ay0 = (rects[4].top + rects[4].height / 2) - (rects[0].top + rects[0].height / 2);
-    const dl = Math.hypot(ax0, ay0) || 1, dir = [ax0 / dl, ay0 / dl];
-    const cs = Dg / srcN, src = cells.map(([x, y, l]) => { const px = cx + (x + .5 - srcN / 2) * cs, py = cy + (y + .5 - srcN / 2) * cs; return { x: px, y: py, l, s: px * dir[0] + py * dir[1] }; }).sort((a, b) => a.s - b.s);
+  const alphaOf = l => [.3, .6, 1][l], colors = COLORS.map(hex);
+  let rects = null, tcs = 1.5, slots = null, frozen = null;
+
+  // where the five solids stand in a row (where the dodecahedron was) and where their circles on the tab bar are.
+  // Every pixel from here on is the size of a pixel in the tab icons.
+  function layout() {
+    rects = tabSolids().map(e => e.getBoundingClientRect());
+    tcs = rects[0].width / TAB_N;
+    const gap = Math.min(W * 0.2, ROW_N * tcs + 12);
+    slots = KINDS.map((_, i) => ({ x: cx + (i - 2) * gap, y: cy }));
+  }
+  // the little pixels that leave the big ones and form the row. Each solid is built from a slice of the dodecahedron (left slice, left solid).
+  function buildParticles(cells, srcN, tRow) {
+    const cs = Dg / srcN, src = cells.map(([x, y, l]) => ({ x: cx + (x + .5 - srcN / 2) * cs, y: cy + (y + .5 - srcN / 2) * cs, l })).sort((a, b) => a.x - b.x);
     const per = src.length / 5, out = [];
-    kinds.forEach((kind, i) => {
-      const slice = src.slice(Math.round(i * per), Math.round((i + 1) * per)), r = rects[i];
-      const tt = tLand, ay = tt * (0.55 + i * 0.08) + i * 1.3, ax = 0.45 + Math.sin(tt * 0.3 + i) * 0.15;
-      const tc = cellsSolid(kind, ay, ax, 20), tcs = r.width / 20;
-      tc.forEach(([x, y, l], j) => {
-        const a = slice[(j * 7 + i) % slice.length] || src[0], ang = Math.random() * TAU, burst = 14 + Math.random() * 46;
-        out.push({ x0: a.x, y0: a.y, l0: a.l, x1: r.left + (x + .5) * tcs, y1: r.top + (y + .5) * tcs, l1: l, s0: cs, s1: tcs, c: colors[i], bx: Math.cos(ang) * burst, by: Math.sin(ang) * burst, delay: Math.random() * 0.3 });
+    KINDS.forEach((kind, i) => {
+      const slice = src.slice(Math.round(i * per), Math.round((i + 1) * per)), q = tabPose(i, tRow);
+      cellsSolid(kind, q.ay, q.ax, ROW_N).forEach(([x, y, l], j) => {
+        const a = slice[(j * 7 + i) % slice.length] || src[0], ang = Math.random() * TAU, burst = 8 + Math.random() * 26;
+        out.push({ x0: a.x + (Math.random() - .5) * cs, y0: a.y + (Math.random() - .5) * cs, l0: a.l, x1: slots[i].x + (x + .5 - ROW_N / 2) * tcs, y1: slots[i].y + (y + .5 - ROW_N / 2) * tcs, l1: l, c: colors[i], bx: Math.cos(ang) * burst, by: Math.sin(ang) * burst, delay: Math.random() * 0.3 });
       });
     });
     return out;
   }
-  const alphaOf = l => [.3, .6, 1][l];
+  // the solids in a row, spinning like the real tab icons; later each drops to its circle, getting smaller pixel by pixel
+  function drawSolids(t, now) {
+    KINDS.forEach((kind, i) => {
+      const q = tabPose(i, now), e = ease(clamp((t - T.drop - i * DROP_STAGGER) / DROP_DUR)), N = Math.round(lerp(ROW_N, TAB_N, e)), r = rects[i];
+      const x = lerp(slots[i].x, r.left + r.width / 2, e), y = lerp(slots[i].y, r.top + r.height / 2, e);
+      cellsSolid(kind, q.ay, q.ax, N).forEach(([gx, gy, l]) => {
+        ctx.fillStyle = `rgba(${colors[i][0]},${colors[i][1]},${colors[i][2]},${alphaOf(l)})`;
+        ctx.fillRect(x + (gx - N / 2) * tcs, y + (gy - N / 2) * tcs, tcs, tcs);
+      });
+    });
+  }
 
   function tick() {
     if (done) return;
@@ -198,7 +204,7 @@ export function play({ root, input, tabSolids, preview }) {
         drawScene(sctx, Q, st, grad);
         ctx.globalAlpha = fade; ctx.drawImage(scene, cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1;
       } else if (t < T.snap) {
-        // coarser and coarser pixels: 128, 64 across, then the app's own 40-cell solid in Arcade orange
+        // coarser and coarser pixels: 128, 64 across, then the app's own 40-cell solid in Arcade orange (still spinning faster)
         const stage = (t - T.pix) / (T.snap - T.pix), n = stage < 0.34 ? 128 : (stage < 0.67 ? 64 : 40);
         if (n > 40) {
           drawScene(sctx, Q, st, grad);
@@ -211,26 +217,31 @@ export function play({ root, input, tabSolids, preview }) {
       }
     } else {
       if (!particles) {
-        const poseNow = pose(T.split), cells = cellsSolid('dodeca', poseNow.ay, poseNow.ax, 40);
-        grid = cells; particles = buildParticles(cells, 40, t0 + T.end);
+        layout();
+        const p0 = pose(T.split); frozen = cellsSolid('dodeca', p0.ay, p0.ax, 40);
+        particles = buildParticles(frozen, 40, t0 + T.row);
       }
-      const k = (t - T.split);
-      wrap.style.background = `rgba(6,6,7,${clamp(1 - k / 0.5)})`;
-      particles.forEach(p => {
-        const e = clamp((k - p.delay) / SPLIT_DUR), m = ease(e), bump = Math.sin(Math.PI * easeOut(e));
-        const x = lerp(p.x0, p.x1, m) + p.bx * bump, y = lerp(p.y0, p.y1, m) + p.by * bump, s = lerp(p.s0, p.s1, m);
-        const r = lerp(ORANGE[0], p.c[0], m) | 0, g = lerp(ORANGE[1], p.c[1], m) | 0, b = lerp(ORANGE[2], p.c[2], m) | 0;
-        ctx.fillStyle = `rgba(${r},${g},${b},${lerp(alphaOf(p.l0), alphaOf(p.l1), m)})`;
-        ctx.fillRect(x - s / 2, y - s / 2, s, s);
-      });
+      const k = t - T.split;
+      // the dark gives way to the app as the solids start to drop
+      wrap.style.background = `rgba(6,6,7,${clamp(1 - (t - (T.drop - 0.1)) / 0.5)})`;
+      if (t < T.row) {
+        if (k < 0.2) drawCells(frozen, 40, 1, 0, 1 - k / 0.2); // the big pixels dissolve as the small ones leave them
+        particles.forEach(p => {
+          const e = clamp((k - p.delay) / SPLIT_DUR), m = ease(e), bump = Math.sin(Math.PI * easeOut(e));
+          const x = lerp(p.x0, p.x1, m) + p.bx * bump, y = lerp(p.y0, p.y1, m) + p.by * bump;
+          const r = lerp(ORANGE[0], p.c[0], m) | 0, g = lerp(ORANGE[1], p.c[1], m) | 0, b = lerp(ORANGE[2], p.c[2], m) | 0;
+          ctx.fillStyle = `rgba(${r},${g},${b},${lerp(alphaOf(p.l0), alphaOf(p.l1), m)})`;
+          ctx.fillRect(x - tcs / 2, y - tcs / 2, tcs, tcs);
+        });
+      } else drawSolids(t, now);
     }
     raf = requestAnimationFrame(tick);
   }
-  function drawCells(cells, n, scale, shake = 0) {
+  function drawCells(cells, n, scale, shake = 0, alpha = 1) {
     const cs = Dg / n;
     cells.forEach(([x, y, l]) => {
       const jx = shake ? (Math.random() - .5) * shake * 3 : 0, jy = shake ? (Math.random() - .5) * shake * 3 : 0;
-      ctx.fillStyle = `rgba(${ORANGE[0]},${ORANGE[1]},${ORANGE[2]},${alphaOf(l)})`;
+      ctx.fillStyle = `rgba(${ORANGE[0]},${ORANGE[1]},${ORANGE[2]},${alphaOf(l) * alpha})`;
       ctx.fillRect(cx + (x - n / 2) * cs * scale + jx, cy + (y - n / 2) * cs * scale + jy, cs * scale, cs * scale);
     });
   }
