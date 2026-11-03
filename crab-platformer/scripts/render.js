@@ -102,6 +102,14 @@ function render() {
     ctx.fillStyle = CREAM; ctx.fillRect(mid - 15, my - 3, 30, 11);
     text('PAUSED', mid - 12, my, INK, null);
   }
+  if (cleared && clearT > 20) {
+    const mid = VW >> 1, my = (VH >> 1) - 10, last = SCENES.indexOf(SCENE) === SCENES.length - 1;
+    const msg = last ? 'ALL CLEAR!' : 'LEVEL CLEAR!', w = msg.length * 4;
+    ctx.fillStyle = INK; ctx.fillRect(mid - w / 2 - 6, my - 4, w + 12, 13);
+    ctx.fillStyle = CREAM; ctx.fillRect(mid - w / 2 - 5, my - 3, w + 10, 11);
+    text(msg, mid - w / 2 + 1, my, TEAL_DK, null);
+    if (clearT > 60 && (t >> 4) % 2) text('PRESS JUMP', mid - 20, my + 14, INK, CREAM);
+  }
   if (crab.dead && overT > 40) {
     const mid = VW >> 1, my = (VH >> 1) - 10;
     ctx.fillStyle = INK; ctx.fillRect(mid - 26, my - 4, 52, 13);

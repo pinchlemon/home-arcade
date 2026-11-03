@@ -1,4 +1,10 @@
 // ---- eyes ----
+// levels: an eye placed in the Studio waits at its spot (h pixels above the sand) until the crab comes near
+function placeEye(p) {
+  eyes.push({ x: p.x, y: GROUND - p.h, vx: 0, hy: GROUND - p.h, homeX: p.x, homeY: GROUND - p.h,
+    pref: (Math.random() < 0.5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)), hp: EYE_HP, st: 'float', t: 0, timer: rnd(...S.eyes.firstShotFrames),
+    ax: 0, ay: 1, flash: 0, lx: 0, ly: 0, squint: 0, phase: rnd(0, 6), scale: 1, melt: 0, vy: 0, blink: 0, blinkIn: rnd(30, 160) });
+}
 function spawnEye() {
   const side = Math.random() < S.spawning.aheadChance ? crab.face : -crab.face;
   const x = crab.x + side * (VW / 2 + 26);
@@ -56,9 +62,12 @@ function updateRope(e) {
 }
 const BLINK_LEN = 10;
 function updateEyes() {
+  if (LEVEL) { if (!eyesPlaced) { eyesPlaced = true; for (const p of LEVEL.enemies || []) if (p.type === 'eye') placeEye(p); } }
+  else {
   const want = Math.min(1 + Math.floor(kills / S.spawning.oneMorePerKills), S.spawning.maxAlive);
   const alive = eyes.filter(e => e.st !== 'dying').length;
   if (!crab.dead && alive < want && --spawnT <= 0) { spawnEye(); spawnT = rnd(...S.spawning.intervalFrames); }
+  }
 
   for (const e of eyes) {
     e.t++;
@@ -92,7 +101,8 @@ function updateEyes() {
       continue;
     }
     // drift toward a spot near the crab, bobbing as it floats
-    const tx = crab.x + e.pref;
+    const asleep = e.homeX !== undefined && Math.abs(crab.x - e.homeX) > S.level.wakeRange;
+    const tx = asleep ? e.homeX : crab.x + e.pref;
     e.vx += (tx - e.x) * S.eyes.driftPull; e.vx *= S.eyes.driftDamping;
     e.x += e.vx;
     const by = e.hy + Math.sin(e.t * 0.05 + e.phase) * 3;
@@ -103,7 +113,7 @@ function updateEyes() {
 
     if (e.st === 'float') {
       e.squint = Math.max(0, e.squint - 0.08);
-      if (--e.timer <= 0 && onScreen(e.x, -8) && !crab.dead) { e.st = 'charge'; e.t = 0; sfx.charge(); }
+      if (--e.timer <= 0 && onScreen(e.x, -8) && !crab.dead && !asleep) { e.st = 'charge'; e.t = 0; sfx.charge(); }
     } else if (e.st === 'charge') {
       if (e.t < AIM_LOCK) { e.ax = dx / d; e.ay = dy / d; }
       e.squint = Math.min(0.55, e.t / CHARGE * 0.7);
@@ -141,5 +151,5 @@ function updateEyes() {
     // bumping into an eye hurts
     if (Math.hypot(cxr - e.x, cyr - e.y) < S.eyes.contactRadius) hurtCrab(e.x);
   }
-  eyes = eyes.filter(e => !e.gone && Math.abs(e.x - crab.x) < 600);
+  eyes = eyes.filter(e => !e.gone && (e.homeX !== undefined || Math.abs(e.x - crab.x) < 600));
 }

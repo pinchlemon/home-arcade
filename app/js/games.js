@@ -49,4 +49,4 @@ export async function loadGame(folder) {
 export const forgetGame = (folder) => { delete cache[folder]; };
 
 // open a code game; swiping back from it returns to the app
-export function launch(g) { try { sessionStorage.setItem('ha.return', 'app/'); } catch (e) {} location.href = g.path; }
+export function launch(g, scene) { try { sessionStorage.setItem('ha.return', 'app/'); } catch (e) {} location.href = g.path + (scene ? '?scene=' + encodeURIComponent(scene) : ''); }

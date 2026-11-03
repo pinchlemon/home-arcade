@@ -512,7 +512,108 @@
    "glyph": "eye",
    "color": "#ff4fd8",
    "path": "eyes.hoverHeight"
-  }
+  },
+  "levelItems": [
+   {
+    "type": "palm",
+    "name": "Palm",
+    "glyph": "palm",
+    "list": "props",
+    "w": 72,
+    "h": 98,
+    "color": "#e4e2dc"
+   },
+   {
+    "type": "umbrella",
+    "name": "Umbrella",
+    "glyph": "umbrella",
+    "list": "props",
+    "w": 17,
+    "h": 20,
+    "color": "#4d7cff"
+   },
+   {
+    "type": "castle",
+    "name": "Castle",
+    "glyph": "castle",
+    "list": "props",
+    "w": 46,
+    "h": 38,
+    "color": "#ffd23f",
+    "solid": true
+   },
+   {
+    "type": "eye",
+    "name": "Eye",
+    "glyph": "eye",
+    "list": "enemies",
+    "w": 14,
+    "h": 14,
+    "color": "#ff4fd8",
+    "height": [
+     16,
+     110
+    ]
+   },
+   {
+    "type": "checkpoint",
+    "name": "Checkpoint",
+    "glyph": "flag",
+    "list": "checkpoints",
+    "w": 5,
+    "h": 8,
+    "color": "#ffd23f"
+   },
+   {
+    "type": "exit",
+    "name": "Exit",
+    "glyph": "exit",
+    "list": "exit",
+    "single": true,
+    "w": 7,
+    "h": 13,
+    "color": "#7dff6a"
+   },
+   {
+    "type": "start",
+    "name": "Start",
+    "glyph": "crab",
+    "list": "start",
+    "single": true,
+    "w": 24,
+    "h": 16,
+    "color": "#ff5a1f"
+   }
+  ],
+  "newLevel": {
+   "kind": "level",
+   "width": 640,
+   "start": {
+    "x": 40
+   },
+   "exit": {
+    "x": 600
+   },
+   "checkpoints": [],
+   "props": [
+    {
+     "type": "palm",
+     "x": 110
+    },
+    {
+     "type": "castle",
+     "x": 300
+    }
+   ],
+   "enemies": [
+    {
+     "type": "eye",
+     "x": 420,
+     "h": 50
+    }
+   ]
+  },
+  "levelSummary": "Level \u00b7 laid out by hand"
  },
  "background": [
   {

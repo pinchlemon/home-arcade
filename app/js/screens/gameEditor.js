@@ -21,7 +21,10 @@ const ART = {
   gull: ['10001', '01010', '00100'],
   boat: ['0001000', '0001100', '0001110', '0001000', '1111111', '0111110'],
   wave: ['0011000110001100', '1100111001110011'],
-  beach: ['00000000', '00011000', '00111100', '01111110', '00011000', '00011000', '11111111', '11111111']
+  beach: ['00000000', '00011000', '00111100', '01111110', '00011000', '00011000', '11111111', '11111111'],
+  flag: ['11100', '11111', '11100', '10000', '10000', '10000', '10000', '10000'],
+  exit: ['1111110', '1101111', '1111110', '1100000', '1000000', '1000000', '1000000', '1100000'],
+  level: ['11111111', '10000001', '10110001', '10000001', '10001101', '10000001', '11111111', '00000000']
 };
 const BG_ART = { sun: ART.sun, cloudsFar: ART.cloud, cloudsNear: ART.cloud, gulls: ART.gull, city: ['1101011', '1101011', '1111111', '1111111', '1111111'], sea: ART.wave.map(r => r.slice(0, 8)), boat: ART.boat, sand: ART.ground };
 const BG_COLORS = { sun: '#ffd23f', cloudsFar: BONE, cloudsNear: BONE, gulls: '#ffffff', city: '#8f8d88', sea: '#4d7cff', boat: BONE, sand: BONE };
@@ -41,7 +44,7 @@ function nudge(f, v, dir) {
 }
 
 export function openGameEditor(app, g) {
-  const ed = { tab: app.ui.geTab || 'scene', group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
+  const ed = { tab: app.ui.geTab || 'scene', scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
   let view = null, off = null, octx = null, drag = null, dragged = false;
   const folder = g.file;
   games.loadGame(folder).then(x => { ed.game = x; rerender(); }).catch(e => { ed.error = e.message; rerender(); });
@@ -69,7 +72,69 @@ export function openGameEditor(app, g) {
     if (p.solid && Math.abs(x + cw / 2 - D.player.startX) < D.beach.castleKeepAway) p = sc.props.find(q => q.glyph === 'umbrella');
     return { ...p, x, i };
   }
+  // ---- scenes: the first is the endless Waves beach; Level scenes are laid out by hand
+  const scenes = () => data().scenes || [{ id: 'main', name: ed.game.schema.scene.name, kind: 'waves' }];
+  const scene = () => { const l = scenes(); return l.find(x => x.id === ed.scene) || l[0]; };
+  const levelItems = () => ed.game.schema.scene.levelItems || [];
+  const itemDef = (type) => levelItems().find(d => d.type === type);
+  // every thing in a level as one list: { def, list, index, x, h }
+  function itemsOf(L) {
+    const out = [];
+    (L.props || []).forEach((p, i) => { const d = itemDef(p.type); if (d) out.push({ def: d, list: 'props', index: i, x: p.x }); });
+    (L.enemies || []).forEach((p, i) => { const d = itemDef(p.type); if (d) out.push({ def: d, list: 'enemies', index: i, x: p.x, h: p.h }); });
+    (L.checkpoints || []).forEach((p, i) => out.push({ def: itemDef('checkpoint'), list: 'checkpoints', index: i, x: p.x }));
+    if (L.exit) out.push({ def: itemDef('exit'), list: 'exit', index: 0, x: L.exit.x });
+    if (L.start) out.push({ def: itemDef('start'), list: 'start', index: 0, x: L.start.x });
+    return out.filter(it => it.def);
+  }
+  // where a thing sits on screen: props and flags stand on the sand, eyes float h pixels up, the start is centred on its x
+  function boxOf(it, GROUND) {
+    const d = it.def, x0 = d.list === 'start' ? it.x - d.w / 2 : d.list === 'enemies' ? it.x - d.w / 2 : it.x;
+    const y1 = d.list === 'enemies' ? GROUND - it.h + d.h / 2 : GROUND;
+    return { x0, y0: y1 - d.h, x1: x0 + d.w, y1 };
+  }
+  function changeScenes(fn) { const list = structuredClone(scenes()); fn(list); games.setValue(folder, 'scenes', list); }
+  function changeLevel(fn) { changeScenes(list => { const L = list.find(x => x.id === scene().id); if (L) fn(L); }); }
+  const sameItem = (a, b) => a && b && a.list === b.list && a.index === b.index;
+  function hitItem(L, wx, wy, GROUND) {
+    let hit = null;
+    for (const it of itemsOf(L)) { const b = boxOf(it, GROUND); if (wx >= b.x0 - 2 && wx <= b.x1 + 2 && wy >= b.y0 - 2 && wy <= b.y1 + 2) { if (!hit || (b.x1 - b.x0) < (boxOf(hit, GROUND).x1 - boxOf(hit, GROUND).x0)) hit = it; } }
+    return hit;   // the smallest thing under the finger wins, so an eye in front of a palm is easy to pick
+  }
+  function drawLevel(L) {
+    const D = data(), c = octx, GROUND = D.screen.ground, cx = Math.round(ed.camX);
+    c.fillStyle = '#000'; c.fillRect(0, 0, VW, VH);
+    // outside the level: hatched
+    c.fillStyle = '#1c1c20';
+    for (let x = 0; x < VW; x++) { const wx = x + cx; if (wx < 0 || wx >= L.width) for (let y = (wx & 3); y < VH; y += 4) c.fillRect(x, y, 1, 1); }
+    for (let x = -(((cx % 8) + 8) % 8); x < VW; x += 8) { if (x + cx < 0 || x + cx >= L.width) continue; drawRows(c, ART.ground, x, GROUND, 'rgba(228,226,220,.55)'); drawRows(c, ART.ground, x, GROUND + 8, 'rgba(228,226,220,.3)'); }
+    for (const it of itemsOf(L)) {
+      const b = boxOf(it, GROUND), on = sameItem(it, ed.lsel), d = it.def, x = Math.round(b.x0 - cx), w = d.w, h = d.h, top = Math.round(b.y0);
+      if (d.list === 'props') {
+        c.fillStyle = on ? GREEN : DIM;
+        for (let k = 0; k < w; k += 2) { c.fillRect(x + k, top, 1, 1); c.fillRect(x + k, GROUND, 1, 1); }
+        for (let k = 0; k < h; k += 2) { c.fillRect(x, top + k, 1, 1); c.fillRect(x + w - 1, top + k, 1, 1); }
+        drawRows(c, ART[d.glyph], Math.round(x + w / 2 - 4), GROUND - 9, on ? GREEN : d.color);
+        if (d.solid) for (const s2 of D.beach.castle.solids) { c.fillStyle = on ? GREEN : d.color; c.fillRect(x + s2.x0, GROUND + 1 - D.beach.castle.height + s2.top, s2.x1 - s2.x0, 1); }
+      } else if (d.list === 'enemies') {
+        // its wake-up range, faintly, then the symbol
+        const wr = D.level ? D.level.wakeRange : 110;
+        c.fillStyle = on ? 'rgba(125,255,106,.5)' : 'rgba(255,79,216,.35)';
+        for (let k = -wr; k <= wr; k += 4) c.fillRect(Math.round(it.x - cx + k), GROUND - 2, 2, 1);
+        drawRows(c, ART[d.glyph], Math.round(it.x - cx - 4), Math.round(GROUND - it.h - 4), on ? GREEN : d.color);
+      } else {
+        const art = ART[d.glyph];
+        drawRows(c, art, Math.round(d.list === 'start' ? it.x - cx - 4 : x), GROUND - art.length, on ? GREEN : d.color);
+        if (d.list === 'start') { c.fillStyle = on ? GREEN : 'rgba(255,90,31,.5)'; for (let y = GROUND - 30; y < GROUND - 10; y += 2) c.fillRect(Math.round(it.x - cx), y, 1, 1); }
+      }
+      if (on) { c.fillStyle = GREEN; c.fillRect(Math.round(b.x0 - cx) - 1, Math.round(b.y1) + 1, Math.round(b.x1 - b.x0) + 2, 1); }
+    }
+    const txt = 'X ' + String(Math.round(ed.camX + VW / 2)).padStart(4, '0') + ' / ' + L.width, w = textRows(txt)[0].length;
+    c.fillStyle = '#000'; c.fillRect(VW - w - 4, 0, w + 4, 8); drawText(c, txt, VW - w - 2, 2, GREEN);
+    present(off, view, VW, VH);
+  }
   function drawScene() {
+    if (scene().kind === 'level') { const L = scene(); if (ed.camX == null) ed.camX = Math.max(-16, L.start.x - VW / 2); return drawLevel(L); }
     const D = data(), sc = ed.game.schema.scene, c = octx, GROUND = D.screen.ground;
     if (ed.camX == null) ed.camX = D.player.startX - VW / 2;
     const cx = Math.round(ed.camX);
@@ -98,7 +163,25 @@ export function openGameEditor(app, g) {
     c.fillStyle = '#000'; c.fillRect(VW - w - 4, 0, w + 4, 8); drawText(c, txt, VW - w - 2, 2, GREEN);
     present(off, view, VW, VH);
   }
+  const toWorld = (e) => { const r = view.getBoundingClientRect(); return { wx: (e.clientX - r.left) / r.width * VW + ed.camX, wy: (e.clientY - r.top) / r.height * VH }; };
+  function levelTap(e) {
+    const L = scene(), GROUND = data().screen.ground, { wx, wy } = toWorld(e), hit = hitItem(L, wx, wy, GROUND);
+    if (ed.tool === 'erase') { if (hit && hit.list !== 'start') { changeLevel(L2 => { if (hit.list === 'exit') delete L2.exit; else L2[hit.list].splice(hit.index, 1); }); ed.lsel = null; } rerender(); return; }
+    if (ed.tool === 'place') {
+      const d = itemDef(ed.placeType), x = Math.max(0, Math.min(L.width - 1, Math.round(wx)));
+      changeLevel(L2 => {
+        if (d.list === 'start') L2.start = { x };
+        else if (d.list === 'exit') L2.exit = { x };
+        else if (d.list === 'checkpoints') { (L2.checkpoints = L2.checkpoints || []).push({ x }); L2.checkpoints.sort((a, b) => a.x - b.x); }
+        else if (d.list === 'enemies') (L2.enemies = L2.enemies || []).push({ type: d.type, x, h: Math.max(d.height[0], Math.min(d.height[1], Math.round(GROUND - wy))) });
+        else (L2.props = L2.props || []).push({ type: d.type, x: Math.round(x - d.w / 2) });
+      });
+      rerender(); return;
+    }
+    ed.lsel = hit; rerender();
+  }
   function sceneTap(e) {
+    if (scene().kind === 'level') return levelTap(e);
     const r = view.getBoundingClientRect(), wx = (e.clientX - r.left) / r.width * VW + ed.camX, wy = (e.clientY - r.top) / r.height * VH;
     const D = data(), sc = ed.game.schema.scene, SP = D.beach.propSpacing, i0 = Math.floor((wx - 80) / SP) - 1;
     let hit = null;
@@ -173,11 +256,48 @@ export function openGameEditor(app, g) {
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
       if (ed.tab === 'scene') {
-        const s = ed.sel, sc = schema.scene, grp = schema.groups.find(x => x.id === sc.fieldsGroup);
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="The scene, drawn as symbols. Drag to move along it, tap a prop to see it." role="img"></canvas></div>`;
-        panel = `<div class="plate inspector gap20">
-          <div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : sc.name)}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed by the scatter rule' : sc.summary)}</span></span></div>
-          ${grp ? grp.fields.map(field).join('') : ''}</div>`;
+        const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.indexOf(cur)), isLevel = cur.kind === 'level';
+        const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
+        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
+        const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
+          <div style="display:flex;gap:6px">${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:10px">Waves · props by rule</span>`}</div>
+          <div style="display:flex;align-items:center;gap:2px">
+            ${iconBtn('left', A(() => go(-1)), { color: '#fff', label: 'Previous scene' })}<span class="cap acc" style="min-width:34px;text-align:center">${si + 1}/${list.length}</span>${iconBtn('right', A(() => go(1)), { color: '#fff', label: 'Next scene' })}
+            ${iconBtn('plus', A(() => {
+              const n = list.filter(x => x.kind === 'level').length + 1, id = 'level-' + Date.now().toString(36);
+              changeScenes(l2 => l2.push({ id, name: 'Level ' + n, ...structuredClone(sc.newLevel) }));
+              ed.scene = id; ed.camX = null; ed.lsel = null; ed.tool = 'select'; rerender();
+            }), { label: 'New level' })}
+          </div></div>`;
+        let body;
+        if (!isLevel) {
+          const s = ed.sel, grp = schema.groups.find(x => x.id === sc.fieldsGroup);
+          body = `<div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : cur.name || sc.name)}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed by the scatter rule' : sc.summary)}</span></span></div>
+            ${grp ? grp.fields.map(field).join('') : ''}`;
+        } else if (ed.tool === 'place') {
+          body = `<div class="ihead">${well(40, svgRows(ART[itemDef(ed.placeType).glyph], GREEN))}<span class="t"><span class="title acc ell">Place · ${esc(itemDef(ed.placeType).name)}</span><span class="sub">Tap the level to put one there</span></span></div>
+            <div class="tray" style="margin-top:4px">${levelItems().map(d => { const on = d.type === ed.placeType; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" ${A(() => { ed.placeType = d.type; rerender(); })}>${well(40, (on ? '<span class="ring"></span>' : '') + (on ? `<span class="art-on">${svgRows(ART[d.glyph], GREEN)}</span><span class="art-off">${svgRows(ART[d.glyph], d.color)}</span>` : svgRows(ART[d.glyph], d.color)))}<span class="cap">${esc(d.name)}</span></button>`; }).join('')}</div>`;
+        } else if (ed.lsel) {
+          const it = itemsOf(cur).find(x => sameItem(x, ed.lsel));
+          if (!it) { ed.lsel = null; body = ''; }
+          else {
+            const d = it.def, move = (k, v) => changeLevel(L2 => { const o = it.list === 'start' || it.list === 'exit' ? L2[it.list] : L2[it.list][it.index]; o[k] = v; if (it.list === 'checkpoints') L2.checkpoints.sort((a, b) => a.x - b.x); });
+            const num = (label, help, v, step, lo, hi, k) => `<div class="grow"><span class="t"><span class="cap">${label}</span><span class="sub">${help}</span></span>${stepper(String(v), A(() => move(k, Math.max(lo, v - step))), A(() => move(k, Math.min(hi, v + step))), label)}</div>`;
+            body = `<div class="ihead">${well(40, svgRows(ART[d.glyph], GREEN))}<span class="t"><span class="title acc ell">${esc(d.name)}</span><span class="sub">Drag it to move it</span></span>
+                ${it.list !== 'start' ? iconBtn('trash', A(() => { changeLevel(L2 => { if (it.list === 'exit') delete L2.exit; else L2[it.list].splice(it.index, 1); }); ed.lsel = null; rerender(); }), { label: 'Remove ' + d.name }) : ''}</div>
+              ${num('Across', 'Pixels from the left of the level', it.x, 4, 0, cur.width - 1, 'x')}
+              ${d.height ? num('Height', 'Pixels above the ground', it.h, 2, d.height[0], d.height[1], 'h') : ''}`;
+          }
+        }
+        if (isLevel && !body) {
+          const setL = (fn) => { changeLevel(fn); rerender(); };
+          body = `<div class="ihead">${well(40, svgRows(ART.level, GREEN))}<span class="t"><span class="title acc ell">${esc(cur.name)}</span><span class="sub">Level · ${itemsOf(cur).length} things · ${cur.width} px</span></span>
+              ${iconBtn('rename', A(() => { const n = prompt('Level name', cur.name); if (n && n.trim()) setL(L2 => { L2.name = n.trim().slice(0, 24); }); }), { label: 'Rename level' })}
+              ${iconBtn('trash', A(() => { if (!confirm('Delete ' + cur.name + '?')) return; changeScenes(l2 => { const i = l2.findIndex(x => x.id === cur.id); if (i > 0) l2.splice(i, 1); }); ed.scene = null; ed.camX = null; rerender(); }), { label: 'Delete level' })}</div>
+            <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">How long the level is, in pixels</span></span>${stepper(String(cur.width), A(() => setL(L2 => { L2.width = Math.max(160, L2.width - 32); })), A(() => setL(L2 => { L2.width = Math.min(4000, L2.width + 32); })), 'Width')}</div>
+            <div class="grow"><span class="t"><span class="cap">Tip</span><span class="sub">Select a thing to move it, Place to add, Erase to remove. Play starts this level.</span></span></div>`;
+        }
+        panel = `${toolbar}<div class="plate inspector gap20">${body}</div>`;
       } else if (ed.tab === 'background') {
         screen = `<div class="screen fit gap20 stack" id="stk" style="perspective:1100px;touch-action:none;cursor:grab"><div class="rig${ed.combined ? ' flat' : ''}" style="transform:${ed.combined ? 'rotateX(0deg) rotateZ(0deg) scale(1.3)' : `rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)`}">${bgHtml()}</div>
           <span class="cap" id="stkhint" style="position:absolute;left:18px;top:14px;font-size:9px;color:#6f6d69;pointer-events:none">${ed.combined ? 'All layers together, facing forward' : 'Drag to tilt · tap a layer'}</span>
@@ -198,7 +318,7 @@ export function openGameEditor(app, g) {
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(g.name)}</span><span class="sub ge-sub">${esc(g.mode)}${n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''}</span></span>
           ${n ? iconBtn('reset', A(() => { if (confirm('Undo all ' + n + ' changes to ' + g.name + ' on this phone?')) { games.resetEdits(folder); rerender(); } }), { label: 'Undo all changes' }) : ''}
-          ${bareBtn('play', 'Play', A(() => games.launch(g)))}
+          ${bareBtn('play', 'Play', A(() => games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null)))}
         </div>
         <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px">
           ${TABS.map(([k2, l2, ic]) => `<button class="seg${ed.tab === k2 ? ' on' : ''}" role="tab" aria-selected="${ed.tab === k2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], ed.tab === k2 ? GREEN : BONE))}${l2}${ed.tab === k2 ? '<span class="selring"></span>' : ''}</button>`).join('')}
@@ -213,9 +333,39 @@ export function openGameEditor(app, g) {
         const r = view.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
         view.width = Math.round(r.width * dpr) || 320; view.height = Math.round(r.height * dpr) || 288;
         if (!off) { off = document.createElement('canvas'); off.width = VW; off.height = VH; octx = off.getContext('2d'); }
-        view.addEventListener('pointerdown', (e) => { view.setPointerCapture(e.pointerId); drag = { x: e.clientX, cam: ed.camX }; dragged = false; });
-        view.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x; if (!dragged && Math.abs(dx) < 5) return; dragged = true; ed.camX = drag.cam - dx / (view.getBoundingClientRect().width / VW); drawScene(); });
-        view.addEventListener('pointerup', (e) => { if (drag && !dragged) sceneTap(e); drag = null; setTimeout(() => { dragged = false; }, 0); });
+        view.addEventListener('pointerdown', (e) => {
+          view.setPointerCapture(e.pointerId); dragged = false;
+          drag = { x: e.clientX, y: e.clientY, cam: ed.camX };
+          // grabbing the selected thing moves it
+          if (scene().kind === 'level' && ed.tool === 'select' && ed.lsel) {
+            const L = scene(), { wx, wy } = toWorld(e), hit = hitItem(L, wx, wy, data().screen.ground);
+            if (sameItem(hit, ed.lsel)) drag.item = { it: hit, x: hit.x, h: hit.h };
+          }
+        });
+        view.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          const px = view.getBoundingClientRect().width / VW, dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+          if (!dragged && Math.abs(dx) + Math.abs(dy) < 5) return;
+          dragged = true;
+          if (drag.item) {
+            const L = scene(), it = drag.item.it, nx = Math.max(0, Math.min(L.width - 1, Math.round(drag.item.x + dx / px)));
+            const d = it.def, nh = d.height ? Math.max(d.height[0], Math.min(d.height[1], Math.round(drag.item.h - dy / px))) : undefined;
+            drag.item.nx = nx; drag.item.nh = nh;
+            // draw the move live, save it when the finger lifts
+            const L2 = structuredClone(L);
+            if (it.list === 'start' || it.list === 'exit') L2[it.list].x = nx; else { L2[it.list][it.index].x = nx; if (nh !== undefined) L2[it.list][it.index].h = nh; }
+            drawLevel(L2); return;
+          }
+          ed.camX = drag.cam - dx / px; drawScene();
+        });
+        view.addEventListener('pointerup', (e) => {
+          if (drag && drag.item && drag.item.nx !== undefined) {
+            const it = drag.item.it, nx = drag.item.nx, nh = drag.item.nh;
+            changeLevel(L2 => { if (it.list === 'start' || it.list === 'exit') L2[it.list].x = nx; else { L2[it.list][it.index].x = nx; if (nh !== undefined) L2[it.list][it.index].h = nh; if (it.list === 'checkpoints') L2.checkpoints.sort((a, b) => a.x - b.x); } });
+            drag = null; setTimeout(() => { dragged = false; }, 0); rerender(); return;
+          }
+          if (drag && !dragged) sceneTap(e); drag = null; setTimeout(() => { dragged = false; }, 0);
+        });
         drawScene();
       }
       if (ed.tab === 'background') {

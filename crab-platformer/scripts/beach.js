@@ -32,7 +32,16 @@ function propAt(i) {
   if (img === castle && Math.abs(x + CASTLE_W / 2 - P.startX) < S.beach.castleKeepAway) img = umb;
   return { img, x };
 }
+// levels: props are placed by hand in the Studio instead of by the scatter rule
+const LEVEL_PROPS = LEVEL ? (LEVEL.props || []).map(p => ({ img: { palm, umbrella: umb, castle }[p.type], x: p.x, type: p.type })).filter(p => p.img) : null;
+const PROP_W = { palm: 72, umbrella: 17, castle: CASTLE_W };
 function solidsNear(wx, range = 120) {
+  if (LEVEL_PROPS) {
+    const out = [];
+    for (const p of LEVEL_PROPS) if (p.img === castle && p.x + CASTLE_W >= wx - range && p.x <= wx + range)
+      for (const s of CASTLE_SOLIDS) out.push({ x0: p.x + s.x0, x1: p.x + s.x1, top: GROUND + 1 - CASTLE_H + s.top });
+    return out;
+  }
   const out = [], i0 = Math.floor((wx - range - CASTLE_W) / SLOT), i1 = Math.floor((wx + range) / SLOT);
   for (let i = i0; i <= i1; i++) {
     const p = propAt(i);
@@ -106,9 +115,25 @@ function drawBackdrop(cx) {
     else if (k < 0.5) { ctx.fillStyle = CREAM; ctx.fillRect(x, y, 2, 1); ctx.fillStyle = PINK; ctx.fillRect(x, y + 1, 2, 1); }
     else if (k < 0.54) sprite(STAR, x, y - 1);
   }
+  if (LEVEL_PROPS) {
+    for (const p of LEVEL_PROPS) if (p.x - cx < VW && p.x + PROP_W[p.type] - cx > 0) ctx.drawImage(p.img, p.x - cx, GROUND + 1 - p.img.height);
+    drawLevelMarks(cx);
+    return;
+  }
   const i0 = Math.floor((cx - CASTLE_W - 40) / SLOT);
   for (let i = i0; i <= i0 + Math.ceil(VW / SLOT) + 2; i++) {
     const p = propAt(i); if (!p) continue;
     ctx.drawImage(p.img, p.x - cx, GROUND + 1 - p.img.height);
   }
+}
+
+// levels: checkpoint pennants (they turn cream once reached) and the exit flag
+const PENNANT = ["kyy..", "kyyyy", "kyy..", "k....", "k....", "k....", "k....", "k...."];
+const EXIT_FLAG = ["krrrrr.", "krrwrrr", "krrrrr.", "krr....", "k......", "k......", "k......", "k......", "k......", "k......", "k......", "k......", "kk....."];
+function drawLevelMarks(cx) {
+  for (const c of LEVEL.checkpoints || []) {
+    const got = checkpointX !== null && c.x <= checkpointX;
+    sprite(got ? PENNANT.map(r => r.replace(/y/g, 'w')) : PENNANT, Math.round(c.x - cx), GROUND - PENNANT.length + 1);
+  }
+  if (LEVEL.exit) sprite(EXIT_FLAG, Math.round(LEVEL.exit.x - cx), GROUND - EXIT_FLAG.length + 1);
 }

@@ -166,5 +166,15 @@
       "parallax": 0.35,
       "drift": 0.08
     }
+  },
+  "scenes": [
+    {
+      "id": "beach",
+      "name": "Beach",
+      "kind": "waves"
+    }
+  ],
+  "level": {
+    "wakeRange": 110
   }
 }
