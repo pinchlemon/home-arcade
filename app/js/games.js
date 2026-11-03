@@ -7,7 +7,8 @@ export const CODE_GAMES = [
   { name: 'Crab Platformer', path: '../crab-platformer/', kind: '2D · Canvas', size: '97 KB', file: 'crab-platformer', editable: true, mode: 'Waves' },
   { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard' },
   { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor' },
-  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' }
+  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' },
+  { name: 'Circuit Crush', path: '../circuit-crush/', kind: '2D · Canvas · study game', size: '371 KB', file: 'circuit-crush' }
 ];
 export const editableGames = () => CODE_GAMES.filter(g => g.editable);
 
