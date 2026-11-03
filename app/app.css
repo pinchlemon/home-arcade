@@ -251,3 +251,13 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 /* the controller ring needs something to hang on: any focused button, and the object rows */
 .screen-tool button.pf{position:relative}
 .orow.pf::after{inset:3px -10px;border-radius:var(--r-btn)}
+
+/* ---- controller ring, one style: rounded like the tab pills and clear of what it surrounds ---- */
+.pf::after{inset:-3px;border-radius:var(--r-btn)}
+.grow.pf::after,.orow.pf::after{inset:3px -10px;border-radius:var(--r-btn)}
+[data-pad=pager].pf::after{inset:-2px;border-radius:var(--r-bar)}
+.tray button.pf::after{inset:-4px -2px;border-radius:var(--r-btn)}
+.namebtn{padding:0 12px}
+.namebtn.pf::after{inset:-6px 0;border-radius:var(--r-btn)}
+.seg.pf::after{inset:-1px;border-radius:inherit}
+.seg.pf .selring{display:none}

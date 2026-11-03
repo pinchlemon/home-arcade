@@ -371,7 +371,7 @@ export function openGameEditor(app, g) {
     } else rows += `<div class="grow"><span class="t"><span class="sub">Built in: the game draws it with its own art${o.base === 'castle' ? ', and the player can stand on it' : ''}.</span></span>${artJump(o)}</div>`;
     return `<div class="plate bar gap20" style="flex:none">
         ${iconBtn('back', A(() => { ed.obj = null; ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'All objects' })}
-        <button style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left" ${A(() => { const nm = prompt('Object name', o.name); if (nm && nm.trim()) setObj(x => { x.name = nm.trim().slice(0, 20); }); })} aria-label="Rename ${esc(o.name)}">
+        <button class="namebtn" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left" ${A(() => { const nm = prompt('Object name', o.name); if (nm && nm.trim()) setObj(x => { x.name = nm.trim().slice(0, 20); }); })} aria-label="Rename ${esc(o.name)}">
           ${well(28, svgRows(glyph(o.symbol || o.base), o.color || BONE))}<span style="display:flex;flex-direction:column;min-width:0"><span class="title ell" style="font-size:14px">${esc(o.name)}</span><span class="sub">${k} placed · tap to rename</span></span></button>
         ${iconBtn('dup', A(() => { let n = 2; while (all[id + n]) n++; changeObjects(a2 => { a2[id + n] = { ...structuredClone(o), name: (o.name + ' ' + n).slice(0, 20) }; }); ed.obj = id + n; rerender(); }), { label: 'Copy ' + o.name })}
         ${iconBtn('trash', A(() => {
