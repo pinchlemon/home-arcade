@@ -5,7 +5,6 @@
 import { solid, cellsSolid } from './pixel.js';
 
 const PHI = (1 + Math.sqrt(5)) / 2, TAU = Math.PI * 2;
-const ORANGE = [255, 90, 31];
 const ICON_STOPS = [[0, '#86c94a'], [.12, '#3f9fa8'], [.25, '#5a5cf0'], [.4, '#c04fd0'], [.5, '#ff4fa0'], [.62, '#ff7a2a'], [.75, '#ff9a2a'], [.88, '#c8c83a'], [1, '#86c94a']];
 // seconds: icon (hold), spin and pixelate, separate into small pixels, solids in a row, drop to the tabs
 const T = { hold: 0.45, pix: 1.25, snap: 1.85, split: 2.2, row: 3.1, drop: 3.5, end: 4.55 };
@@ -98,7 +97,7 @@ function pixelate(src, n, tmp) {
   const out = tmp(n, 1), x = out.getContext('2d');
   x.clearRect(0, 0, n, n); x.imageSmoothingEnabled = true; x.drawImage(cur, 0, 0, n, n);
   const d = x.getImageData(0, 0, n, n), a = d.data;
-  for (let i = 0; i < a.length; i += 4) a[i + 3] = a[i + 3] > 150 ? 255 : (a[i + 3] > 90 ? 110 : 0);
+  for (let i = 0; i < a.length; i += 4) a[i + 3] = a[i + 3] > 110 ? 255 : (a[i + 3] > 45 ? 120 : 0);
   x.putImageData(d, 0, 0);
   return out;
 }
@@ -165,13 +164,13 @@ export function play({ root, input, tabSolids, preview }) {
   }
   // the little pixels that leave the big ones and form the row. Each solid is built from a slice of the dodecahedron (left slice, left solid).
   function buildParticles(cells, srcN, tRow) {
-    const cs = Dg / srcN, src = cells.map(([x, y, l]) => ({ x: cx + (x + .5 - srcN / 2) * cs, y: cy + (y + .5 - srcN / 2) * cs, l })).sort((a, b) => a.x - b.x);
+    const cs = Dg / srcN, src = cells.map(c => ({ x: cx + (c.x + .5 - srcN / 2) * cs, y: cy + (c.y + .5 - srcN / 2) * cs, a: c.a, c: c.c })).sort((a, b) => a.x - b.x);
     const per = src.length / 5, out = [];
     KINDS.forEach((kind, i) => {
       const slice = src.slice(Math.round(i * per), Math.round((i + 1) * per)), q = tabPose(i, tRow);
       cellsSolid(kind, q.ay, q.ax, ROW_N).forEach(([x, y, l], j) => {
         const a = slice[(j * 7 + i) % slice.length] || src[0], ang = Math.random() * TAU, burst = 8 + Math.random() * 26;
-        out.push({ x0: a.x + (Math.random() - .5) * cs, y0: a.y + (Math.random() - .5) * cs, l0: a.l, x1: slots[i].x + (x + .5 - ROW_N / 2) * tcs, y1: slots[i].y + (y + .5 - ROW_N / 2) * tcs, l1: l, c: colors[i], bx: Math.cos(ang) * burst, by: Math.sin(ang) * burst, delay: Math.random() * 0.3 });
+        out.push({ x0: a.x + (Math.random() - .5) * cs, y0: a.y + (Math.random() - .5) * cs, a0: a.a, c0: a.c, x1: slots[i].x + (x + .5 - ROW_N / 2) * tcs, y1: slots[i].y + (y + .5 - ROW_N / 2) * tcs, l1: l, c: colors[i], bx: Math.cos(ang) * burst, by: Math.sin(ang) * burst, delay: Math.random() * 0.3 });
       });
     });
     return out;
@@ -203,47 +202,38 @@ export function play({ root, input, tabSolids, preview }) {
       if (t < T.pix) {
         drawScene(sctx, Q, st, grad);
         ctx.globalAlpha = fade; ctx.drawImage(scene, cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1;
-      } else if (t < T.snap) {
-        // coarser and coarser pixels: 128, 64 across, then the app's own 40-cell solid in Arcade orange (still spinning faster)
-        const stage = (t - T.pix) / (T.snap - T.pix), n = stage < 0.34 ? 128 : (stage < 0.67 ? 64 : 40);
-        if (n > 40) {
-          drawScene(sctx, Q, st, grad);
-          const px = pixelate(scene, n, tmp); ctx.imageSmoothingEnabled = false; ctx.drawImage(px, cx - Dg / 2, cy - Dg / 2, Dg, Dg);
-        } else drawCells(cellsSolid('dodeca', st.ay, st.ax, 40), 40, 1);
       } else {
-        // a held breath: the pixels tremble before they let go
-        const j = (t - T.snap) / (T.split - T.snap);
-        drawCells(cellsSolid('dodeca', st.ay, st.ax, 40), 40, 1 + Math.sin(j * 40) * 0.01 * j, j);
+        // coarser and coarser pixels (128, 64, then 40 across), still iridescent and still spinning faster; at the end they tremble
+        const n = t < T.pix + 0.2 ? 128 : (t < T.pix + 0.4 ? 64 : 40), j = clamp((t - T.snap) / (T.split - T.snap));
+        drawScene(sctx, Q, st, grad);
+        const px = pixelate(scene, n, tmp); ctx.imageSmoothingEnabled = false;
+        const sh = j * 3, sc = 1 + Math.sin(j * 40) * 0.01 * j;
+        ctx.drawImage(px, cx - Dg * sc / 2 + (Math.random() - .5) * sh, cy - Dg * sc / 2 + (Math.random() - .5) * sh, Dg * sc, Dg * sc);
       }
     } else {
       if (!particles) {
         layout();
-        const p0 = pose(T.split); frozen = cellsSolid('dodeca', p0.ay, p0.ax, 40);
-        particles = buildParticles(frozen, 40, t0 + T.row);
+        drawScene(sctx, Q, pose(T.split), grad);
+        const px = pixelate(scene, 40, tmp), data = px.getContext('2d').getImageData(0, 0, 40, 40).data, cells = [];
+        frozen = document.createElement('canvas'); frozen.width = frozen.height = 40; frozen.getContext('2d').drawImage(px, 0, 0);
+        for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) { const i = (y * 40 + x) * 4; if (data[i + 3]) cells.push({ x, y, a: data[i + 3] / 255, c: [data[i], data[i + 1], data[i + 2]] }); }
+        particles = buildParticles(cells, 40, t0 + T.row);
       }
       const k = t - T.split;
       // the dark gives way to the app as the solids start to drop
       wrap.style.background = `rgba(6,6,7,${clamp(1 - (t - (T.drop - 0.1)) / 0.5)})`;
       if (t < T.row) {
-        if (k < 0.2) drawCells(frozen, 40, 1, 0, 1 - k / 0.2); // the big pixels dissolve as the small ones leave them
+        if (k < 0.2) { ctx.globalAlpha = 1 - k / 0.2; ctx.imageSmoothingEnabled = false; ctx.drawImage(frozen, cx - Dg / 2, cy - Dg / 2, Dg, Dg); ctx.globalAlpha = 1; } // the big pixels dissolve as the small ones leave them
         particles.forEach(p => {
           const e = clamp((k - p.delay) / SPLIT_DUR), m = ease(e), bump = Math.sin(Math.PI * easeOut(e));
           const x = lerp(p.x0, p.x1, m) + p.bx * bump, y = lerp(p.y0, p.y1, m) + p.by * bump;
-          const r = lerp(ORANGE[0], p.c[0], m) | 0, g = lerp(ORANGE[1], p.c[1], m) | 0, b = lerp(ORANGE[2], p.c[2], m) | 0;
-          ctx.fillStyle = `rgba(${r},${g},${b},${lerp(alphaOf(p.l0), alphaOf(p.l1), m)})`;
+          const r = lerp(p.c0[0], p.c[0], m) | 0, g = lerp(p.c0[1], p.c[1], m) | 0, b = lerp(p.c0[2], p.c[2], m) | 0;
+          ctx.fillStyle = `rgba(${r},${g},${b},${lerp(p.a0, alphaOf(p.l1), m)})`;
           ctx.fillRect(x - tcs / 2, y - tcs / 2, tcs, tcs);
         });
       } else drawSolids(t, now);
     }
     raf = requestAnimationFrame(tick);
-  }
-  function drawCells(cells, n, scale, shake = 0, alpha = 1) {
-    const cs = Dg / n;
-    cells.forEach(([x, y, l]) => {
-      const jx = shake ? (Math.random() - .5) * shake * 3 : 0, jy = shake ? (Math.random() - .5) * shake * 3 : 0;
-      ctx.fillStyle = `rgba(${ORANGE[0]},${ORANGE[1]},${ORANGE[2]},${alphaOf(l) * alpha})`;
-      ctx.fillRect(cx + (x - n / 2) * cs * scale + jx, cy + (y - n / 2) * cs * scale + jy, cs * scale, cs * scale);
-    });
   }
   raf = requestAnimationFrame(tick);
   return new Promise(res => { const iv = setInterval(() => { if (done) { clearInterval(iv); res(); } }, 100); });
