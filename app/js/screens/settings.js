@@ -11,6 +11,11 @@ export const BUILD = '0.1';
 export const SPRITE_BGS = ['CHECKER', 'BLACK', 'GRAY', 'LIGHT', 'SKY', 'GRASS'];
 const GROUPS = [['controller', 'Controller', 'controller'], ['sync', 'Sync', 'changes'], ['github', 'GitHub', 'github'], ['audio', 'Audio', 'sounds'], ['display', 'Display', 'display']];
 
+// the row the controller is on gets a ring
+function markFocus(root, app) {
+  const rows = [...root.querySelectorAll('.group > .setrow, .group > .row')], f = app.ui.setRow ?? -1;
+  rows.forEach((r, k) => r.classList.toggle('pf', k === f));
+}
 const srow = (label, sub, control) => `<div class="plate setrow">
   <span style="display:flex;flex-direction:column;gap:4px;min-width:0"><span class="title ell" style="font-size:14px">${esc(label)}</span><span class="sub">${esc(sub)}</span></span>${control}</div>`;
 const info = (text, act, label) => `<span style="display:flex;align-items:center;gap:2px;flex:none;min-width:0"><span class="sub" style="color:var(--text);max-width:170px">${esc(text)}</span>${act ? iconBtn('rename', act, { label }) : '<span style="width:6px"></span>'}</span>`;
@@ -65,7 +70,7 @@ export default {
     const body = `<div class="group">
       <div class="plate bar">
         <div role="tablist" aria-label="Settings groups" style="display:flex;align-items:center;gap:4px">
-          ${GROUPS.map(([k, l, ic]) => `<span class="dotwrap">${iconBtn(ic, A(() => { app.ui.setGroup = k; app.saveUI(); app.render(); }), { on: g === k, label: l, pressed: g === k })}${k === 'sync' && changeList().length ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>`).join('')}
+          ${GROUPS.map(([k, l, ic]) => `<span class="dotwrap">${iconBtn(ic, A(() => { app.ui.setGroup = k; app.ui.setRow = -1; app.saveUI(); app.render(); }), { on: g === k, label: l, pressed: g === k })}${k === 'sync' && changeList().length ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>`).join('')}
         </div>
         <span class="cap acc" style="padding-right:10px">${esc(name)}</span>
       </div>
@@ -73,11 +78,28 @@ export default {
     </div>`;
     return { right, body };
   },
+  // Controller: left and right switch groups; down steps into the rows (up goes back to the group bar).
+  // On a row, left and right change its value, and A switches it, taps it or opens it.
+  mount(root, app) { markFocus(root, app); },
   pad(app, input2) {
+    const rowsEl = [...document.querySelectorAll('#app .group > .setrow, #app .group > .row')];
+    let f = Math.min(app.ui.setRow ?? -1, rowsEl.length - 1);
+    const move = (n) => { app.ui.setRow = n; markFocus(document.getElementById('app'), app); };
+    const step = (dir) => {   // dir -1 = less, 1 = more
+      const row = rowsEl[f]; if (!row) return;
+      const el = row.querySelector(dir < 0 ? '[aria-label^="Less"]' : '[aria-label^="More"]') || row.querySelector('[role=switch]');
+      if (el) el.click();
+    };
     const i = GROUPS.findIndex(x => x[0] === (app.ui.setGroup || 'controller')), n = GROUPS.length;
-    if (input2.pressed('right')) { app.ui.setGroup = GROUPS[(i + 1) % n][0]; app.saveUI(); app.render(); }
-    else if (input2.pressed('left')) { app.ui.setGroup = GROUPS[(i + n - 1) % n][0]; app.saveUI(); app.render(); }
-    else if (app.ui.setGroup === 'sync' && input2.pressed('a')) pushAll(app);
+    const group = (d) => { app.ui.setGroup = GROUPS[(i + d + n) % n][0]; app.ui.setRow = -1; app.saveUI(); app.render(); };
+    if (input2.pressed('down')) move(Math.min(rowsEl.length - 1, f + 1));
+    else if (input2.pressed('up')) move(Math.max(-1, f - 1));
+    else if (input2.pressed('right')) { if (f < 0) group(1); else step(1); }
+    else if (input2.pressed('left')) { if (f < 0) group(-1); else step(-1); }
+    else if (input2.pressed('a')) {
+      if (f >= 0 && rowsEl[f]) { const row = rowsEl[f]; (row.matches('button') ? row : row.querySelector('[role=switch],button.icon,button'))?.click(); }
+      else if (app.ui.setGroup === 'sync') pushAll(app);
+    }
   }
 };
 
