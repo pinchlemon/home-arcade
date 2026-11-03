@@ -609,6 +609,9 @@ export function openGameEditor(app, g) {
       }
       if (!ed.game) return;
       padFrame(document.getElementById('app'), nav, input, { tap: enterPad });
+      // on the scene, say how to get into it
+      const h = document.querySelector('.padhint');
+      if (h && !ed.pad) { const on = !!document.querySelector('#scn.pf'); h.classList.toggle('live', on); if (on) h.textContent = 'Press A to edit this scene'; }
     }
   };
   ov.onClose = () => { if (app.settings.autoPush && games.getEdits(folder).dirty) pushAll(app, true); };
