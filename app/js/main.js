@@ -121,7 +121,11 @@ function fitRows() {
     sc.style.paddingTop = ''; sc.style.paddingBottom = ''; sc.style.setProperty('--list-h', listH(rows()) + 'px');
     // the shape grows to fill the space above the text, up to a size that still looks right
     const info = em.querySelector('.emblem-info');
-    if (info) { const free = em.clientHeight - info.offsetHeight - 16; sc.style.setProperty('--hz', Math.max(0.5, Math.min(0.82, (free - 2) / 236)).toFixed(3)); }
+    if (info) {
+      // size the shape (circle included) and space it so the gap above it equals the gap below it, down to the text
+      const free = em.clientHeight - info.offsetHeight - 16, z = Math.max(0.5, Math.min(0.9, (free - 40) / 164)), g = (free - 164 * z) / 2;
+      sc.style.setProperty('--hz', z.toFixed(3)); sc.style.setProperty('--hm', (g / z - 36).toFixed(1) + 'px');
+    }
     return;
   }
   const gap = parseFloat(getComputedStyle(sc).rowGap) || 20, safeTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
@@ -137,7 +141,11 @@ function fitRows() {
   sc.style.setProperty('--list-h', listH(rows()) + 'px');
   sc.style.paddingTop = top + 'px'; sc.style.paddingBottom = '0px';
 }
-addEventListener('resize', () => { setRows(4); if (!app.overlay) render(); });
+// turning the phone: the new size arrives a moment after the event, so draw again once it has settled
+let turnT = [];
+function redraw() { setRows(4); if (!app.overlay) render(); else sizeApp(); }
+addEventListener('resize', () => { redraw(); turnT.forEach(clearTimeout); turnT = [setTimeout(redraw, 250), setTimeout(redraw, 800)]; });
+addEventListener('orientationchange', () => { turnT.forEach(clearTimeout); turnT = [setTimeout(redraw, 100), setTimeout(redraw, 400), setTimeout(redraw, 900)]; });
 
 // Taps: one soft thud on touch-down. While held, the button sinks and lights up like a selected one,
 // and whatever was selected next to it (same list, tab bar or tool row) steps back so only one thing is lit.

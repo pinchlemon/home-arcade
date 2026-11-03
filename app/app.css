@@ -94,8 +94,8 @@ body{background:transparent}
     padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
   .tabbar{grid-area:nav;height:auto;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));padding:4px 0}
   /* the text and buttons sit at the bottom of the panel; the shape sits exactly halfway between the top edge and the text */
-  .emblem{grid-area:emblem;height:auto;flex-direction:column;justify-content:flex-end;gap:0;padding:0 14px 16px}
-  .emblem>.mount:first-child{zoom:var(--hz,.82);margin:auto -36px!important;flex:none;align-self:center}
+  .emblem{grid-area:emblem;height:auto;flex-direction:column;justify-content:space-between;gap:0;padding:0 14px 16px}
+  .emblem>.mount:first-child{zoom:var(--hz,.8);margin:var(--hm,0px) -36px!important;flex:none;align-self:center}
   .emblem-info{align-self:stretch;flex:none;padding:0;gap:3px}
   .emblem-info .actions{gap:6px;margin-top:8px}
   .emblem-info .btn{height:36px}
