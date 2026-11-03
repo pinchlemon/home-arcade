@@ -119,6 +119,9 @@ function fitRows() {
     let k = 4; while (k > 1 && listH(k) > avail) k--;
     if (k !== rows() && fitting < 3) { setRows(k); fitting++; render(); fitting--; return; }
     sc.style.paddingTop = ''; sc.style.paddingBottom = ''; sc.style.setProperty('--list-h', listH(rows()) + 'px');
+    // the shape grows to fill the space above the text, up to a size that still looks right
+    const info = em.querySelector('.emblem-info');
+    if (info) { const free = em.clientHeight - info.offsetHeight - 16; sc.style.setProperty('--hz', Math.max(0.5, Math.min(0.82, (free - 2) / 236)).toFixed(3)); }
     return;
   }
   const gap = parseFloat(getComputedStyle(sc).rowGap) || 20, safeTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
