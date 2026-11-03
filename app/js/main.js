@@ -98,9 +98,18 @@ function render() {
 const probe = document.createElement('div'); probe.className = 'safe-probe'; document.body.appendChild(probe);
 const listH = (n) => 52 + 8 + n * 64 + (n - 1) * 8;
 let fitting = 0;
+const LANDSCAPE = matchMedia('(orientation: landscape) and (max-height: 520px)');
 function fitRows() {
   const sc = root.querySelector('.screen-tabs'), em = sc && sc.querySelector('.emblem'), tb = sc && sc.querySelector('.tabbar');
   if (!em || !tb) return;
+  if (LANDSCAPE.matches) {
+    // the top panel and tab bar sit beside the list, so the list can use the whole height
+    const avail = innerHeight - Math.max(parseFloat(getComputedStyle(probe).paddingTop) || 0, 16) - 16;
+    let k = 4; while (k > 1 && listH(k) > avail) k--;
+    if (k !== rows() && fitting < 3) { setRows(k); fitting++; render(); fitting--; return; }
+    sc.style.paddingTop = ''; sc.style.paddingBottom = ''; sc.style.setProperty('--list-h', listH(rows()) + 'px');
+    return;
+  }
   const gap = parseFloat(getComputedStyle(sc).rowGap) || 20, safeTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
   const minTop = safeTop + 16, minBottom = 12, fixed = em.offsetHeight + tb.offsetHeight + gap * 2;
   let n = 4; while (n > 1 && fixed + listH(n) > innerHeight - minTop - minBottom) n--;
