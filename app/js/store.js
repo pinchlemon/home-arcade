@@ -8,7 +8,7 @@ const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); retu
 // the old Studio game format (and its sample game, Tide Pool) is gone; tidy up what it left on the phone
 try { for (const k of Object.keys(localStorage)) if (k === 'ha.projects' || k.startsWith('ha.p.')) localStorage.removeItem(k); } catch (e) {}
 
-export const DEFAULT_SETTINGS = { labels: 'XBOX', rumble: true, deadzone: 2, swapAB: false, autoPush: false, sfx: 7, menuSounds: true, reduceMotion: false, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER', repo: 'pinchlemon/home-arcade', branch: 'main', token: '' };
+export const DEFAULT_SETTINGS = { labels: 'XBOX', rumble: true, deadzone: 2, swapAB: false, autoPush: false, sfx: 7, menuSounds: true, reduceMotion: false, launchAnim: true, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER', repo: 'pinchlemon/home-arcade', branch: 'main', token: '' };
 export const getSettings = () => ({ ...DEFAULT_SETTINGS, ...read(K.settings, {}) });
 export const setSettings = (s) => write(K.settings, s);
 
