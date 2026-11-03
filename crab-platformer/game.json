@@ -48,7 +48,7 @@
     "walkMax": 1.5,
     "gravity": 0.320068359375,
     "holdJumpGravity": 0.183837890625,
-    "jumpSpeed": 3.7841796875,
+    "jumpSpeed": 4,
     "maxFall": 3.46728515625,
     "coyoteFrames": 6,
     "jumpBufferFrames": 7,
@@ -67,7 +67,7 @@
     "recoilFrames": 6,
     "drops": 10,
     "dropSpeed": 3.9,
-    "seedChance": 0.4
+    "seedChance": 0
   },
   "eyes": {
     "hp": 9,
