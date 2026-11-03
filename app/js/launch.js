@@ -9,10 +9,11 @@ import { solid, cellsSolid } from './pixel.js';
 const PHI = (1 + Math.sqrt(5)) / 2, TAU = Math.PI * 2;
 const ICON_STOPS = [[0, '#86c94a'], [.12, '#3f9fa8'], [.25, '#5a5cf0'], [.4, '#c04fd0'], [.5, '#ff4fa0'], [.62, '#ff7a2a'], [.75, '#ff9a2a'], [.88, '#c8c83a'], [1, '#86c94a']]
   .map(([o, h]) => [o, [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))]);
-// seconds. The spin picks up speed until `fast`, then keeps going flat out. At `leave` pixels begin to leave the dodecahedron, one by one,
+// seconds. Between `row` (the last pixel lands) and `drop` the finished solids just spin, with nothing flying.
+// The spin picks up speed until `fast`, then keeps going flat out. At `leave` pixels begin to leave the dodecahedron, one by one,
 // until `gone`; each takes FLIGHT seconds to reach the row, so the row is complete at `row`. Then the row drops to the tabs.
-const FLIGHT = 0.8, ROW_N = 44, TAB_N = 20, DROP_DUR = 0.7, DROP_STAGGER = 0.07;
-const T = { hold: 0.45, fast: 2.65, pix: 2.2, pixIn: 0.6, leave: 3.2, gone: 4.2, row: 4.2 + FLIGHT, drop: 5.3, end: 5.3 + 4 * DROP_STAGGER + DROP_DUR };
+const FLIGHT = 0.9, ROW_N = 44, TAB_N = 20, DROP_DUR = 0.7, DROP_STAGGER = 0.07;
+const T = { hold: 0.45, fast: 2.65, pix: 2.2, pixIn: 0.6, leave: 3.0, gone: 5.4, row: 5.4 + FLIGHT, drop: 6.8, end: 6.8 + 4 * DROP_STAGGER + DROP_DUR };
 const OMEGA = 32; // radians per second at full speed (about 5 turns a second)
 const KINDS = ['dodeca', 'cube', 'icosa', 'octa', 'tetra'];
 
@@ -77,6 +78,20 @@ function pose(t) {
 const tabPose = (i, tt) => ({ ay: tt * (0.55 + i * 0.08) + i * 1.3, ax: 0.45 + Math.sin(tt * 0.3 + i) * 0.15 });
 
 // ---- drawing the smooth wireframe
+// a faint, cheap copy of the front bars (one flat colour per bar), for the motion blur trail
+function drawGhost(ctx, Q, st, alpha) {
+  const g = geo(), u = Q / 2.5, c = Q / 2;
+  const P = project(g.s.v, st.ay, st.ax, st.roll, st.persp).map(p => [c + p[0] * u, c + p[1] * u]);
+  const fn = g.faces.map(f => rotN(f.n, st.ay, st.ax, st.roll));
+  ctx.lineCap = 'round'; ctx.lineWidth = u * 0.07; ctx.globalAlpha = alpha;
+  g.s.e.forEach(([i, j], k) => {
+    if (!g.edgeFaces[k].some(f => fn[f][2] > 0.001)) return;
+    const a = P[i], b = P[j], m = iconColor(Math.atan2((a[1] + b[1]) / 2 - c, (a[0] + b[0]) / 2 - c) / TAU).match(/\d+/g).map(Number), w = st.white;
+    ctx.strokeStyle = `rgb(${lerp(m[0], 255, w) | 0},${lerp(m[1], 255, w) | 0},${lerp(m[2], 255, w) | 0})`;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
 function drawScene(ctx, Q, st) {
   const g = geo(), u = Q / 2.5, c = Q / 2;
   ctx.clearRect(0, 0, Q, Q);
@@ -94,7 +109,7 @@ function drawScene(ctx, Q, st) {
   // far edges, faint, show the solid behind (a skeleton: no faces)
   if (st.back > 0.01) {
     ctx.lineWidth = u * 0.03;
-    g.s.e.forEach(([i, j], k) => { if (!front[k]) { ctx.globalAlpha = st.back * (0.1 + 0.2 * clamp(0.5 - (P[i][2] + P[j][2]) / 2)); ctx.strokeStyle = edgeGrad(P[i], P[j]); line(P[i], P[j]); } });
+    g.s.e.forEach(([i, j], k) => { if (!front[k]) { ctx.globalAlpha = st.back * (0.1 + 0.2 * clamp(0.5 - (P[i][2] + P[j][2]) / 2)); ctx.strokeStyle = iconColor(Math.atan2((P[i][1] + P[j][1]) / 2 - c, (P[i][0] + P[j][0]) / 2 - c) / TAU); line(P[i], P[j]); } }); // faint, so one flat colour each is plenty
   }
   const w = u * 0.07, near = [];
   g.s.e.forEach(([i, j], k) => { if (front[k]) near.push([P[i], P[j]]); });
@@ -161,20 +176,18 @@ export function play({ root, input, tabSolids, preview }) {
   const ctx = cv.getContext('2d');
 
   const U = Math.min(W, H) * 0.35, cx = W / 2, cy = Math.min(H * 0.43, H - U * 2), Dg = U * 2.5; // U: px per unit, Dg: the 2.5-unit square the solid lives in
-  const Q = Math.round(Dg * dpr), scene = document.createElement('canvas'); scene.width = scene.height = Q;
+  const Q = Math.round(Dg * Math.min(dpr, 2)), scene = document.createElement('canvas'); scene.width = scene.height = Q;
   const sctx = scene.getContext('2d'), acc = document.createElement('canvas'); acc.width = acc.height = Q;
   const actx = acc.getContext('2d');
   const pool = {}; const tmp = (w, key) => { const k = key ? 'px' + w : 'm' + w; if (!pool[k]) { pool[k] = document.createElement('canvas'); pool[k].width = pool[k].height = w; } return pool[k]; };
 
   // the smooth wireframe at time t; when it spins fast, several moments within a few milliseconds are laid over each other (motion blur)
   function renderSmooth(t, still) {
-    const st = pose(t), K = still || st.speed < 6 ? 1 : 7;
+    const st = pose(t), K = still || st.speed < 6 ? 0 : 5;
     actx.clearRect(0, 0, Q, Q);
-    for (let k = K - 1; k >= 0; k--) {
-      drawScene(sctx, Q, k ? pose(t - k * 0.003) : st);
-      actx.globalAlpha = k ? 0.2 : 1; actx.drawImage(scene, 0, 0);
-    }
-    actx.globalAlpha = 1;
+    for (let k = K; k >= 1; k--) drawGhost(actx, Q, pose(t - k * 0.004), 0.16);
+    drawScene(sctx, Q, st);
+    actx.drawImage(scene, 0, 0);
     return acc;
   }
 
