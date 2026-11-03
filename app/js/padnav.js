@@ -26,7 +26,10 @@ function targets(root) {
 }
 const center = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 
-export const makeNav = () => ({ i: -1 });
+// every ring is cleared when this number goes up (the phone turning back upright, say)
+let epoch = 0;
+export const clearAllNav = () => { epoch++; document.querySelectorAll('.pf').forEach(e => e.classList.remove('pf')); };
+export const makeNav = () => ({ i: -1, epoch });
 export const clearNav = (nav) => { nav.i = -1; };
 
 // put the ring on the chosen thing (called after every redraw too)
@@ -44,6 +47,8 @@ function pick(list, from, dir) {
   let best = null, bestScore = Infinity;
   for (const el of list) {
     if (el === from) continue;
+    // going sideways stays on the same row: never jump up or down to another plate
+    if (dir === 'left' || dir === 'right') { const a = from.getBoundingClientRect(), b = el.getBoundingClientRect(), over = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); if (over < Math.min(a.height, b.height) * 0.3) continue; }
     // going up or down, a pager bar counts as one stop (its extra button, like New, is reached with A)
     if ((dir === 'up' || dir === 'down') && el.closest('[data-pad=pager]') && !el.matches('[data-pad=pager]')) continue;
     const r = el.getBoundingClientRect(), p = center(r), dx = p.x - c.x, dy = p.y - c.y;
@@ -60,6 +65,7 @@ function pick(list, from, dir) {
 // Call every frame. hooks: { pan(dx) slides the scene, tap() taps the scene's middle }.
 // Returns true when it used the press.
 export function padFrame(root, nav, input, hooks = {}) {
+  if (nav.epoch !== epoch) { nav.epoch = epoch; nav.i = -1; }
   const dirs = ['up', 'down', 'left', 'right'].filter(d => input.pressed(d));
   const list = targets(root);
   let cur = nav.i >= 0 ? mark(root, nav) : null;
@@ -84,7 +90,11 @@ export function padFrame(root, nav, input, hooks = {}) {
   }
   const d = dirs[0];
   if (cur.id === 'scn' && (d === 'left' || d === 'right')) return true;   // those slide the scene
-  if (pager && (d === 'left' || d === 'right')) { turn(d === 'left' ? -1 : 1); return true; }
+  if (pager && (d === 'left' || d === 'right')) {
+    const extra = cur.querySelector('.btn.bare:not(.icon)'), m = /(\d+)\s*\/\s*(\d+)/.exec(cur.innerText || '');
+    if (d === 'right' && extra && m && +m[1] >= +m[2]) { nav.i = list.indexOf(extra); mark(root, nav); return true; }   // last page: on to New
+    turn(d === 'left' ? -1 : 1); return true;
+  }
   if (row && (d === 'left' || d === 'right')) {
     const el = cur.querySelector(d === 'left' ? '[aria-label^="Less"]' : '[aria-label^="More"]') || cur.querySelector('[role=switch]');
     el?.click(); return true;

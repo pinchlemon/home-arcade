@@ -5,6 +5,7 @@ import * as S from './store.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
 import * as games from './games.js';
+import { clearAllNav } from './padnav.js';
 import { A, resetActions, getAction, esc, setRows, rows } from './ui.js';
 import arcade from './screens/arcade.js';
 import studio from './screens/studio.js';
@@ -141,6 +142,11 @@ function fitRows() {
   sc.style.setProperty('--list-h', listH(rows()) + 'px');
   sc.style.paddingTop = top + 'px'; sc.style.paddingBottom = '0px';
 }
+// turning the phone back upright: the controller's ring goes away (things that stay highlighted on their own do)
+LANDSCAPE.addEventListener('change', (e) => {
+  if (e.matches) return;
+  clearAllNav(); app.ui.setRow = -1; app.saveUI();
+});
 // turning the phone: the new size arrives a moment after the event, so draw again once it has settled
 let turnT = [];
 function redraw() { setRows(4); if (!app.overlay) render(); else sizeApp(); }
