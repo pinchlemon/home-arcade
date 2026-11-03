@@ -319,7 +319,7 @@ export function openGameEditor(app, g) {
         const o = all[id], k = placedCount(id), kind = isActor(o) ? (o.behaviors || []).length + ' behaviors' : 'Built in · ' + o.base;
         return `<button class="orow" ${A(() => { ed.obj = id; ed.addingBehavior = false; rerender(); })}>${well(40, svgRows(glyph(o.symbol || o.base), o.color || BONE))}<span class="t"><span class="title ell" style="font-size:14px">${esc(o.name)}</span><span class="sub">${esc(kind)}</span></span><span class="cap" style="color:var(--muted)">${k} placed</span></button>`;
       }).join('');
-      return `<div class="plate bar gap20" style="flex:none">
+      return `<div class="plate bar gap20" style="flex:none" data-pad="pager">
           <span class="cap" style="color:var(--muted);padding-left:10px">Objects · ${ids.length}</span>
           <div style="display:flex;align-items:center;gap:2px">
             ${iconBtn('left', A(() => { ed.objPage = Math.max(0, pg - 1); rerender(); }), { color: '#fff', label: 'Previous page' })}<span class="cap acc" style="min-width:30px;text-align:center">${pg + 1}/${pages}</span>${iconBtn('right', A(() => { ed.objPage = Math.min(pages - 1, pg + 1); rerender(); }), { color: '#fff', label: 'Next page' })}
