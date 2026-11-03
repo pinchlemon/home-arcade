@@ -199,7 +199,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .ptab{transition:color .3s ease,opacity .4s ease}
 
 /* objects tab: list rows and behavior headings inside a panel */
-.orow{display:flex;align-items:center;gap:12px;min-height:58px;width:100%;text-align:left;border-top:1px solid rgba(255,255,255,.06);padding:4px 0}
+.orow{display:flex;align-items:center;gap:12px;min-height:66px;width:100%;text-align:left;border-top:1px solid rgba(255,255,255,.06);padding:8px 10px}
 .inspector>.orow:first-child{border-top:0}
 .orow .t,.bhead .t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
 .orow .sub{font-size:11px;line-height:14px}
@@ -261,3 +261,5 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .namebtn.pf::after{inset:-6px 0;border-radius:var(--r-btn)}
 .seg.pf::after{inset:-1px;border-radius:inherit}
 .seg.pf .selring{display:none}
+
+.orow.pf::after{inset:2px -6px}

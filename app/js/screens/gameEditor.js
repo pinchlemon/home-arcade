@@ -362,7 +362,7 @@ export function openGameEditor(app, g) {
     } else if (o.base === 'eye') {
       // an eye object can change any of the game's eye settings just for itself
       const grp = ed.game.schema.groups.find(x => x.id === 'eyes');
-      rows += `<div class="bhead"><span class="t"><span class="cap acc">Eye settings</span><span class="sub">Green ones differ from the game's usual eye</span></span></div>`;
+      rows += `<div class="bhead"><span class="t"><span class="cap acc">Eye settings</span><span class="sub">These apply to this object only. A setting turns green once you change it from the game's normal eye</span></span></div>`;
       for (const f of grp ? grp.fields : []) {
         const key = f.path.replace(/^eyes\./, ''), base = games.getPath(data(), f.path), mine = games.getPath(o.settings || {}, key), v = mine ?? base;
         const put = (nv) => setObj(x => { x.settings = x.settings || {}; const ks = key.split('.'); if (ks.length === 2) { x.settings[ks[0]] = [...(x.settings[ks[0]] || games.getPath(data(), 'eyes.' + ks[0]))]; x.settings[ks[0]][+ks[1]] = nv; } else x.settings[key] = nv; });
