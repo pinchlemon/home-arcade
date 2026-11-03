@@ -8,6 +8,13 @@ function update() {
     pressed.jump = pressed.a = pressed.b = false;
     return;
   }
+  if (cleared) {   // levels: reached the exit; jump goes on to the next scene
+    clearT++;
+    if (clearT > 60 && (pressed.jump || pressed.a || pressed.b)) nextScene();
+    updateParts(); updateEyes();
+    pressed.jump = pressed.a = pressed.b = false;
+    return;
+  }
   const dir = crab.stun > 0 ? 0 : (held('right') ? 1 : 0) - (held('left') ? 1 : 0);
   if (crab.stun > 0) crab.stun--;
   if (crab.invuln > 0) crab.invuln--;
@@ -34,6 +41,7 @@ function update() {
   // horizontal: walls of the castle block him, small ledges he just steps up
   const prevX = crab.x;
   crab.x += crab.vx;
+  if (LEVEL) { const lo = 12, hi = LEVEL.width - 12; if (crab.x < lo || crab.x > hi) { crab.x = Math.max(lo, Math.min(hi, crab.x)); crab.vx = 0; } }
   for (const r of solids) {
     if (crab.y <= r.top + 0.5 || crab.x + HW <= r.x0 || crab.x - HW >= r.x1) continue;
     if (crab.y - r.top <= 3 && wasGround) { crab.y = r.top; continue; }
@@ -77,10 +85,21 @@ function update() {
   // camera is locked to the crab's whole-pixel position; only the look-ahead eases
   look += (crab.face * S.camera.lookAhead - look) * S.camera.lookEase;
   camX = Math.round(crab.x) - VW / 2 + Math.round(look);
+  if (LEVEL) {
+    camX = Math.max(0, Math.min(Math.max(0, LEVEL.width - VW), camX));
+    for (const c of LEVEL.checkpoints || []) if (crab.x >= c.x && (checkpointX === null || checkpointX < c.x)) { checkpointX = c.x; sfx.jump(); }
+    if (LEVEL.exit && crab.x >= LEVEL.exit.x && !crab.dead) { cleared = true; clearT = 0; sfx.over(); }
+  }
   pressed.jump = pressed.a = pressed.b = false;
 }
 
 function spawnDust(x, y) {
   for (const d of [-1, 1]) for (let i = 0; i < 2; i++) parts.push({
     kind: 'dust', x: x + d * (8 + i * 3), y: y - 1, vx: d * (0.4 + i * .3), vy: -0.15, life: 14, max: 14 });
+}
+
+// levels: after the exit, the next scene in game.json; after the last one, back to the first
+function nextScene() {
+  const i = SCENES.indexOf(SCENE), next = SCENES[i + 1] || SCENES[0];
+  location.replace(location.pathname + '?scene=' + encodeURIComponent(next.id));
 }

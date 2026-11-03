@@ -125,7 +125,7 @@ body{background:transparent}
 .itab .dot{width:6px;height:6px;background:#3a3a3f}.itab.on .dot{background:var(--acc)}
 .tray{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:14px;margin-top:14px}
 .tray button{display:flex;flex-direction:column;align-items:center;gap:8px}
-.tray .cap{font-size:10px;letter-spacing:.12em;color:var(--muted);max-width:76px;overflow:hidden;text-overflow:ellipsis}
+.tray .cap{font-size:10px;letter-spacing:.06em;color:var(--muted);max-width:86px;overflow:hidden;text-overflow:ellipsis}
 .tray .on .cap{color:var(--acc)}
 canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .center-note{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 12px}
