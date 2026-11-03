@@ -6,7 +6,7 @@ import * as games from '../games.js';
 import * as input from '../input.js';
 import { makeNav, padFrame } from '../padnav.js';
 import { fmt } from './gameEditor.js';
-import { pushAll } from './sync.js';
+import { pushAll, markSeen } from './sync.js';
 
 const BLUE = '#4d7cff';
 
@@ -29,6 +29,7 @@ function describe(schema, base, path, now) {
 }
 
 export function openReview(app, g) {
+  markSeen(g);   // looking at the changes clears the dot
   let game = null, error = null;
   games.loadGame(g.file).then(x => { game = x; rer(); }).catch(e => { error = e.message; rer(); });
   const rer = () => { if (app.overlay === ov) app.render(); };

@@ -14,7 +14,7 @@ import studio from './screens/studio.js';
 import art from './screens/art.js';
 import sound from './screens/soundTab.js';
 import settings from './screens/settings.js';
-import { changeList } from './screens/sync.js';
+import { unseenCount } from './screens/sync.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -66,7 +66,7 @@ function applySettings() {
 }
 
 function tabBar() {
-  const toPush = changeList().length; // a dot on Settings while there are changes to push (Settings › Sync)
+  const toPush = unseenCount(); // a dot on Settings while there are changes to push (Settings › Sync)
   return `<nav class="plate tabbar" aria-label="Sections">${SECTIONS.map((s, i) => {
     const on = i === app.ui.tab, color = on ? s.color : '#ffffff', dot = s.name === 'Settings' && toPush;
     return `<button class="tab" ${A(() => app.setTab(i, true))} ${on ? 'aria-current="page"' : ''} style="color:${color};--acc:${s.color}"${dot ? ` aria-label="Settings, ${toPush} to push"` : ''}>

@@ -2,7 +2,7 @@
 import { well, icon, svgText } from '../pixel.js';
 import * as S from '../store.js';
 import { A, esc, plateBtn, iconBtn, stepper, toggle, rows as rowCount } from '../ui.js';
-import { syncGroup, changeList, pushAll } from './sync.js';
+import { syncGroup, unseenCount, pushAll } from './sync.js';
 import * as input from '../input.js';
 import * as snd from '../sound.js';
 import { hardUpdate, buildDate } from '../update.js';
@@ -69,7 +69,7 @@ export default {
     const body = `<div class="group">
       <div class="plate bar">
         <div role="tablist" aria-label="Settings groups" style="display:flex;align-items:center;gap:4px">
-          ${GROUPS.map(([k, l, ic]) => `<span class="dotwrap">${iconBtn(ic, A(() => { app.ui.setGroup = k; app.ui.setRow = -1; app.saveUI(); app.render(); }), { on: g === k, label: l, pressed: g === k })}${k === 'sync' && changeList().length ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>`).join('')}
+          ${GROUPS.map(([k, l, ic]) => `<span class="dotwrap">${iconBtn(ic, A(() => { app.ui.setGroup = k; app.ui.setRow = -1; app.saveUI(); app.render(); }), { on: g === k, label: l, pressed: g === k })}${k === 'sync' && unseenCount() ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>`).join('')}
         </div>
         <span class="cap acc" style="padding-right:10px">${esc(name)}</span>
       </div>
