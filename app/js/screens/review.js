@@ -59,7 +59,7 @@ export function openReview(app, g) {
         ${top}
         <div class="plate inspector">${rows || `<div class="center-note">${well(40, icon('check', BLUE))}<span class="sub">${game ? 'No changes left. ' + esc(g.name) + ' matches GitHub.' : 'Loading…'}</span></div>`}</div>
         <div class="plate bar">
-          ${bareBtn('trash', 'Discard all', A(() => { if (n && confirm('Discard all ' + n + ' changes to ' + g.name + '? They go back to the version on GitHub.')) putBack(items.map(i => i.path)); }))}
+          ${bareBtn('trash', 'Discard all', A(() => { if (n && confirm('Discard all ' + n + ' changes to ' + g.name + '? They go back to the version on GitHub.')) putBack(Object.keys(games.getEdits(g.file).overrides)); }))}
           ${bareBtn('up', n ? 'Push' : 'Pushed', A(() => { if (n) pushAll(app).then(() => rer()); }), n ? BLUE : undefined)}
         </div>
       </div>`;

@@ -25,7 +25,7 @@ export const when = (t) => {
 export function changeList() {
   const out = [];
   for (const g of games.editableGames()) {
-    const e = games.getEdits(g.file), n = Object.keys(e.overrides).length;
+    const e = games.getEdits(g.file), n = games.editCount(g.file);
     if (e.dirty && n) out.push({ game: g, name: g.name, meta: n + (n === 1 ? ' change' : ' changes') + ' · edited ' + games.ago(e.edited), act: 'Changed' });
   }
   return out;
