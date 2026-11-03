@@ -41,7 +41,9 @@ const cache = {};
 export async function loadGame(folder) {
   if (!cache[folder]) {
     const get = (f) => fetch(`../${folder}/${f}`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return r.json(); });
-    cache[folder] = Promise.all([get('game.json'), get('studio.json')]).then(([data, schema]) => ({ data, schema }))
+    const engine = (f) => fetch(`../engine/${f}`, { cache: 'no-cache' }).then(r => r.json()).catch(() => ({}));
+    cache[folder] = Promise.all([get('game.json'), get('studio.json'), engine('behaviors.json'), engine('symbols.json')])
+      .then(([data, schema, behaviors, symbols]) => ({ data, schema, behaviors: behaviors.behaviors || {}, symbols }))
       .catch(e => { delete cache[folder]; throw e; });
   }
   return cache[folder];

@@ -44,7 +44,7 @@ function nudge(f, v, dir) {
 }
 
 export function openGameEditor(app, g) {
-  const ed = { tab: app.ui.geTab || 'scene', scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
+  const ed = { tab: app.ui.geTab || 'scene', obj: null, objPage: 0, addingBehavior: false, scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
   let view = null, off = null, octx = null, drag = null, dragged = false;
   const folder = g.file;
   games.loadGame(folder).then(x => { ed.game = x; rerender(); }).catch(e => { ed.error = e.message; rerender(); });
@@ -94,16 +94,32 @@ export function openGameEditor(app, g) {
     if (p.solid && Math.abs(x + cw / 2 - D.player.startX) < D.beach.castleKeepAway) p = sc.props.find(q => q.glyph === 'umbrella');
     return { ...p, x, i };
   }
+  // ---- objects: reusable templates. Levels place copies; changing an object changes every copy.
+  const objects = () => data().objects || {};
+  const glyph = (name) => ART[name] || (ed.game.symbols || {})[name] || ART.beach;
+  const isActor = (o) => o && o.base === 'actor';
+  // how an object is drawn and placed in the editor: built-ins borrow the game's item sizes, others come from their symbol
+  function defFor(id) {
+    const o = objects()[id]; if (!o) return null;
+    if (isActor(o)) { const g2 = glyph(o.symbol), k = o.scale || 2; return { type: id, name: o.name, glyph: o.symbol, color: o.color, w: g2[0].length * k, h: g2.length * k, list: 'enemies', height: [0, 120], actor: true }; }
+    const base = (ed.game.schema.scene.levelItems || []).find(d => d.type === o.base); if (!base) return null;
+    return { ...base, type: id, name: o.name, color: o.color || base.color };
+  }
+  const thingsOf = (L) => L.things || [...(L.props || []).map(p => ({ obj: p.type, x: p.x })), ...(L.enemies || []).map(p => ({ obj: p.type, x: p.x, h: p.h }))];
+  function changeObjects(fn) { const o = structuredClone(objects()); fn(o); record(); games.setValue(folder, 'objects', o); }
+  function placedCount(id) { let n = 0; for (const sc2 of scenes()) if (sc2.kind === 'level') n += thingsOf(sc2).filter(t => t.obj === id).length; return n; }
   // ---- scenes: the first is the endless Waves beach; Level scenes are laid out by hand
   const scenes = () => data().scenes || [{ id: 'main', name: ed.game.schema.scene.name, kind: 'waves' }];
   const scene = () => { const l = scenes(); return l.find(x => x.id === ed.scene) || l[0]; };
   const levelItems = () => ed.game.schema.scene.levelItems || [];
   const itemDef = (type) => levelItems().find(d => d.type === type);
+  // what the Place tray offers: every object, then the level's own markers
+  const placeList = () => [...Object.keys(objects()).map(defFor).filter(Boolean), ...['checkpoint', 'exit', 'start'].map(itemDef).filter(Boolean)];
+  const placeDef = (type) => placeList().find(d => d.type === type);
   // every thing in a level as one list: { def, list, index, x, h }
   function itemsOf(L) {
     const out = [];
-    (L.props || []).forEach((p, i) => { const d = itemDef(p.type); if (d) out.push({ def: d, list: 'props', index: i, x: p.x }); });
-    (L.enemies || []).forEach((p, i) => { const d = itemDef(p.type); if (d) out.push({ def: d, list: 'enemies', index: i, x: p.x, h: p.h }); });
+    thingsOf(L).forEach((t, i) => { const d = defFor(t.obj); if (d) out.push({ def: d, list: 'things', index: i, x: t.x, h: t.h || 0 }); });
     (L.checkpoints || []).forEach((p, i) => out.push({ def: itemDef('checkpoint'), list: 'checkpoints', index: i, x: p.x }));
     if (L.exit) out.push({ def: itemDef('exit'), list: 'exit', index: 0, x: L.exit.x });
     if (L.start) out.push({ def: itemDef('start'), list: 'start', index: 0, x: L.start.x });
@@ -112,11 +128,12 @@ export function openGameEditor(app, g) {
   // where a thing sits on screen: props and flags stand on the sand, eyes float h pixels up, the start is centred on its x
   function boxOf(it, GROUND) {
     const d = it.def, x0 = d.list === 'start' ? it.x - d.w / 2 : d.list === 'enemies' ? it.x - d.w / 2 : it.x;
-    const y1 = d.list === 'enemies' ? GROUND - it.h + d.h / 2 : GROUND;
+    const y1 = d.actor ? GROUND - it.h : d.list === 'enemies' ? GROUND - it.h + d.h / 2 : GROUND;
     return { x0, y0: y1 - d.h, x1: x0 + d.w, y1 };
   }
   function changeScenes(fn) { const list = structuredClone(scenes()); fn(list); record(); games.setValue(folder, 'scenes', list); }
-  function changeLevel(fn) { changeScenes(list => { const L = list.find(x => x.id === scene().id); if (L) fn(L); }); }
+  // older levels kept props and enemies apart; the first change moves them into one list of placed things
+  function changeLevel(fn) { changeScenes(list => { const L = list.find(x => x.id === scene().id); if (!L) return; if (!L.things) { L.things = thingsOf(L); delete L.props; delete L.enemies; } fn(L); }); }
   const sameItem = (a, b) => a && b && a.list === b.list && a.index === b.index;
   function hitItem(L, wx, wy, GROUND) {
     let hit = null;
@@ -136,14 +153,17 @@ export function openGameEditor(app, g) {
         c.fillStyle = on ? GREEN : DIM;
         for (let k = 0; k < w; k += 2) { c.fillRect(x + k, top, 1, 1); c.fillRect(x + k, GROUND, 1, 1); }
         for (let k = 0; k < h; k += 2) { c.fillRect(x, top + k, 1, 1); c.fillRect(x + w - 1, top + k, 1, 1); }
-        drawRows(c, ART[d.glyph], Math.round(x + w / 2 - 4), GROUND - 9, on ? GREEN : d.color);
+        drawRows(c, glyph(d.glyph), Math.round(x + w / 2 - 4), GROUND - 9, on ? GREEN : d.color);
         if (d.solid) for (const s2 of D.beach.castle.solids) { c.fillStyle = on ? GREEN : d.color; c.fillRect(x + s2.x0, GROUND + 1 - D.beach.castle.height + s2.top, s2.x1 - s2.x0, 1); }
       } else if (d.list === 'enemies') {
         // its wake-up range, faintly, then the symbol
-        const wr = D.level ? D.level.wakeRange : 110;
-        c.fillStyle = on ? 'rgba(125,255,106,.5)' : 'rgba(255,79,216,.35)';
-        for (let k = -wr; k <= wr; k += 4) c.fillRect(Math.round(it.x - cx + k), GROUND - 2, 2, 1);
-        drawRows(c, ART[d.glyph], Math.round(it.x - cx - 4), Math.round(GROUND - it.h - 4), on ? GREEN : d.color);
+        if (!d.actor) {
+          const wr = D.level ? D.level.wakeRange : 110;
+          c.fillStyle = on ? 'rgba(125,255,106,.5)' : 'rgba(255,79,216,.35)';
+          for (let k = -wr; k <= wr; k += 4) c.fillRect(Math.round(it.x - cx + k), GROUND - 2, 2, 1);
+        }
+        const g2 = glyph(d.glyph);
+        drawRows(c, g2, Math.round(it.x - cx - g2[0].length / 2), Math.round(GROUND - it.h - (d.actor ? g2.length : g2.length / 2)), on ? GREEN : d.color);
       } else {
         const art = ART[d.glyph];
         drawRows(c, art, Math.round(d.list === 'start' ? it.x - cx - 4 : x), GROUND - art.length, on ? GREEN : d.color);
@@ -190,13 +210,14 @@ export function openGameEditor(app, g) {
     const L = scene(), GROUND = data().screen.ground, { wx, wy } = toWorld(e), hit = hitItem(L, wx, wy, GROUND);
     if (ed.tool === 'erase') { if (hit && hit.list !== 'start') { changeLevel(L2 => { if (hit.list === 'exit') delete L2.exit; else L2[hit.list].splice(hit.index, 1); }); ed.lsel = null; } rerender(); return; }
     if (ed.tool === 'place') {
-      const d = itemDef(ed.placeType), x = Math.max(0, Math.min(L.width - 1, Math.round(wx)));
+      const d = placeDef(ed.placeType); if (!d) return;
+      const x = Math.max(0, Math.min(L.width - 1, Math.round(wx)));
       changeLevel(L2 => {
         if (d.list === 'start') L2.start = { x };
         else if (d.list === 'exit') L2.exit = { x };
         else if (d.list === 'checkpoints') { (L2.checkpoints = L2.checkpoints || []).push({ x }); L2.checkpoints.sort((a, b) => a.x - b.x); }
-        else if (d.list === 'enemies') (L2.enemies = L2.enemies || []).push({ type: d.type, x, h: Math.max(d.height[0], Math.min(d.height[1], Math.round(GROUND - wy))) });
-        else (L2.props = L2.props || []).push({ type: d.type, x: Math.round(x - d.w / 2) });
+        else if (d.list === 'enemies') L2.things.push({ obj: d.type, x, h: Math.max(d.height[0], Math.min(d.height[1], Math.round(GROUND - wy - (d.actor ? 0 : 0)))) });
+        else L2.things.push({ obj: d.type, x: Math.round(x - d.w / 2) });
       });
       rerender(); return;
     }
@@ -269,8 +290,88 @@ export function openGameEditor(app, g) {
           ${l.fields.length ? l.fields.map(field).join('') : `<div class="grow"><span class="sub">Moves with the world, like the player.</span></div>`}</div>`;
   }
 
+  // ---------------------------------------------------------------- Objects: the templates, and the behaviors they're made of
+  const PALETTE_COLORS = ['#ff5a1f', '#ffd23f', '#7dff6a', '#4d7cff', '#ff4fd8', '#e4e2dc', '#8f8d88', '#d25855', '#6aaa9f', '#e7b44c'];
+  const COLOR_NAMES = ['ORANGE', 'YELLOW', 'GREEN', 'BLUE', 'PINK', 'BONE', 'GRAY', 'RED', 'TEAL', 'GOLD'];
+  const BEH = () => ed.game.behaviors || {};
+  function objectsPanel() {
+    const all = objects(), ids = Object.keys(all);
+    if (ed.obj && !all[ed.obj]) ed.obj = null;
+    if (!ed.obj) {
+      // the list: every object, with how many copies are placed
+      const per = 5, pages = Math.max(1, Math.ceil(ids.length / per)), pg = Math.min(ed.objPage, pages - 1), slice = ids.slice(pg * per, pg * per + per);
+      const rowsHtml = slice.map(id => {
+        const o = all[id], k = placedCount(id), kind = isActor(o) ? (o.behaviors || []).length + ' behaviors' : 'Built in · ' + o.base;
+        return `<button class="orow" ${A(() => { ed.obj = id; ed.addingBehavior = false; rerender(); })}>${well(40, svgRows(glyph(o.symbol || o.base), o.color || BONE))}<span class="t"><span class="title ell" style="font-size:14px">${esc(o.name)}</span><span class="sub">${esc(kind)}</span></span><span class="cap" style="color:var(--muted)">${k} placed</span></button>`;
+      }).join('');
+      return `<div class="plate bar gap20" style="flex:none">
+          <span class="cap" style="color:var(--muted);padding-left:10px">Objects · ${ids.length}</span>
+          <div style="display:flex;align-items:center;gap:2px">
+            ${iconBtn('left', A(() => { ed.objPage = Math.max(0, pg - 1); rerender(); }), { color: '#fff', label: 'Previous page' })}<span class="cap acc" style="min-width:30px;text-align:center">${pg + 1}/${pages}</span>${iconBtn('right', A(() => { ed.objPage = Math.min(pages - 1, pg + 1); rerender(); }), { color: '#fff', label: 'Next page' })}
+            ${bareBtn('plus', 'New', A(() => {
+              let n = 1; while (all['object' + n]) n++;
+              const id = 'object' + n;
+              changeObjects(o => { o[id] = { name: 'Object ' + n, base: 'actor', symbol: 'blob', color: '#ff5a1f', scale: 2, behaviors: [{ type: 'hover' }, { type: 'touchDamage' }] }; });
+              ed.obj = id; rerender();
+            }))}
+          </div></div>
+        <div class="plate inspector" style="margin-top:8px">${rowsHtml}
+          <div class="grow"><span class="t"><span class="sub">An object is a template. Place copies in any level; change the object and every copy changes.</span></span></div></div>`;
+    }
+    // one object
+    const id = ed.obj, o = all[id], actor = isActor(o), k = placedCount(id);
+    const setObj = (fn) => { changeObjects(all2 => fn(all2[id])); rerender(); };
+    const cyc = (label, help, list, cur, show, onPick) => { const i = Math.max(0, list.indexOf(cur)); return `<div class="grow"><span class="t"><span class="cap">${label}</span><span class="sub">${help}</span></span>${stepper(show(cur), A(() => onPick(list[(i - 1 + list.length) % list.length])), A(() => onPick(list[(i + 1) % list.length])), label)}</div>`; };
+    const symbols = Object.keys(ed.game.symbols || {});
+    let rows = '';
+    rows += cyc('Color', 'Its color in the Studio' + (actor ? ' and in the game' : ''), PALETTE_COLORS, o.color, c => COLOR_NAMES[PALETTE_COLORS.indexOf(c)] || 'CUSTOM', c => setObj(x => { x.color = c; }));
+    if (actor) {
+      rows += cyc('Symbol', 'The pixel shape it uses', symbols, o.symbol, c => c, c => setObj(x => { x.symbol = c; }));
+      rows += cyc('Size', 'How many screen pixels per symbol pixel', [1, 2, 3, 4], o.scale || 2, c => c + '×', c => setObj(x => { x.scale = c; }));
+      // its behaviors, each with its own settings
+      (o.behaviors || []).forEach((bh, bi) => {
+        const def = BEH()[bh.type] || { name: bh.type, help: '', params: {} };
+        rows += `<div class="bhead"><span class="t"><span class="cap acc">${esc(def.name)}</span><span class="sub">${esc(def.help)}</span></span>${iconBtn('trash', A(() => setObj(x => { x.behaviors.splice(bi, 1); })), { label: 'Remove ' + def.name })}</div>`;
+        for (const [pk, pdef] of Object.entries(def.params || {})) {
+          const v = bh[pk] ?? pdef.default, f = { ...pdef, path: '' };
+          const show = pdef.show === 'onoff' ? (v ? 'ON' : 'OFF') : fmt(f, v);
+          rows += `<div class="grow"><span class="t"><span class="cap">${esc(pdef.label)}</span><span class="sub">${esc(pdef.help)}</span></span>${stepper(show, A(() => setObj(x => { x.behaviors[bi][pk] = pdef.show === 'onoff' ? (v ? 0 : 1) : nudge(f, v, -1); })), A(() => setObj(x => { x.behaviors[bi][pk] = pdef.show === 'onoff' ? (v ? 0 : 1) : nudge(f, v, 1); })), pdef.label)}</div>`;
+        }
+      });
+      if (ed.addingBehavior) {
+        const have = new Set((o.behaviors || []).map(b => b.type));
+        rows += `<div class="bhead"><span class="t"><span class="cap acc">Add a behavior</span><span class="sub">Tap one to add it</span></span>${iconBtn('back', A(() => { ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'Cancel' })}</div>`;
+        for (const [bk, def] of Object.entries(BEH())) if (!have.has(bk)) rows += `<button class="orow" ${A(() => { ed.addingBehavior = false; setObj(x => { (x.behaviors = x.behaviors || []).push({ type: bk }); }); })}><span class="t"><span class="cap">${esc(def.name)}</span><span class="sub" style="white-space:normal">${esc(def.help)}</span></span>${well(28, svgRows(G.plus, BONE))}</button>`;
+      } else rows += `<div class="grow">${bareBtn('plus', 'Add behavior', A(() => { ed.addingBehavior = true; rerender(); }))}</div>`;
+    } else if (o.base === 'eye') {
+      // an eye object can change any of the game's eye settings just for itself
+      const grp = ed.game.schema.groups.find(x => x.id === 'eyes');
+      rows += `<div class="bhead"><span class="t"><span class="cap acc">Eye settings</span><span class="sub">Green ones differ from the game's usual eye</span></span></div>`;
+      for (const f of grp ? grp.fields : []) {
+        const key = f.path.replace(/^eyes\./, ''), base = games.getPath(data(), f.path), mine = games.getPath(o.settings || {}, key), v = mine ?? base;
+        const put = (nv) => setObj(x => { x.settings = x.settings || {}; const ks = key.split('.'); if (ks.length === 2) { x.settings[ks[0]] = [...(x.settings[ks[0]] || games.getPath(data(), 'eyes.' + ks[0]))]; x.settings[ks[0]][+ks[1]] = nv; } else x.settings[key] = nv; });
+        rows += `<div class="grow"><span class="t"><span class="cap" style="color:${mine !== undefined ? GREEN : 'var(--text)'}">${esc(f.label)}</span><span class="sub">${esc(f.help)}</span></span>${stepper(fmt(f, v), A(() => put(nudge(f, v, -1))), A(() => put(nudge(f, v, 1))), f.label)}</div>`;
+      }
+    } else rows += `<div class="grow"><span class="t"><span class="sub">Built in: the game draws it with its own art${o.base === 'castle' ? ', and the player can stand on it' : ''}.</span></span></div>`;
+    return `<div class="plate bar gap20" style="flex:none">
+        ${iconBtn('back', A(() => { ed.obj = null; ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'All objects' })}
+        <button style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left" ${A(() => { const nm = prompt('Object name', o.name); if (nm && nm.trim()) setObj(x => { x.name = nm.trim().slice(0, 20); }); })} aria-label="Rename ${esc(o.name)}">
+          ${well(28, svgRows(glyph(o.symbol || o.base), o.color || BONE))}<span style="display:flex;flex-direction:column;min-width:0"><span class="title ell" style="font-size:14px">${esc(o.name)}</span><span class="sub">${k} placed · tap to rename</span></span></button>
+        ${iconBtn('dup', A(() => { let n = 2; while (all[id + n]) n++; changeObjects(a2 => { a2[id + n] = { ...structuredClone(o), name: (o.name + ' ' + n).slice(0, 20) }; }); ed.obj = id + n; rerender(); }), { label: 'Copy ' + o.name })}
+        ${iconBtn('trash', A(() => {
+          if (!confirm(k ? `Delete ${o.name}? Its ${k} placed ${k === 1 ? 'copy goes' : 'copies go'} too.` : `Delete ${o.name}?`)) return;
+          record();
+          const list = structuredClone(scenes());
+          for (const L of list) if (L.kind === 'level') { L.things = thingsOf(L).filter(t => t.obj !== id); delete L.props; delete L.enemies; }
+          const o2 = structuredClone(all); delete o2[id];
+          games.setValue(folder, 'scenes', list); games.setValue(folder, 'objects', o2); ed.obj = null; rerender();
+        }), { label: 'Delete ' + o.name })}
+      </div>
+      <div class="plate inspector" style="margin-top:8px">${rows}</div>`;
+  }
+
   // ---------------------------------------------------------------- the screen
-  const TABS = [['scene', 'Scene', 'scene'], ['background', 'Backdrop', 'display'], ['settings', 'Settings', 'controller']];
+  const TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['background', 'Backdrop', 'display'], ['settings', 'Settings', 'controller']];
   const ov = {
     render() {
       if (!ed.game) return `<div class="screen-tool" style="--acc:${GREEN}"><div class="plate bar">${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}<span class="title" style="flex:1">${esc(g.name)}</span></div>
@@ -297,15 +398,18 @@ export function openGameEditor(app, g) {
           body = `<div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : cur.name || sc.name)}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed by the scatter rule' : sc.summary)}</span></span></div>
             ${grp ? grp.fields.map(field).join('') : ''}`;
         } else if (ed.tool === 'place') {
-          body = `<div class="ihead">${well(40, svgRows(ART[itemDef(ed.placeType).glyph], GREEN))}<span class="t"><span class="title acc ell">Place · ${esc(itemDef(ed.placeType).name)}</span><span class="sub">Tap the level to put one there</span></span></div>
-            <div class="tray" style="margin-top:4px">${levelItems().map(d => { const on = d.type === ed.placeType; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" ${A(() => { ed.placeType = d.type; rerender(); })}>${well(40, (on ? '<span class="ring"></span>' : '') + (on ? `<span class="art-on">${svgRows(ART[d.glyph], GREEN)}</span><span class="art-off">${svgRows(ART[d.glyph], d.color)}</span>` : svgRows(ART[d.glyph], d.color)))}<span class="cap">${esc(d.name)}</span></button>`; }).join('')}</div>`;
+          const pd = placeDef(ed.placeType) || placeList()[0]; if (pd) ed.placeType = pd.type;
+          body = `<div class="ihead">${well(40, svgRows(glyph(pd.glyph), GREEN))}<span class="t"><span class="title acc ell">Place · ${esc(pd.name)}</span><span class="sub">Tap the level to put one there</span></span></div>
+            <div class="tray" style="margin-top:4px">${placeList().map(d => { const on = d.type === ed.placeType, g2 = glyph(d.glyph); return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" ${A(() => { ed.placeType = d.type; rerender(); })}>${well(40, (on ? '<span class="ring"></span>' : '') + (on ? `<span class="art-on">${svgRows(g2, GREEN)}</span><span class="art-off">${svgRows(g2, d.color)}</span>` : svgRows(g2, d.color)))}<span class="cap">${esc(d.name)}</span></button>`; }).join('')}</div>`;
         } else if (ed.lsel) {
           const it = itemsOf(cur).find(x => sameItem(x, ed.lsel));
           if (!it) { ed.lsel = null; body = ''; }
           else {
             const d = it.def, move = (k, v) => changeLevel(L2 => { const o = it.list === 'start' || it.list === 'exit' ? L2[it.list] : L2[it.list][it.index]; o[k] = v; if (it.list === 'checkpoints') L2.checkpoints.sort((a, b) => a.x - b.x); });
             const num = (label, help, v, step, lo, hi, k) => `<div class="grow"><span class="t"><span class="cap">${label}</span><span class="sub">${help}</span></span>${stepper(String(v), A(() => move(k, Math.max(lo, v - step))), A(() => move(k, Math.min(hi, v + step))), label)}</div>`;
-            body = `<div class="ihead">${well(40, svgRows(ART[d.glyph], GREEN))}<span class="t"><span class="title acc ell">${esc(d.name)}</span><span class="sub">Drag it to move it</span></span>
+            const isThing = it.list === 'things', tid = isThing ? thingsOf(cur)[it.index].obj : null;
+            body = `<div class="ihead">${well(40, svgRows(glyph(d.glyph), GREEN))}<span class="t"><span class="title acc ell">${esc(d.name)}</span><span class="sub">${isThing ? 'A copy · drag it to move it' : 'Drag it to move it'}</span></span>
+                ${isThing ? iconBtn('edit', A(() => { ed.tab = 'objects'; ed.obj = tid; app.ui.geTab = 'objects'; app.saveUI(); rerender(); }), { label: 'Edit the ' + d.name + ' object' }) : ''}
                 ${it.list !== 'start' ? iconBtn('trash', A(() => { changeLevel(L2 => { if (it.list === 'exit') delete L2.exit; else L2[it.list].splice(it.index, 1); }); ed.lsel = null; rerender(); }), { label: 'Remove ' + d.name }) : ''}</div>
               ${num('Across', 'Pixels from the left of the level', it.x, 4, 0, cur.width - 1, 'x')}
               ${d.height ? num('Height', 'Pixels above the ground', it.h, 2, d.height[0], d.height[1], 'h') : ''}`;
@@ -320,6 +424,8 @@ export function openGameEditor(app, g) {
             <div class="grow"><span class="t"><span class="cap">Tip</span><span class="sub">Select a thing to move it, Place to add, Erase to remove. Play starts this level.</span></span></div>`;
         }
         panel = `${toolbar}<div class="plate inspector gap20">${body}</div>`;
+      } else if (ed.tab === 'objects') {
+        panel = objectsPanel(n);
       } else if (ed.tab === 'background') {
         screen = `<div class="screen fit gap20 stack" id="stk" style="perspective:1100px;touch-action:none;cursor:grab"><div class="rig${ed.combined ? ' flat' : ''}" style="transform:${ed.combined ? 'rotateX(0deg) rotateZ(0deg) scale(1.3)' : `rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)`}">${bgHtml()}</div>
           <span class="cap" id="stkhint" style="position:absolute;left:18px;top:14px;font-size:9px;color:#6f6d69;pointer-events:none">${ed.combined ? 'All layers together, facing forward' : 'Drag to tilt · tap a layer'}</span>
@@ -338,8 +444,8 @@ export function openGameEditor(app, g) {
       return `<div class="screen-tool" style="--acc:${GREEN}">
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
         ${topBar()}
-        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px">
-          ${TABS.map(([k2, l2, ic]) => `<button class="seg${ed.tab === k2 ? ' on' : ''}" role="tab" aria-selected="${ed.tab === k2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], ed.tab === k2 ? GREEN : BONE))}${l2}${ed.tab === k2 ? '<span class="selring"></span>' : ''}</button>`).join('')}
+        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${TABS.map(([k2]) => (ed.tab === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
+          ${TABS.map(([k2, l2, ic]) => `<button class="seg${ed.tab === k2 ? ' on' : ''}" role="tab" aria-selected="${ed.tab === k2}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], ed.tab === k2 ? GREEN : BONE))}${ed.tab === k2 ? l2 + '<span class="selring"></span>' : ''}</button>`).join('')}
         </div>
         ${screen}${panel}
       </div>`;

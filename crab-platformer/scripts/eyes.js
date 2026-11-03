@@ -1,14 +1,14 @@
 // ---- eyes ----
 // levels: an eye placed in the Studio waits at its spot (h pixels above the sand) until the crab comes near
-function placeEye(p) {
-  eyes.push({ x: p.x, y: GROUND - p.h, vx: 0, hy: GROUND - p.h, homeX: p.x, homeY: GROUND - p.h,
-    pref: (Math.random() < 0.5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)), hp: EYE_HP, st: 'float', t: 0, timer: rnd(...S.eyes.firstShotFrames),
+function placeEye(p, c) {
+  eyes.push({ c, x: p.x, y: GROUND - p.h, vx: 0, hy: GROUND - p.h, homeX: p.x, homeY: GROUND - p.h,
+    pref: (Math.random() < 0.5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)), hp: c.hp, st: 'float', t: 0, timer: rnd(...c.firstShotFrames),
     ax: 0, ay: 1, flash: 0, lx: 0, ly: 0, squint: 0, phase: rnd(0, 6), scale: 1, melt: 0, vy: 0, blink: 0, blinkIn: rnd(30, 160) });
 }
 function spawnEye() {
   const side = Math.random() < S.spawning.aheadChance ? crab.face : -crab.face;
   const x = crab.x + side * (VW / 2 + 26);
-  eyes.push({ x, y: GROUND - rnd(...S.eyes.spawnHeight), vx: -side * 0.8, hy: GROUND - rnd(...S.eyes.hoverHeight),
+  eyes.push({ c: EYE_DEFAULT, x, y: GROUND - rnd(...S.eyes.spawnHeight), vx: -side * 0.8, hy: GROUND - rnd(...S.eyes.hoverHeight),
     pref: side * rnd(34, Math.max(44, VW / 2 - 20)), hp: EYE_HP, st: 'float', t: 0, timer: rnd(...S.eyes.firstShotFrames),
     ax: 0, ay: 1, flash: 0, lx: 0, ly: 0, squint: 0, phase: rnd(0, 6), scale: 1, melt: 0, vy: 0, blink: 0, blinkIn: rnd(30, 160) });
 }
@@ -62,7 +62,7 @@ function updateRope(e) {
 }
 const BLINK_LEN = 10;
 function updateEyes() {
-  if (LEVEL) { if (!eyesPlaced) { eyesPlaced = true; for (const p of LEVEL.enemies || []) if (p.type === 'eye') placeEye(p); } }
+  if (LEVEL) { if (!eyesPlaced) { eyesPlaced = true; for (const p of LEVEL_THINGS) { const o = objOf(p); if (o.base === 'eye') placeEye(p, { ...EYE_DEFAULT, ...(o.settings || {}) }); } } }
   else {
   const want = Math.min(1 + Math.floor(kills / S.spawning.oneMorePerKills), S.spawning.maxAlive);
   const alive = eyes.filter(e => e.st !== 'dying').length;
@@ -103,7 +103,7 @@ function updateEyes() {
     // drift toward a spot near the crab, bobbing as it floats
     const asleep = e.homeX !== undefined && Math.abs(crab.x - e.homeX) > S.level.wakeRange;
     const tx = asleep ? e.homeX : crab.x + e.pref;
-    e.vx += (tx - e.x) * S.eyes.driftPull; e.vx *= S.eyes.driftDamping;
+    e.vx += (tx - e.x) * e.c.driftPull; e.vx *= e.c.driftDamping;
     e.x += e.vx;
     const by = e.hy + Math.sin(e.t * 0.05 + e.phase) * 3;
     e.y += (by - e.y) * 0.08;
@@ -115,14 +115,14 @@ function updateEyes() {
       e.squint = Math.max(0, e.squint - 0.08);
       if (--e.timer <= 0 && onScreen(e.x, -8) && !crab.dead && !asleep) { e.st = 'charge'; e.t = 0; sfx.charge(); }
     } else if (e.st === 'charge') {
-      if (e.t < AIM_LOCK) { e.ax = dx / d; e.ay = dy / d; }
-      e.squint = Math.min(0.55, e.t / CHARGE * 0.7);
-      if (e.t > AIM_LOCK) e.x += (e.t % 2 ? 1 : -1) * 0.5;   // shiver right before firing
+      if (e.t < e.c.aimLockFrames) { e.ax = dx / d; e.ay = dy / d; }
+      e.squint = Math.min(0.55, e.t / e.c.chargeFrames * 0.7);
+      if (e.t > e.c.aimLockFrames) e.x += (e.t % 2 ? 1 : -1) * 0.5;   // shiver right before firing
       if (e.t % 2 === 0) {
         const a = rnd(0, Math.PI * 2), r = rnd(10, 14);
         parts.push({ kind: 'charge', x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, tx: e.x, ty: e.y, ang: a, rad: r, eye: e, life: 14, max: 14 });
       }
-      if (e.t >= CHARGE) {
+      if (e.t >= e.c.chargeFrames) {
         e.st = 'fire'; e.t = 0; e.squint = 0; sfx.laser();
         if (onScreen(e.x, 20)) { shake = Math.max(shake, 8); rumble(180, 0.45, 0.5); }
         // energy bursting off the eye as it fires
@@ -133,7 +133,7 @@ function updateEyes() {
       }
     } else if (e.st === 'fire') {
       const len = beamLen(e);
-      if (segDist(cxr, cyr, e.x, e.y, e.ax, e.ay, len) < S.eyes.beamRadius) hurtCrab(e.x);
+      if (segDist(cxr, cyr, e.x, e.y, e.ax, e.ay, len) < e.c.beamRadius) hurtCrab(e.x);
       if (e.ay > 0.02 && len < 590 && e.t % 2 === 0) {
         const hx = e.x + e.ax * len;
         parts.push({ kind: 'spark', x: hx, y: GROUND - 2, vx: rnd(-1.2, 1.2), vy: rnd(-1.6, -.4), life: 16, max: 16 });
@@ -144,12 +144,12 @@ function updateEyes() {
         const a = Math.atan2(-e.ay, -e.ax) + rnd(-0.9, 0.9);
         parts.push({ kind: 'ember', x: e.x + Math.cos(a) * 7, y: e.y + Math.sin(a) * 7, vx: Math.cos(a) * rnd(0.8, 1.8), vy: Math.sin(a) * rnd(0.8, 1.8), life: 12, max: 12 });
       }
-      if (e.t === FIRE - 8) e.shakeT = 22;
-      if (e.t >= FIRE) e.openT = 24;
-      if (e.t >= FIRE) { e.st = 'float'; e.t = 0; e.timer = rnd(...S.eyes.restFrames); e.hy = GROUND - rnd(...S.eyes.hoverHeight); e.pref = (Math.random() < .5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)); }
+      if (e.t === e.c.fireFrames - 8) e.shakeT = 22;
+      if (e.t >= e.c.fireFrames) e.openT = 24;
+      if (e.t >= e.c.fireFrames) { e.st = 'float'; e.t = 0; e.timer = rnd(...e.c.restFrames); e.hy = GROUND - rnd(...e.c.hoverHeight); e.pref = (Math.random() < .5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)); }
     }
     // bumping into an eye hurts
-    if (Math.hypot(cxr - e.x, cyr - e.y) < S.eyes.contactRadius) hurtCrab(e.x);
+    if (Math.hypot(cxr - e.x, cyr - e.y) < e.c.contactRadius) hurtCrab(e.x);
   }
   eyes = eyes.filter(e => !e.gone && (e.homeX !== undefined || Math.abs(e.x - crab.x) < 600));
 }

@@ -20,6 +20,7 @@
     "eye-look",
     "beach",
     "render",
+    "engine/actors",
     "engine/loop"
   ],
   "screen": {
@@ -176,5 +177,32 @@
   ],
   "level": {
     "wakeRange": 110
+  },
+  "objects": {
+    "eye": {
+      "name": "Eye",
+      "base": "eye",
+      "symbol": "eye",
+      "color": "#ff4fd8",
+      "settings": {}
+    },
+    "palm": {
+      "name": "Palm",
+      "base": "palm",
+      "symbol": "palm",
+      "color": "#e4e2dc"
+    },
+    "umbrella": {
+      "name": "Umbrella",
+      "base": "umbrella",
+      "symbol": "umbrella",
+      "color": "#4d7cff"
+    },
+    "castle": {
+      "name": "Castle",
+      "base": "castle",
+      "symbol": "castle",
+      "color": "#ffd23f"
+    }
   }
 }

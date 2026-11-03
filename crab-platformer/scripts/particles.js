@@ -9,11 +9,12 @@ function updateParts() {
         if (Math.hypot(p.x - e.x, p.y - e.y) < 8) {
           p.life = 0; splash(p.x, p.y, 3);
           e.hp--; e.flash = 8; e.pain = 52; e.vx += Math.sign(p.vx) * 0.5; e.squint = 1;
-          if (e.st === 'charge' && e.hp <= EYE_HP / 2) { e.st = 'float'; e.timer = rnd(60, 110); }   // juice in the eye interrupts the charge
+          if (e.st === 'charge' && e.hp <= e.c.hp / 2) { e.st = 'float'; e.timer = rnd(60, 110); }   // juice in the eye interrupts the charge
           sfx.eyeHit();
           if (e.hp <= 0) { e.st = 'dying'; e.t = 0; kills++; sfx.melt(); rumble(160, 0.2, 0.5); splash(e.x, e.y, 6, RED); }
         }
       }
+      if (LEVEL && p.life > 0) juiceHitsActor(p);
       if (p.life > 0) for (const r of solidsNear(p.x, 0)) if (p.x >= r.x0 && p.x <= r.x1 && p.y >= r.top) { p.life = 0; splash(p.x, r.top - 1, 2); break; }
       if (p.life > 0 && p.y >= GROUND - 1) {
         p.life = 0; splash(p.x, GROUND - 1, 2);
