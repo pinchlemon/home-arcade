@@ -1,94 +1,78 @@
-// Studio: the games you make here. Pick one to open the level editor or play it. Controller: D-pad picks, A edits, X plays.
+// Studio: the game you're working on (shared with the Art and Sound tabs). Its parts are listed below;
+// tap one to open it: Scenes, Objects and Settings open the editor there, Art and Sound jump to those tabs.
+// Controller: D-pad picks a part, left and right switch games, A opens, X plays.
 import { icon } from '../pixel.js';
-import { A, esc, row, pager, plateBtn, bareBtn, pageOf, emptyRow, rows } from '../ui.js';
-import * as S from '../store.js';
-import { openEditor } from './editor.js';
-import { openPlayer } from './player.js';
-import { openGameEditor } from './gameEditor.js';
+import { A, esc, row, plateBtn, iconBtn, pager, pageOf, emptyRow, rows } from '../ui.js';
 import * as games from '../games.js';
+import { openGameEditor } from './gameEditor.js';
 
-const per = () => Math.max(1, rows() - 1); // one row's space goes to the Rename / Copy / Delete bar
-const ago = (t) => {
-  const s = (Date.now() - t) / 1000;
-  if (s < 60) return 'just now';
-  if (s < 3600) return Math.floor(s / 60) + ' min ago';
-  if (s < 86400) return Math.floor(s / 3600) + ' h ago';
-  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
-// the Studio lists games made here and repo games that have settings to adjust (like Crab Platformer)
-const items = (app) => [...app.projects.map(p => ({ id: p.id, p })), ...games.editableGames().map(g => ({ id: 'g:' + g.file, g }))];
-function current(app) {
-  const list = items(app);
-  return list.find(x => x.id === app.ui.studioSel) || list.find(x => x.p && x.p.id === (app.project() || {}).id) || list[0] || null;
+const loaded = {};
+function info(app, g) {
+  if (!loaded[g.file]) {
+    loaded[g.file] = 'loading';
+    games.loadGame(g.file).then(x => { loaded[g.file] = x; if (!app.overlay) app.render(); }).catch(() => { loaded[g.file] = null; });
+  }
+  const x = loaded[g.file];
+  if (!x || x === 'loading') return null;
+  const D = games.applyOverrides(x.data, games.getEdits(g.file).overrides), sc = D.scenes || [];
+  return { scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length,
+    art: ((x.schema.art || {}).folders || []).reduce((n, f) => n + f.items.length, 0), sounds: ((x.schema.sound || {}).effects || []).length, music: ((x.schema.sound || {}).music || []).length };
 }
-const idx = (app) => Math.max(0, items(app).indexOf(current(app)));
-function pick(app, i) {
-  const list = items(app), x = list[Math.max(0, Math.min(list.length - 1, i))]; if (!x) return;
-  app.ui.studioSel = x.id; if (x.p) app.ui.project = x.p.id;
-  app.ui.studioPage = Math.floor(list.indexOf(x) / per()); app.saveUI(); app.render();
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
+function parts(app, g, k) {
+  const edit = (tab) => () => { app.ui.geTab = tab; app.saveUI(); openGameEditor(app, g); };
+  return [
+    { id: 'scene', icon: 'scene', name: 'Scenes', meta: k ? plural(k.scenes, 'scene', 'scenes') + (k.levels ? ' · ' + plural(k.levels, 'level', 'levels') : '') + ' · backdrop' : '…', tag: 'Edit', go: edit('scene') },
+    { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' and their behaviors' : '…', tag: 'Edit', go: edit('objects') },
+    { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump and more' : '…', tag: 'Edit', go: edit('settings') },
+    { id: 'art', icon: 'sprites', name: 'Art', meta: k ? plural(k.art, 'picture', 'pictures') + ' · sprites, props, backdrop' : '…', tag: 'Art', go: () => app.setTab(2) },
+    { id: 'sound', icon: 'sounds', name: 'Sound', meta: k ? plural(k.sounds, 'effect', 'effects') + ' · ' + plural(k.music, 'song', 'songs') : '…', tag: 'Sound', go: () => app.setTab(3) }
+  ];
 }
-const edit = (app, x) => (x.p ? openEditor(app, x.p) : openGameEditor(app, x.g));
-const play = (app, x) => (x.p ? openPlayer(app, x.p, null, null) : games.launch(x.g));
-function create(app) {
-  const p = S.newProject('New game ' + (app.projects.length + 1), false);
-  S.saveProject(p); app.refreshProjects(); app.ui.project = p.id; app.ui.studioSel = p.id; app.ui.studioPage = Math.floor((app.projects.length - 1) / per()); app.saveUI();
-  openEditor(app, p);
+function switchGame(app, d) {
+  const list = games.editableGames(), cur = games.currentGame(app); if (!cur) return;
+  games.setCurrentGame(app, list[(list.indexOf(cur) + d + list.length) % list.length]); app.render();
 }
 
 export default {
   render(app) {
-    const cur = current(app), list = items(app), i = idx(app), p = cur && cur.p;
-    if (!cur) {
-      return {
-        right: `<span class="cap acc">No games yet</span><span class="title clamp2">Make your first game</span><span class="sub">Tiles, objects and events</span>
-          <div class="actions">${plateBtn('plus', 'New game', A(() => create(app)))}</div>`,
-        body: `<div class="group"><div class="plate bar"><span class="cap" style="color:var(--muted);padding-left:10px">Games 0 / 0</span>${bareBtn('plus', 'New game', A(() => create(app)), 'var(--acc)')}</div>
-          ${emptyRow('scene', 'Games you make here show up in the Arcade.')}</div>`
-      };
-    }
-    const n = cur.g ? games.editCount(cur.g.file) : 0;
-    const info = cur.p ? (() => { const sc = S.flatten(p.scenes).length; return sc + (sc === 1 ? ' scene · ' : ' scenes · ') + S.flatten(p.library.sprites).length + ' sprites'; })()
-      : cur.g.mode + ' · ' + (n ? n + (n === 1 ? ' change' : ' changes') : 'code game');
-    const page = app.ui.studioPage ?? Math.floor(i / per()), pg = pageOf(list, page, per());
+    const g = games.currentGame(app);
+    if (!g) return { right: `<span class="cap acc">Studio</span><span class="title clamp2">No games to edit</span><span class="sub">A game needs a game.json to open here</span>`, body: `<div class="group">${emptyRow('code', 'No game in the repo has Studio settings yet.')}</div>` };
+    const list = games.editableGames(), gi = list.indexOf(g), k = info(app, g), all = parts(app, g, k);
+    const sel = Math.max(0, Math.min(all.length - 1, app.ui.studioSel | 0)), pg = pageOf(all, Math.floor(sel / rows()));
     const right = `
-      <span class="cap acc">Selected · ${String(i + 1).padStart(2, '0')}/${String(list.length).padStart(2, '0')}</span>
-      <span class="title clamp2">${esc(cur.p ? p.name : cur.g.name)}</span>
-      <span class="sub">${esc(info)}</span>
+      <span class="cap acc">Game · ${String(gi + 1).padStart(2, '0')}/${String(list.length).padStart(2, '0')}</span>
+      <span class="title clamp2">${esc(g.name)}</span>
+      <span class="sub">${esc(games.editLine(g))}</span>
       <div class="actions">
-        ${plateBtn('edit', 'Edit', A(() => edit(app, cur)))}
-        ${plateBtn('play', 'Play', A(() => play(app, cur)))}
+        ${plateBtn('edit', 'Edit', A(() => openGameEditor(app, g)))}
+        ${plateBtn('play', 'Play', A(() => games.launch(g)))}
       </div>`;
+    const pick = (i) => { app.ui.studioSel = i; app.saveUI(); app.render(); };
     const rowHtml = pg.slice.map((x, j) => {
-      const on = x.id === cur.id, ic = x.p ? 'scene' : 'code';
-      const meta = x.p ? (() => { const k = S.flatten(x.p.scenes).length; return k + (k === 1 ? ' scene · ' : ' scenes · ') + ago(x.p.updated); })() : x.g.mode + ' · settings';
-      return row({ art: icon(ic, on ? 'var(--acc)' : '#e4e2dc'), artOff: icon(ic, '#e4e2dc'), name: x.p ? x.p.name : x.g.name, meta, tag: x.g ? 'Repo' : on ? 'Open' : '', selected: on,
-        act: A(() => (on ? edit(app, x) : pick(app, pg.p * per() + j))) });
+      const i = pg.p * rows() + j, on = i === sel;
+      return row({ art: icon(x.icon, on ? 'var(--acc)' : '#e4e2dc'), artOff: icon(x.icon, '#e4e2dc'), name: x.name, meta: x.meta, tag: x.tag, selected: on,
+        act: A(() => (on ? x.go() : pick(i))) });
     }).join('');
     const body = `<div class="group">
       <div class="plate bar">
-        ${pager('Games ' + pg.range, A(() => { app.ui.studioPage = Math.max(0, pg.p - 1); app.saveUI(); app.render(); }), A(() => { app.ui.studioPage = Math.min(pg.pages - 1, pg.p + 1); app.saveUI(); app.render(); }))}
-        ${bareBtn('plus', 'New game', A(() => create(app)), 'var(--acc)')}
+        ${pager('Parts ' + pg.range, A(() => pick(Math.max(0, pg.p - 1) * rows())), A(() => pick(Math.min(pg.pages - 1, pg.p + 1) * rows())))}
+        ${list.length > 1 ? `<div style="display:flex;align-items:center;gap:2px">${iconBtn('left', A(() => switchGame(app, -1)), { color: '#fff', label: 'Previous game' })}<span class="cap" style="color:var(--muted)">Game</span>${iconBtn('right', A(() => switchGame(app, 1)), { color: '#fff', label: 'Next game' })}</div>` : '<span class="cap" style="color:var(--muted);padding-right:10px">Tap again to open</span>'}
       </div>
       ${rowHtml}
-      ${cur.g ? `<div class="plate bar text-start"><span class="sub" style="white-space:normal">Its code lives on GitHub. Changes made here are settings on top.</span></div>` : `<div class="plate bar">
-        ${bareBtn('rename', 'Rename', A(() => { const n = prompt('Game name', p.name); if (n && n.trim()) { p.name = n.trim().slice(0, 28); S.saveProject(p); app.refreshProjects(); app.render(); } }))}
-        ${bareBtn('dup', 'Copy', A(() => {
-          const c = structuredClone(p); c.id = S.uid('p'); c.name = (p.name + ' copy').slice(0, 28); c.created = Date.now();
-          S.saveProject(c); app.refreshProjects(); app.ui.project = c.id; app.ui.studioPage = Math.floor((app.projects.length - 1) / per()); app.saveUI(); app.toast('Copied ' + p.name); app.render();
-        }))}
-        ${bareBtn('trash', 'Delete', A(() => {
-          if (!confirm('Delete "' + p.name + '"? This removes it from this phone' + (S.getSync().pushed[p.id] ? ' and from GitHub on your next push.' : '.'))) return;
-          S.deleteProject(p.id); app.refreshProjects(); app.ui.project = null; app.ui.studioSel = null; app.ui.studioPage = 0; app.saveUI(); app.toast('Deleted ' + p.name); app.render();
-        }))}
-      </div>`}
     </div>`;
     return { right, body };
   },
   pad(app, input) {
-    const i = idx(app), x = current(app);
-    if (input.pressed('down')) pick(app, i + 1);
-    else if (input.pressed('up')) pick(app, i - 1);
-    else if (x && (input.pressed('a') || input.pressed('start'))) edit(app, x);
-    else if (x && input.pressed('x')) play(app, x);
+    const g = games.currentGame(app); if (!g) return;
+    const all = parts(app, g, info(app, g)), i = app.ui.studioSel | 0;
+    const pick = (n) => { app.ui.studioSel = Math.max(0, Math.min(all.length - 1, n)); app.saveUI(); app.render(); };
+    if (input.pressed('down')) pick(i + 1);
+    else if (input.pressed('up')) pick(i - 1);
+    else if (input.pressed('left')) switchGame(app, -1);
+    else if (input.pressed('right')) switchGame(app, 1);
+    else if (input.pressed('a')) all[Math.min(i, all.length - 1)].go();
+    else if (input.pressed('x') || input.pressed('start')) games.launch(g);
   }
 };

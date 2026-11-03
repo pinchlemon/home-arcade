@@ -4,12 +4,36 @@
 // GitHub from Sync. Changing only what you touched means updates made on GitHub still come through.
 
 export const CODE_GAMES = [
-  { name: 'Crab Platformer', path: '../crab-platformer/', kind: '2D · Canvas', size: '97 KB', file: 'crab-platformer', editable: true, mode: 'Waves' },
-  { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard' },
-  { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor' },
-  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' }
+  { name: 'Crab Platformer', path: '../crab-platformer/', kind: '2D · Canvas', size: '97 KB', file: 'crab-platformer', editable: true, mode: 'Waves',
+    about: 'A crab with lemon claws squirts juice at eyes on the beach.' },
+  { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard', about: 'A wizard adrift in the void.' },
+  { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor', about: 'A glowing-screen arcade game.' },
+  { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl', about: 'Bowling, with physics, in purgatory.' }
 ];
 export const editableGames = () => CODE_GAMES.filter(g => g.editable);
+
+// The game you're working on, shared by the Studio, Art and Sound tabs (and set by Edit in the Arcade)
+export function currentGame(app) {
+  const list = editableGames();
+  return list.find(g => g.file === app.ui.game) || list[0] || null;
+}
+export function setCurrentGame(app, g) { if (g && g.editable) { app.ui.game = g.file; app.saveUI(); } }
+
+export const ago = (t) => {
+  const s = (Date.now() - t) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+  if (s < 172800) return 'yesterday';
+  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+// a short line about a game's changes on this phone
+export function editLine(g) {
+  if (!g.editable) return g.kind;
+  const e = getEdits(g.file), n = Object.keys(e.overrides).length;
+  if (!n) return 'No changes on this phone';
+  return n + (n === 1 ? ' change · ' : ' changes · ') + 'edited ' + ago(e.edited) + (e.dirty ? '' : ' · pushed');
+}
 
 const KEY = (folder) => 'ha.game.' + folder;
 const read = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };

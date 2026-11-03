@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Listen</title></head>
+<body style="margin:0;background:#000">
+<!-- A hidden page the app's Sound tab uses to play a game's own sounds and music, exactly as the game makes them.
+     It loads only the scripts the game's studio.json lists under sound.load (never the game loop), with the
+     phone's Studio changes applied, then answers HA.play(id) and HA.music(id, on). The app hands it its audio. -->
+<div class="titlebar" hidden></div><canvas id="game" width="160" height="144" hidden></canvas>
+<script>
+(function () {
+  const game = new URLSearchParams(location.search).get('game') || '';
+  if (!/^[\w-]+$/.test(game)) return;
+  const base = document.createElement('base'); base.href = '../' + game + '/'; document.head.prepend(base);
+  const json = (u) => fetch(u, { cache: 'no-cache' }).then(r => r.json());
+  function phoneEdits() { try { const e = JSON.parse(localStorage.getItem('ha.game.' + game) || 'null'); return (e && e.overrides) || {}; } catch (err) { return {}; } }
+  function apply(g, ov) {
+    for (const path in ov) { const ks = path.split('.'); let o = g; try { for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; if (o && ks[ks.length - 1] in o) o[ks[ks.length - 1]] = ov[path]; } catch (err) {} }
+    return g;
+  }
+  Promise.all([json('game.json'), json('studio.json'), json('../engine/symbols.json').catch(() => ({}))]).then(([g, studio, symbols]) => {
+    const snd = studio.sound; if (!snd) return;
+    window.SYMBOLS = symbols; window.BEHAVIORS = { behaviors: {} };
+    window.GAME = apply(g, phoneEdits());
+    const ok = (s) => /^[A-Za-z_$][\w$]*$/.test(s || '');
+    for (const name of snd.load) {
+      const s = document.createElement('script');
+      s.src = name.startsWith('engine/') ? '../engine/' + name.slice(7) + '.js' : 'scripts/' + name + '.js';
+      s.async = false; document.body.appendChild(s);
+    }
+    // the last script runs in the game's own scope, so it can reach its sound table and music switch
+    const music = (snd.music || []).filter(m => ok(m.start) && ok(m.on));
+    const last = document.createElement('script'); last.async = false;
+    last.textContent = `window.HA = {
+      use(ctx) {
+        if (actx) return;
+        actx = ctx; noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.5, actx.sampleRate);
+        const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      },
+      play(id) { const t = ${ok(snd.table) ? snd.table : '{}'}; if (actx && t[id]) t[id](); },
+      music(id, on) { if (!actx) return; ${music.map(m => `if (id === ${JSON.stringify(m.id)}) { ${m.on} = !!on; if (on) ${m.start}(); }`).join(' ')} }
+    }; parent.postMessage({ listen: 'ready' }, '*');`;
+    document.body.appendChild(last);
+  });
+})();
+</script>
+</body></html>

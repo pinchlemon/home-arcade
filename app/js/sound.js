@@ -1,4 +1,5 @@
-// Tiny sound synth for Library sounds: a wave, a starting pitch, a pitch slide and a length.
+// The app's sounds: a tiny synth (a wave, a starting pitch, a pitch slide and a length) and the menu thud.
+// The Sound tab borrows the same audio to play a game's own sounds (see engine/listen.html).
 import { getSettings } from './store.js';
 
 let ctx = null, settings = getSettings();
@@ -8,6 +9,8 @@ export function unlock() {
   if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
   if (ctx.state === 'suspended') ctx.resume();
 }
+// the audio, woken up (iOS only lets it start from a tap); null when sound is off
+export function context() { unlock(); return ctx && settings.sfx > 0 ? ctx : null; }
 addEventListener('pointerdown', unlock, { capture: true });
 addEventListener('keydown', unlock, { capture: true });
 

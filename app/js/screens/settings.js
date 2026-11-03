@@ -1,13 +1,14 @@
-// Settings: Controller, GitHub, Audio, Display. Every row changes something real and is saved on the phone.
+// Settings: Controller, Sync, GitHub, Audio, Display. Every row changes something real and is saved on the phone.
 import { well, icon, svgText } from '../pixel.js';
 import * as S from '../store.js';
-import { A, esc, plateBtn, iconBtn, stepper, toggle } from '../ui.js';
+import { A, esc, plateBtn, iconBtn, stepper, toggle, rows as rowCount } from '../ui.js';
+import { syncGroup, changeList, pushAll } from './sync.js';
 import * as input from '../input.js';
 import * as snd from '../sound.js';
 
 const YELLOW = '#ffd23f';
 export const BUILD = '0.1';
-const GROUPS = [['controller', 'Controller', 'controller'], ['github', 'GitHub', 'github'], ['audio', 'Audio', 'sounds'], ['display', 'Display', 'display']];
+const GROUPS = [['controller', 'Controller', 'controller'], ['sync', 'Sync', 'changes'], ['github', 'GitHub', 'github'], ['audio', 'Audio', 'sounds'], ['display', 'Display', 'display']];
 
 const srow = (label, sub, control) => `<div class="plate setrow">
   <span style="display:flex;flex-direction:column;gap:4px;min-width:0"><span class="title ell" style="font-size:14px">${esc(label)}</span><span class="sub">${esc(sub)}</span></span>${control}</div>`;
@@ -33,8 +34,10 @@ export default {
       a = plateBtn('controller', 'Test', A(() => openTester(app)));
       b = plateBtn('controller', 'Rumble', A(() => { if (!input.rumble(300, 1, true)) app.toast(pad ? 'This controller or browser cannot rumble' : 'No controller connected'); }));
       rows = cyc('labels', 'Button labels', 'Match your controller', ['XBOX', 'PS', 'SWITCH']) + tog('rumble', 'Vibration', 'Rumble when you get hit') + num('deadzone', 'Stick deadzone', 'Ignore small stick drift', 0, 9) + tog('swapAB', 'Swap A and B', 'Jump and confirm with B instead');
+    } else if (g === 'sync') {
+      ({ title, sub, a, b, rows } = syncGroup(app, plateBtn, A, rowCount()));
     } else if (g === 'github') {
-      title = st.token ? 'Token saved' : 'Not signed in'; sub = st.token ? 'Push and pull are on' : 'Needed to push';
+      title = st.token ? 'Token saved' : 'Not signed in'; sub = st.token ? 'Pushing is on' : 'Needed to push';
       a = plateBtn('key', st.token ? 'Change token' : 'Add token', A(() => setToken(app)));
       b = plateBtn('out', 'Sign out', A(() => { if (!st.token) { app.toast('No token saved'); return; } if (confirm('Remove the GitHub token from this phone?')) { put({ token: '' }); app.toast('Signed out'); } }));
       rows = srow('Repository', 'Where games are pushed', info(st.repo, A(() => { const v = prompt('Repository (owner/name)', st.repo); if (v && /^[\w.-]+\/[\w.-]+$/.test(v.trim())) put({ repo: v.trim() }); else if (v) app.toast('Use owner/name, like pinchlemon/home-arcade'); }), 'Change repository'))
@@ -56,12 +59,12 @@ export default {
       rows = tog('reduceMotion', 'Reduce motion', 'Stop the solids spinning') + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
         + srow('Version', 'Home Arcade', info(BUILD + ' · ' + (navigator.onLine ? 'online' : 'offline')));
     }
-    const name = GROUPS.find(x => x[0] === g)[1];
+    const name = (GROUPS.find(x => x[0] === g) || GROUPS[0])[1];
     const right = `<span class="cap acc">${esc(name)}</span><span class="title clamp2">${esc(title)}</span><span class="sub">${esc(sub)}</span><div class="actions">${a}${b}</div>`;
     const body = `<div class="group">
       <div class="plate bar">
         <div role="tablist" aria-label="Settings groups" style="display:flex;align-items:center;gap:4px">
-          ${GROUPS.map(([k, l, ic]) => iconBtn(ic, A(() => { app.ui.setGroup = k; app.saveUI(); app.render(); }), { on: g === k, label: l, pressed: g === k })).join('')}
+          ${GROUPS.map(([k, l, ic]) => `<span class="dotwrap">${iconBtn(ic, A(() => { app.ui.setGroup = k; app.saveUI(); app.render(); }), { on: g === k, label: l, pressed: g === k })}${k === 'sync' && changeList().length ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>`).join('')}
         </div>
         <span class="cap acc" style="padding-right:10px">${esc(name)}</span>
       </div>
@@ -70,9 +73,10 @@ export default {
     return { right, body };
   },
   pad(app, input2) {
-    const i = GROUPS.findIndex(x => x[0] === (app.ui.setGroup || 'controller'));
-    if (input2.pressed('right')) { app.ui.setGroup = GROUPS[(i + 1) % 4][0]; app.saveUI(); app.render(); }
-    else if (input2.pressed('left')) { app.ui.setGroup = GROUPS[(i + 3) % 4][0]; app.saveUI(); app.render(); }
+    const i = GROUPS.findIndex(x => x[0] === (app.ui.setGroup || 'controller')), n = GROUPS.length;
+    if (input2.pressed('right')) { app.ui.setGroup = GROUPS[(i + 1) % n][0]; app.saveUI(); app.render(); }
+    else if (input2.pressed('left')) { app.ui.setGroup = GROUPS[(i + n - 1) % n][0]; app.saveUI(); app.render(); }
+    else if (app.ui.setGroup === 'sync' && input2.pressed('a')) pushAll(app);
   }
 };
 

@@ -4,10 +4,10 @@
 
 The new Home Arcade: play every game with a controller, and make small games on the phone with the touchscreen. Open https://pinchlemon.github.io/home-arcade/app/ in Safari and use Add to Home Screen. It works offline.
 
-- **Arcade**: the code games in this repo plus every game made in the Studio. D-pad picks, A plays, X edits.
-- **Studio**: the level editor. Tiles, objects and events (WHEN → DO cables), scenes in folders, undo, play from any scene.
-- **Library**: each game's sprites, tiles and sounds, in folders. The Studio trays read the same Library.
-- **Sync**: pushes Studio games to GitHub and pulls changes made elsewhere. Needs a GitHub token (Settings › GitHub) to push.
-- **Settings**: controller labels, vibration, deadzone, swap A/B, GitHub, audio, display.
+- **Arcade**: every game in this repo, with what it is and when you last changed it. D-pad picks, A plays, X edits.
+- **Studio**: the game you're working on and its parts. Edit opens the game editor: Scene (with a Backdrop view of the background layers), Objects (reusable templates and their behaviors) and Settings.
+- **Art**: the current game's pictures in folders (sprites, props, backdrop) and the pixel symbols its objects use. View them big; sprite sheets play their animations.
+- **Sound**: the current game's sound effects and music, played by the game's own sound code (`engine/listen.html`).
+- **Settings**: controller, Sync (push your changes to GitHub; the tab shows a dot when there is something to push), GitHub token, audio, display.
 
-Studio games are saved as one JSON file each in `studio/projects/<id>.json`, so they can be edited here on GitHub too and pulled onto the phone. The format is described at the top of `app/js/store.js`.
+Studio, Art and Sound share one current game. A game opens in them when it has a `game.json` and a `studio.json` (see `crab-platformer/`): `studio.json` says which settings the Studio shows and lists the game's art and sound. Changes made on the phone are kept as a list of changed settings and pushed onto `game.json`.

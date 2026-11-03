@@ -1,4 +1,5 @@
-// Home Arcade: app shell. Tabs (Arcade, Studio, Library, Sync, Settings) and full-screen tools (editor, pixel editor, player).
+// Home Arcade: app shell. Tabs (Arcade, Studio, Art, Sound, Settings) and full-screen tools (the game editor, the art viewer).
+// Studio, Art and Sound all work on one game at a time: the current game (app.ui.game, see games.js).
 import { well, solidSvg, rasterSolid, paintSolid, icon } from './pixel.js';
 import * as S from './store.js';
 import * as input from './input.js';
@@ -6,15 +7,16 @@ import * as snd from './sound.js';
 import { A, resetActions, getAction, esc, setRows, rows } from './ui.js';
 import arcade from './screens/arcade.js';
 import studio from './screens/studio.js';
-import library from './screens/library.js';
-import sync from './screens/sync.js';
+import art from './screens/art.js';
+import sound from './screens/soundTab.js';
 import settings from './screens/settings.js';
+import { changeList } from './screens/sync.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
   { name: 'Studio', solid: 'cube', color: '#7dff6a', page: studio },
-  { name: 'Library', solid: 'icosa', color: '#ff4fd8', page: library },
-  { name: 'Sync', solid: 'octa', color: '#4d7cff', page: sync },
+  { name: 'Art', solid: 'icosa', color: '#ff4fd8', page: art },
+  { name: 'Sound', solid: 'octa', color: '#4d7cff', page: sound },
   { name: 'Settings', solid: 'tetra', color: '#ffd23f', page: settings }
 ];
 
@@ -22,24 +24,23 @@ const root = document.getElementById('app');
 export const app = {
   ui: S.getUI(),
   settings: S.getSettings(),
-  projects: S.listProjects(),
   overlay: null,
   busy: false,
 
   saveUI() { S.setUI(this.ui); },
-  refreshProjects() { this.projects = S.listProjects(); },
-  project() {
-    let p = this.projects.find(x => x.id === this.ui.project) || this.projects[0] || null;
-    if (p && this.ui.project !== p.id) { this.ui.project = p.id; this.saveUI(); }
-    return p;
-  },
   setSettings(patch) {
     this.settings = { ...this.settings, ...patch }; S.setSettings(this.settings);
     input.refreshSettings(); snd.refreshSettings(); applySettings(); this.render();
   },
-  setTab(i, quiet) { if (i === this.ui.tab) return; this.ui.tab = (i + 5) % 5; this.saveUI(); if (!quiet) snd.click(); this.render(); },
+  setTab(i, quiet) {
+    i = (i + SECTIONS.length) % SECTIONS.length;
+    if (i === this.ui.tab && !this.overlay) return;
+    leave(); this.ui.tab = i; this.saveUI();
+    if (this.overlay) { const o = this.overlay; this.overlay = null; if (o.onClose) o.onClose(); } // a jump from a full-screen tool to a tab
+    if (!quiet) snd.click(); this.render();
+  },
   open(overlay) { this.overlay = overlay; this.render(); },
-  close() { const o = this.overlay; this.overlay = null; if (o && o.onClose) o.onClose(); this.refreshProjects(); this.render(); },
+  close() { const o = this.overlay; this.overlay = null; if (o && o.onClose) o.onClose(); this.render(); },
   toast(msg) {
     let t = document.querySelector('.toast');
     if (!t) { t = document.createElement('div'); t.className = 'toast plate'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
@@ -49,6 +50,8 @@ export const app = {
   render
 };
 window.__app = app; // handy for debugging in the browser console
+const leave = () => { const pg = SECTIONS[app.ui.tab] && SECTIONS[app.ui.tab].page; if (pg && pg.leave) pg.leave(app); };
+if (!SECTIONS[app.ui.tab]) app.ui.tab = 0;
 
 function applySettings() {
   document.documentElement.classList.toggle('large', app.settings.textSize === 'LARGE');
@@ -56,10 +59,11 @@ function applySettings() {
 }
 
 function tabBar() {
+  const toPush = changeList().length; // a dot on Settings while there are changes to push (Settings › Sync)
   return `<nav class="plate tabbar" aria-label="Sections">${SECTIONS.map((s, i) => {
-    const on = i === app.ui.tab, color = on ? s.color : '#ffffff';
-    return `<button class="tab" ${A(() => app.setTab(i, true))} ${on ? 'aria-current="page"' : ''} style="color:${color};--acc:${s.color}">
-      ${well(40, (on ? '<span class="ring" style="border-color:currentColor"></span>' : '') + solidSvg(20, 30, color, `data-solid="tab${i}" style="opacity:${on ? 1 : 0.85}"`))}
+    const on = i === app.ui.tab, color = on ? s.color : '#ffffff', dot = s.name === 'Settings' && toPush;
+    return `<button class="tab" ${A(() => app.setTab(i, true))} ${on ? 'aria-current="page"' : ''} style="color:${color};--acc:${s.color}"${dot ? ` aria-label="Settings, ${toPush} to push"` : ''}>
+      ${well(40, (on ? '<span class="ring" style="border-color:currentColor"></span>' : '') + solidSvg(20, 30, color, `data-solid="tab${i}" style="opacity:${on ? 1 : 0.85}"`) + (dot ? '<span class="dot" aria-hidden="true"></span>' : ''))}
       <span class="cap" style="color:${on ? 'var(--text)' : 'var(--muted)'}">${s.name}</span></button>`;
   }).join('')}</nav>`;
 }
@@ -176,7 +180,7 @@ function frame(ms) {
   requestAnimationFrame(frame);
 }
 input.onConnection(() => { if (!app.overlay) render(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { app.refreshProjects(); if (!app.overlay) render(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); else if (!app.overlay) render(); });
 
 // a new version on GitHub reloads the app the next time you come back to it (never mid-edit or mid-game)
 let version = null;

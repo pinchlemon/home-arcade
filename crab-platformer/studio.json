@@ -500,7 +500,7 @@
   "seedAdd": 3,
   "slotWidth": 26,
   "name": "Beach",
-  "summary": "Waves mode \u00b7 endless scene, props placed by rule",
+  "summary": "Waves mode · endless scene, props placed by rule",
   "fieldsGroup": "beach",
   "player": {
    "name": "Player start",
@@ -613,7 +613,7 @@
     }
    ]
   },
-  "levelSummary": "Level \u00b7 laid out by hand"
+  "levelSummary": "Level · laid out by hand"
  },
  "background": [
   {
@@ -767,5 +767,187 @@
    "name": "Sand",
    "fields": []
   }
- ]
+ ],
+ "art": {
+  "about": "The game's art, in folders, for the Art tab. file is next to the game. cell is the size of one frame in a sprite sheet; anims name runs of frames (in reading order).",
+  "folders": [
+   {
+    "id": "player",
+    "name": "Player",
+    "items": [
+     {
+      "id": "sheet",
+      "name": "Crab",
+      "file": "assets/sheet.png",
+      "cell": [
+       48,
+       16
+      ],
+      "frames": 46,
+      "help": "The crab with its two lemon claws",
+      "anims": [
+       {
+        "name": "Walk left",
+        "from": 0,
+        "count": 4,
+        "ticks": "player.walkFrameTicks"
+       },
+       {
+        "name": "Walk right",
+        "from": 4,
+        "count": 4,
+        "ticks": "player.walkFrameTicks"
+       },
+       {
+        "name": "Stand left",
+        "from": 8,
+        "count": 4,
+        "ticks": "player.idleFrameTicks"
+       },
+       {
+        "name": "Stand right",
+        "from": 12,
+        "count": 4,
+        "ticks": "player.idleFrameTicks"
+       },
+       {
+        "name": "Every frame",
+        "from": 0,
+        "count": 46,
+        "ticks": 12
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "props",
+    "name": "Props",
+    "items": [
+     {
+      "id": "palm",
+      "name": "Palm",
+      "file": "assets/palm.png",
+      "object": "palm",
+      "help": "A tree on the beach"
+     },
+     {
+      "id": "umbrella",
+      "name": "Umbrella",
+      "file": "assets/umbrella.png",
+      "object": "umbrella",
+      "help": "A beach umbrella"
+     },
+     {
+      "id": "castle",
+      "name": "Castle",
+      "file": "assets/castle.png",
+      "object": "castle",
+      "help": "A sandcastle the player can stand on"
+     }
+    ]
+   },
+   {
+    "id": "backdrop",
+    "name": "Backdrop",
+    "items": [
+     {
+      "id": "city",
+      "name": "City",
+      "file": "assets/city.png",
+      "layer": "city",
+      "help": "The skyline far behind"
+     },
+     {
+      "id": "cloud",
+      "name": "Cloud",
+      "file": "assets/cloud.png",
+      "layer": "cloudsFar",
+      "help": "Drifting clouds"
+     },
+     {
+      "id": "sand",
+      "name": "Sand",
+      "file": "assets/sand.png",
+      "layer": "sand",
+      "help": "The ground, repeated across the beach"
+     }
+    ]
+   }
+  ]
+ },
+ "sound": {
+  "about": "The game's sounds and music, for the Sound tab. Each effect names an entry in the game's sound table (scripts/sounds.js); load lists the scripts needed to hear them.",
+  "load": [
+   "engine/screen",
+   "art",
+   "settings",
+   "engine/input",
+   "engine/audio",
+   "sounds",
+   "music"
+  ],
+  "table": "sfx",
+  "effects": [
+   {
+    "id": "jump",
+    "name": "Jump",
+    "help": "The player leaves the ground"
+   },
+   {
+    "id": "land",
+    "name": "Land",
+    "help": "The player lands"
+   },
+   {
+    "id": "step",
+    "name": "Step",
+    "help": "Feet in the sand, twice a walk cycle"
+   },
+   {
+    "id": "squirt",
+    "name": "Squirt",
+    "help": "Lemon juice from a claw"
+   },
+   {
+    "id": "charge",
+    "name": "Charge",
+    "help": "An eye winds up a shot"
+   },
+   {
+    "id": "laser",
+    "name": "Laser",
+    "help": "An eye fires"
+   },
+   {
+    "id": "eyeHit",
+    "name": "Sizzle",
+    "help": "Juice hits an eye"
+   },
+   {
+    "id": "melt",
+    "name": "Melt",
+    "help": "An eye is beaten"
+   },
+   {
+    "id": "hurt",
+    "name": "Hurt",
+    "help": "The player takes a hit"
+   },
+   {
+    "id": "over",
+    "name": "Game over",
+    "help": "The last heart is gone"
+   }
+  ],
+  "music": [
+   {
+    "id": "bossa",
+    "name": "Beach bossa",
+    "help": "16 bars of chiptune bossa nova in F, 132 BPM",
+    "start": "startMusic",
+    "on": "musicOn"
+   }
+  ]
+ }
 }
