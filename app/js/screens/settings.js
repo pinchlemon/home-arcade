@@ -51,7 +51,7 @@ export default {
       rows = num('sfx', 'Sound effects', 'Game and editor sounds', 0, 9) + tog('menuSounds', 'Menu sounds', 'Clicks as you move around');
     } else {
       title = 'Display'; sub = st.reduceMotion ? 'Motion reduced' : 'Solids spinning';
-      a = plateBtn('reset', 'Check update', A(async () => {
+      a = plateBtn('reset', 'Update', A(async () => {
         try { const r = await navigator.serviceWorker?.getRegistration(); if (r) await r.update(); } catch (e) {}
         app.toast('Reloading with the newest version'); setTimeout(() => location.reload(), 600);
       }));

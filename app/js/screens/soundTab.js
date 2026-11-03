@@ -5,6 +5,7 @@
 import { icon } from '../pixel.js';
 import { A, esc, row, pager, plateBtn, iconBtn, pageOf, emptyRow, rows } from '../ui.js';
 import * as games from '../games.js';
+import { notReady } from './studio.js';
 import * as snd from '../sound.js';
 
 const loaded = {};
@@ -51,7 +52,7 @@ const lists = (x) => {
   ];
 };
 function state(app) {
-  const g = games.currentGame(app); if (!g) return null;
+  const g = games.currentGame(app); if (!g || !g.editable) return { g, off: true };
   const x = load(app, g); if (!x) return { g };
   const L = lists(x), fi = Math.max(0, L.findIndex(f => f.id === app.ui.soundFolder)), f = L[fi];
   const si = Math.max(0, f.items.findIndex(it => it.id === app.ui.soundSel));
@@ -73,15 +74,15 @@ function setSel(app, i, andHear) {
 export default {
   render(app) {
     const s = state(app);
-    if (!s) return { right: `<span class="cap acc">Sound</span><span class="title clamp2">No game</span><span class="sub">Pick a game in the Studio</span>`, body: `<div class="group">${emptyRow('sounds', 'Sound plays the effects and music of the game you pick in the Studio.')}</div>` };
+    if (s.off) return notReady(app, s.g, 'sounds', 'Sound');
     if (!s.L) return { right: `<span class="cap acc">Sound</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sounds', 'Loading the sounds…')}</div>` };
     const { g, L, fi, f, si, it } = s;
     listener(g); // start loading the game's sound code now, so the first tap plays
     const on = it && it.kind === 'music' && playing === it.id;
     const right = it ? `
-      <span class="cap acc">${esc(f.name)} · ${String(si + 1).padStart(2, '0')}/${String(f.items.length).padStart(2, '0')}</span>
+      <span class="cap acc ell">${esc(g.name)}</span>
       <span class="title clamp2">${esc(it.name)}</span>
-      <span class="sub clamp2" style="white-space:normal">${esc(it.help)}</span>
+      <span class="sub clamp2" style="white-space:normal">${esc(f.name + ' · ' + it.help)}</span>
       <div class="actions">
         ${plateBtn(on ? 'pause' : 'play', on ? 'Stop' : 'Play', A(() => hear(app, g, it)))}
         ${plateBtn('right', 'Next', A(() => setSel(app, si + 1, true)))}
@@ -107,7 +108,7 @@ export default {
   // leaving the tab (or the app) stops the music
   leave() { stopMusic(); },
   pad(app, input) {
-    const s = state(app); if (!s || !s.L) return;
+    const s = state(app); if (!s || s.off || !s.L) return;
     if (input.pressed('down')) setSel(app, s.si + 1);
     else if (input.pressed('up')) setSel(app, s.si - 1);
     else if (input.pressed('right')) setFolder(app, s.fi + 1);
