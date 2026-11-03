@@ -1,10 +1,12 @@
 // Editor for a repo game that has a game.json, like Crab Platformer.
 // Scene: the whole scene at once, drawn as simple pixel symbols (not the real art).
-// Background: the backdrop as a stack of planes, one per layer, spaced evenly; tilt it, tap a layer to adjust it.
+// Scene › Backdrop: the backdrop as a stack of planes, one per layer, spaced evenly; tilt it, tap a layer to adjust it.
+// Objects: reusable templates and their behaviors; each one's picture opens in the Art tab.
 // Settings: every number the game exposes, in groups. Universal groups work the same for any game; the rest are this game's extras.
 import { well, icon, svgRows, G, drawRows, drawText, textRows, present } from '../pixel.js';
 import { A, esc, iconBtn, bareBtn, stepper } from '../ui.js';
 import * as games from '../games.js';
+import { pushAll } from './sync.js';
 import * as input from '../input.js';
 
 const GREEN = '#7dff6a', BONE = '#e4e2dc', DIM = '#3a3a3f';
@@ -44,9 +46,11 @@ function nudge(f, v, dir) {
 }
 
 export function openGameEditor(app, g) {
-  const ed = { tab: app.ui.geTab || 'scene', obj: null, objPage: 0, addingBehavior: false, scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
+  const ed = { tab: app.ui.geTab || 'scene', obj: app.ui.geObj || null, objPage: 0, addingBehavior: false, scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: app.ui.geLayer || 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
+  delete app.ui.geObj; delete app.ui.geLayer; app.saveUI(); // a jump from the Art tab picks these once
   let view = null, off = null, octx = null, drag = null, dragged = false;
   const folder = g.file;
+  games.setCurrentGame(app, g);
   games.loadGame(folder).then(x => { ed.game = x; rerender(); }).catch(e => { ed.error = e.message; rerender(); });
   const rerender = () => { if (app.overlay === ov) app.render(); };
   const edits = () => games.getEdits(folder);
@@ -294,6 +298,15 @@ export function openGameEditor(app, g) {
   const PALETTE_COLORS = ['#ff5a1f', '#ffd23f', '#7dff6a', '#4d7cff', '#ff4fd8', '#e4e2dc', '#8f8d88', '#d25855', '#6aaa9f', '#e7b44c'];
   const COLOR_NAMES = ['ORANGE', 'YELLOW', 'GREEN', 'BLUE', 'PINK', 'BONE', 'GRAY', 'RED', 'TEAL', 'GOLD'];
   const BEH = () => ed.game.behaviors || {};
+  // jump to this object's picture in the Art tab (a built-in's own art, or an actor's symbol)
+  function artJump(o) {
+    const folders = ((ed.game.schema.art || {}).folders || []);
+    let f = null, item = null;
+    for (const x of folders) for (const it of x.items) if (it.object === o.base) { f = x.id; item = it.id; }
+    if (!item && o.symbol && (ed.game.symbols || {})[o.symbol] && isActor(o)) { f = 'symbols'; item = 'sym:' + o.symbol; }
+    if (!item) return '';
+    return bareBtn('sprites', 'Art', A(() => { app.ui.artFolder = f; app.ui.artSel = item; app.saveUI(); app.setTab(2); }));
+  }
   function objectsPanel() {
     const all = objects(), ids = Object.keys(all);
     if (ed.obj && !all[ed.obj]) ed.obj = null;
@@ -338,6 +351,7 @@ export function openGameEditor(app, g) {
           rows += `<div class="grow"><span class="t"><span class="cap">${esc(pdef.label)}</span><span class="sub">${esc(pdef.help)}</span></span>${stepper(show, A(() => setObj(x => { x.behaviors[bi][pk] = pdef.show === 'onoff' ? (v ? 0 : 1) : nudge(f, v, -1); })), A(() => setObj(x => { x.behaviors[bi][pk] = pdef.show === 'onoff' ? (v ? 0 : 1) : nudge(f, v, 1); })), pdef.label)}</div>`;
         }
       });
+      rows += `<div class="grow"><span class="t"><span class="sub">Its symbol is in Art, under Symbols.</span></span>${artJump(o)}</div>`;
       if (ed.addingBehavior) {
         const have = new Set((o.behaviors || []).map(b => b.type));
         rows += `<div class="bhead"><span class="t"><span class="cap acc">Add a behavior</span><span class="sub">Tap one to add it</span></span>${iconBtn('back', A(() => { ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'Cancel' })}</div>`;
@@ -352,7 +366,7 @@ export function openGameEditor(app, g) {
         const put = (nv) => setObj(x => { x.settings = x.settings || {}; const ks = key.split('.'); if (ks.length === 2) { x.settings[ks[0]] = [...(x.settings[ks[0]] || games.getPath(data(), 'eyes.' + ks[0]))]; x.settings[ks[0]][+ks[1]] = nv; } else x.settings[key] = nv; });
         rows += `<div class="grow"><span class="t"><span class="cap" style="color:${mine !== undefined ? GREEN : 'var(--text)'}">${esc(f.label)}</span><span class="sub">${esc(f.help)}</span></span>${stepper(fmt(f, v), A(() => put(nudge(f, v, -1))), A(() => put(nudge(f, v, 1))), f.label)}</div>`;
       }
-    } else rows += `<div class="grow"><span class="t"><span class="sub">Built in: the game draws it with its own art${o.base === 'castle' ? ', and the player can stand on it' : ''}.</span></span></div>`;
+    } else rows += `<div class="grow"><span class="t"><span class="sub">Built in: the game draws it with its own art${o.base === 'castle' ? ', and the player can stand on it' : ''}.</span></span>${artJump(o)}</div>`;
     return `<div class="plate bar gap20" style="flex:none">
         ${iconBtn('back', A(() => { ed.obj = null; ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'All objects' })}
         <button style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left" ${A(() => { const nm = prompt('Object name', o.name); if (nm && nm.trim()) setObj(x => { x.name = nm.trim().slice(0, 20); }); })} aria-label="Rename ${esc(o.name)}">
@@ -371,7 +385,10 @@ export function openGameEditor(app, g) {
   }
 
   // ---------------------------------------------------------------- the screen
-  const TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['background', 'Backdrop', 'display'], ['settings', 'Settings', 'controller']];
+  // the Backdrop is a second view of the Scene tab (the switch is in the corner of the screen)
+  const TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
+  const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
+  const viewSwitch = (toBg) => `<button class="btn bare viewsw" aria-label="${toBg ? 'Show the backdrop layers' : 'Show the scene'}" ${A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); })}>${well(28, svgRows(G[toBg ? 'display' : 'scene'], BONE))}<span>${toBg ? 'Backdrop' : 'Scene'}</span></button>`;
   const ov = {
     render() {
       if (!ed.game) return `<div class="screen-tool" style="--acc:${GREEN}"><div class="plate bar">${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}<span class="title" style="flex:1">${esc(g.name)}</span></div>
@@ -381,7 +398,7 @@ export function openGameEditor(app, g) {
       if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
+        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas>${viewSwitch(true)}</div>`;
         const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
           <div style="display:flex;gap:6px">${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:10px">Waves · props by rule</span>`}</div>
           <div style="display:flex;align-items:center;gap:2px">
@@ -429,7 +446,7 @@ export function openGameEditor(app, g) {
       } else if (ed.tab === 'background') {
         screen = `<div class="screen fit gap20 stack" id="stk" style="perspective:1100px;touch-action:none;cursor:grab"><div class="rig${ed.combined ? ' flat' : ''}" style="transform:${ed.combined ? 'rotateX(0deg) rotateZ(0deg) scale(1.3)' : `rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)`}">${bgHtml()}</div>
           <span class="cap" id="stkhint" style="position:absolute;left:18px;top:14px;font-size:9px;color:#6f6d69;pointer-events:none">${ed.combined ? 'All layers together, facing forward' : 'Drag to tilt · tap a layer'}</span>
-          <button class="btn bare" id="combine" aria-pressed="${!!ed.combined}" style="position:absolute;right:8px;bottom:6px" ${A(() => { ed.combined = !ed.combined; refreshBg(); })}>${well(28, svgRows(G.grid, BONE))}<span class="lbl">${ed.combined ? 'Spread' : 'Combine'}</span></button></div>`;
+          <button class="btn bare" id="combine" aria-pressed="${!!ed.combined}" style="position:absolute;right:8px;bottom:6px" ${A(() => { ed.combined = !ed.combined; refreshBg(); })}>${well(28, svgRows(G.grid, BONE))}<span class="lbl">${ed.combined ? 'Spread' : 'Combine'}</span></button>${viewSwitch(false)}</div>`;
         panel = bgPanel();
       } else {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
@@ -444,8 +461,8 @@ export function openGameEditor(app, g) {
       return `<div class="screen-tool" style="--acc:${GREEN}">
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
         ${topBar()}
-        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${TABS.map(([k2]) => (ed.tab === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
-          ${TABS.map(([k2, l2, ic]) => `<button class="seg${ed.tab === k2 ? ' on' : ''}" role="tab" aria-selected="${ed.tab === k2}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], ed.tab === k2 ? GREEN : BONE))}${ed.tab === k2 ? l2 + '<span class="selring"></span>' : ''}</button>`).join('')}
+        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${TABS.map(([k2]) => (tabOf() === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
+          ${TABS.map(([k2, l2, ic]) => { const on = tabOf() === k2; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], on ? GREEN : BONE))}${on ? l2 + '<span class="selring"></span>' : ''}</button>`; }).join('')}
         </div>
         ${screen}${panel}
       </div>`;
@@ -497,7 +514,7 @@ export function openGameEditor(app, g) {
         root.querySelectorAll('[data-layer]').forEach(el => el.appendChild(planeArt(el.dataset.layer, D)));
         if (!ed.fanned) { ed.fanned = true; requestAnimationFrame(() => requestAnimationFrame(() => refreshBg())); }
         const stk = root.querySelector('#stk');
-        stk.addEventListener('pointerdown', (e) => { if (ed.combined || e.target.closest('#combine')) return; drag = { x: e.clientX, y: e.clientY, yaw: ed.yaw, pitch: ed.pitch }; dragged = false; });
+        stk.addEventListener('pointerdown', (e) => { if (ed.combined || e.target.closest('#combine,.viewsw')) return; drag = { x: e.clientX, y: e.clientY, yaw: ed.yaw, pitch: ed.pitch }; dragged = false; });
         stk.addEventListener('pointermove', (e) => {
           if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
           if (!dragged && Math.abs(dx) + Math.abs(dy) < 6) return;
@@ -511,5 +528,6 @@ export function openGameEditor(app, g) {
     },
     frame() { if (input.pressed('b')) app.close(); else if (input.pressed('start')) games.launch(g); }
   };
+  ov.onClose = () => { if (app.settings.autoPush && games.getEdits(folder).dirty) pushAll(app, true); };
   app.open(ov);
 }
