@@ -87,6 +87,34 @@ body{background:transparent}
 @media (max-height:820px){.screen-tabs{gap:14px}.emblem{height:208px}.emblem-info{padding:10px 0}.emblem-info .actions{gap:6px;margin-top:4px}.emblem-info .btn{height:36px}}
 @media (max-height:720px){.emblem{height:188px}.emblem .well-lg{transform:scale(.9)}.setrow{height:56px}}
 
+/* landscape phone: the tab bar becomes a column on the left, the top panel sits beside the list */
+@media (orientation:landscape) and (max-height:520px){
+  #app{max-width:none}
+  .screen-tabs{display:grid;grid-template-columns:84px 360px minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"nav emblem body";gap:16px;align-items:stretch;
+    padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
+  .tabbar{grid-area:nav;height:auto;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));padding:4px 0}
+  .emblem{grid-area:emblem;height:auto;gap:16px;padding:0 16px}
+  .emblem>.mount:first-child{transform:scale(.7);margin:-36px -61px!important}
+  .emblem-info{padding:10px 0}
+  .emblem-info .actions{gap:6px;margin-top:4px}
+  .emblem-info .btn{height:36px}
+  .screen-tabs>.emblem+*{grid-area:body;align-self:center}
+  /* editors: the picture or scene fills the left side; the bars and panel stack on the right */
+  .screen-tool{padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
+  .screen-tool:has(>.screen){flex-flow:column wrap;align-content:flex-start;column-gap:16px}
+  .screen-tool:has(>.screen)>*{width:380px;flex:none}
+  .screen-tool:has(>.screen)>.inspector{flex:1 1 0}
+  .screen-tool:has(>.screen)>.screen.fit{order:-1;width:calc(100% - 396px);height:100%;min-height:0;flex:none;padding:8px}
+  .screen-tool:has(>.screen)>.gap20{margin-top:0}
+  .screen-tool:not(:has(>.screen)){max-width:560px;width:100%;margin:0 auto}
+  /* editor tabs without a picture (Objects, Settings): the title bar and tabs share one row to leave room for the list */
+  .screen-tool:not(:has(>.screen)):has(>[role=tablist]){max-width:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);column-gap:12px;row-gap:8px;align-content:stretch}
+  .screen-tool:not(:has(>.screen)):has(>[role=tablist])>*{grid-column:1/-1;margin-top:0}
+  .screen-tool:not(:has(>.screen)):has(>[role=tablist])>.ge-top{grid-column:1;grid-row:1}
+  .screen-tool:not(:has(>.screen)):has(>[role=tablist])>[role=tablist]{grid-column:2;grid-row:1}
+  .screen-tool:not(:has(>.screen)):has(>[role=tablist])>.inspector{grid-row:3;min-height:0}
+}
+
 /* press feedback: the button sinks and lights up in the section colour, like a selected one */
 [data-a],.pbtn{transition:transform .08s}
 .mount{transition:transform .08s}
