@@ -38,7 +38,7 @@ export default {
     const sy = S.getSync(), pad = input.padConnected();
     let title, sub, a, b, rows;
     if (g === 'controller') {
-      title = pad ? input.padName() : 'No controller'; sub = pad ? 'Connected' : 'Pair it in Bluetooth';
+      title = pad ? input.padName() : 'No controller'; sub = pad ? 'Connected' : 'Press a button on it';
       a = plateBtn('controller', 'Test', A(() => openTester(app)));
       b = plateBtn('controller', 'Rumble', A(() => { if (!input.rumble(300, 1, true)) app.toast(pad ? 'This controller or browser cannot rumble' : 'No controller connected'); }));
       rows = cyc('labels', 'Button labels', 'Match your controller', ['XBOX', 'PS', 'SWITCH']) + tog('rumble', 'Vibration', 'Rumble when you get hit') + num('deadzone', 'Stick deadzone', 'Ignore small stick drift', 0, 9) + tog('swapAB', 'Swap A and B', 'Jump and confirm with B instead');
