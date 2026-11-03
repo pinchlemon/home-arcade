@@ -8,6 +8,7 @@ import * as snd from '../sound.js';
 
 const YELLOW = '#ffd23f';
 export const BUILD = '0.1';
+export const SPRITE_BGS = ['CHECKER', 'BLACK', 'GRAY', 'LIGHT', 'SKY', 'GRASS'];
 const GROUPS = [['controller', 'Controller', 'controller'], ['sync', 'Sync', 'changes'], ['github', 'GitHub', 'github'], ['audio', 'Audio', 'sounds'], ['display', 'Display', 'display']];
 
 const srow = (label, sub, control) => `<div class="plate setrow">
@@ -50,14 +51,14 @@ export default {
       b = plateBtn('mute', st.sfx ? 'Mute all' : 'Unmute', A(() => (st.sfx ? put({ sfx: 0, lastSfx: st.sfx }) : put({ sfx: st.lastSfx || 7 }))));
       rows = num('sfx', 'Sound effects', 'Game and editor sounds', 0, 9) + tog('menuSounds', 'Menu sounds', 'Clicks as you move around');
     } else {
-      title = 'Display'; sub = st.reduceMotion ? 'Motion reduced' : 'Solids spinning';
+      title = 'Display'; sub = 'Version ' + BUILD + ' · ' + (navigator.onLine ? 'online' : 'offline');
       a = plateBtn('reset', 'Update', A(async () => {
         try { const r = await navigator.serviceWorker?.getRegistration(); if (r) await r.update(); } catch (e) {}
         app.toast('Reloading with the newest version'); setTimeout(() => location.reload(), 600);
       }));
-      b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, dots: true, textSize: 'NORMAL' })));
+      b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER' })));
       rows = tog('reduceMotion', 'Reduce motion', 'Stop the solids spinning') + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
-        + srow('Version', 'Home Arcade', info(BUILD + ' · ' + (navigator.onLine ? 'online' : 'offline')));
+        + cyc('spriteBg', 'Art background', 'Behind sprites, to see them', SPRITE_BGS);
     }
     const name = (GROUPS.find(x => x[0] === g) || GROUPS[0])[1];
     const right = `<span class="cap acc">${esc(name)}</span><span class="title clamp2">${esc(title)}</span><span class="sub">${esc(sub)}</span><div class="actions">${a}${b}</div>`;

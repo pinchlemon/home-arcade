@@ -42,11 +42,12 @@ function folders(app, g) {
 const FOLDER_ICON = { player: 'sprites', props: 'objects', backdrop: 'display', symbols: 'grid' };
 
 function thumb(g, it, size, color) {
-  if (it.kind === 'symbol') return svgRows(it.rows, color || '#e4e2dc', 4);
+  if (it.kind === 'symbol') return svgRows(it.rows, color || '#e4e2dc', 3);
   const s = size, cw = it.cell ? it.cell[0] : s && s[0], ch = it.cell ? it.cell[1] : s && s[1];
   if (!cw) return '';
-  const k = Math.min(34 / cw, 34 / ch, 4), W = s ? s[0] : cw, H = s ? s[1] : ch;
-  return `<span class="thumb" style="width:${Math.round(cw * k)}px;height:${Math.round(ch * k)}px;background-image:url('${src(g, it)}');background-size:${W * k}px ${H * k}px"></span>`;
+  // small enough that its corners stay inside the round well (on the sprite background from Settings)
+  const k = Math.min(32 / Math.hypot(cw, ch), 4), W = s ? s[0] : cw, H = s ? s[1] : ch;
+  return `<span class="thumbbg"><span class="thumb" style="width:${Math.round(cw * k)}px;height:${Math.round(ch * k)}px;background-image:url('${src(g, it)}');background-size:${W * k}px ${H * k}px"></span></span>`;
 }
 const meta = (it, s) => it.kind === 'symbol' ? '8×8 symbol · ' + it.help : (s ? s[0] + '×' + s[1] + ' px' : '…') + (it.cell ? ' · ' + it.frames + ' frames' : '') + ' · ' + it.help;
 

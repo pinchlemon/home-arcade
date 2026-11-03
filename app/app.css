@@ -181,7 +181,8 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .dotwrap .dot{top:6px;right:6px}
 /* Art: thumbnails of the game's pictures, crisp pixels */
 .thumb{display:block;background-repeat:no-repeat;background-position:0 0;image-rendering:pixelated}
-.screen.checker{background:#000 repeating-conic-gradient(#0c0c0c 0 25%,#000 0 50%) 0 0/16px 16px}
+.screen.checker{background:var(--spritebg,#000)}
+.thumbbg{position:absolute;inset:0;border-radius:50%;background:var(--spritebg,#000);display:flex;align-items:center;justify-content:center}
 .screen.checker canvas{image-rendering:pixelated}
-/* the Scene / Backdrop switch, in the corner of the editor's screen */
-.viewsw{position:absolute;right:8px;top:6px;z-index:2}
+/* the Scene / Backdrop switch at the start of the editor's bar: a thin divider after it */
+.vsep{width:1px;height:24px;background:rgba(255,255,255,.12);flex:none}
