@@ -59,7 +59,7 @@ export function openGameEditor(app, g) {
       ${stepper(fmt(f, v), A(() => set(f.path, nudge(f, v, -1))), A(() => set(f.path, nudge(f, v, 1))), f.label)}</div>`;
   }
 
-  // ---------------------------------------------------------------- Scene: the beach as symbols
+  // ---------------------------------------------------------------- Scene: the whole scene as symbols
   function propAt(i, D, sc) {
     const r = mulberry(i * sc.seedMul + sc.seedAdd);
     if (r() < D.beach.emptyChance) return null;
@@ -91,7 +91,7 @@ export function openGameEditor(app, g) {
     }
     // sand
     for (let x = -(((cx % 8) + 8) % 8); x < VW; x += 8) { drawRows(c, ART.ground, x, GROUND, 'rgba(228,226,220,.55)'); drawRows(c, ART.ground, x, GROUND + 8, 'rgba(228,226,220,.3)'); }
-    // the crab's starting spot
+    // where the player starts
     c.fillStyle = 'rgba(255,90,31,.5)'; for (let y = GROUND - 30; y < GROUND - 10; y += 2) c.fillRect(D.player.startX - cx, y, 1, 1);
     drawRows(c, ART.crab, D.player.startX - cx - 4, GROUND - 8, '#ff5a1f');
     const txt = 'X ' + String(Math.round(ed.camX + VW / 2)).padStart(4, '0'), w = textRows(txt)[0].length;
@@ -114,13 +114,13 @@ export function openGameEditor(app, g) {
       const L = D.backdrop.clouds[id === 'cloudsFar' ? 0 : 1], step = Math.max(14, L.spacing / 4), r = mulberry(L.seed);
       for (let x = 4; x < 112; x += step) drawRows(g2, ART.cloud, Math.round(x), 4 + Math.round(r() * (id === 'cloudsFar' ? 10 : 22)), col);
     }
-    if (id === 'gulls') for (let k = 0; k < D.backdrop.gulls.count; k++) drawRows(g2, ART.gull, 14 + k * 30 % 96, 10 + k * 9 % 30, col);
+    if (id === 'gulls') for (let k = 0; k < D.backdrop.gulls.count; k++) drawRows(g2, ART.gull, 14 + k * 30 % 96, 12 + k * 7 % 22, col);
     if (id === 'city') {
       const r = mulberry(42); let x = 0;
-      while (x < 120) { const w = 4 + (r() * 6 | 0), h = 6 + (r() * 16 | 0); g2.fillStyle = col; g2.fillRect(x, 60 - h, w, h); g2.fillStyle = '#000'; for (let y = 62 - h; y < 58; y += 3) for (let k = x + 1; k < x + w - 1; k += 2) g2.fillRect(k, y, 1, 1); x += w + 1; }
+      while (x < 120) { const w = 4 + (r() * 6 | 0), h = 5 + (r() * 14 | 0); g2.fillStyle = col; g2.fillRect(x, 44 - h, w, h); g2.fillStyle = '#000'; for (let y = 46 - h; y < 42; y += 3) for (let k = x + 1; k < x + w - 1; k += 2) g2.fillRect(k, y, 1, 1); x += w + 1; }
     }
-    if (id === 'sea') for (let x = 0; x < 120; x += 16) { drawRows(g2, ART.wave, x, 46, col); drawRows(g2, ART.wave, x + 8, 53, col); }
-    if (id === 'boat') drawRows(g2, ART.boat, 40, 40, col);
+    if (id === 'sea') for (let x = 0; x < 120; x += 16) { drawRows(g2, ART.wave, x, 46, col); drawRows(g2, ART.wave, x + 8, 51, col); }
+    if (id === 'boat') drawRows(g2, ART.boat, 40, 39, col);
     if (id === 'sand') for (let x = 0; x < 120; x += 8) drawRows(g2, ART.ground, x, 56, col);
     return c;
   }
@@ -131,8 +131,8 @@ export function openGameEditor(app, g) {
     const layers = ed.game.schema.background, n = layers.length;
     return layers.map((l, i) => {
       const on = l.id === ed.bg;
-      return `<button class="plane${on ? ' on' : ''}" data-plane="${l.id}" ${A(() => { if (dragged) return; ed.bg = l.id; refreshBg(); })} aria-pressed="${on}" aria-label="Layer ${i + 1}, ${esc(l.name)}"
-        style="transform:translateZ(${ed.fanned ? planeZ(i, n, on) : 0}px);transition-delay:${i * 28}ms,0ms,0ms,0ms">
+      return `<button class="plane${on ? ' on' : ''}" data-plane="${l.id}" ${A(() => { if (dragged || ed.combined) return; ed.bg = l.id; refreshBg(); })} aria-pressed="${on}" aria-label="Layer ${i + 1}, ${esc(l.name)}"
+        style="transform:translateZ(${ed.fanned && !ed.combined ? planeZ(i, n, on) : 0}px);transition-delay:${i * 28}ms,0ms,0ms,0ms">
         <span class="ptab">${esc(tabText(l, i))}</span><span class="pc" data-layer="${l.id}"></span></button>`;
     }).join('');
   }
@@ -144,10 +144,15 @@ export function openGameEditor(app, g) {
       const el = root.querySelector(`[data-plane="${l.id}"]`); if (!el) return;
       const on = l.id === ed.bg;
       el.classList.toggle('on', on); el.setAttribute('aria-pressed', on);
-      el.style.transform = `translateZ(${planeZ(i, layers.length, on)}px)`;
+      el.style.transform = ed.combined ? 'translateZ(0px)' : `translateZ(${planeZ(i, layers.length, on)}px)`;
+      el.style.transitionDelay = `${(ed.combined ? layers.length - 1 - i : i) * 28}ms,0ms,0ms,0ms`;
       el.querySelector('.ptab').textContent = tabText(l, i);
       const pc = el.querySelector('.pc'); pc.innerHTML = ''; pc.appendChild(planeArt(l.id, D));
     });
+    const rig = root.querySelector('.rig');
+    if (rig) { rig.classList.toggle('flat', !!ed.combined); rig.style.transform = ed.combined ? 'rotateX(0deg) rotateZ(0deg) scale(1.3)' : `rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)`; }
+    const btn = root.querySelector('#combine'); if (btn) { btn.querySelector('.lbl').textContent = ed.combined ? 'Spread' : 'Combine'; btn.setAttribute('aria-pressed', !!ed.combined); }
+    const hint = root.querySelector('#stkhint'); if (hint) hint.textContent = ed.combined ? 'All layers together, facing forward' : 'Drag to tilt · tap a layer';
     const panel = root.querySelector('.inspector'); if (panel) panel.outerHTML = bgPanel();
   }
 
@@ -156,7 +161,7 @@ export function openGameEditor(app, g) {
     return `<div class="plate inspector gap20">
           <div class="ihead">${well(40, svgRows(BG_ART[l.id] || ART.sun, GREEN))}<span class="t"><span class="title acc ell">${esc(l.name)}</span><span class="sub">Background layer ${i + 1} of ${schema.background.length}</span></span>
             ${iconBtn('down', A(() => { ed.bg = schema.background[Math.max(0, i - 1)].id; refreshBg(); }), { color: '#fff', label: 'Layer behind' })}${iconBtn('up', A(() => { ed.bg = schema.background[Math.min(schema.background.length - 1, i + 1)].id; refreshBg(); }), { color: '#fff', label: 'Layer in front' })}</div>
-          ${l.fields.length ? l.fields.map(field).join('') : `<div class="grow"><span class="sub">Moves with the world, like the crab.</span></div>`}</div>`;
+          ${l.fields.length ? l.fields.map(field).join('') : `<div class="grow"><span class="sub">Moves with the world, like the player.</span></div>`}</div>`;
   }
 
   // ---------------------------------------------------------------- the screen
@@ -168,14 +173,15 @@ export function openGameEditor(app, g) {
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
       if (ed.tab === 'scene') {
-        const s = ed.sel, beach = schema.groups.find(x => x.id === 'beach');
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="The beach, drawn as symbols. Drag to move along it, tap a prop to see it." role="img"></canvas></div>`;
+        const s = ed.sel, sc = schema.scene, grp = schema.groups.find(x => x.id === sc.fieldsGroup);
+        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="The scene, drawn as symbols. Drag to move along it, tap a prop to see it." role="img"></canvas></div>`;
         panel = `<div class="plate inspector gap20">
-          <div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : 'Beach')}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed by the scatter rule' : 'Waves · an endless beach, props placed by rule')}</span></span></div>
-          ${beach.fields.map(field).join('')}</div>`;
+          <div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : sc.name)}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed by the scatter rule' : sc.summary)}</span></span></div>
+          ${grp ? grp.fields.map(field).join('') : ''}</div>`;
       } else if (ed.tab === 'background') {
-        screen = `<div class="screen fit gap20 stack" id="stk" style="perspective:1100px;touch-action:none;cursor:grab"><div class="rig" style="transform:rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)${ed.dragging ? ';transition:transform .08s linear' : ''}">${bgHtml()}</div>
-          <span class="cap" style="position:absolute;left:18px;bottom:12px;font-size:9px;color:#6f6d69;pointer-events:none">Drag to tilt · tap a layer</span></div>`;
+        screen = `<div class="screen fit gap20 stack" id="stk" style="perspective:1100px;touch-action:none;cursor:grab"><div class="rig${ed.combined ? ' flat' : ''}" style="transform:${ed.combined ? 'rotateX(0deg) rotateZ(0deg) scale(1.3)' : `rotateX(${ed.pitch}deg) rotateZ(${ed.yaw}deg)`}">${bgHtml()}</div>
+          <span class="cap" id="stkhint" style="position:absolute;left:18px;top:14px;font-size:9px;color:#6f6d69;pointer-events:none">${ed.combined ? 'All layers together, facing forward' : 'Drag to tilt · tap a layer'}</span>
+          <button class="btn bare" id="combine" aria-pressed="${!!ed.combined}" style="position:absolute;right:8px;bottom:6px" ${A(() => { ed.combined = !ed.combined; refreshBg(); })}>${well(28, svgRows(G.grid, BONE))}<span class="lbl">${ed.combined ? 'Spread' : 'Combine'}</span></button></div>`;
         panel = bgPanel();
       } else {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
@@ -217,7 +223,7 @@ export function openGameEditor(app, g) {
         root.querySelectorAll('[data-layer]').forEach(el => el.appendChild(planeArt(el.dataset.layer, D)));
         if (!ed.fanned) { ed.fanned = true; requestAnimationFrame(() => requestAnimationFrame(() => refreshBg())); }
         const stk = root.querySelector('#stk');
-        stk.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: ed.yaw, pitch: ed.pitch }; dragged = false; });
+        stk.addEventListener('pointerdown', (e) => { if (ed.combined || e.target.closest('#combine')) return; drag = { x: e.clientX, y: e.clientY, yaw: ed.yaw, pitch: ed.pitch }; dragged = false; });
         stk.addEventListener('pointermove', (e) => {
           if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
           if (!dragged && Math.abs(dx) + Math.abs(dy) < 6) return;

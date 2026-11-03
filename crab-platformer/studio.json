@@ -9,7 +9,7 @@
     {
      "path": "player.walkMax",
      "label": "Top speed",
-     "help": "How fast he scuttles",
+     "help": "How fast the player moves",
      "min": 0.5,
      "max": 4,
      "step": 0.05
@@ -17,7 +17,7 @@
     {
      "path": "player.walkAccel",
      "label": "Speed up",
-     "help": "How quickly he gets to top speed",
+     "help": "How quickly the player reaches top speed",
      "min": 0.02,
      "max": 1,
      "step": 0.01
@@ -25,7 +25,7 @@
     {
      "path": "player.stopDecel",
      "label": "Slow down",
-     "help": "How quickly he stops",
+     "help": "How quickly the player stops",
      "min": 0.02,
      "max": 1,
      "step": 0.01
@@ -33,7 +33,7 @@
     {
      "path": "player.walkFrameTicks",
      "label": "Walk animation",
-     "help": "Frames per step of the walk",
+     "help": "Frames per step of the walk cycle",
      "min": 1,
      "max": 20,
      "step": 1
@@ -41,7 +41,7 @@
     {
      "path": "player.idleFrameTicks",
      "label": "Idle animation",
-     "help": "Frames per step standing still",
+     "help": "Frames per step while standing still",
      "min": 1,
      "max": 30,
      "step": 1
@@ -56,7 +56,7 @@
     {
      "path": "player.jumpSpeed",
      "label": "Jump strength",
-     "help": "Higher jumps",
+     "help": "How high the player jumps",
      "min": 1,
      "max": 8,
      "step": 0.05
@@ -64,7 +64,7 @@
     {
      "path": "player.gravity",
      "label": "Gravity",
-     "help": "Pull down when falling",
+     "help": "How fast the player falls",
      "min": 0.05,
      "max": 1,
      "step": 0.01
@@ -72,7 +72,7 @@
     {
      "path": "player.holdJumpGravity",
      "label": "Hold-jump gravity",
-     "help": "Pull while you hold jump: lower floats longer",
+     "help": "Gravity while jump is held: lower floats longer",
      "min": 0.02,
      "max": 1,
      "step": 0.01
@@ -80,7 +80,7 @@
     {
      "path": "player.maxFall",
      "label": "Max fall speed",
-     "help": "Fastest he can fall",
+     "help": "The fastest the player can fall",
      "min": 1,
      "max": 8,
      "step": 0.05
@@ -88,7 +88,7 @@
     {
      "path": "player.coyoteFrames",
      "label": "Coyote time",
-     "help": "Jump allowed just after leaving a ledge",
+     "help": "A jump still works just after walking off a ledge",
      "min": 0,
      "max": 30,
      "step": 1,
@@ -97,7 +97,7 @@
     {
      "path": "player.jumpBufferFrames",
      "label": "Jump buffer",
-     "help": "Jump pressed a little early still counts",
+     "help": "A jump pressed just before landing still counts",
      "min": 0,
      "max": 30,
      "step": 1,
@@ -113,7 +113,7 @@
     {
      "path": "player.lives",
      "label": "Hearts",
-     "help": "Hits before game over",
+     "help": "Hits the player can take before game over",
      "min": 1,
      "max": 9,
      "step": 1
@@ -121,7 +121,7 @@
     {
      "path": "player.hurtInvulnFrames",
      "label": "Safe after a hit",
-     "help": "Time he flashes and can't be hurt",
+     "help": "Time the player flashes and can't be hurt",
      "min": 0,
      "max": 300,
      "step": 5,
@@ -130,7 +130,7 @@
     {
      "path": "player.hurtStunFrames",
      "label": "Stun after a hit",
-     "help": "Time the controls freeze",
+     "help": "Time the controls freeze after a hit",
      "min": 0,
      "max": 60,
      "step": 1,
@@ -139,7 +139,7 @@
     {
      "path": "player.knockback",
      "label": "Knockback",
-     "help": "Push away from what hit him",
+     "help": "Push away from whatever hit the player",
      "min": 0,
      "max": 6,
      "step": 0.1
@@ -162,7 +162,7 @@
     {
      "path": "camera.lookAhead",
      "label": "Look ahead",
-     "help": "Pixels the view leads where he faces",
+     "help": "Pixels the view leads in the direction the player faces",
      "min": 0,
      "max": 60,
      "step": 1
@@ -170,7 +170,7 @@
     {
      "path": "camera.lookEase",
      "label": "Look ease",
-     "help": "How fast it swings when he turns",
+     "help": "How quickly the view swings when the player turns",
      "min": 0.01,
      "max": 1,
      "step": 0.01
@@ -185,7 +185,7 @@
     {
      "path": "spawning.startDelay",
      "label": "First enemy after",
-     "help": "Wait at the start",
+     "help": "Wait before the first enemy appears",
      "min": 0,
      "max": 600,
      "step": 10,
@@ -212,7 +212,7 @@
     {
      "path": "spawning.maxAlive",
      "label": "Most at once",
-     "help": "Cap on enemies out together",
+     "help": "Most enemies out at the same time",
      "min": 1,
      "max": 9,
      "step": 1
@@ -220,7 +220,7 @@
     {
      "path": "spawning.oneMorePerKills",
      "label": "One more every",
-     "help": "Melts before another can join",
+     "help": "Defeats before one more enemy can join",
      "min": 1,
      "max": 20,
      "step": 1
@@ -228,7 +228,7 @@
     {
      "path": "spawning.aheadChance",
      "label": "From the front",
-     "help": "Chance they come from the side he faces",
+     "help": "Chance enemies come from the side the player faces",
      "min": 0,
      "max": 1,
      "step": 0.05,
@@ -244,7 +244,7 @@
     {
      "path": "squirt.drops",
      "label": "Drops",
-     "help": "Juice drops per squirt",
+     "help": "Juice drops in each squirt",
      "min": 1,
      "max": 30,
      "step": 1
@@ -252,7 +252,7 @@
     {
      "path": "squirt.dropSpeed",
      "label": "Drop speed",
-     "help": "How hard the juice shoots",
+     "help": "How hard the juice shoots out",
      "min": 1,
      "max": 8,
      "step": 0.1
@@ -260,7 +260,7 @@
     {
      "path": "squirt.snapFrames",
      "label": "Squeeze time",
-     "help": "How long a squeeze lasts",
+     "help": "How long one squeeze of the lemon lasts",
      "min": 4,
      "max": 40,
      "step": 1,
@@ -278,7 +278,7 @@
     {
      "path": "squirt.recoilFrames",
      "label": "Recoil",
-     "help": "Kick back after squeezing",
+     "help": "How long the crab kicks back after squeezing",
      "min": 0,
      "max": 20,
      "step": 1,
@@ -303,7 +303,7 @@
     {
      "path": "eyes.hp",
      "label": "Hit points",
-     "help": "Juice drops to melt one",
+     "help": "Juice drops it takes to melt one eye",
      "min": 1,
      "max": 40,
      "step": 1
@@ -311,7 +311,7 @@
     {
      "path": "eyes.chargeFrames",
      "label": "Charge",
-     "help": "Time charging before the laser",
+     "help": "How long an eye charges before its laser",
      "min": 10,
      "max": 200,
      "step": 2,
@@ -320,7 +320,7 @@
     {
      "path": "eyes.aimLockFrames",
      "label": "Aim locks",
-     "help": "When the aim stops following him",
+     "help": "When during the charge the aim stops following the player",
      "min": 0,
      "max": 200,
      "step": 2,
@@ -338,7 +338,7 @@
     {
      "path": "eyes.firstShotFrames.0",
      "label": "First shot, soonest",
-     "help": "After it arrives",
+     "help": "After an eye arrives",
      "min": 10,
      "max": 400,
      "step": 5,
@@ -347,7 +347,7 @@
     {
      "path": "eyes.firstShotFrames.1",
      "label": "First shot, latest",
-     "help": "After it arrives",
+     "help": "After an eye arrives",
      "min": 10,
      "max": 400,
      "step": 5,
@@ -356,7 +356,7 @@
     {
      "path": "eyes.restFrames.0",
      "label": "Rest, shortest",
-     "help": "Between shots",
+     "help": "Between an eye's shots",
      "min": 10,
      "max": 600,
      "step": 5,
@@ -365,7 +365,7 @@
     {
      "path": "eyes.restFrames.1",
      "label": "Rest, longest",
-     "help": "Between shots",
+     "help": "Between an eye's shots",
      "min": 10,
      "max": 600,
      "step": 5,
@@ -374,7 +374,7 @@
     {
      "path": "eyes.hoverHeight.0",
      "label": "Hover, lowest",
-     "help": "Pixels above the sand",
+     "help": "Pixels above the ground",
      "min": 8,
      "max": 120,
      "step": 1
@@ -382,7 +382,7 @@
     {
      "path": "eyes.hoverHeight.1",
      "label": "Hover, highest",
-     "help": "Pixels above the sand",
+     "help": "Pixels above the ground",
      "min": 8,
      "max": 120,
      "step": 1
@@ -390,7 +390,7 @@
     {
      "path": "eyes.driftPull",
      "label": "Drift pull",
-     "help": "How eagerly they follow him",
+     "help": "How eagerly eyes follow the player",
      "min": 0.0002,
      "max": 0.01,
      "step": 0.0002
@@ -406,7 +406,7 @@
     {
      "path": "eyes.contactRadius",
      "label": "Touch reach",
-     "help": "Bumping into one hurts within this",
+     "help": "Touching an eye this close hurts",
      "min": 2,
      "max": 30,
      "step": 1
@@ -414,7 +414,7 @@
     {
      "path": "eyes.beamRadius",
      "label": "Laser width",
-     "help": "How close to the beam counts as hit",
+     "help": "This close to the beam counts as a hit",
      "min": 1,
      "max": 20,
      "step": 1
@@ -428,8 +428,8 @@
    "fields": [
     {
      "path": "player.startX",
-     "label": "Crab starts at",
-     "help": "Pixels from the left",
+     "label": "Player starts at",
+     "help": "Pixels from the left of the scene",
      "min": 0,
      "max": 400,
      "step": 4
@@ -445,7 +445,7 @@
     {
      "path": "beach.emptyChance",
      "label": "Empty slots",
-     "help": "Chance a slot stays empty",
+     "help": "Chance a prop slot stays empty",
      "min": 0,
      "max": 1,
      "step": 0.05,
@@ -454,7 +454,7 @@
     {
      "path": "beach.castleKeepAway",
      "label": "Castle clearance",
-     "help": "No castle this close to the start",
+     "help": "No castle this close to where the player starts",
      "min": 0,
      "max": 200,
      "step": 5
@@ -498,7 +498,21 @@
   ],
   "seedMul": 7919,
   "seedAdd": 3,
-  "slotWidth": 26
+  "slotWidth": 26,
+  "name": "Beach",
+  "summary": "Waves mode \u00b7 endless scene, props placed by rule",
+  "fieldsGroup": "beach",
+  "player": {
+   "name": "Player start",
+   "glyph": "crab",
+   "color": "#ff5a1f"
+  },
+  "enemyBand": {
+   "name": "Where enemies hover",
+   "glyph": "eye",
+   "color": "#ff4fd8",
+   "path": "eyes.hoverHeight"
+  }
  },
  "background": [
   {
@@ -508,7 +522,7 @@
     {
      "path": "backdrop.sun.parallax",
      "label": "Parallax",
-     "help": "Scroll speed: 0 is fixed, 1 moves with the world",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -522,7 +536,7 @@
     {
      "path": "backdrop.clouds.0.parallax",
      "label": "Parallax",
-     "help": "Scroll speed",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -530,7 +544,7 @@
     {
      "path": "backdrop.clouds.0.drift",
      "label": "Drift",
-     "help": "Pixels a frame on their own",
+     "help": "Pixels it moves on its own each frame",
      "min": 0,
      "max": 1,
      "step": 0.01
@@ -538,7 +552,7 @@
     {
      "path": "backdrop.clouds.0.spacing",
      "label": "Spacing",
-     "help": "One cloud slot every",
+     "help": "One slot every this many pixels",
      "min": 40,
      "max": 400,
      "step": 10
@@ -552,7 +566,7 @@
     {
      "path": "backdrop.clouds.1.parallax",
      "label": "Parallax",
-     "help": "Scroll speed",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -560,7 +574,7 @@
     {
      "path": "backdrop.clouds.1.drift",
      "label": "Drift",
-     "help": "Pixels a frame on their own",
+     "help": "Pixels it moves on its own each frame",
      "min": 0,
      "max": 1,
      "step": 0.01
@@ -568,7 +582,7 @@
     {
      "path": "backdrop.clouds.1.spacing",
      "label": "Spacing",
-     "help": "One cloud slot every",
+     "help": "One slot every this many pixels",
      "min": 40,
      "max": 400,
      "step": 10
@@ -582,7 +596,7 @@
     {
      "path": "backdrop.gulls.parallax",
      "label": "Parallax",
-     "help": "Scroll speed",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -590,7 +604,7 @@
     {
      "path": "backdrop.gulls.count",
      "label": "Count",
-     "help": "How many",
+     "help": "How many there are",
      "min": 0,
      "max": 9,
      "step": 1
@@ -604,7 +618,7 @@
     {
      "path": "backdrop.city.parallax",
      "label": "Parallax",
-     "help": "Scroll speed",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -618,7 +632,7 @@
     {
      "path": "backdrop.sea.parallax",
      "label": "Parallax",
-     "help": "Scroll speed of the glints",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -632,7 +646,7 @@
     {
      "path": "backdrop.boat.parallax",
      "label": "Parallax",
-     "help": "Scroll speed",
+     "help": "Scroll speed: 0 stays put, 1 moves with the world",
      "min": 0,
      "max": 1.5,
      "step": 0.01
@@ -640,7 +654,7 @@
     {
      "path": "backdrop.boat.drift",
      "label": "Drift",
-     "help": "Sails on its own",
+     "help": "Pixels it moves on its own each frame",
      "min": 0,
      "max": 1,
      "step": 0.01

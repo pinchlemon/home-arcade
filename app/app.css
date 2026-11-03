@@ -145,6 +145,13 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .plane.on .pc canvas{opacity:1}
 .ptab{position:absolute;left:-1px;bottom:100%;margin-bottom:4px;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;color:#8f8d88;pointer-events:none;transition:color .3s ease}
 .plane.on .ptab{color:var(--acc)}
+/* combined: the layers lie on top of each other, facing forward, as one picture */
+.rig.flat .plane{border-color:transparent;background-color:transparent;background-image:none}
+.rig.flat .plane.on{border:1px solid rgba(255,255,255,.22)}
+.rig.flat .plane .pc canvas{opacity:.7}
+.rig.flat .plane.on .pc canvas{opacity:1}
+.rig.flat .ptab{opacity:0}
+.ptab{transition:color .3s ease,opacity .4s ease}
 
 /* game player */
 .player{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:10;padding:max(env(safe-area-inset-top),12px) 12px max(env(safe-area-inset-bottom),12px)}
