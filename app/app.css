@@ -5,6 +5,7 @@
   --arcade:#ff5a1f;--studio:#7dff6a;--library:#ff4fd8;--sync:#4d7cff;--settings:#ffd23f;
   --acc:var(--arcade);
   --r-btn:6px;--r-bar:8px;--r-plate:10px;
+  --il:env(safe-area-inset-left,0px);--ir:env(safe-area-inset-right,0px);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Saira,system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior:none}
@@ -94,7 +95,7 @@ body{background:transparent}
 @media (orientation:landscape) and (max-height:520px){
   #app{max-width:none}
   .screen-tabs{display:grid;grid-template-columns:76px 244px minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"nav emblem body";gap:14px;align-items:stretch;
-    padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
+    padding:max(env(safe-area-inset-top),16px) calc(var(--ir) + 20px) max(env(safe-area-inset-bottom),16px) calc(var(--il) + 20px)}
   .tabbar{grid-area:nav;height:auto;grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr));padding:4px 0}
   /* the text and buttons sit at the bottom of the panel; the shape sits exactly halfway between the top edge and the text */
   .emblem{grid-area:emblem;height:auto;flex-direction:column;justify-content:space-between;gap:0;padding:0 14px 16px}
@@ -112,7 +113,7 @@ body{background:transparent}
   .screen-tabs>.emblem+.group>.row,.screen-tabs>.emblem+.group>.setrow,.screen-tabs>.emblem+.group>.row-empty{flex:1 1 0;min-height:0;height:auto;max-height:96px}
   .screen-tabs>.emblem+*{grid-area:body}
   /* editors: the picture or scene fills the left side; the bars and panel stack on the right */
-  .screen-tool{padding:max(env(safe-area-inset-top),16px) calc(env(safe-area-inset-right) + 20px) max(env(safe-area-inset-bottom),16px) calc(env(safe-area-inset-left) + 20px)}
+  #app .screen-tool{padding:max(env(safe-area-inset-top),16px) calc(var(--ir) + 20px) max(env(safe-area-inset-bottom),16px) calc(var(--il) + 20px)}
   .screen-tool:has(>.screen){flex-flow:column wrap;align-content:flex-start;column-gap:16px}
   .screen-tool:has(>.screen)>*{width:380px;flex:none}
   .screen-tool:has(>.screen)>.inspector{flex:1 1 0}
