@@ -1,0 +1,202 @@
+{
+ "about": "The behavior library. Any object can mix these; the Studio shows each one's settings. Speeds are pixels per frame, times are frames (60 a second).",
+ "behaviors": {
+  "patrol": {
+   "name": "Patrol",
+   "help": "Walks back and forth around where it was placed, turning at walls",
+   "params": {
+    "speed": {
+     "label": "Speed",
+     "help": "How fast it walks",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.1,
+     "default": 0.6
+    },
+    "range": {
+     "label": "Range",
+     "help": "How far either way it walks",
+     "min": 0,
+     "max": 400,
+     "step": 8,
+     "default": 48
+    }
+   }
+  },
+  "hover": {
+   "name": "Hover",
+   "help": "Floats in place, bobbing gently",
+   "params": {
+    "bob": {
+     "label": "Bob",
+     "help": "How far it bobs up and down",
+     "min": 0,
+     "max": 20,
+     "step": 1,
+     "default": 3
+    },
+    "bobSpeed": {
+     "label": "Bob speed",
+     "help": "How fast it bobs",
+     "min": 0.01,
+     "max": 0.3,
+     "step": 0.01,
+     "default": 0.05
+    }
+   }
+  },
+  "chase": {
+   "name": "Chase",
+   "help": "Goes after the player when they come near, then drifts back home",
+   "params": {
+    "range": {
+     "label": "Sight",
+     "help": "How close the player must be",
+     "min": 0,
+     "max": 400,
+     "step": 10,
+     "default": 90
+    },
+    "speed": {
+     "label": "Speed",
+     "help": "How fast it closes in",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.1,
+     "default": 0.8
+    },
+    "fly": {
+     "label": "Flies",
+     "help": "On: chases through the air. Off: along the ground",
+     "min": 0,
+     "max": 1,
+     "step": 1,
+     "default": 1,
+     "show": "onoff"
+    }
+   }
+  },
+  "shooter": {
+   "name": "Shooter",
+   "help": "Fires at the player when they're in range",
+   "params": {
+    "range": {
+     "label": "Range",
+     "help": "How close the player must be",
+     "min": 20,
+     "max": 400,
+     "step": 10,
+     "default": 120
+    },
+    "every": {
+     "label": "Every",
+     "help": "Time between shots",
+     "min": 10,
+     "max": 600,
+     "step": 5,
+     "default": 90,
+     "show": "seconds"
+    },
+    "speed": {
+     "label": "Shot speed",
+     "help": "How fast the shots fly",
+     "min": 0.4,
+     "max": 6,
+     "step": 0.1,
+     "default": 1.6
+    }
+   }
+  },
+  "touchDamage": {
+   "name": "Hurts on touch",
+   "help": "The player loses a heart touching it",
+   "params": {}
+  },
+  "health": {
+   "name": "Can be defeated",
+   "help": "The player's shots wear it down; at zero it pops and counts as a defeat",
+   "params": {
+    "hp": {
+     "label": "Hit points",
+     "help": "Shots it takes",
+     "min": 1,
+     "max": 50,
+     "step": 1,
+     "default": 3
+    }
+   }
+  },
+  "collectible": {
+   "name": "Collectible",
+   "help": "Picked up on touch",
+   "params": {
+    "score": {
+     "label": "Score",
+     "help": "Added to the score",
+     "min": 0,
+     "max": 100,
+     "step": 1,
+     "default": 1
+    },
+    "hearts": {
+     "label": "Hearts",
+     "help": "Hearts it gives back",
+     "min": 0,
+     "max": 9,
+     "step": 1,
+     "default": 0
+    }
+   }
+  },
+  "bouncer": {
+   "name": "Bouncer",
+   "help": "Launches the player up when they land on it",
+   "params": {
+    "strength": {
+     "label": "Strength",
+     "help": "How high it throws them",
+     "min": 1,
+     "max": 10,
+     "step": 0.1,
+     "default": 4.5
+    }
+   }
+  },
+  "solid": {
+   "name": "Solid",
+   "help": "The player can stand on top of it",
+   "params": {}
+  },
+  "mover": {
+   "name": "Mover",
+   "help": "Glides back and forth along a path, carrying anyone standing on it",
+   "params": {
+    "dx": {
+     "label": "Across",
+     "help": "How far it travels sideways",
+     "min": -400,
+     "max": 400,
+     "step": 8,
+     "default": 48
+    },
+    "dy": {
+     "label": "Up and down",
+     "help": "How far it travels up (+) or down (-)",
+     "min": -120,
+     "max": 120,
+     "step": 4,
+     "default": 0
+    },
+    "period": {
+     "label": "Round trip",
+     "help": "Time for one there-and-back",
+     "min": 30,
+     "max": 900,
+     "step": 10,
+     "default": 180,
+     "show": "seconds"
+    }
+   }
+  }
+ }
+}

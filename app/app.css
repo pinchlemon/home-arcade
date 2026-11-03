@@ -153,6 +153,14 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .rig.flat .ptab{opacity:0}
 .ptab{transition:color .3s ease,opacity .4s ease}
 
+/* objects tab: list rows and behavior headings inside a panel */
+.orow{display:flex;align-items:center;gap:12px;min-height:58px;width:100%;text-align:left;border-top:1px solid rgba(255,255,255,.06);padding:4px 0}
+.inspector>.orow:first-child{border-top:0}
+.orow .t,.bhead .t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.orow .sub{font-size:11px;line-height:14px}
+.bhead{display:flex;align-items:center;gap:10px;min-height:48px;margin-top:10px;border-top:1px solid rgba(255,255,255,.14);padding-top:6px}
+.bhead .sub{white-space:normal;font-size:11px;line-height:14px}
+
 /* game player */
 .player{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:10;padding:max(env(safe-area-inset-top),12px) 12px max(env(safe-area-inset-bottom),12px)}
 .player .topbar{position:absolute;top:max(env(safe-area-inset-top),12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center}

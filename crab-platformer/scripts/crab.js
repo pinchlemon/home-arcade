@@ -77,6 +77,7 @@ function update() {
 
   updateParts();
   updateEyes();
+  if (LEVEL) updateActors();
 
   const walking = crab.onGround && dir !== 0;
   if (walking !== crab.walking) { crab.walking = walking; crab.animT = 0; crab.frame = (crab.frame + 1) & 3; }

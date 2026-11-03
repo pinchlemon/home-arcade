@@ -67,7 +67,7 @@ function paintEye(e) {
   eyeG.clearRect(0, 0, EYE_W, EYE_H);
   const put = (c, x, y) => { eyeG.fillStyle = c; eyeG.fillRect(x, y, 1, 1); };
   const dying = e.st === 'dying';
-  const dmg = dying ? 99 : Math.floor((EYE_HP - e.hp) * 6 / EYE_HP);   // 0 = healthy … 5 = nearly melted
+  const dmg = dying ? 99 : Math.floor((e.c.hp - e.hp) * 6 / e.c.hp);   // 0 = healthy … 5 = nearly melted
   const red = dying ? Math.min(1, e.t / 14) : 0;                  // how far it has flushed red while melting
   const wince = !dying && e.flash > 0;
   // eyelids: 0 = wide open, 1 = shut. Blinks now and then, squints while charging, squeezes shut when juiced.
@@ -76,8 +76,8 @@ function paintEye(e) {
   if (!dying) {
     if (e.blink > 0) lidT = lidB = Math.sin(Math.PI * (1 - e.blink / BLINK_LEN));
     if (e.st === 'charge') {
-      if (e.t >= CHARGE - 6) { lidT = 0; lidB = 0; }                                       // eyes pop wide right before the shot
-      else { const k = Math.min(1, e.t / (CHARGE * 0.3)); lidT = Math.max(lidT, 0.8 * k); lidB = Math.max(lidB, 0.8 * k); }   // a quick, hard squint
+      if (e.t >= e.c.chargeFrames - 6) { lidT = 0; lidB = 0; }                                       // eyes pop wide right before the shot
+      else { const k = Math.min(1, e.t / (e.c.chargeFrames * 0.3)); lidT = Math.max(lidT, 0.8 * k); lidB = Math.max(lidB, 0.8 * k); }   // a quick, hard squint
     }
     if (e.st === 'fire') { lidT = 0; lidB = 0; }                                 // wide open for the whole blast
     if (e.openT > 0) { lidT = 0; lidB = 0; }                                   // ...and for a moment after
@@ -116,12 +116,12 @@ function paintEye(e) {
     if (ch === '#') put(INK, x, y); else if (ch === 'o') put(sclera(x, y), x, y);
   }
   if (red < 1) {
-    if (e.hp < EYE_HP) for (const [x, y] of BASE_VEINS) if (veinOK(x, y)) put(RED, x, y);   // fresh eyes are clean
+    if (e.hp < e.c.hp) for (const [x, y] of BASE_VEINS) if (veinOK(x, y)) put(RED, x, y);   // fresh eyes are clean
     const branches = Math.min(VEIN_BRANCHES.length, dmg * 2), len = Math.min(4, 1 + dmg);
     for (let b = 0; b < branches; b++) VEIN_BRANCHES[b].slice(0, len).forEach(([x, y]) => { if (veinOK(x, y)) put(RED, x, y); });
   }
   if (red >= 1) return;
-  const iris = e.st === 'fire' ? RED : e.st === 'charge' ? (((t >> (e.t > AIM_LOCK ? 1 : 2)) & 1) ? RED : PINK) : TEAL;
+  const iris = e.st === 'fire' ? RED : e.st === 'charge' ? (((t >> (e.t > e.c.aimLockFrames ? 1 : 2)) & 1) ? RED : PINK) : TEAL;
   const pained = e.pain > 0 && e.st !== 'fire' && e.st !== 'charge';
   const PUP = pained ? PUPIL_SMALL : EYE_PUPIL;
   const pj = pained ? [((t >> 1) % 3) - 1, 0] : [0, 0];
@@ -147,8 +147,8 @@ function drawEye(e, cx) {
   const ouch = e.pain > 20 && e.st !== 'dying' ? (t % 2 ? 1 : -1) : e.pain > 0 && t % 4 === 0 ? 1 : 0;   // shaking in pain
   const x = Math.round(e.x - cx) + jit + ouch, y = Math.round(e.y) + (e.shakeT > 8 && t % 4 === 0 ? 1 : 0);
   const ex = x, ey = y;
-  if (e.st === 'charge' && (e.t > AIM_LOCK || t % 2 === 0)) {          // glow ring tightening around the eye
-    const rad = 13 - e.t / CHARGE * 3;
+  if (e.st === 'charge' && (e.t > e.c.aimLockFrames || t % 2 === 0)) {          // glow ring tightening around the eye
+    const rad = 13 - e.t / e.c.chargeFrames * 3;
     for (let k = 0; k < 20; k++) {
       const a = k / 20 * Math.PI * 2 + t * 0.12;
       ctx.fillStyle = k % 2 ? RED : PINK; ctx.fillRect(Math.round(ex + Math.cos(a) * rad), Math.round(ey + Math.sin(a) * rad), 1, 1);
@@ -179,7 +179,7 @@ function drawEye(e, cx) {
   }
 }
 function drawBeam(e, cx) {
-  const len = beamLen(e), thin = e.t < 3 || e.t > FIRE - 4;
+  const len = beamLen(e), thin = e.t < 3 || e.t > e.c.fireFrames - 4;
   for (const pass of [0, 1]) for (let i = 6; i < len; i++) {
     const x = Math.round(e.x + e.ax * i - cx), y = Math.round(e.y + e.ay * i);
     if (x < -2 || x > VW + 2) continue;
@@ -190,6 +190,6 @@ function drawBeam(e, cx) {
 function drawTelegraph(e, cx) {
   if (t % 2) return;
   const reach = Math.min(beamLen(e), 30 + e.t * 3);
-  ctx.fillStyle = e.t > AIM_LOCK ? RED : PINK;
+  ctx.fillStyle = e.t > e.c.aimLockFrames ? RED : PINK;
   for (let i = 10; i < reach; i += 5) ctx.fillRect(Math.round(e.x + e.ax * i - cx), Math.round(e.y + e.ay * i), 1, 1);
 }

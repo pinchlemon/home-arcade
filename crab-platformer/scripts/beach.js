@@ -33,13 +33,14 @@ function propAt(i) {
   return { img, x };
 }
 // levels: props are placed by hand in the Studio instead of by the scatter rule
-const LEVEL_PROPS = LEVEL ? (LEVEL.props || []).map(p => ({ img: { palm, umbrella: umb, castle }[p.type], x: p.x, type: p.type })).filter(p => p.img) : null;
+const LEVEL_PROPS = LEVEL ? LEVEL_THINGS.map(t => { const b = objOf(t).base; return { img: { palm, umbrella: umb, castle }[b], x: t.x, type: b }; }).filter(p => p.img) : null;
 const PROP_W = { palm: 72, umbrella: 17, castle: CASTLE_W };
 function solidsNear(wx, range = 120) {
   if (LEVEL_PROPS) {
     const out = [];
     for (const p of LEVEL_PROPS) if (p.img === castle && p.x + CASTLE_W >= wx - range && p.x <= wx + range)
       for (const s of CASTLE_SOLIDS) out.push({ x0: p.x + s.x0, x1: p.x + s.x1, top: GROUND + 1 - CASTLE_H + s.top });
+    for (const r of actorSolids(wx, range)) out.push(r);
     return out;
   }
   const out = [], i0 = Math.floor((wx - range - CASTLE_W) / SLOT), i1 = Math.floor((wx + range) / SLOT);
@@ -136,4 +137,5 @@ function drawLevelMarks(cx) {
     sprite(got ? PENNANT.map(r => r.replace(/y/g, 'w')) : PENNANT, Math.round(c.x - cx), GROUND - PENNANT.length + 1);
   }
   if (LEVEL.exit) sprite(EXIT_FLAG, Math.round(LEVEL.exit.x - cx), GROUND - EXIT_FLAG.length + 1);
+  drawActors(cx);
 }

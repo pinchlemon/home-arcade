@@ -15,7 +15,10 @@
     }
     return game;
   }
-  fetch('game.json', { cache: 'no-cache' }).then(r => r.json()).then(game => {
+  const json = (u) => fetch(u, { cache: 'no-cache' }).then(r => r.json());
+  // the shared behavior library and symbols come with the engine; a game that doesn't use them simply ignores them
+  Promise.all([json('game.json'), json(here + 'behaviors.json').catch(() => ({ behaviors: {} })), json(here + 'symbols.json').catch(() => ({}))]).then(([game, behaviors, symbols]) => {
+    window.BEHAVIORS = behaviors; window.SYMBOLS = symbols;
     window.GAME = apply(game, phoneEdits());
     for (const name of game.load) {
       const s = document.createElement('script');
