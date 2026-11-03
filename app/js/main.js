@@ -4,6 +4,7 @@ import { well, solidSvg, rasterSolid, paintSolid, icon } from './pixel.js';
 import * as S from './store.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
+import * as games from './games.js';
 import { A, resetActions, getAction, esc, setRows, rows } from './ui.js';
 import arcade from './screens/arcade.js';
 import studio from './screens/studio.js';
@@ -198,5 +199,6 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 
 applySettings();
 render();
+games.preload(() => { if (!app.overlay) render(); });
 checkVersion();
 requestAnimationFrame(frame);

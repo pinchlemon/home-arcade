@@ -30,7 +30,7 @@ export const ago = (t) => {
 // a short line about a game's changes on this phone
 export function editLine(g) {
   if (!g.editable) return g.kind;
-  const e = getEdits(g.file), n = Object.keys(e.overrides).length;
+  const e = getEdits(g.file), n = realChanges(g.file).length;
   if (!n) return 'No changes on this phone';
   return n + (n === 1 ? ' change · ' : ' changes · ') + 'edited ' + ago(e.edited) + (e.dirty ? '' : ' · pushed');
 }
@@ -45,7 +45,16 @@ export function setValue(folder, path, value) {
   const e = getEdits(folder); e.overrides[path] = value; e.dirty = true; e.edited = Date.now(); setEdits(folder, e);
 }
 export function resetEdits(folder) { try { localStorage.removeItem(KEY(folder)); } catch (e) {} }
-export const editCount = (folder) => Object.keys(getEdits(folder).overrides).length;
+// The settings that really differ from the game.json on GitHub. A setting changed and then changed back
+// is still stored, but it isn't a change. (Until the game's file has loaded, every stored setting counts.)
+const bases = {};
+export function realChanges(folder) {
+  const o = getEdits(folder).overrides, b = bases[folder];
+  return Object.keys(o).filter(p => !b || JSON.stringify(getPath(b, p)) !== JSON.stringify(o[p]));
+}
+export const editCount = (folder) => realChanges(folder).length;
+// load every editable game's file in the background, so counts and dots are right from the start
+export function preload(then) { editableGames().forEach(g => loadGame(g.file).then(() => then && then()).catch(() => {})); }
 
 // paths look like 'eyes.firstShotFrames.0'
 export function getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
@@ -67,12 +76,12 @@ export async function loadGame(folder) {
     const get = (f) => fetch(`../${folder}/${f}`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return r.json(); });
     const engine = (f) => fetch(`../engine/${f}`, { cache: 'no-cache' }).then(r => r.json()).catch(() => ({}));
     cache[folder] = Promise.all([get('game.json'), get('studio.json'), engine('behaviors.json'), engine('symbols.json')])
-      .then(([data, schema, behaviors, symbols]) => ({ data, schema, behaviors: behaviors.behaviors || {}, symbols }))
+      .then(([data, schema, behaviors, symbols]) => (bases[folder] = data, { data, schema, behaviors: behaviors.behaviors || {}, symbols }))
       .catch(e => { delete cache[folder]; throw e; });
   }
   return cache[folder];
 }
-export const forgetGame = (folder) => { delete cache[folder]; };
+export const forgetGame = (folder) => { delete cache[folder]; delete bases[folder]; };
 
 // open a code game; swiping back from it returns to the app
 export function launch(g, scene) { try { sessionStorage.setItem('ha.return', 'app/'); } catch (e) {} location.href = g.path + (scene ? '?scene=' + encodeURIComponent(scene) : ''); }
