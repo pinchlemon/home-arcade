@@ -8,7 +8,9 @@ const prev = { ...held };
 const edge = { ...held };
 const keyboard = { ...held };
 export const touch = { ...held };
-let pad = null, settings = getSettings();
+let pad = null, pads = [], settings = getSettings();
+const stickOn = { left: false, right: false, up: false, down: false };   // which directions the stick is already holding (for hysteresis)
+const since = {}, again = {};   // when a direction went down / was last repeated
 const listeners = new Set();
 
 export const refreshSettings = () => { settings = getSettings(); };
@@ -33,24 +35,41 @@ addEventListener('blur', () => { for (const k of KEYS) { keyboard[k] = false; to
 function pollPad() {
   const list = navigator.getGamepads ? navigator.getGamepads() : [];
   const was = !!pad;
-  pad = null;
-  for (const g of list) if (g && g.connected) { pad = g; break; }
+  pad = null; pads = [];
+  // some controllers show up as more than one device; use all of them together
+  for (const g of list) if (g && g.connected) { pads.push(g); if (!pad) pad = g; }
   if (was !== !!pad) listeners.forEach(f => f());
 }
 
 export function poll() {
   pollPad();
   const n = Object.fromEntries(KEYS.map(k => [k, keyboard[k] || touch[k]]));
-  if (pad) {
-    const b = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
-    const dz = 0.15 + settings.deadzone * 0.06, ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
-    n.left = n.left || b(14) || ax < -dz; n.right = n.right || b(15) || ax > dz;
-    n.up = n.up || b(12) || ay < -dz; n.down = n.down || b(13) || ay > dz;
+  // the stick: the strongest push among the connected devices
+  let ax = 0, ay = 0;
+  for (const g of pads) { const x = g.axes[0] || 0, y = g.axes[1] || 0; if (Math.hypot(x, y) > Math.hypot(ax, ay)) { ax = x; ay = y; } }
+  const dz = 0.15 + settings.deadzone * 0.06;
+  // it counts as one direction at a time (the stronger way), and a direction it is already holding stays on until the stick eases well back,
+  // so a wobbling stick doesn't flicker between directions or fire sideways presses while you push up or down
+  const hx = Math.abs(ax), hy = Math.abs(ay), onX = stickOn.left || stickOn.right, onY = stickOn.up || stickOn.down;
+  const wantX = hx >= (onX ? dz * 0.7 : dz) && hx >= hy, wantY = !wantX && hy >= (onY ? dz * 0.7 : dz);
+  stickOn.left = wantX && ax < 0; stickOn.right = wantX && ax > 0; stickOn.up = wantY && ay < 0; stickOn.down = wantY && ay > 0;
+  n.left = n.left || stickOn.left; n.right = n.right || stickOn.right; n.up = n.up || stickOn.up; n.down = n.down || stickOn.down;
+  for (const g of pads) {
+    const b = (i) => !!(g.buttons[i] && g.buttons[i].pressed);
+    n.left = n.left || b(14); n.right = n.right || b(15); n.up = n.up || b(12); n.down = n.down || b(13);
     const A = settings.swapAB ? b(1) : b(0), B = settings.swapAB ? b(0) : b(1);
     n.a = n.a || A; n.b = n.b || B; n.x = n.x || b(2) || b(3);
     n.start = n.start || b(9); n.lb = n.lb || b(4) || b(6); n.rb = n.rb || b(5) || b(7);
   }
-  for (const k of KEYS) { edge[k] = n[k] && !prev[k]; prev[k] = n[k]; held[k] = n[k]; }
+  if (!pads.length) for (const k in stickOn) stickOn[k] = false;
+  const now = performance.now();
+  for (const k of KEYS) {
+    edge[k] = n[k] && !prev[k];
+    if (edge[k]) { since[k] = now; again[k] = now; }
+    // holding a direction keeps moving after a short wait
+    else if (n[k] && 'leftrightupdown'.includes(k) && now - since[k] > 380 && now - again[k] > 120) { edge[k] = true; again[k] = now; }
+    prev[k] = n[k]; held[k] = n[k];
+  }
 }
 export const isHeld = (k) => held[k];
 export const pressed = (k) => edge[k];

@@ -36,7 +36,7 @@ export const app = {
   setTab(i, quiet) {
     i = (i + SECTIONS.length) % SECTIONS.length;
     if (i === this.ui.tab && !this.overlay) return;
-    leave(); this.ui.tab = i; this.saveUI();
+    leave(); this.ui.tab = i; this.ui.setRow = -1; this.saveUI();
     if (this.overlay) { const o = this.overlay; this.overlay = null; if (o.onClose) o.onClose(); } // a jump from a full-screen tool to a tab
     if (!quiet) snd.click(); this.render();
   },
