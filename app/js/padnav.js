@@ -14,7 +14,8 @@ function targets(root) {
     if (el.disabled || el.classList.contains('plane')) continue;
     const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
     if (el.matches('[data-pad=pager]')) { out.push(el); continue; }
-    if (el.closest('[data-pad=pager]')) continue;   // its buttons are turned by left and right
+    // a pager's previous and next buttons are turned by left and right; anything else on the bar (like New) stays its own stop
+    if (el.closest('[data-pad=pager]') && el.matches('[aria-label^="Previous"],[aria-label^="Next"]')) continue;
     const row = el.closest('.grow');
     if (el.matches('.grow')) { if (!el.querySelector('.stepper,[role=switch]')) continue; }
     else if (el !== row && row && row.querySelector('.stepper,[role=switch]')) continue;   // its row stands for its buttons
@@ -43,6 +44,8 @@ function pick(list, from, dir) {
   let best = null, bestScore = Infinity;
   for (const el of list) {
     if (el === from) continue;
+    // going up or down, a pager bar counts as one stop (its extra button, like New, is reached with A)
+    if ((dir === 'up' || dir === 'down') && el.closest('[data-pad=pager]') && !el.matches('[data-pad=pager]')) continue;
     const r = el.getBoundingClientRect(), p = center(r), dx = p.x - c.x, dy = p.y - c.y;
     let score = Infinity;
     if (dir === 'down' && dy > 4) score = dy + Math.abs(dx) * 2;
@@ -71,9 +74,9 @@ export function padFrame(root, nav, input, hooks = {}) {
     nav.i = 0; mark(root, nav); return true;
   }
   const row = cur.matches('.grow'), pager = cur.matches('[data-pad=pager]');
-  const turn = (dir) => { const b = cur.querySelectorAll('button'); (dir < 0 ? b[0] : b[b.length - 1])?.click(); };
+  const turn = (dir) => cur.querySelector(dir < 0 ? '[aria-label^="Previous"]' : '[aria-label^="Next"]')?.click();
   if (input.pressed('a')) {
-    if (pager) { turn(1); return true; }
+    if (pager) { (cur.querySelector('.btn.bare:not(.icon)') || cur.querySelector('[aria-label^="Next"]'))?.click(); return true; }
     if (cur.id === 'scn') { hooks.tap && hooks.tap(); return true; }
     if (row) { const sw = cur.querySelector('[role=switch]'); (sw || cur.querySelector('[aria-label^="More"]'))?.click(); }
     else cur.click();
