@@ -44,7 +44,7 @@ function nudge(f, v, dir) {
 }
 
 export function openGameEditor(app, g) {
-  const ed = { tab: app.ui.geTab || 'scene', scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
+  const ed = { tab: app.ui.geTab || 'scene', zoom: 1, scene: null, tool: 'select', placeType: 'palm', lsel: null, group: 0, bg: 'city', camX: null, pitch: 58, yaw: -32, dragging: false, sel: null, game: null, error: null };
   let view = null, off = null, octx = null, drag = null, dragged = false;
   const folder = g.file;
   games.loadGame(folder).then(x => { ed.game = x; rerender(); }).catch(e => { ed.error = e.message; rerender(); });
@@ -94,6 +94,25 @@ export function openGameEditor(app, g) {
     if (p.solid && Math.abs(x + cw / 2 - D.player.startX) < D.beach.castleKeepAway) p = sc.props.find(q => q.glyph === 'umbrella');
     return { ...p, x, i };
   }
+  // ---- the scene view: 1 game pixel per pixel at 1×; zooming out shows 2× or 4× more of the world, ground kept at the bottom
+  const SW = () => VW * ed.zoom, SH = () => VH * ed.zoom, OYZ = () => SH() - VH;
+  // a symbol scaled up to about the real size of the thing it stands for, so the map reads like a zoomed-out real one
+  function symScale(rows, w, h) { const r = Math.min(w / rows[0].length, h / rows.length); return r >= 1.5 ? Math.max(2, Math.floor(r)) : 1; }
+  function drawSym(c, rows, x, bottom, s, color) {
+    c.fillStyle = color; const top = bottom - rows.length * s;
+    for (let r = 0; r < rows.length; r++) for (let k = 0; k < rows[r].length; k++) if (rows[r][k] === '1') c.fillRect(x + k * s, top + r * s, s, s);
+  }
+  function dashBox(c, x, top, w, bottom, color) {
+    c.fillStyle = color;
+    for (let k = 0; k < w; k += 2) { c.fillRect(x + k, top, 1, 1); c.fillRect(x + k, bottom, 1, 1); }
+    for (let k = 0; k < bottom - top; k += 2) { c.fillRect(x, top + k, 1, 1); c.fillRect(x + w - 1, top + k, 1, 1); }
+  }
+  // the position readout stays the same size on screen at any zoom
+  function readout(c, txt) {
+    const w = textRows(txt)[0].length, t = document.createElement('canvas'); t.width = w + 4; t.height = 8;
+    const g2 = t.getContext('2d'); g2.fillStyle = '#000'; g2.fillRect(0, 0, w + 4, 8); drawText(g2, txt, 2, 2, GREEN);
+    c.imageSmoothingEnabled = false; c.drawImage(t, SW() - (w + 4) * ed.zoom, 0, (w + 4) * ed.zoom, 8 * ed.zoom);
+  }
   // ---- scenes: the first is the endless Waves beach; Level scenes are laid out by hand
   const scenes = () => data().scenes || [{ id: 'main', name: ed.game.schema.scene.name, kind: 'waves' }];
   const scene = () => { const l = scenes(); return l.find(x => x.id === ed.scene) || l[0]; };
@@ -125,67 +144,71 @@ export function openGameEditor(app, g) {
   }
   function drawLevel(L) {
     const D = data(), c = octx, GROUND = D.screen.ground, cx = Math.round(ed.camX);
-    c.fillStyle = '#000'; c.fillRect(0, 0, VW, VH);
+    c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, SW(), SH()); c.translate(0, OYZ());
     // outside the level: hatched
     c.fillStyle = '#1c1c20';
-    for (let x = 0; x < VW; x++) { const wx = x + cx; if (wx < 0 || wx >= L.width) for (let y = (wx & 3); y < VH; y += 4) c.fillRect(x, y, 1, 1); }
-    for (let x = -(((cx % 8) + 8) % 8); x < VW; x += 8) { if (x + cx < 0 || x + cx >= L.width) continue; drawRows(c, ART.ground, x, GROUND, 'rgba(228,226,220,.55)'); drawRows(c, ART.ground, x, GROUND + 8, 'rgba(228,226,220,.3)'); }
+    for (let x = 0; x < SW(); x++) { const wx = x + cx; if (wx < 0 || wx >= L.width) for (let y = (wx & 3) - OYZ(); y < VH; y += 4) c.fillRect(x, y, 1, 1); }
+    for (let x = -(((cx % 8) + 8) % 8); x < SW(); x += 8) { if (x + cx < 0 || x + cx >= L.width) continue; drawRows(c, ART.ground, x, GROUND, 'rgba(228,226,220,.55)'); drawRows(c, ART.ground, x, GROUND + 8, 'rgba(228,226,220,.3)'); }
     for (const it of itemsOf(L)) {
       const b = boxOf(it, GROUND), on = sameItem(it, ed.lsel), d = it.def, x = Math.round(b.x0 - cx), w = d.w, h = d.h, top = Math.round(b.y0);
       if (d.list === 'props') {
-        c.fillStyle = on ? GREEN : DIM;
-        for (let k = 0; k < w; k += 2) { c.fillRect(x + k, top, 1, 1); c.fillRect(x + k, GROUND, 1, 1); }
-        for (let k = 0; k < h; k += 2) { c.fillRect(x, top + k, 1, 1); c.fillRect(x + w - 1, top + k, 1, 1); }
-        drawRows(c, ART[d.glyph], Math.round(x + w / 2 - 4), GROUND - 9, on ? GREEN : d.color);
+        const art = ART[d.glyph], k = symScale(art, w, h);
+        if (on) dashBox(c, x, top, w, GROUND, GREEN);
+        drawSym(c, art, Math.round(x + (w - art[0].length * k) / 2), GROUND, k, on ? GREEN : d.color);
         if (d.solid) for (const s2 of D.beach.castle.solids) { c.fillStyle = on ? GREEN : d.color; c.fillRect(x + s2.x0, GROUND + 1 - D.beach.castle.height + s2.top, s2.x1 - s2.x0, 1); }
       } else if (d.list === 'enemies') {
         // its wake-up range, faintly, then the symbol
         const wr = D.level ? D.level.wakeRange : 110;
         c.fillStyle = on ? 'rgba(125,255,106,.5)' : 'rgba(255,79,216,.35)';
         for (let k = -wr; k <= wr; k += 4) c.fillRect(Math.round(it.x - cx + k), GROUND - 2, 2, 1);
-        drawRows(c, ART[d.glyph], Math.round(it.x - cx - 4), Math.round(GROUND - it.h - 4), on ? GREEN : d.color);
+        const art = ART[d.glyph], k = symScale(art, d.w, d.h);
+        drawSym(c, art, Math.round(it.x - cx - art[0].length * k / 2), Math.round(GROUND - it.h + art.length * k / 2), k, on ? GREEN : d.color);
       } else {
-        const art = ART[d.glyph];
-        drawRows(c, art, Math.round(d.list === 'start' ? it.x - cx - 4 : x), GROUND - art.length, on ? GREEN : d.color);
+        const art = ART[d.glyph], k = symScale(art, d.w, d.h);
+        drawSym(c, art, Math.round(d.list === 'start' ? it.x - cx - art[0].length * k / 2 : x), GROUND, k, on ? GREEN : d.color);
         if (d.list === 'start') { c.fillStyle = on ? GREEN : 'rgba(255,90,31,.5)'; for (let y = GROUND - 30; y < GROUND - 10; y += 2) c.fillRect(Math.round(it.x - cx), y, 1, 1); }
       }
       if (on) { c.fillStyle = GREEN; c.fillRect(Math.round(b.x0 - cx) - 1, Math.round(b.y1) + 1, Math.round(b.x1 - b.x0) + 2, 1); }
     }
-    const txt = 'X ' + String(Math.round(ed.camX + VW / 2)).padStart(4, '0') + ' / ' + L.width, w = textRows(txt)[0].length;
-    c.fillStyle = '#000'; c.fillRect(VW - w - 4, 0, w + 4, 8); drawText(c, txt, VW - w - 2, 2, GREEN);
-    present(off, view, VW, VH);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    readout(c, 'X ' + String(Math.round(ed.camX + SW() / 2)).padStart(4, '0') + ' / ' + L.width);
+    present(off, view, SW(), SH());
+  }
+  // keep a level in view: centred when it all fits, otherwise no more than a sliver past either end
+  function fitLevel() {
+    const L = scene(); if (!L || L.kind !== 'level' || ed.camX == null) return;
+    ed.camX = L.width <= SW() ? (L.width - SW()) / 2 : Math.max(-16, Math.min(L.width - SW() + 16, ed.camX));
   }
   function drawScene() {
-    if (scene().kind === 'level') { const L = scene(); if (ed.camX == null) ed.camX = Math.max(-16, L.start.x - VW / 2); return drawLevel(L); }
+    if (scene().kind === 'level') { const L = scene(); if (ed.camX == null) ed.camX = Math.max(-16, L.start.x - SW() / 2); return drawLevel(L); }
     const D = data(), sc = ed.game.schema.scene, c = octx, GROUND = D.screen.ground;
-    if (ed.camX == null) ed.camX = D.player.startX - VW / 2;
+    if (ed.camX == null) ed.camX = D.player.startX - SW() / 2;
     const cx = Math.round(ed.camX);
-    c.fillStyle = '#000'; c.fillRect(0, 0, VW, VH);
+    c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#000'; c.fillRect(0, 0, SW(), SH()); c.translate(0, OYZ());
     // where the eyes hover: a band above the sand
     const [lo, hi] = D.eyes.hoverHeight;
-    for (let x = ((-cx % 4) + 4) % 4; x < VW; x += 4) { c.fillStyle = 'rgba(255,79,216,.45)'; c.fillRect(x, GROUND - hi, 2, 1); c.fillRect(x, GROUND - lo, 2, 1); }
-    for (const wx of [D.player.startX + 60, D.player.startX - 70]) drawRows(c, ART.eye, wx - cx - 4, GROUND - (lo + hi) / 2 - 4, '#ff4fd8');
+    for (let x = ((-cx % 4) + 4) % 4; x < SW(); x += 4) { c.fillStyle = 'rgba(255,79,216,.45)'; c.fillRect(x, GROUND - hi, 2, 1); c.fillRect(x, GROUND - lo, 2, 1); }
+    for (const wx of [D.player.startX + 60, D.player.startX - 70]) drawSym(c, ART.eye, wx - cx - 8, GROUND - (lo + hi) / 2 + 8, 2, '#ff4fd8');
     // props from the scatter rule, each shown at its real size with its symbol at the base
     const SP = D.beach.propSpacing, i0 = Math.floor((cx - 80) / SP) - 1;
-    for (let i = i0; i <= i0 + Math.ceil(VW / SP) + 3; i++) {
+    for (let i = i0; i <= i0 + Math.ceil(SW() / SP) + 3; i++) {
       const p = propAt(i, D, sc); if (!p) continue;
       const x = p.x - cx, top = GROUND + 1 - p.h, on = ed.sel && ed.sel.i === i;
-      c.fillStyle = on ? GREEN : DIM;
-      for (let k = 0; k < p.w; k += 2) { c.fillRect(x + k, top, 1, 1); c.fillRect(x + k, GROUND, 1, 1); }
-      for (let k = 0; k < p.h; k += 2) { c.fillRect(x, top + k, 1, 1); c.fillRect(x + p.w - 1, top + k, 1, 1); }
-      drawRows(c, ART[p.glyph], Math.round(x + p.w / 2 - 4), GROUND - 9, on ? GREEN : p.solid ? '#ffd23f' : p.glyph === 'umbrella' ? '#4d7cff' : BONE);
+      const art = ART[p.glyph], k = symScale(art, p.w, p.h);
+      if (on) dashBox(c, x, top, p.w, GROUND, GREEN);
+      drawSym(c, art, Math.round(x + (p.w - art[0].length * k) / 2), GROUND, k, on ? GREEN : p.solid ? '#ffd23f' : p.glyph === 'umbrella' ? '#4d7cff' : BONE);
       if (p.solid) for (const s of D.beach.castle.solids) { c.fillStyle = on ? GREEN : '#ffd23f'; c.fillRect(x + s.x0, GROUND + 1 - D.beach.castle.height + s.top, s.x1 - s.x0, 1); }
     }
     // sand
-    for (let x = -(((cx % 8) + 8) % 8); x < VW; x += 8) { drawRows(c, ART.ground, x, GROUND, 'rgba(228,226,220,.55)'); drawRows(c, ART.ground, x, GROUND + 8, 'rgba(228,226,220,.3)'); }
+    for (let x = -(((cx % 8) + 8) % 8); x < SW(); x += 8) { drawRows(c, ART.ground, x, GROUND, 'rgba(228,226,220,.55)'); drawRows(c, ART.ground, x, GROUND + 8, 'rgba(228,226,220,.3)'); }
     // where the player starts
     c.fillStyle = 'rgba(255,90,31,.5)'; for (let y = GROUND - 30; y < GROUND - 10; y += 2) c.fillRect(D.player.startX - cx, y, 1, 1);
-    drawRows(c, ART.crab, D.player.startX - cx - 4, GROUND - 8, '#ff5a1f');
-    const txt = 'X ' + String(Math.round(ed.camX + VW / 2)).padStart(4, '0'), w = textRows(txt)[0].length;
-    c.fillStyle = '#000'; c.fillRect(VW - w - 4, 0, w + 4, 8); drawText(c, txt, VW - w - 2, 2, GREEN);
-    present(off, view, VW, VH);
+    drawSym(c, ART.crab, D.player.startX - cx - 8, GROUND, 2, '#ff5a1f');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    readout(c, 'X ' + String(Math.round(ed.camX + SW() / 2)).padStart(4, '0'));
+    present(off, view, SW(), SH());
   }
-  const toWorld = (e) => { const r = view.getBoundingClientRect(); return { wx: (e.clientX - r.left) / r.width * VW + ed.camX, wy: (e.clientY - r.top) / r.height * VH }; };
+  const toWorld = (e) => { const r = view.getBoundingClientRect(); return { wx: (e.clientX - r.left) / r.width * SW() + ed.camX, wy: (e.clientY - r.top) / r.height * SH() - OYZ() }; };
   function levelTap(e) {
     const L = scene(), GROUND = data().screen.ground, { wx, wy } = toWorld(e), hit = hitItem(L, wx, wy, GROUND);
     if (ed.tool === 'erase') { if (hit && hit.list !== 'start') { changeLevel(L2 => { if (hit.list === 'exit') delete L2.exit; else L2[hit.list].splice(hit.index, 1); }); ed.lsel = null; } rerender(); return; }
@@ -204,7 +227,7 @@ export function openGameEditor(app, g) {
   }
   function sceneTap(e) {
     if (scene().kind === 'level') return levelTap(e);
-    const r = view.getBoundingClientRect(), wx = (e.clientX - r.left) / r.width * VW + ed.camX, wy = (e.clientY - r.top) / r.height * VH;
+    const r = view.getBoundingClientRect(), wx = (e.clientX - r.left) / r.width * SW() + ed.camX, wy = (e.clientY - r.top) / r.height * SH() - OYZ();
     const D = data(), sc = ed.game.schema.scene, SP = D.beach.propSpacing, i0 = Math.floor((wx - 80) / SP) - 1;
     let hit = null;
     for (let i = i0; i <= i0 + 3; i++) { const p = propAt(i, D, sc); if (p && wx >= p.x && wx < p.x + p.w && wy >= D.screen.ground + 1 - p.h) hit = p; }
@@ -280,7 +303,8 @@ export function openGameEditor(app, g) {
       if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
-        screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
+        const zoomBtn = `<button class="btn bare" style="position:absolute;left:8px;top:6px;z-index:2" aria-label="Zoom out, now ${ed.zoom === 1 ? '1' : ed.zoom === 2 ? 'half' : 'quarter'} size" ${A(() => { const mid = ed.camX + SW() / 2; ed.zoom = ed.zoom === 4 ? 1 : ed.zoom * 2; ed.camX = mid - SW() / 2; fitLevel(); rerender(); })}>${well(28, svgRows(G.minus, BONE))}<span>${ed.zoom === 1 ? '1×' : ed.zoom === 2 ? '½×' : '¼×'}</span></button>`;
+        screen = `<div class="screen fit gap20" style="position:relative">${zoomBtn}<canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
         const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
           <div style="display:flex;gap:6px">${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:10px">Waves · props by rule</span>`}</div>
           <div style="display:flex;align-items:center;gap:2px">
@@ -350,7 +374,7 @@ export function openGameEditor(app, g) {
         view = root.querySelector('#scn');
         const r = view.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
         view.width = Math.round(r.width * dpr) || 320; view.height = Math.round(r.height * dpr) || 288;
-        if (!off) { off = document.createElement('canvas'); off.width = VW; off.height = VH; octx = off.getContext('2d'); }
+        if (!off || off.width !== SW()) { off = document.createElement('canvas'); off.width = SW(); off.height = SH(); octx = off.getContext('2d'); }
         view.addEventListener('pointerdown', (e) => {
           view.setPointerCapture(e.pointerId); dragged = false;
           drag = { x: e.clientX, y: e.clientY, cam: ed.camX };
@@ -362,7 +386,7 @@ export function openGameEditor(app, g) {
         });
         view.addEventListener('pointermove', (e) => {
           if (!drag) return;
-          const px = view.getBoundingClientRect().width / VW, dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+          const px = view.getBoundingClientRect().width / SW(), dx = e.clientX - drag.x, dy = e.clientY - drag.y;
           if (!dragged && Math.abs(dx) + Math.abs(dy) < 5) return;
           dragged = true;
           if (drag.item) {
@@ -374,7 +398,7 @@ export function openGameEditor(app, g) {
             if (it.list === 'start' || it.list === 'exit') L2[it.list].x = nx; else { L2[it.list][it.index].x = nx; if (nh !== undefined) L2[it.list][it.index].h = nh; }
             drawLevel(L2); return;
           }
-          ed.camX = drag.cam - dx / px; drawScene();
+          ed.camX = drag.cam - dx / px; fitLevel(); drawScene();
         });
         view.addEventListener('pointerup', (e) => {
           if (drag && drag.item && drag.item.nx !== undefined) {
