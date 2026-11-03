@@ -70,7 +70,7 @@
     "seedChance": 0
   },
   "eyes": {
-    "hp": 9,
+    "hp": 12,
     "chargeFrames": 62,
     "aimLockFrames": 46,
     "fireFrames": 18,
