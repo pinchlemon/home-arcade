@@ -53,7 +53,8 @@ export function openGameEditor(app, g) {
   const data = () => games.applyOverrides(ed.game.data, edits().overrides);
   const val = (path) => games.getPath(data(), path);
   const set = (path, v) => { games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
-  const refreshTitle = () => { const n = games.editCount(folder), el = document.querySelector('.screen-tool .ge-sub'); if (el) el.textContent = g.mode + (n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''); };
+  const sceneLabel = () => { const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' ? 'Level' : 'Waves'); };
+  const refreshTitle = () => { const n = games.editCount(folder), el = document.querySelector('.screen-tool .ge-sub'); if (el) el.textContent = sceneLabel() + (n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''); };
 
   // one adjustable setting: its name and what it does, and a stepper
   function field(f) {
@@ -256,13 +257,13 @@ export function openGameEditor(app, g) {
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
       if (ed.tab === 'scene') {
-        const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.indexOf(cur)), isLevel = cur.kind === 'level';
+        const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
         screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas></div>`;
         const toolbar = `<div class="plate bar" role="toolbar" aria-label="Scenes and tools">
           <div style="display:flex;gap:6px">${isLevel ? [['select', 'Select'], ['place', 'Place'], ['erase', 'Erase']].map(([k, l]) => iconBtn(k, A(() => { ed.tool = k; if (k !== 'select') ed.lsel = null; rerender(); }), { on: ed.tool === k, label: l, pressed: ed.tool === k })).join('') : `<span class="cap" style="color:var(--muted);padding-left:10px">Waves · props by rule</span>`}</div>
           <div style="display:flex;align-items:center;gap:2px">
-            ${iconBtn('left', A(() => go(-1)), { color: '#fff', label: 'Previous scene' })}<span class="cap acc" style="min-width:34px;text-align:center">${si + 1}/${list.length}</span>${iconBtn('right', A(() => go(1)), { color: '#fff', label: 'Next scene' })}
+            ${iconBtn('left', A(() => go(-1)), { color: '#fff', label: 'Previous scene' })}<span class="cap acc" style="min-width:34px;text-align:center" aria-label="Scene ${si + 1} of ${list.length}">${si + 1}/${list.length}</span>${iconBtn('right', A(() => go(1)), { color: '#fff', label: 'Next scene' })}
             ${iconBtn('plus', A(() => {
               const n = list.filter(x => x.kind === 'level').length + 1, id = 'level-' + Date.now().toString(36);
               changeScenes(l2 => l2.push({ id, name: 'Level ' + n, ...structuredClone(sc.newLevel) }));
@@ -316,7 +317,7 @@ export function openGameEditor(app, g) {
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
         <div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}
-          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(g.name)}</span><span class="sub ge-sub">${esc(g.mode)}${n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''}</span></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(g.name)}</span><span class="sub ge-sub">${esc(sceneLabel())}${n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''}</span></span>
           ${n ? iconBtn('reset', A(() => { if (confirm('Undo all ' + n + ' changes to ' + g.name + ' on this phone?')) { games.resetEdits(folder); rerender(); } }), { label: 'Undo all changes' }) : ''}
           ${bareBtn('play', 'Play', A(() => games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null)))}
         </div>
