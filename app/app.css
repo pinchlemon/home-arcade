@@ -241,3 +241,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 #scn.pf{outline:1.5px solid var(--acc);outline-offset:2px}
 .xhair{display:none;position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;background:linear-gradient(var(--acc),var(--acc)) center/2px 100% no-repeat,linear-gradient(var(--acc),var(--acc)) center/100% 2px no-repeat}
 #scn.pf~.xhair{display:block}
+
+/* the ring on a setting row matches the one on the tabs: rounded, with room around the text */
+.grow.pf::after{inset:3px -10px;border-radius:var(--r-btn)}
+.grow.pf{margin-left:0}
