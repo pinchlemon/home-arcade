@@ -54,6 +54,11 @@ body{
 .hud #mode{color:var(--gold)}
 .hud #score{color:#ff8a6a}
 .hud #tip{color:#7a80b8}
+.hud .modelink{pointer-events:auto;align-self:flex-start;font-size:10px;letter-spacing:.1em;color:var(--gold);text-decoration:none;border:1px solid var(--line);padding:6px 9px;background:var(--panel)}
+.hud .modelink:hover{color:#ffd98a}
+.hud .modelink:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#duelBanner{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);font-size:18px;letter-spacing:.14em;text-align:center;pointer-events:none;text-shadow:0 0 12px currentColor;opacity:0;transition:opacity .25s}
+#duelBanner span{display:block;margin-top:8px;font-size:10px;letter-spacing:.1em;color:var(--ink);text-shadow:none}
 .pop{position:fixed;left:0;top:0;font-size:13px;letter-spacing:.12em;pointer-events:none;white-space:nowrap;text-shadow:0 0 8px currentColor;will-change:transform,opacity}
 .solid-name span{display:block;margin-top:4px;font-size:8px;letter-spacing:.06em;opacity:.75;white-space:normal}
 .solid-name{position:fixed;left:max(16px, env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));
@@ -76,6 +81,7 @@ body.pad .hop, body.pad .stick, body.pad #tip, body.pad #hint{display:none!impor
   <p id="score">DEMONS DOWN: 0</p>
   <p id="mode">BUDDY: FOLLOW</p>
   <p id="hint">WASD move · Shift run · Space jump · C crouch (tap while running to dive) · E catch / hold to throw · R change shape · Q tackle · F buddy mode</p>
+  <a class="modelink" id="modeLink" href="?duel">PLAY 2V2 DUEL</a>
   <p id="tip">Standing throws lob where you face (hold longer to throw farther). Jump-throw for a fastball that bends onto the demon if you're facing it. Crouch-throw to bowl. Pass back and forth to build resonance. Catch a lob mid-jump and throw before you land for an alley-oop. Plug in a second controller to play the red wizard.</p>
 </div>
 <button class="px" id="pxBtn" type="button">PIXEL 2×</button>
@@ -86,6 +92,7 @@ body.pad .hop, body.pad .stick, body.pad #tip, body.pad #hint{display:none!impor
 <button class="hop tkl" id="tklBtn" type="button">TACKLE</button>
 <button class="hop dv" id="dvBtn" type="button">DIVE</button>
 <div class="solid-name" id="solidName">OCTAHEDRON<span>AIR · floaty, easy to catch</span></div>
+<div id="duelBanner" role="status" aria-live="polite"></div>
 <div class="stick" id="stick" hidden><div class="knob" id="knob"></div></div>
 
 <script src="../lib/three.min.js"></script>
@@ -330,9 +337,23 @@ function updateWizard(W,dt,inp){
   W.disc.position.set(W.pos.x,0.002,W.pos.z);const ds=1/(1+W.y*0.6);W.disc.scale.set(ds,ds,1);W.disc.material.opacity=0.32*ds*clamp(1-W.tilt*1.5,0,1);
 }
 
+// ?duel = 2v2: blue (you + buddy) against red. Pass to build resonance, then hit the red summoner to capture them.
+const DUEL=/[?&]duel\b/.test(location.search);
+const CAP_RES=3, ARENA_R=22, TEAM_COL=[0x6a8cff,0xff6050];
 const player=makeWizard(0x3d4fc4,0xe8b64a,0x5560ff);
-const buddy=makeWizard(0xc4473d,0x7fd0c0,0xff6050);
+const buddy=DUEL?makeWizard(0x2f8fb0,0xe8b64a,0x40b8ff):makeWizard(0xc4473d,0x7fd0c0,0xff6050);
 buddy.pos.set(4,0,-10);buddy.yaw=Math.PI;
+const foes=[];
+if(DUEL){
+  player.team=0;player.summoner=true;buddy.team=0;
+  const es=makeWizard(0xc4473d,0x7fd0c0,0xff6050), em=makeWizard(0xb8642a,0x3a2a5c,0xff9a40);
+  es.team=1;es.summoner=true;em.team=1;es.discBase=0xff6050;em.discBase=0xff9a40;foes.push(es,em);
+}
+const ALL=[player,buddy,...foes];
+// summoners wear a little pentagon halo in their team's colour
+if(DUEL)for(const W of ALL){W.ai={holdT:0};W.capT=0;if(!W.summoner)continue;
+  const h=new THREE.Mesh(new THREE.TorusGeometry(0.24,0.035,6,5),new THREE.MeshBasicMaterial({color:TEAM_COL[W.team]}));
+  h.rotation.x=Math.PI/2;h.position.y=1.45;W.root.add(h);W.halo=h;}
 
 // ---- the octahedron: a physical thing you toss back and forth
 const ORB_R=0.24, HOT=new THREE.Color(0xf4fffd), DOWN=new THREE.Vector3(0,-1,0);
@@ -480,7 +501,11 @@ function grab(W,caught){
   orb.fast=false;orb.bowl=false;
   W.catchFlash=1;
   if(orb.state==='ground'&&morphT<0){orb.glow=0;}
-  if(caught&&orb.state==='air'&&orb.last&&orb.last!==W){
+  if(caught&&orb.state==='air'&&orb.last&&orb.last!==W&&DUEL&&orb.last.team!==W.team){
+    // an interception: the other team's resonance is gone
+    if(orb.res>0){orb.res=0;fizzle();}
+    popup('INTERCEPTED',orb.p,W.team===0?'#9fb4ff':'#ff8a6a',true);
+  }else if(caught&&orb.state==='air'&&orb.last&&orb.last!==W){
     orb.res=Math.min(5,orb.res+(cur.name==='dodecahedron'?2:1));
     for(let i=0;i<6+orb.res*3;i++){randDir(rv).multiplyScalar(2+orb.res*0.4);spark(orb.p,rv,0.3,0.55,i%2?0xffffff:cur.col,3);}
     if(orb.res>=3)popup('RESONANCE '+orb.res,orb.p,'#'+cur.color.getHexString());
@@ -552,7 +577,7 @@ function knockDown(W,dx,dz,power){
 }
 function knockLoose(W,dx,dz,power){
   if(orb.state==='held'&&orb.holder===W){ // the solid goes flying
-    W.charging=false;
+    W.charging=false;if(DUEL&&orb.res>0){orb.res=0;fizzle();}
     orb.state='air';orb.holder=null;orb.last=W;orb.lastT=time+0.6;orb.morphPending=true;orb.fast=false;orb.bowl=false;
     orb.v.set(dx*(2+power*0.3)+(Math.random()-.5)*2,5+Math.random()*2,dz*(2+power*0.3)+(Math.random()-.5)*2);
     randDir(orb.w).multiplyScalar(10);
@@ -591,7 +616,7 @@ function playerThrow(W){
     // jump throw: a hard, flat fastball. If any part of the demon is within about 30 degrees of where
     // you're facing, it bends onto that part (leading it as it moves); otherwise it flies straight.
     const fv=(16+c*8)*cur.speed;let fy;const gg=G*cur.grav;
-    const tgt=demon.alive&&!demon.dying?demonPartAlong(W,dx,dz,0.52):null;
+    const tgt=DUEL?duelAimAlong(W,dx,dz,0.52):demon.alive&&!demon.dying?demonPartAlong(W,dx,dz,0.52):null;
     if(tgt){
       let px=tgt.pos.x,pz=tgt.pos.z;
       for(let it=0;it<2;it++){const T=Math.hypot(px-orb.p.x,pz-orb.p.z)/fv;px=tgt.pos.x+tgt.vel.x*T;pz=tgt.pos.z+tgt.vel.z*T;}
@@ -712,13 +737,13 @@ castBtn.addEventListener('contextmenu',e=>e.preventDefault());
 if(matchMedia('(pointer:coarse)').matches)document.getElementById('hint').textContent='Drag to move · HOP jump · CATCH / hold THROW · TACKLE · buddy mode button';
 
 // ---- controllers: the first is player 1, a second one takes over the red wizard as player 2
-const PAD_HINT='Stick move · R1 run · Cross jump · Circle crouch (tap while running to dive-roll) · Square catch / hold to throw · L1 tackle · Triangle change shape (or buddy mode when empty-handed)';
+const PAD_HINT='Stick move · R1 run · Cross jump · Circle crouch (tap while running to dive-roll) · Square catch / hold to throw · L1 tackle · Triangle change shape (or buddy mode when empty-handed) · D-pad up switch demon / 2v2 duel';
 const padPrev={};let padOn=false, padToP2=false;
 addEventListener('gamepadconnected',()=>{padOn=true;document.getElementById('hint').textContent=PAD_HINT;});
 addEventListener('keydown',e=>{if(e.code==='Digit2'&&!e.repeat){padToP2=!padToP2;popup(padToP2?'CONTROLLER → PLAYER 2':'CONTROLLER → PLAYER 1',player.pos,'#ffd36a');}});
 function padRead(gp,W){
   const b=i=>gp.buttons[i]?(gp.buttons[i].pressed||gp.buttons[i].value>0.3):false;
-  const now=[b(0),b(5)||b(10),b(2)||b(7),b(3),b(9),b(1)||b(6),b(4),b(8)];
+  const now=[b(0),b(5)||b(10),b(2)||b(7),b(3),b(9),b(1)||b(6),b(4),b(8),b(12)];
   const prev=padPrev[gp.index]||[];
   const down=i=>now[i]&&!prev[i], up=i=>!now[i]&&prev[i];
   if(down(0)){W.jumpHeld=true;W.jumpQ=true;}
@@ -730,6 +755,7 @@ function padRead(gp,W){
   if(down(5))dive(W);
   if(down(4))pxBtn.click();
   if(down(7))rumbleTest(W);
+  if(down(8))document.getElementById('modeLink').click(); // D-pad up: switch between the demon and the 2v2 duel
   padPrev[gp.index]=now;
   let x=gp.axes[0]||0,y=gp.axes[1]||0;const m=Math.hypot(x,y);
   if(m<0.18){x=0;y=0;}else{const k=Math.min(1,(m-0.18)/0.78)/m;x*=k;y*=k;}
@@ -844,6 +870,122 @@ function buddyInput(dt){
     if(d>arrive){const s=Math.min(1,(d-arrive)/0.6)*(stroll?0.55:1);inp.ix=dx/d*s;inp.iz=dz/d*s;inp.run=!stroll&&d>4;}
   }
   return inp;
+}
+
+// ---- duel: two teams, one solid. Capture the other team's summoner.
+const duel={score:[0,0],over:0};
+const bannerEl=document.getElementById('duelBanner');
+const mateOf=W=>ALL.find(o=>o!==W&&o.team===W.team);
+const foeSummoner=W=>ALL.find(o=>o.team!==W.team&&o.summoner);
+const duelVec=new THREE.Vector3();
+// jump-throw help: bend onto the opponent you're facing (the summoner first)
+function duelAimAlong(W,dx,dz,cone){
+  let best=null,bs=-1;
+  for(const o of ALL){if(o.team===W.team||o.capT>0)continue;
+    const ox=o.pos.x-W.pos.x,oz=o.pos.z-W.pos.z,od=Math.hypot(ox,oz)||1;
+    if(od>24||Math.acos(clamp((ox*dx+oz*dz)/od,-1,1))>cone)continue;
+    const s=(o.summoner?2:1)/od;if(s>bs){bs=s;best=o;}}
+  return best?{pos:duelVec.set(best.pos.x,best.y+0.6,best.pos.z),vel:best.vel}:null;
+}
+function aiPass(W,T){
+  const ang=Math.random()*Math.PI*2, off=Math.random()*1.1;
+  lobTo(W,W.charge,T.pos.x+T.vel.x*0.4+Math.cos(ang)*off,T.pos.z+T.vel.z*0.4+Math.sin(ang)*off);
+}
+function aiShoot(W,T){
+  const c=W.charge, fv=(14+c*6)*cur.speed;
+  let px=T.pos.x,pz=T.pos.z;
+  for(let i=0;i<2;i++){const t=Math.hypot(px-orb.p.x,pz-orb.p.z)/fv;px=T.pos.x+T.vel.x*t;pz=T.pos.z+T.vel.z*t;}
+  const dx=px-orb.p.x,dz=pz-orb.p.z,d=Math.max(0.5,Math.hypot(dx,dz)),t=d/fv;
+  throwOrb(W,c,dx/d,dz/d,fv,(T.y+0.6-orb.p.y+0.5*G*cur.grav*t*t)/t,true);orb.fast=true;
+}
+// where to stand when your side has the solid: up the field, off to one side, clear of the defenders
+function openSpot(W,H,out){
+  const fwd=W.team===0?-1:1, side=Math.sign(W.pos.x-H.pos.x)||(W.summoner?-1:1);
+  out.set(H.pos.x+side*6,0,H.pos.z+fwd*(W.summoner?-2:5));
+  for(const o of ALL){if(o.team===W.team)continue;const ox=out.x-o.pos.x,oz=out.z-o.pos.z,od=Math.hypot(ox,oz)||1;if(od<4){out.x+=ox/od*(4-od);out.z+=oz/od*(4-od);}}
+  return out;
+}
+function duelAI(W,dt){
+  const inp={ix:0,iz:0,run:false}, A=W.ai;
+  if(W.downT>0||W.capT>0||duel.over>0){A.holdT=0;return inp;}
+  const mate=mateOf(W), tS=foeSummoner(W), holder=orb.state==='held'?orb.holder:null;
+  let target=null,arrive=0.3;
+  if(holder===W){
+    A.holdT+=dt;
+    let near=null,nd=99;for(const o of ALL)if(o.team!==W.team&&o.downT<=0&&o.capT<=0){const d=hdist(o.pos,W.pos);if(d<nd){nd=d;near=o;}}
+    const dS=hdist(W.pos,tS.pos), mateUp=mate.downT<=0&&mate.capT<=0;
+    const wantShot=orb.res>=CAP_RES||!mateUp, closing=wantShot&&dS>14&&nd>2.5;
+    if(!W.charging&&!closing&&A.holdT>(nd<3?0.15:0.45+Math.random()*0.2)){
+      W.charging=true;W.charge=0;
+      A.shoot=wantShot;
+      A.goal=A.shoot?0.55+Math.random()*0.35:0.2+Math.random()*0.35;
+    }
+    W.faceTarget=A.shoot||closing?tS.pos:mate.pos;
+    if(closing){target=tmp.copy(tS.pos);arrive=13;}
+    else if(near&&nd<4){const ax=W.pos.x-near.pos.x,az=W.pos.z-near.pos.z,ad=Math.hypot(ax,az)||1;target=tmp.set(W.pos.x+ax/ad*3,0,W.pos.z+az/ad*3);arrive=0.2;}
+    if(W.charging){W.charge=Math.min(1,W.charge+dt/1.1);
+      if(W.charge>=A.goal){if(A.shoot)aiShoot(W,tS);else aiPass(W,mate);A.holdT=0;}}
+  }else{
+    A.holdT=0;W.faceTarget=orb.p;
+    if(!holder){
+      // the nearest one on each team goes for it; the other spreads out
+      // a teammate's pass: run to where it will come down to chest height. Defenders just chase it.
+      let land=null;
+      if(orb.state==='air'&&orb.last&&orb.last.team===W.team){const gg=G*cur.grav,h=orb.p.y-0.9,vy=orb.v.y,t=(vy+Math.sqrt(Math.max(0,vy*vy+2*gg*h)))/gg;land=duelVec.set(orb.p.x+orb.v.x*t,0,orb.p.z+orb.v.z*t);}
+      const spot=land||orb.p;
+      let chaser=W;if(!mate.human&&mate.downT<=0&&mate.capT<=0&&mate!==orb.last&&hdist(mate.pos,spot)<hdist(W.pos,spot)-0.5)chaser=mate;
+      if(orb.last===mate&&orb.state==='air')chaser=W;
+      if(chaser===W&&!(orb.last===W&&time-orb.lastT<0.45)){if(land){target=tmp.copy(land);arrive=0.05;}else{target=tmp.copy(orb.p);if(orb.state==='air')target.addScaledVector(orb.v,0.25);arrive=0.1;}}
+      else{target=tmp.set(orb.p.x+(W.summoner?-5:5),0,orb.p.z+(W.team===0?6:-6));arrive=1;}
+    }else if(holder.team!==W.team){
+      // defend: the non-summoner presses the holder and tackles; the summoner keeps its distance
+      const presser=!W.summoner||mate.downT>0||mate.capT>0||mate===holder;
+      if(presser){
+        target=tmp.copy(holder.pos);arrive=0.5;
+        if(hdist(W.pos,holder.pos)<2.3&&W.lungeCD<=0&&W.grounded&&Math.random()<dt*5){W.yaw=Math.atan2(holder.pos.x-W.pos.x,holder.pos.z-W.pos.z);W.faceLock=0.2;tackle(W);}
+      }else{
+        const ax=W.pos.x-holder.pos.x,az=W.pos.z-holder.pos.z,ad=Math.hypot(ax,az)||1;
+        if(ad<11){target=tmp.set(W.pos.x+ax/ad*4,0,W.pos.z+az/ad*4);arrive=0.3;}
+        W.faceTarget=holder.pos;
+      }
+    }else{target=openSpot(W,holder,tmp);arrive=0.6;}
+  }
+  if(target){
+    const tr=Math.hypot(target.x,target.z);if(tr>ARENA_R-0.4){target.x*=(ARENA_R-0.4)/tr;target.z*=(ARENA_R-0.4)/tr;}
+    const dx=target.x-W.pos.x,dz=target.z-W.pos.z,d=Math.hypot(dx,dz);
+    if(d>arrive){const s=Math.min(1,(d-arrive)/0.6);inp.ix=dx/d*s;inp.iz=dz/d*s;inp.run=d>3;}
+  }
+  return inp;
+}
+function showBanner(text,sub,color){bannerEl.innerHTML=text+(sub?'<span>'+sub+'</span>':'');bannerEl.style.color=color;bannerEl.style.opacity=text?'1':'0';}
+function duelScore(){scoreEl.textContent='BLUE '+duel.score[0]+' · RED '+duel.score[1];}
+function capture(W){
+  const win=1-W.team;duel.score[win]++;duel.over=3.4;duelScore();
+  W.capT=0.001;W.charging=false;W.downT=0;
+  if(orb.state==='held')orb.holder=null;
+  orb.state='air';orb.last=null;orb.res=0;orb.fast=false;orb.v.set(0,6,0);randDir(orb.w).multiplyScalar(14);
+  for(let i=0;i<40;i++){randDir(rv).multiplyScalar(3+Math.random()*4);spark(orb.p,rv,0.6,0.8,i%2?0xffffff:cur.col,2.5);}
+  shake=Math.max(shake,0.3);rumbleAll(0.9,0.9,600);
+  if(W===player)showBanner('YOUR SUMMONER WAS CAPTURED','RED '+duel.score[1]+' · BLUE '+duel.score[0],'#ff8a6a');
+  else if(W.team===1)showBanner('SUMMONER CAPTURED','BLUE '+duel.score[0]+' · RED '+duel.score[1],'#ff7ac8');
+  else showBanner('YOUR SUMMONER WAS CAPTURED','','#ff8a6a');
+}
+function duelReset(){
+  const spots=[[0,9],[-6,13],[0,-9],[6,-13]];
+  ALL.forEach((W,i)=>{W.pos.set(spots[i][0],0,spots[i][1]);W.vel.set(0,0,0);W.y=0;W.vy=0;W.grounded=true;W.downT=0;W.tilt=0;W.tiltV=0;
+    W.charging=false;W.capT=0;W.root.scale.setScalar(1);W.root.visible=true;W.disc.visible=true;W.yaw=W.team?0:Math.PI;W.ai.holdT=0;});
+  orb.state='ground';orb.holder=null;orb.last=null;orb.res=0;orb.fast=false;orb.p.set(0,0.4,0);orb.v.set(0,0,0);orb.w.set(0,0,0);orb.groundT=0;settleTarget();
+  rv.set(0,0,0);spawnPuffs(12,2.2,rv,0.9);
+  duel.over=0;showBanner('');
+}
+let arenaRing=null;
+if(DUEL){
+  arenaRing=new THREE.Mesh(new THREE.RingGeometry(ARENA_R-0.1,ARENA_R+0.1,120),new THREE.MeshBasicMaterial({color:0x4a4f8e,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
+  arenaRing.rotation.x=-Math.PI/2;arenaRing.position.y=0.004;scene.add(arenaRing);
+  document.querySelector('.hud h1').textContent='VOID WIZARD · DUEL';
+  document.getElementById('mode').textContent='CAPTURE THE RED SUMMONER';
+  document.getElementById('tip').textContent='You are the blue summoner (pentagon halo). Pass with your buddy to build resonance. At 3 lights, a jump-throw that hits the red summoner captures them. Tackle their holder to break it, and keep away from their shots.';
+  const ml=document.getElementById('modeLink');ml.textContent='BACK TO THE DEMON';ml.href='?';
 }
 
 resize();
@@ -1355,7 +1497,8 @@ const setLayer=(o,n)=>o.traverse(c=>c.layers.set(n));
 setLayer(orbG,1);
 for(const x of sparks)setLayer(x.m,2);
 for(const x of puffs)setLayer(x.m,2);
-for(const x of [player.disc,buddy.disc,orbMark,motes,reachRing,demon.disc,hpBar,warnG,landGlow])setLayer(x,2);
+if(arenaRing)setLayer(arenaRing,2);
+for(const x of [...ALL.map(W=>W.disc),orbMark,motes,reachRing,demon.disc,hpBar,warnG,landGlow])setLayer(x,2);
 for(const V of venoms){setLayer(V.g,2);setLayer(V.puddle,2);}
 
 // ---- loop
@@ -1397,8 +1540,38 @@ function frame(now){
              crouch:keys.has('KeyC')||keys.has('ControlLeft')||(gp?gp.crouch:false)};
   player.faceTarget=null;
   updateWizard(player,dt,pin);
-  updateWizard(buddy,dt,buddy.human?(gp2?{ix:gp2.x,iz:gp2.y,run:gp2.run,crouch:gp2.crouch}:{ix:0,iz:0,run:false}):buddyInput(dt));
-  {
+  updateWizard(buddy,dt,buddy.human?(gp2?{ix:gp2.x,iz:gp2.y,run:gp2.run,crouch:gp2.crouch}:{ix:0,iz:0,run:false}):DUEL?duelAI(buddy,dt):buddyInput(dt));
+  for(const W of foes)if(W.capT<=0)updateWizard(W,dt,duelAI(W,dt));
+  if(DUEL){
+    for(const W of ALL){
+      // stay inside the ring
+      const r=Math.hypot(W.pos.x,W.pos.z);if(r>ARENA_R){W.pos.x*=ARENA_R/r;W.pos.z*=ARENA_R/r;}
+      // being drawn into the solid
+      if(W.capT>0){W.capT+=dt;const u=Math.min(1,W.capT/0.9);
+        W.pos.lerp(rv.set(orb.p.x,0,orb.p.z),1-Math.exp(-5*dt));
+        W.root.position.set(W.pos.x,Math.max(0,orb.p.y-0.7)*u,W.pos.z);W.root.scale.setScalar(Math.max(0.02,1-u));W.root.rotation.y+=dt*(4+u*14);
+        W.disc.visible=u<0.6;if(Math.random()<0.6){randDir(rv).multiplyScalar(1.5);spark(W.root.position,rv,0.4,0.5,TEAM_COL[W.team],2);}
+        if(u>=1)W.root.visible=false;}
+    }
+    if(duel.over>0){duel.over-=dt;if(duel.over<=0)duelReset();}
+    if(orb.state==='ground'&&Math.hypot(orb.p.x,orb.p.z)>ARENA_R+0.3&&orb.groundT>0.6){orb.p.set(0,0.4,0);settleTarget();rv.set(0,0,0);spawnPuffs(10,2,rv,0.9);orb.groundT=0;}
+  }
+  if(DUEL){
+    for(let i=0;i<ALL.length;i++)for(let j=i+1;j<ALL.length;j++){
+      const P=ALL[i],B=ALL[j];if(P.capT>0||B.capT>0)continue;
+      const dx=B.pos.x-P.pos.x,dz=B.pos.z-P.pos.z,d=Math.hypot(dx,dz)||0.001;
+      if(d<0.85&&Math.abs(P.y-B.y)<0.9){const o=(0.85-d)*0.5,nx=dx/d,nz=dz/d;P.pos.x-=nx*o;P.pos.z-=nz*o;B.pos.x+=nx*o;B.pos.z+=nz*o;}
+    }
+    for(const A of ALL)for(const B of ALL){
+      if(A===B||A.team===B.team||A.capT>0||B.capT>0)continue;
+      const ex=B.pos.x-A.pos.x,ez=B.pos.z-A.pos.z,ed=Math.hypot(ex,ez)||0.001,nx=ex/ed,nz=ez/ed,above=A.y-B.y;
+      if(B.downT<=0&&A.downT<=0&&ed<0.75&&A.vy<-2&&above>0.5&&above<1.5){knockDown(B,nx||1,nz,7);A.vy=10;A.grounded=false;A.airJumps=1;A.y=Math.max(A.y,B.y+1);}
+      if(A.lungeT>0&&!A.tackleHit&&B.downT<=0&&ed<1.15&&Math.abs(above)<1&&(A.lungeDir.x*nx+A.lungeDir.z*nz)>0.3){
+        A.tackleHit=true;rumble(A,0.55,0.5,120);A.lungeT=0;A.vel.multiplyScalar(0.25);A.landSquash=Math.max(A.landSquash,0.35);
+        if(A.tacklePower>6.2)knockDown(B,nx,nz,A.tacklePower+4);else pushBack(B,nx,nz,A.tacklePower);
+      }
+    }
+  }else{
     const dx=buddy.pos.x-player.pos.x,dz=buddy.pos.z-player.pos.z,d=Math.hypot(dx,dz)||0.001;
     if(d<0.85&&Math.abs(player.y-buddy.y)<0.9){const o=(0.85-d)*0.5,nx=dx/d,nz=dz/d;player.pos.x-=nx*o;player.pos.z-=nz*o;buddy.pos.x+=nx*o;buddy.pos.z+=nz*o;}
     for(const [A,B] of [[player,buddy],[buddy,player]]){
@@ -1416,8 +1589,7 @@ function frame(now){
     }
   }
 
-  updateDemon(dt);
-  updateVenom(dt);
+  if(!DUEL){updateDemon(dt);updateVenom(dt);}
 
   // ---- orb
   const hw=orb.state==='held'?orb.holder:null;
@@ -1461,12 +1633,25 @@ function frame(now){
       orbSpin.quaternion.slerp(orb.qT,1-Math.exp(-12*dt));
       orb.p.y+=(cur.circ*cur.inr+orb.hop-orb.p.y)*(1-Math.exp(-16*dt));
     }
-    // catching and picking up
-    for(const W of [player,buddy]){
+    // duel: a fast shot from the other team that hits a summoner captures them at full resonance, otherwise just flattens them
+    if(DUEL&&orb.state==='air'&&orb.fast&&orb.last&&duel.over<=0){
+      for(const W of ALL){
+        if(W.team===orb.last.team||!W.summoner||W.downT>0||W.capT>0||W.diveT>0)continue;
+        if(hdist(orb.p,W.pos)<0.9&&Math.abs(orb.p.y-(W.y+0.6))<0.95){
+          if(orb.res>=CAP_RES)capture(W);
+          else{const sp=Math.hypot(orb.v.x,orb.v.z)||1;knockDown(W,orb.v.x/sp,orb.v.z/sp,9);orb.v.set(-orb.v.x*0.25,4,-orb.v.z*0.25);randDir(orb.w).multiplyScalar(12);orb.fast=false;if(orb.res>0){orb.res=0;fizzle();}}
+          break;
+        }
+      }
+    }
+    // catching and picking up (in a duel the thrower's team gets first go at it)
+    const order=DUEL&&orb.last?[...ALL].sort((a,b)=>(a.team===orb.last.team?0:1)-(b.team===orb.last.team?0:1)):ALL;
+    for(const W of order){
       if(orb.last===W&&time-orb.lastT<0.45)continue;
       const me=W.human, C=W.ctl;
-      if(W.downT>0)continue;
-      if(orb.state==='air'&&me&&orb.last&&orb.last!==W&&orb.last.human&&!(C.catchT>0)&&(orb.fast||(orb.bowl&&Math.hypot(orb.v.x,orb.v.z)>8))&&hdist(orb.p,W.pos)<0.85&&Math.abs(orb.p.y-(W.y+0.55))<0.9){
+      if(W.downT>0||W.capT>0||duel.over>0)continue;
+      if(DUEL&&W.summoner&&orb.fast&&orb.last&&orb.last.team!==W.team)continue;
+      if(!DUEL&&orb.state==='air'&&me&&orb.last&&orb.last!==W&&orb.last.human&&!(C.catchT>0)&&(orb.fast||(orb.bowl&&Math.hypot(orb.v.x,orb.v.z)>8))&&hdist(orb.p,W.pos)<0.85&&Math.abs(orb.p.y-(W.y+0.55))<0.9){
         const sp=Math.hypot(orb.v.x,orb.v.z)||1;knockDown(W,orb.v.x/sp,orb.v.z/sp,9);
         orb.v.set(-orb.v.x*0.25,4,-orb.v.z*0.25);randDir(orb.w).multiplyScalar(12);break;
       }
@@ -1474,7 +1659,7 @@ function frame(now){
       const d=hdist(orb.p,W.pos), dy=orb.p.y-(W.y+0.55);
       const dv=W.diveT>0;
       const up=me&&!W.grounded&&!dv;
-      if(orb.state==='air'&&!(dv&&orb.touched)&&d<(me?(dv?(CATCH_R.dive*cur.catchMul):up?(CATCH_R.air*cur.catchMul):(CATCH_R.stand*cur.catchMul)):0.8)&&Math.abs(dy)<(me?(dv?(CATCH_R.diveY*cur.catchMul):up?(CATCH_R.airY*cur.catchMul):(CATCH_R.standY*cur.catchMul)):0.85)){grab(W,true);if(me)C.catchT=0;if(dv)popup('DIVING CATCH',orb.p,'#9fe0ff');break;}
+      if(orb.state==='air'&&!(dv&&orb.touched)&&d<(me?(dv?(CATCH_R.dive*cur.catchMul):up?(CATCH_R.air*cur.catchMul):(CATCH_R.stand*cur.catchMul)):(DUEL&&orb.last&&orb.last.team!==W.team?0.5:0.8))&&Math.abs(dy)<(me?(dv?(CATCH_R.diveY*cur.catchMul):up?(CATCH_R.airY*cur.catchMul):(CATCH_R.standY*cur.catchMul)):0.85)){grab(W,true);if(me)C.catchT=0;if(dv)popup('DIVING CATCH',orb.p,'#9fe0ff');break;}
       if(orb.state==='ground'&&d<(me?(CATCH_R.pick*cur.catchMul):0.85)&&W.y<0.8){grab(W,false);if(me)C.catchT=0;break;}
     }
   }
@@ -1495,7 +1680,7 @@ function frame(now){
   orbMorph.scale.setScalar(1+orb.res*0.06);
   updatePops(dt);
   {
-    for(const W of [player,buddy]){
+    for(const W of ALL){
       if(!W.human){W.catchFlash*=Math.exp(-5*dt);continue;}
       const free=orb.state!=='held'&&!(orb.last===W&&time-orb.lastT<0.45);
       const d=hdist(orb.p,W.pos), dy=Math.abs(orb.p.y-(W.y+0.55));
@@ -1543,8 +1728,8 @@ function frame(now){
 
   // camera centre: player 1, or halfway between both players
   const two=buddy.human, sep=two?hdist(player.pos,buddy.pos):0;
-  const pos=two?camC.set((player.pos.x+buddy.pos.x)/2,0,(player.pos.z+buddy.pos.z)/2):camC.copy(player.pos);
-  const zoom=1+clamp((sep-9)*0.05,0,0.9), camY=two?Math.max(player.y,buddy.y):player.y;
+  const pos=two?camC.set((player.pos.x+buddy.pos.x)/2,0,(player.pos.z+buddy.pos.z)/2):DUEL?camC.set(player.pos.x*0.6+orb.p.x*0.4,0,player.pos.z*0.6+orb.p.z*0.4):camC.copy(player.pos);
+  const zoom=(DUEL?1.15:1)+clamp((sep-9)*0.05,0,0.9), camY=two?Math.max(player.y,buddy.y):player.y;
   // motes wrap around the view
   if(!reduce)for(let i=0;i<MOTES;i++)mp[i*3+1]+=dt*0.08;
   for(let i=0;i<MOTES;i++){
@@ -1582,6 +1767,7 @@ function frame(now){
   renderer.setViewport(0,0,innerWidth,innerHeight);renderer.setClearColor(0x000000,1);
   requestAnimationFrame(frame);
 }
+if(DUEL){duelReset();duelScore();}
 requestAnimationFrame(frame);
 })();
 
