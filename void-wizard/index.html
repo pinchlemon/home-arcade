@@ -564,6 +564,7 @@ function throwOrb(W,c,dirX,dirZ,vh,vy,exact){
   for(let i=0;i<6+Math.round(c*10);i++){randDir(rv);rv.x+=dirX*1.5;rv.z+=dirZ*1.5;rv.multiplyScalar(1.5+Math.random()*2+c*2);spark(orb.p,rv,0.2+Math.random()*0.15,0.6+Math.random()*0.5,i%2?0xf4fffd:cur.col,4);}
   if(c>0.5){rv.set(W.pos.x,0,W.pos.z);spawnPuffs(4+Math.round(c*5),1+c*1.5,rv);}
   shake=Math.max(shake,0.04+c*0.12);
+  if(PARTY&&W.team===0)orb.pend=W; // party: control will jump to whoever is nearest where it lands
 }
 const DOWN_TIME=2.4;
 const DIVE_T=0.55;
@@ -624,7 +625,7 @@ function pushBack(W,dx,dz,power){
 // the tackle: a short lunge in the direction you're facing
 function tackle(W){
   W=W||player;
-  if(PARTY&&orb.state==='held'&&orb.holder===W){weapon(W);return;} // holding the Solid, the tackle button swings your weapon
+  if(PARTY&&orb.state==='held'&&orb.holder===W){blast(W);return;} // holding the Solid, the tackle button fires your blast
   if(W.lungeCD>0||W.downT>0)return;
   W.tacklePower=Math.hypot(W.vel.x,W.vel.z);W.tackleHit=false;
   W.charging=false;
@@ -659,7 +660,7 @@ function playerThrow(W){
     return;
   }
   // duel: a standing lob goes to a teammate you're roughly facing
-  if(DUEL){let m=null,ms=-9;for(const o of ALL){if(o===W||o.team!==W.team||o.capT>0)continue;const mx=o.pos.x-W.pos.x,mz=o.pos.z-W.pos.z,md=Math.hypot(mx,mz)||1,dot=(mx*dx+mz*dz)/md;
+  if(DUEL&&!PARTY){let m=null,ms=-9;for(const o of ALL){if(o===W||o.team!==W.team||o.capT>0)continue;const mx=o.pos.x-W.pos.x,mz=o.pos.z-W.pos.z,md=Math.hypot(mx,mz)||1,dot=(mx*dx+mz*dz)/md;
     if(dot>0.8&&md<28&&dot-md*0.01>ms){ms=dot-md*0.01;m=o;}}
     if(m){lobTo(W,c,m.pos.x+m.vel.x*0.4,m.pos.z+m.vel.z*0.4);return;}}
   // standing: a lob straight where you're facing, farther the longer you wound up. No aim help.
@@ -972,7 +973,7 @@ function bestPass(W){
 function ringBurst(p,col,r){for(let i=0;i<44;i++){const a=i/44*Math.PI*2;rv.set(Math.cos(a)*r*2.2,0.4,Math.sin(a)*r*2.2);rv2.set(p.x,0.3,p.z);spark(rv2,rv,0.45,0.7,i%2?0xffffff:col,1);}}
 // fire's explosion: floors every opponent close by
 function boom(p,team){
-  shake=Math.max(shake,0.25);rumbleAll(0.7,0.6,250,p,14);
+  rumbleAll(0.7,0.6,250,p,14);boomFx(p);
   for(let i=0;i<50;i++){randDir(rv).multiplyScalar(3+Math.random()*5);rv.y=Math.abs(rv.y)+1;spark(p,rv,0.5,0.8,i%3?0xff8a4a:0xffd36a,2.5);}
   rv.set(p.x,0,p.z);spawnPuffs(14,3,rv,1.1);
   for(const o of ALL)if(o.team!==team&&up(o)){const dx=o.pos.x-p.x,dz=o.pos.z-p.z,d=Math.hypot(dx,dz)||1;if(d<3.8)knockDown(o,dx/d,dz/d,8);}
@@ -981,76 +982,92 @@ function boom(p,team){
 function special(W){
   if(W.magic<1){if(W.human)popup('MAGIC NOT FULL',W.pos,'#8a8fb8',true);return;}
   W.magic=0;W.mad=Math.min(1,W.mad+0.1);const e=W.elem,col=ELEM_COL[e];
-  popup(ELEM_NAME[e]+' SPECIAL',W.pos,'#'+new THREE.Color(col).getHexString(),true);
-  rumble(W,0.6,0.8,250);shake=Math.max(shake,0.15);
-  rv2.set(W.pos.x,W.y+0.8,W.pos.z);for(let i=0;i<30;i++){randDir(rv).multiplyScalar(4);spark(rv2,rv,0.5,0.7,i%2?0xffffff:col,3);}
+  rumble(W,0.6,0.8,250);
+  rv2.set(W.pos.x,W.y+0.8,W.pos.z);fxSphere(rv2,col,2.4,0.4);fxBurst(rv2,col,90,6);fxRing(W.pos.x,W.pos.z,col,4,0.5);fxRing(W.pos.x,W.pos.z,0xffffff,2.5,0.4,0.06);fxPillar(W.pos.x,W.pos.z,col,9,0.9,0.7);orb.flash=Math.max(orb.flash,4);
   if(e===0||e===3){ // fire: an exploding shot at whoever you face. aether: a seeking shot at their summoner that can't be caught
     const T=PARTY?(demon.alive?demonT:null):e===3?foeSummoner(W):aimFoe(W,0.6);W.charge=1;
     if(T)aiShoot(W,T);else{throwOrb(W,1,Math.sin(W.yaw),Math.cos(W.yaw),20*cur.speed,3,true);orb.fast=true;}
     orb.special=e===3?'aether':'fire';
   }else if(e===1){ // earth: a shockwave that floors everyone close
     for(const o of ALL)if(o.team!==W.team&&up(o)){const dx=o.pos.x-W.pos.x,dz=o.pos.z-W.pos.z,d=Math.hypot(dx,dz)||1;if(d<5.5)knockDown(o,dx/d,dz/d,9);}
-    ringBurst(W.pos,col,5.5);if(PARTY&&demon.alive&&hdist(demon.pos,W.pos)<9)demon.stunT=1.8;
+    ringBurst(W.pos,col,5.5);fxRing(W.pos.x,W.pos.z,col,7,0.5);fxRing(W.pos.x,W.pos.z,0xffffff,4.5,0.45,0.1);fxRing(W.pos.x,W.pos.z,col,2.5,0.5,0.2);fxBurst(rv2.set(W.pos.x,0.3,W.pos.z),col,60,5);
+    if(PARTY&&demon.alive&&hdist(demon.pos,W.pos)<9)demon.stunT=1.8;
   }else if(e===2){ // air: a long dash nobody can tackle you out of
-    W.lungeDir.set(Math.sin(W.yaw),0,Math.cos(W.yaw));W.lungeSpd=24;W.lungeT=0.4;W.tackleHit=true;W.graceT=2;W.faceLock=0.4;
+    W.lungeDir.set(Math.sin(W.yaw),0,Math.cos(W.yaw));W.lungeSpd=24;W.lungeT=0.4;W.tackleHit=true;W.graceT=2;W.faceLock=0.4;W.dashFx=0.55;
   }else{ // water: everyone nearby wades for a few seconds
     for(const o of ALL)if(o.team!==W.team&&hdist(o.pos,W.pos)<10)o.slowT=4;
-    ringBurst(W.pos,col,10);if(PARTY&&demon.alive&&hdist(demon.pos,W.pos)<16)demon.slowT=4;
+    ringBurst(W.pos,col,10);for(let k=0;k<3;k++)fxRing(W.pos.x,W.pos.z,k?0xffffff:col,10-k*2,0.7,k*0.15);fxBurst(rv2.set(W.pos.x,0.3,W.pos.z),col,60,3);
+    if(PARTY&&demon.alive&&hdist(demon.pos,W.pos)<16)demon.slowT=4;
   }
 }
-// party weapons: hold the Solid and press tackle (L1 / Q). Fire sword, earth hammer, water spear, air arrow, aether bolt.
-const WPN={0:{reach:3.4,cone:1.1,dmg:16,cd:0.8},1:{reach:3.4,cone:1.4,dmg:26,cd:1.3},4:{reach:5.6,cone:0.45,dmg:15,cd:0.9},2:{reach:22,cone:0.12,dmg:13,cd:0.9},3:{reach:20,cone:3.2,dmg:11,cd:1.0}};
+// ---- energy effects: rings, pillars, beams, flashes (no text, no shake)
+const fxList=[], fxRingGeo=new THREE.RingGeometry(0.86,1,48), fxBoxGeo=new THREE.BoxGeometry(1,1,1), fxCylGeo=new THREE.CylinderGeometry(1,1,1,14,1,true), fxSphGeo=new THREE.SphereGeometry(1,12,9);
+const fxMat=(c,o)=>new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:o,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+function fxAdd(m,dur,upd,delay){scene.add(m);fxList.push({m,t:-(delay||0),dur,upd});if(delay)m.visible=false;}
+function fxRing(x,z,col,maxR,dur,delay,y){const m=new THREE.Mesh(fxRingGeo,fxMat(col,0.9));m.rotation.x=-Math.PI/2;m.position.set(x,y||0.06,z);fxAdd(m,dur,u=>{const k=Math.max(0.01,maxR*(1-(1-u)*(1-u)));m.scale.set(k,k,1);m.material.opacity=0.9*(1-u);},delay);}
+function fxPillar(x,z,col,h,r,dur,delay){const m=new THREE.Mesh(fxCylGeo,fxMat(col,0.7));m.position.set(x,h/2,z);fxAdd(m,dur,u=>{m.scale.set(Math.max(0.01,r*(1-u*0.7)),h,Math.max(0.01,r*(1-u*0.7)));m.material.opacity=0.7*(1-u);},delay);}
+function fxSphere(p,col,r,dur){const m=new THREE.Mesh(fxSphGeo,fxMat(col,0.8));m.position.copy(p);fxAdd(m,dur,u=>{const k=Math.max(0.01,r*(0.35+0.65*u));m.scale.setScalar(k);m.material.opacity=0.8*(1-u)*(1-u);});}
+function fxBeam(a,b,col,w,dur){const len=Math.max(0.1,a.distanceTo(b)),m=new THREE.Mesh(fxBoxGeo,fxMat(col,0.95));m.position.copy(a).lerp(b,0.5);m.lookAt(b);m.scale.set(w,w,len);
+  fxAdd(m,dur,u=>{m.scale.set(Math.max(0.01,w*(1-u)),Math.max(0.01,w*(1-u)),len);m.material.opacity=0.95*(1-u);});}
+function fxBurst(p,col,n,sp){for(let i=0;i<n;i++){randDir(rv).multiplyScalar(sp*(0.4+Math.random()));spark(p,rv,0.5+Math.random()*0.5,0.7,i%3?col:0xffffff,2.5);}}
+function boomFx(p){fxSphere(p,0xffd36a,4.2,0.5);fxRing(p.x,p.z,0xff8a4a,5.5,0.55);fxRing(p.x,p.z,0xffd36a,3.5,0.4,0.08);fxPillar(p.x,p.z,0xff8a4a,8,1.1,0.6);fxBurst(rv2.set(p.x,Math.max(0.4,p.y),p.z),0xff8a4a,70,6);}
+// the nearest-first list of the demon's body parts
 function demonParts(){const o=[];headCenter(lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.62*demon.scale});for(const S of demon.segs){segCenter(S,lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.5*S.w*demon.scale});}return o;}
-function makeWeapon(e){
-  const g=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:ELEM_COL[e],transparent:true,opacity:0.9});
-  const box=(x,y,z,px,py,pz)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),m);b.position.set(px,py,pz);g.add(b);return b;};
-  if(e===0)box(0.14,0.14,2.4,0,0,1.5);
-  else if(e===1){box(0.12,0.12,1.8,0,0,0.9);box(0.9,0.6,0.6,0,0,1.9);}
-  else if(e===4){box(0.09,0.09,4,0,0,1.8);const c=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.6,6),m);c.rotation.x=Math.PI/2;c.position.z=4.1;g.add(c);}
-  else if(e===2)box(0.08,0.08,1.4,0,0,0);
-  else {const b=new THREE.Mesh(new THREE.IcosahedronGeometry(0.35,0),m);g.add(b);}
-  g.visible=false;scene.add(g);return g;
-}
-function weapon(W){
-  if(!PARTY||W.wpnCD>0||W.downT>0||W.capT>0)return;
-  const w=WPN[W.elem];W.wpnCD=w.cd;W.wpnT=0.001;W.faceLock=0.3;W.mad=Math.min(1,W.mad+0.03);W.magic=Math.min(1,W.magic+0.1);
-  const fx=Math.sin(W.yaw),fz=Math.cos(W.yaw),col=ELEM_COL[W.elem];
-  let best=null,bd=1e9;
-  if(demon.alive&&!demon.dying){
-    for(const q of demonParts()){
-      const dx=q.x-W.pos.x,dz=q.z-W.pos.z,d=Math.hypot(dx,dz)||0.001;
-      if(d-q.r>w.reach)continue;
-      const cosA=(dx*fx+dz*fz)/d;
-      if(W.elem===2){if(cosA>0&&Math.abs(dx*fz-dz*fx)<q.r+0.5&&d<bd){bd=d;best=q;}}
-      else if(W.elem===3){if(d<bd){bd=d;best=q;}}
-      else if(Math.acos(clamp(cosA,-1,1))<w.cone+Math.atan2(q.r,d)&&d<bd){bd=d;best=q;}
-    }
-  }
-  W.wpnTgt=best;
-  rumble(W,0.3,0.5,90);
-  if(W.elem===1){ringBurst(W.pos,col,3);shake=Math.max(shake,0.08);}
-  if(!best)return;
-  demon.hp-=w.dmg;demon.flash=1;
-  rv2.set(best.x,best.y,best.z);for(let i=0;i<16;i++){randDir(rv).multiplyScalar(2+Math.random()*3);spark(rv2,rv,0.3,0.5,i%2?0xffffff:col,3);}
-  popup(String(w.dmg),rv2,'#'+new THREE.Color(col).getHexString(),true);shake=Math.max(shake,0.1);
-  if(W.elem===1)demon.stunT=Math.max(demon.stunT||0,0.9);
-  if(W.elem===4)demon.slowT=Math.max(demon.slowT||0,2.5);
-  if(W.elem===3)for(const o of ALL)o.magic=Math.min(1,o.magic+0.15);
+function hurtDemon(q,dmg,col){
+  if(!demon.alive||demon.dying)return;
+  demon.hp-=dmg;demon.flash=1;
+  rv2.set(q.x,q.y,q.z);fxSphere(rv2,col,1.6,0.3);fxRing(q.x,q.z,col,2.6,0.4);fxBurst(rv2,col,22,4);
   if(demon.hp<=0)killDemon();
 }
-function weaponTick(W,dt){
-  W.wpnCD=Math.max(0,W.wpnCD-dt);
-  if(!W.wpn)W.wpn=makeWeapon(W.elem);
-  const g=W.wpn;if(W.wpnT<=0){g.visible=false;return;}
-  W.wpnT+=dt;const u=W.wpnT/0.3;if(u>=1){W.wpnT=0;g.visible=false;return;}
-  g.visible=true;g.position.set(W.pos.x,W.y+1.0,W.pos.z);
-  const fx=Math.sin(W.yaw),fz=Math.cos(W.yaw);
-  if(W.elem===0)g.rotation.set(0,W.yaw+(u-0.5)*2.4,0,'YXZ');
-  else if(W.elem===1)g.rotation.set(-1.9+2.45*Math.min(1,u*1.6),W.yaw,0,'YXZ');
-  else if(W.elem===4){g.rotation.set(0,W.yaw,0,'YXZ');const t=-0.5+Math.sin(u*Math.PI)*1.6;g.position.x+=fx*t;g.position.z+=fz*t;}
-  else if(W.elem===2){g.rotation.set(0,W.yaw,0,'YXZ');const t=1+u*20;g.position.x+=fx*t;g.position.z+=fz*t;}
-  else{const T=W.wpnTgt;if(T){g.position.x+=(T.x-W.pos.x)*u;g.position.z+=(T.z-W.pos.z)*u;g.position.y+=(T.y-g.position.y)*u;}else{g.position.x+=fx*u*12;g.position.z+=fz*u*12;}}
-  g.scale.setScalar(W.elem===3?1+Math.sin(u*20)*0.2:1);
+// ---- party blasts: hold the Solid and press tackle (L1 / Q). Fire fireball, earth boulder, air laser, water beam, aether homing bolts.
+const BL=[], BLCD={0:0.7,1:1.4,2:0.8,3:1.1,4:1.4};
+function blast(W){
+  if(!PARTY||W.wpnCD>0||W.downT>0||W.capT>0)return;
+  const e=W.elem,col=ELEM_COL[e],fx=Math.sin(W.yaw),fz=Math.cos(W.yaw);
+  W.wpnCD=BLCD[e];W.faceLock=0.3;W.mad=Math.min(1,W.mad+0.03);W.magic=Math.min(1,W.magic+0.1);
+  const o=new THREE.Vector3(W.pos.x+fx*0.6,W.y+1.0,W.pos.z+fz*0.6);
+  rumble(W,0.3,0.5,90);W.vel.x-=fx*1.5;W.vel.z-=fz*1.5;W.robeS.v.z+=0.8;
+  fxSphere(o,col,0.9,0.18);fxBurst(o,col,14,3);
+  const mk=(r)=>{const g=new THREE.Group();g.add(new THREE.Mesh(fxSphGeo,fxMat(col,0.55)));const c=new THREE.Mesh(fxSphGeo,fxMat(0xffffff,0.95));c.scale.setScalar(0.55);g.add(c);g.scale.setScalar(r);g.position.copy(o);scene.add(g);return g;};
+  if(e===0||e===1){const sp=e===0?20:11;BL.push({m:mk(e===0?0.5:0.85),p:o.clone(),v:new THREE.Vector3(fx*sp,0,fz*sp),e,r:e===0?0.5:0.85,dmg:e===0?18:28,life:1.8,col});}
+  else if(e===3){for(let k=-1;k<=1;k++){const a=W.yaw+k*0.45;BL.push({m:mk(0.28),p:o.clone(),v:new THREE.Vector3(Math.sin(a)*14,0.6,Math.cos(a)*14),e,r:0.28,dmg:7,life:2.2,col,home:true});}}
+  else{ // air laser / water beam: instant, along where you face
+    const wide=e===4,len=wide?18:30,w=wide?1.2:0.28,dmg=wide?22:11,maxHits=wide?1:2;
+    const end=new THREE.Vector3(o.x+fx*len,o.y,o.z+fz*len);let hits=0;
+    if(demon.alive&&!demon.dying){
+      const qs=demonParts().map(q=>{const dx=q.x-o.x,dz=q.z-o.z;return {q,d:Math.hypot(dx,dz),perp:Math.abs(dx*fz-dz*fx),fw:dx*fx+dz*fz};}).filter(h=>h.fw>0&&h.fw<len&&h.perp<h.q.r+w*0.5+0.2).sort((a,b)=>a.fw-b.fw);
+      for(const h of qs){if(hits>=maxHits)break;hurtDemon(h.q,dmg,col);if(wide)demon.slowT=Math.max(demon.slowT||0,2.5);hits++;if(wide||hits===1)end.set(o.x+fx*h.fw,o.y,o.z+fz*h.fw);}
+    }
+    fxBeam(o,end,col,w*2.2,0.35);fxBeam(o,end,0xffffff,w,0.28);
+    if(wide){fxRing(o.x,o.z,col,3,0.4);fxPillar(o.x,o.z,col,3,0.5,0.35);}
+    const n=Math.floor(o.distanceTo(end)/1.2);for(let i=0;i<n;i++){rv2.set(o.x+(end.x-o.x)*i/n,o.y,o.z+(end.z-o.z)*i/n);randDir(rv).multiplyScalar(1.2);spark(rv2,rv,0.4,0.5,i%2?col:0xffffff,2);}
+  }
+}
+function blastTick(dt){
+  if(!BL.length)return;const parts=demon.alive&&!demon.dying?demonParts():[];
+  for(let i=BL.length-1;i>=0;i--){
+    const b=BL[i];b.life-=dt;
+    if(b.home&&parts.length){let bq=null,bd=1e9;for(const q of parts){const d=Math.hypot(q.x-b.p.x,q.z-b.p.z);if(d<bd){bd=d;bq=q;}}
+      if(bq){const sp=b.v.length(),tx=bq.x-b.p.x,ty=bq.y-b.p.y,tz=bq.z-b.p.z,tl=Math.hypot(tx,ty,tz)||1;b.v.x+=(tx/tl*sp-b.v.x)*Math.min(1,dt*5);b.v.y+=(ty/tl*sp-b.v.y)*Math.min(1,dt*5);b.v.z+=(tz/tl*sp-b.v.z)*Math.min(1,dt*5);}}
+    b.p.addScaledVector(b.v,dt);b.m.position.copy(b.p);b.m.scale.setScalar(b.r*(1+Math.sin(time*40+i)*0.12));
+    for(let k=0;k<2;k++){randDir(rv).multiplyScalar(0.8);spark(b.p,rv,0.35,0.5+b.r*0.4,k?b.col:0xffffff,2);}
+    let hit=null;for(const q of parts){const dx=q.x-b.p.x,dy=q.y-b.p.y,dz=q.z-b.p.z;if(Math.hypot(dx,dy,dz)<q.r+b.r){hit=q;break;}}
+    if(hit){
+      hurtDemon(hit,b.dmg,b.col);
+      if(b.e===0)boomFx(rv.set(hit.x,hit.y,hit.z));
+      if(b.e===1){demon.stunT=Math.max(demon.stunT||0,1);fxPillar(hit.x,hit.z,b.col,7,1.4,0.6);fxRing(hit.x,hit.z,b.col,5,0.5);}
+      if(b.e===3)for(const o of ALL)o.magic=Math.min(1,o.magic+0.05);
+    }
+    if(hit||b.life<=0){scene.remove(b.m);b.m.traverse(c=>{if(c.material)c.material.dispose();});BL.splice(i,1);}
+  }
+}
+function fxTick(dt){
+  for(let i=fxList.length-1;i>=0;i--){const f=fxList[i];f.t+=dt;if(f.t<0)continue;f.m.visible=true;const u=f.t/f.dur;
+    if(u>=1){scene.remove(f.m);f.m.material.dispose();fxList.splice(i,1);}else f.upd(u);}
+  blastTick(dt);
+  // the specials glow and leave a trail
+  if(orb.state==='air'&&orb.special){const c=orb.special==='fire'?(Math.random()<.5?0xff8a4a:0xffd36a):0xff7ac8;for(let i=0;i<4;i++){randDir(rv).multiplyScalar(1.4);spark(orb.p,rv,0.45,0.8,c,2);}orb.flash=Math.max(orb.flash,1.6);}
+  for(const W of ALL)if(W.dashFx>0){W.dashFx-=dt;for(let i=0;i<3;i++){rv2.set(W.pos.x+(Math.random()-.5)*0.5,W.y+0.2+Math.random()*1.2,W.pos.z+(Math.random()-.5)*0.5);rv.set(0,0.3,0);spark(rv2,rv,0.5,0.9,i%2?ELEM_COL[2]:0xffffff,1.5);}}
 }
 function duelAI(W,dt){
   const inp={ix:0,iz:0,run:false},A=W.ai;
@@ -1060,7 +1077,7 @@ function duelAI(W,dt){
   let target=null,arrive=0.4;
   if(holder===W){
     A.holdT+=dt;const dS=hdist(W.pos,tS.pos);
-    if(PARTY&&W.wpnCD<=0&&demon.alive&&!demon.dying&&dS<Math.min(9,WPN[W.elem].reach*0.8+1)&&Math.random()<dt*0.9){W.yaw=Math.atan2(tS.pos.x-W.pos.x,tS.pos.z-W.pos.z);weapon(W);}
+    if(PARTY&&W.wpnCD<=0&&demon.alive&&!demon.dying&&dS<13&&Math.random()<dt*0.6){W.yaw=Math.atan2(tS.pos.x+tS.vel.x*0.4-W.pos.x,tS.pos.z+tS.vel.z*0.4-W.pos.z);blast(W);}
     if(W.magic>=1&&!W.charging){const e=W.elem;
       if((e===3&&dS<26)||(e===0&&dS<16)||(e===1&&(PARTY?dS<7:nd<4))||(e===2&&nd<3.5&&!W.summoner)||(e===4&&(PARTY?dS<10:nd<6))){
         if(e!==2)W.yaw=Math.atan2(tS.pos.x-W.pos.x,tS.pos.z-W.pos.z);special(W);return inp;}}
@@ -1167,7 +1184,14 @@ function duelTick(dt,gp){
   }
   if(duel.cap)captureTick(dt);
   youMark.visible=!WATCH&&player.capT<=0;youMark.position.set(player.pos.x,player.y+(player.summoner?2.1:1.75)+Math.sin(time*5)*0.06,player.pos.z);youMark.rotation.y+=dt*3;
-  if(PARTY)for(const W of ALL)weaponTick(W,dt);
+  if(PARTY){for(const W of ALL)W.wpnCD=Math.max(0,W.wpnCD-dt);
+    if(orb.pend){const T=orb.pend;orb.pend=null;
+      if(orb.state==='air'&&!orb.fast&&orb.last===T&&!WATCH){
+        const gg=G*cur.grav,h=orb.p.y-0.9,vy=orb.v.y,t=(vy+Math.sqrt(Math.max(0,vy*vy+2*gg*h)))/gg,lx=orb.p.x+orb.v.x*t,lz=orb.p.z+orb.v.z*t;
+        let best=null,bd=1e9;for(const o of ALL)if(o!==T&&o.team===0&&up(o)){const d=Math.hypot(o.pos.x-lx,o.pos.z-lz);if(d<bd){bd=d;best=o;}}
+        if(best&&bd<16)switchTo(best);}}
+    }
+  fxTick(dt);
   if(topMad){topMad.style.width=(player.mad*100).toFixed(0)+'%';topMag.style.width=(player.magic*100).toFixed(0)+'%';topMag.style.background='#'+new THREE.Color(ELEM_COL[player.elem]).getHexString();}
   if(youRing){youRing.visible=!WATCH&&player.capT<=0;youRing.position.set(player.pos.x,0.03,player.pos.z);const k=1+Math.sin(time*6)*0.06;youRing.scale.set(k,k,1);
     const nc=orb.state==='held'&&orb.holder===player?null:switchCandidate();nextRing.visible=!!nc&&!WATCH;if(nc){nextRing.position.set(nc.pos.x,0.03,nc.pos.z);const k2=1+Math.sin(time*9)*0.1;nextRing.scale.set(k2,k2,1);}}
@@ -1196,7 +1220,7 @@ if(DUEL){
   addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyI')setTactic(tactic.v+1,tactic.h);else if(e.code==='KeyK')setTactic(tactic.v-1,tactic.h);else if(e.code==='KeyJ')setTactic(tactic.v,tactic.h-1);else if(e.code==='KeyL')setTactic(tactic.v,tactic.h+1);});
   document.querySelector('.hud h1').textContent=PARTY?'VOID WIZARD · PARTY':'VOID WIZARD · DUEL';
   document.getElementById('tip').textContent='5 a side. You play whoever on blue has the Quintessence; Triangle / F takes over the wizard nearest it. Press catch to receive or pick it up. It turns into the element of whoever holds it. Holding it fills magic (Triangle for a special) but feeds madness. Right stick / I J K L: press, defend, shift left or right. Hit the red summoner to break its 5-sided ward, then capture it.';
-  if(PARTY)document.getElementById('tip').textContent='You and four wizards (the summoner plus fire, water, air and earth) against the demon. Catch the Solid (it takes your element), pass it on, and the more different elements it passes through, the harder it hits. Passing fills magic: Triangle for a special. Holding the Solid, L1 / Q swings your weapon (sword, hammer, spear, arrow or bolt). Top right: madness (purple) and magic. White ring is you; gold ring is who you become when you press Triangle.';
+  if(PARTY)document.getElementById('tip').textContent='You and four wizards (the summoner plus fire, water, air and earth) against the demon. Catch the Solid (it takes your element), pass it on, and the more different elements it passes through, the harder it hits. Passing fills magic: Triangle for a special. Throw it anywhere; you take over whoever is nearest where it lands, and catches are automatic. Holding the Solid, L1 / Q fires your blast (fireball, boulder, laser, beam or homing bolts). Beating the demon clears madness for the whole party. Top right: madness (purple) and magic. White ring is you; gold ring is who you become when you press Triangle.';
   const ml=document.getElementById('modeLink');if(PARTY){ml.textContent='TRY THE 2V2 DUEL';ml.href='?duel';}else{ml.textContent='BACK TO THE DEMON';ml.href='?';}
 }
 
@@ -1357,6 +1381,7 @@ function spawnDemon(){
 }
 function killDemon(){
   if(demon.dying)return;
+  if(PARTY)for(const W of ALL){W.mad=0;rv2.set(W.pos.x,W.y+0.9,W.pos.z);fxBurst(rv2,0xb07aff,26,3);fxRing(W.pos.x,W.pos.z,0xb07aff,2.5,0.7);fxPillar(W.pos.x,W.pos.z,0xb07aff,6,0.6,0.8);}
   demon.dying=true;demon.dieT=0;rumbleAll(0.6,0.7,900);demon.dieNext=SEG_N-1;demon.kills++;scoreEl.textContent='DEMONS DOWN: '+demon.kills;
   hpBar.visible=false;shake=Math.max(shake,0.25);
 }
@@ -1639,6 +1664,7 @@ function orbVsDemon(){
   if(!hit)for(const S of demon.segs){segCenter(S,lI);const r=0.5*S.w*demon.scale;if(lI.distanceTo(orb.p)<r+cur.circ*0.7){hit=S;hcV.copy(lI);R=r;break;}}
   if(!hit)return;
   const head=hit==='head';
+  if(orb.special==='fire')boomFx(hcV);if(orb.special==='aether'){fxSphere(hcV,0xff7ac8,3,0.4);fxPillar(hcV.x,hcV.z,0xff7ac8,8,1,0.6);}
   const relay=PARTY&&orb.res>=1&&orb.chain?orb.chain.size:1;
   const mult=RES_MULT[orb.res]*(orb.fast?1.3:1)*(orb.oop?1.6:1)*(head?1.5:1)*(1+0.5*(relay-1))*(orb.special==='fire'?1.8:orb.special==='aether'?2:1);
   if(relay>=3){demon.stunT=Math.max(demon.stunT||0,1.2);for(let i=0;i<30;i++){randDir(rv).multiplyScalar(3+Math.random()*3);spark(orb.p,rv,0.5,0.7,ELEM_COL[i%5],2.5);}}
@@ -1882,7 +1908,7 @@ function frame(now){
         const sp=Math.hypot(orb.v.x,orb.v.z)||1;knockDown(W,orb.v.x/sp,orb.v.z/sp,9);
         orb.v.set(-orb.v.x*0.25,4,-orb.v.z*0.25);randDir(orb.w).multiplyScalar(12);break;
       }
-      if(me&&C.catchT<=0)continue;
+      if(me&&C.catchT<=0&&!PARTY)continue; // in the party, catching is automatic
       const d=hdist(orb.p,W.pos), dy=orb.p.y-(W.y+0.55);
       const dv=W.diveT>0;
       const up=me&&!W.grounded&&!dv;
