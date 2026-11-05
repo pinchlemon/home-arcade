@@ -365,7 +365,7 @@ if(DUEL)for(let t=0;t<(PARTY?1:2);t++)ROLE_SET.forEach((R,i)=>{
 // summoners wear a pentagon halo in their team's colour: it is their ward, one side breaks per hit
 const WARD=5;
 if(DUEL)for(const W of ALL){W.ai={holdT:0,tkCD:0};W.capT=0;W.graceT=0;W.wpnCD=0;W.wpnT=0;if(!W.summoner&&!W.captain)continue;
-  if(PARTY){const hm=new THREE.MeshBasicMaterial({color:0xff3050});for(const sx of [-1,1]){const h=new THREE.Mesh(new THREE.ConeGeometry(0.15,0.66,6),hm);h.position.set(sx*0.24,1.42,0.02);h.rotation.z=-sx*0.55;W.root.add(h);}continue;} // the party's summoner wears two devil horns
+  if(PARTY){const hm=new THREE.MeshBasicMaterial({color:ROBE[W.team][0]});for(const sx of [-1,1]){const h=new THREE.Mesh(new THREE.ConeGeometry(0.15,0.66,6),hm);h.position.set(sx*0.24,1.42,0.02);h.rotation.z=-sx*0.55;W.root.add(h);}continue;} // the party's summoner wears two devil horns
   const h=new THREE.Group();h.position.y=1.5;const mat=new THREE.MeshBasicMaterial({color:TEAM_COL[W.team]});
   const rr=0.4, side=2*rr*Math.sin(Math.PI/5), ap=rr*Math.cos(Math.PI/5);
   for(let i=0;i<WARD;i++){const f=i*Math.PI*2/WARD+Math.PI/WARD+Math.PI/2, e=new THREE.Mesh(new THREE.BoxGeometry(side,0.1,0.1),mat);
@@ -1103,13 +1103,17 @@ function duelAI(W,dt){
   }else{
     A.holdT=0;W.faceTarget=orb.p;A.tkCD=Math.max(0,A.tkCD-dt);
     const field=ALL.filter(o=>o.team===W.team&&!o.summoner&&!o.human&&up(o));
-    if(PARTY&&!WATCH){ // circle the demon and keep facing it; you fetch the Solid yourself
-      const alive=demon.alive&&!demon.dying,c=alive?demon.pos:player.pos;W.faceTarget=alive?demon.pos:orb.p;
-      const i=ALL.indexOf(W),side=i%2?1:-1,dx=W.pos.x-c.x,dz=W.pos.z-c.z,d=Math.hypot(dx,dz)||1,ang=Math.atan2(dz,dx);
-      const want=alive?clamp(7.5-tactic.v*2.5+(i%3)*0.8,3.5,11):3+(i%3),a2=ang+side*0.3;
-      target=tmp.set(c.x+Math.cos(a2)*want,0,c.z+Math.sin(a2)*want);arrive=0.4;
-      if(alive&&d<3.5)target.set(W.pos.x+dx/d*4,0,W.pos.z+dz/d*4);
-      if(alive&&(demon.state==='windup'||demon.state==='strike')&&d<6.5&&W.grounded&&Math.random()<dt*2.5)W.jumpQ=true;
+    if(PARTY&&!WATCH){ // hold a slot in a loose formation around whoever has the Solid (or you), facing the demon; only move when you drift out of it
+      const alive=demon.alive&&!demon.dying,an=(holder||player).pos;W.faceTarget=alive?demon.pos:orb.p;
+      let fx=0,fz=-1;if(alive){const dx=demon.pos.x-an.x,dz=demon.pos.z-an.z,dl=Math.hypot(dx,dz)||1;fx=dx/dl;fz=dz/dl;}
+      const SL={fwd:[3,-4],midL:[0,-6.5],midR:[0,6.5],back:[-5,0],sum:[-4,3]}[W.role]||[-4,0];
+      const f=SL[0]+tactic.v*3,sd=SL[1]+tactic.h*3;
+      const sx=an.x+fx*f-fz*sd,sz=an.z+fz*f+fx*sd,ex=sx-W.pos.x,ez=sz-W.pos.z,ed=Math.hypot(ex,ez);
+      const dx=W.pos.x-demon.pos.x,dz=W.pos.z-demon.pos.z,dd=Math.hypot(dx,dz)||1;
+      if(alive&&dd<3.5)target=tmp.set(W.pos.x+dx/dd*4,0,W.pos.z+dz/dd*4); // too close to the demon: back off
+      else if(ed>(A.moving?0.8:2.6)){target=tmp.set(sx,0,sz);arrive=0.8;A.moving=true;}
+      else A.moving=false;
+      if(alive&&(demon.state==='windup'||demon.state==='strike')&&dd<6.5&&W.grounded&&Math.random()<dt*2.5)W.jumpQ=true;
     }else if(W.summoner){
       target=zoneSpot(W,tmp);
       if(!holder&&hdist(orb.p,W.pos)<6&&!(orb.last===W&&time-orb.lastT<0.45)){target.copy(orb.p);arrive=0.08;}
