@@ -63,6 +63,9 @@ body{
 #duelMeters .bar i{display:block;height:100%}
 #duelMeters span{color:var(--gold);margin-top:4px}
 body.duel #duelBanner,body.duel #duelMeters,body.duel .pop,body.duel .solid-name,body.duel .px,body.duel .fs{display:none!important}
+#topMeters{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:max(16px, env(safe-area-inset-right,0px));width:130px;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.tb{height:7px;background:rgba(120,128,220,.18);border:1px solid var(--line)}
+.tb i{display:block;height:100%;width:0}
 #duelBanner span{display:block;margin-top:8px;font-size:10px;letter-spacing:.1em;color:var(--ink);text-shadow:none}
 .pop{position:fixed;left:0;top:0;font-size:13px;letter-spacing:.12em;pointer-events:none;white-space:nowrap;text-shadow:0 0 8px currentColor;will-change:transform,opacity}
 .solid-name span{display:block;margin-top:4px;font-size:8px;letter-spacing:.06em;opacity:.75;white-space:normal}
@@ -347,21 +350,21 @@ const PARTY=/[?&]party\b/.test(location.search); // ?party: you and three AI wiz
 const DUEL=PARTY||/[?&]duel\b/.test(location.search), WATCH=DUEL&&/[?&]ai\b/.test(location.search); // ?duel&ai: AI plays both sides
 const CAP_RES=3, ARENA_R=PARTY?200:24, TEAM_COL=[0x6a8cff,0xff6050];
 // roles: home spot (x, distance from the centre toward your own end) and element (index into SOLIDS: 0 fire, 1 earth, 2 air, 3 aether, 4 water)
-const ROLES=[{role:'sum',x:0,d:ARENA_R-3,elem:3},{role:'back',x:0,d:13,elem:1},{role:'midL',x:-8,d:5,elem:4},{role:'midR',x:8,d:5,elem:2},{role:'fwd',x:0,d:-3,elem:0}];
+const ROLES=[{role:'sum',x:0,d:PARTY?7:ARENA_R-3,elem:3},{role:'back',x:0,d:13,elem:1},{role:'midL',x:-8,d:5,elem:4},{role:'midR',x:8,d:5,elem:2},{role:'fwd',x:0,d:-3,elem:0}];
 const ELEM_COL=[0xff8a4a,0xa6e36a,0x6ff2e0,0xff7ac8,0xe4f4ff], ELEM_NAME=['FIRE','EARTH','AIR','AETHER','WATER'];
 const ROBE=[[0x3d4fc4,0x2f6fb8,0x3a5ad0,0x2f8fb0,0x4a46b8],[0xc4473d,0xb8642a,0xc43d5a,0xb84a2a,0xa83a3a]];
-let player=DUEL?makeWizard(ROBE[0][0],ELEM_COL[PARTY?0:3],TEAM_COL[0]):makeWizard(0x3d4fc4,0xe8b64a,0x5560ff);
-let buddy=DUEL?makeWizard(ROBE[0][1],ELEM_COL[PARTY?4:1],TEAM_COL[0]):makeWizard(0xc4473d,0x7fd0c0,0xff6050);
+let player=DUEL?makeWizard(ROBE[0][0],ELEM_COL[3],TEAM_COL[0]):makeWizard(0x3d4fc4,0xe8b64a,0x5560ff);
+let buddy=DUEL?makeWizard(ROBE[0][1],ELEM_COL[PARTY?0:1],TEAM_COL[0]):makeWizard(0xc4473d,0x7fd0c0,0xff6050);
 buddy.pos.set(4,0,-10);buddy.yaw=Math.PI;
 const ALL=[player,buddy];
-const ROLE_SET=PARTY?[ROLES[4],ROLES[2],ROLES[3],ROLES[1]]:ROLES; // party: fire, water, air, earth
+const ROLE_SET=PARTY?[ROLES[0],ROLES[4],ROLES[2],ROLES[3],ROLES[1]]:ROLES; // party: you start as the summoner, then fire, water, air, earth
 if(DUEL)for(let t=0;t<(PARTY?1:2);t++)ROLE_SET.forEach((R,i)=>{
   let W;if(t===0&&i<2)W=ALL[i];else{W=makeWizard(ROBE[t][i],ELEM_COL[R.elem],TEAM_COL[t]);ALL.push(W);}
-  W.team=t;W.role=R.role;W.elem=R.elem;W.summoner=R.role==='sum';W.discBase=TEAM_COL[t];W.magic=0;W.mad=0;W.slowT=0;
+  W.team=t;W.role=R.role;W.elem=R.elem;W.captain=R.role==='sum';W.summoner=W.captain&&!PARTY;W.discBase=TEAM_COL[t];W.magic=0;W.mad=0;W.slowT=0;
 });
 // summoners wear a pentagon halo in their team's colour: it is their ward, one side breaks per hit
 const WARD=5;
-if(DUEL)for(const W of ALL){W.ai={holdT:0,tkCD:0};W.capT=0;W.graceT=0;if(!W.summoner)continue;
+if(DUEL)for(const W of ALL){W.ai={holdT:0,tkCD:0};W.capT=0;W.graceT=0;W.wpnCD=0;W.wpnT=0;if(!W.summoner&&!W.captain)continue;
   const h=new THREE.Group();h.position.y=1.5;const mat=new THREE.MeshBasicMaterial({color:TEAM_COL[W.team]});
   const rr=0.4, side=2*rr*Math.sin(Math.PI/5), ap=rr*Math.cos(Math.PI/5);
   for(let i=0;i<WARD;i++){const f=i*Math.PI*2/WARD+Math.PI/WARD+Math.PI/2, e=new THREE.Mesh(new THREE.BoxGeometry(side,0.1,0.1),mat);
@@ -621,6 +624,7 @@ function pushBack(W,dx,dz,power){
 // the tackle: a short lunge in the direction you're facing
 function tackle(W){
   W=W||player;
+  if(PARTY&&orb.state==='held'&&orb.holder===W){weapon(W);return;} // holding the Solid, the tackle button swings your weapon
   if(W.lungeCD>0||W.downT>0)return;
   W.tacklePower=Math.hypot(W.vel.x,W.vel.z);W.tackleHit=false;
   W.charging=false;
@@ -994,6 +998,60 @@ function special(W){
     ringBurst(W.pos,col,10);if(PARTY&&demon.alive&&hdist(demon.pos,W.pos)<16)demon.slowT=4;
   }
 }
+// party weapons: hold the Solid and press tackle (L1 / Q). Fire sword, earth hammer, water spear, air arrow, aether bolt.
+const WPN={0:{reach:3.4,cone:1.1,dmg:16,cd:0.8},1:{reach:3.4,cone:1.4,dmg:26,cd:1.3},4:{reach:5.6,cone:0.45,dmg:15,cd:0.9},2:{reach:22,cone:0.12,dmg:13,cd:0.9},3:{reach:20,cone:3.2,dmg:11,cd:1.0}};
+function demonParts(){const o=[];headCenter(lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.62*demon.scale});for(const S of demon.segs){segCenter(S,lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.5*S.w*demon.scale});}return o;}
+function makeWeapon(e){
+  const g=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:ELEM_COL[e],transparent:true,opacity:0.9});
+  const box=(x,y,z,px,py,pz)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),m);b.position.set(px,py,pz);g.add(b);return b;};
+  if(e===0)box(0.14,0.14,2.4,0,0,1.5);
+  else if(e===1){box(0.12,0.12,1.8,0,0,0.9);box(0.9,0.6,0.6,0,0,1.9);}
+  else if(e===4){box(0.09,0.09,4,0,0,1.8);const c=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.6,6),m);c.rotation.x=Math.PI/2;c.position.z=4.1;g.add(c);}
+  else if(e===2)box(0.08,0.08,1.4,0,0,0);
+  else {const b=new THREE.Mesh(new THREE.IcosahedronGeometry(0.35,0),m);g.add(b);}
+  g.visible=false;scene.add(g);return g;
+}
+function weapon(W){
+  if(!PARTY||W.wpnCD>0||W.downT>0||W.capT>0)return;
+  const w=WPN[W.elem];W.wpnCD=w.cd;W.wpnT=0.001;W.faceLock=0.3;W.mad=Math.min(1,W.mad+0.03);W.magic=Math.min(1,W.magic+0.1);
+  const fx=Math.sin(W.yaw),fz=Math.cos(W.yaw),col=ELEM_COL[W.elem];
+  let best=null,bd=1e9;
+  if(demon.alive&&!demon.dying){
+    for(const q of demonParts()){
+      const dx=q.x-W.pos.x,dz=q.z-W.pos.z,d=Math.hypot(dx,dz)||0.001;
+      if(d-q.r>w.reach)continue;
+      const cosA=(dx*fx+dz*fz)/d;
+      if(W.elem===2){if(cosA>0&&Math.abs(dx*fz-dz*fx)<q.r+0.5&&d<bd){bd=d;best=q;}}
+      else if(W.elem===3){if(d<bd){bd=d;best=q;}}
+      else if(Math.acos(clamp(cosA,-1,1))<w.cone+Math.atan2(q.r,d)&&d<bd){bd=d;best=q;}
+    }
+  }
+  W.wpnTgt=best;
+  rumble(W,0.3,0.5,90);
+  if(W.elem===1){ringBurst(W.pos,col,3);shake=Math.max(shake,0.08);}
+  if(!best)return;
+  demon.hp-=w.dmg;demon.flash=1;
+  rv2.set(best.x,best.y,best.z);for(let i=0;i<16;i++){randDir(rv).multiplyScalar(2+Math.random()*3);spark(rv2,rv,0.3,0.5,i%2?0xffffff:col,3);}
+  popup(String(w.dmg),rv2,'#'+new THREE.Color(col).getHexString(),true);shake=Math.max(shake,0.1);
+  if(W.elem===1)demon.stunT=Math.max(demon.stunT||0,0.9);
+  if(W.elem===4)demon.slowT=Math.max(demon.slowT||0,2.5);
+  if(W.elem===3)for(const o of ALL)o.magic=Math.min(1,o.magic+0.15);
+  if(demon.hp<=0)killDemon();
+}
+function weaponTick(W,dt){
+  W.wpnCD=Math.max(0,W.wpnCD-dt);
+  if(!W.wpn)W.wpn=makeWeapon(W.elem);
+  const g=W.wpn;if(W.wpnT<=0){g.visible=false;return;}
+  W.wpnT+=dt;const u=W.wpnT/0.3;if(u>=1){W.wpnT=0;g.visible=false;return;}
+  g.visible=true;g.position.set(W.pos.x,W.y+1.0,W.pos.z);
+  const fx=Math.sin(W.yaw),fz=Math.cos(W.yaw);
+  if(W.elem===0)g.rotation.set(0,W.yaw+(u-0.5)*2.4,0,'YXZ');
+  else if(W.elem===1)g.rotation.set(-1.9+2.45*Math.min(1,u*1.6),W.yaw,0,'YXZ');
+  else if(W.elem===4){g.rotation.set(0,W.yaw,0,'YXZ');const t=-0.5+Math.sin(u*Math.PI)*1.6;g.position.x+=fx*t;g.position.z+=fz*t;}
+  else if(W.elem===2){g.rotation.set(0,W.yaw,0,'YXZ');const t=1+u*20;g.position.x+=fx*t;g.position.z+=fz*t;}
+  else{const T=W.wpnTgt;if(T){g.position.x+=(T.x-W.pos.x)*u;g.position.z+=(T.z-W.pos.z)*u;g.position.y+=(T.y-g.position.y)*u;}else{g.position.x+=fx*u*12;g.position.z+=fz*u*12;}}
+  g.scale.setScalar(W.elem===3?1+Math.sin(u*20)*0.2:1);
+}
 function duelAI(W,dt){
   const inp={ix:0,iz:0,run:false},A=W.ai;
   if(!up(W)||duel.over>0){A.holdT=0;W.charging=false;return inp;}
@@ -1002,6 +1060,7 @@ function duelAI(W,dt){
   let target=null,arrive=0.4;
   if(holder===W){
     A.holdT+=dt;const dS=hdist(W.pos,tS.pos);
+    if(PARTY&&W.wpnCD<=0&&demon.alive&&!demon.dying&&dS<Math.min(9,WPN[W.elem].reach*0.8+1)&&Math.random()<dt*0.9){W.yaw=Math.atan2(tS.pos.x-W.pos.x,tS.pos.z-W.pos.z);weapon(W);}
     if(W.magic>=1&&!W.charging){const e=W.elem;
       if((e===3&&dS<26)||(e===0&&dS<16)||(e===1&&(PARTY?dS<7:nd<4))||(e===2&&nd<3.5&&!W.summoner)||(e===4&&(PARTY?dS<10:nd<6))){
         if(e!==2)W.yaw=Math.atan2(tS.pos.x-W.pos.x,tS.pos.z-W.pos.z);special(W);return inp;}}
@@ -1108,6 +1167,8 @@ function duelTick(dt,gp){
   }
   if(duel.cap)captureTick(dt);
   youMark.visible=!WATCH&&player.capT<=0;youMark.position.set(player.pos.x,player.y+(player.summoner?2.1:1.75)+Math.sin(time*5)*0.06,player.pos.z);youMark.rotation.y+=dt*3;
+  if(PARTY)for(const W of ALL)weaponTick(W,dt);
+  if(topMad){topMad.style.width=(player.mad*100).toFixed(0)+'%';topMag.style.width=(player.magic*100).toFixed(0)+'%';topMag.style.background='#'+new THREE.Color(ELEM_COL[player.elem]).getHexString();}
   if(youRing){youRing.visible=!WATCH&&player.capT<=0;youRing.position.set(player.pos.x,0.03,player.pos.z);const k=1+Math.sin(time*6)*0.06;youRing.scale.set(k,k,1);
     const nc=orb.state==='held'&&orb.holder===player?null:switchCandidate();nextRing.visible=!!nc&&!WATCH;if(nc){nextRing.position.set(nc.pos.x,0.03,nc.pos.z);const k2=1+Math.sin(time*9)*0.1;nextRing.scale.set(k2,k2,1);}}
   meterT-=dt;if(meterT<=0&&!WATCH){meterT=0.1;const P=player,c='#'+new THREE.Color(ELEM_COL[P.elem]).getHexString();
@@ -1122,7 +1183,7 @@ function duelReset(){
   orbMorph.rotation.z=0;rv.set(0,0,0);spawnPuffs(12,2.2,rv,0.9);
   duel.over=0;showBanner('');switchTo(ALL.find(W=>W.team===0&&W.role==='fwd'));duelScore();
 }
-let arenaRing=null, youMark=null, meterEl=null, youRing=null, nextRing=null;
+let arenaRing=null, youMark=null, meterEl=null, youRing=null, nextRing=null, topMad=null, topMag=null;
 if(DUEL){
   arenaRing=new THREE.Mesh(new THREE.RingGeometry(ARENA_R-0.1,ARENA_R+0.1,120),new THREE.MeshBasicMaterial({color:0x4a4f8e,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
   arenaRing.visible=!PARTY;arenaRing.rotation.x=-Math.PI/2;arenaRing.position.y=0.004;scene.add(arenaRing);
@@ -1130,11 +1191,12 @@ if(DUEL){
   document.body.classList.add('duel');
   const mkRing=(c,o)=>{const m=new THREE.Mesh(new THREE.RingGeometry(0.62,0.78,40),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:o,side:THREE.DoubleSide,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;};
   youRing=mkRing(0xffffff,0.95);nextRing=mkRing(0xffd23f,0.6);
+  const tm=document.createElement('div');tm.id='topMeters';tm.innerHTML='<div class="tb"><i id="tMad" style="background:#7a3aff"></i></div><div class="tb"><i id="tMag"></i></div>';document.body.appendChild(tm);topMad=document.getElementById('tMad');topMag=document.getElementById('tMag');
   meterEl=document.createElement('div');meterEl.id='duelMeters';document.body.appendChild(meterEl);
   addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyI')setTactic(tactic.v+1,tactic.h);else if(e.code==='KeyK')setTactic(tactic.v-1,tactic.h);else if(e.code==='KeyJ')setTactic(tactic.v,tactic.h-1);else if(e.code==='KeyL')setTactic(tactic.v,tactic.h+1);});
   document.querySelector('.hud h1').textContent=PARTY?'VOID WIZARD · PARTY':'VOID WIZARD · DUEL';
   document.getElementById('tip').textContent='5 a side. You play whoever on blue has the Quintessence; Triangle / F takes over the wizard nearest it. Press catch to receive or pick it up. It turns into the element of whoever holds it. Holding it fills magic (Triangle for a special) but feeds madness. Right stick / I J K L: press, defend, shift left or right. Hit the red summoner to break its 5-sided ward, then capture it.';
-  if(PARTY)document.getElementById('tip').textContent='You and three wizards against the demon. Catch the Solid (it takes your element), pass it on, and the more different elements it passes through, the harder it hits. Passing fills magic: Triangle for a special. White ring is you; gold ring is who you become when you press Triangle.';
+  if(PARTY)document.getElementById('tip').textContent='You and four wizards (the summoner plus fire, water, air and earth) against the demon. Catch the Solid (it takes your element), pass it on, and the more different elements it passes through, the harder it hits. Passing fills magic: Triangle for a special. Holding the Solid, L1 / Q swings your weapon (sword, hammer, spear, arrow or bolt). Top right: madness (purple) and magic. White ring is you; gold ring is who you become when you press Triangle.';
   const ml=document.getElementById('modeLink');if(PARTY){ml.textContent='TRY THE 2V2 DUEL';ml.href='?duel';}else{ml.textContent='BACK TO THE DEMON';ml.href='?';}
 }
 
@@ -1578,7 +1640,7 @@ function orbVsDemon(){
   if(!hit)return;
   const head=hit==='head';
   const relay=PARTY&&orb.res>=1&&orb.chain?orb.chain.size:1;
-  const mult=RES_MULT[orb.res]*(orb.fast?1.3:1)*(orb.oop?1.6:1)*(head?1.5:1)*(1+0.5*(relay-1))*(orb.special==='fire'?1.8:1);
+  const mult=RES_MULT[orb.res]*(orb.fast?1.3:1)*(orb.oop?1.6:1)*(head?1.5:1)*(1+0.5*(relay-1))*(orb.special==='fire'?1.8:orb.special==='aether'?2:1);
   if(relay>=3){demon.stunT=Math.max(demon.stunT||0,1.2);for(let i=0;i<30;i++){randDir(rv).multiplyScalar(3+Math.random()*3);spark(orb.p,rv,0.5,0.7,ELEM_COL[i%5],2.5);}}
   const dmg=(6+sp*0.8)*mult*cur.dmg;
   const hs=Math.hypot(orb.v.x,orb.v.z)||1, pushX=orb.v.x/hs, pushZ=orb.v.z/hs;
