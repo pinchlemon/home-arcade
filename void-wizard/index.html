@@ -62,6 +62,7 @@ body{
 #duelMeters .bar{height:4px;background:rgba(120,128,220,.2)}
 #duelMeters .bar i{display:block;height:100%}
 #duelMeters span{color:var(--gold);margin-top:4px}
+body.duel #duelBanner,body.duel #duelMeters,body.duel .pop,body.duel .solid-name,body.duel .px,body.duel .fs{display:none!important}
 #duelBanner span{display:block;margin-top:8px;font-size:10px;letter-spacing:.1em;color:var(--ink);text-shadow:none}
 .pop{position:fixed;left:0;top:0;font-size:13px;letter-spacing:.12em;pointer-events:none;white-space:nowrap;text-shadow:0 0 8px currentColor;will-change:transform,opacity}
 .solid-name span{display:block;margin-top:4px;font-size:8px;letter-spacing:.06em;opacity:.75;white-space:normal}
@@ -1116,6 +1117,7 @@ if(DUEL){
   arenaRing=new THREE.Mesh(new THREE.RingGeometry(ARENA_R-0.1,ARENA_R+0.1,120),new THREE.MeshBasicMaterial({color:0x4a4f8e,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
   arenaRing.rotation.x=-Math.PI/2;arenaRing.position.y=0.004;scene.add(arenaRing);
   youMark=new THREE.Mesh(new THREE.ConeGeometry(0.13,0.26,3),new THREE.MeshBasicMaterial({color:0xffffff}));youMark.rotation.x=Math.PI;scene.add(youMark);
+  document.body.classList.add('duel');
   meterEl=document.createElement('div');meterEl.id='duelMeters';document.body.appendChild(meterEl);
   addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyI')setTactic(tactic.v+1,tactic.h);else if(e.code==='KeyK')setTactic(tactic.v-1,tactic.h);else if(e.code==='KeyJ')setTactic(tactic.v,tactic.h-1);else if(e.code==='KeyL')setTactic(tactic.v,tactic.h+1);});
   document.querySelector('.hud h1').textContent='VOID WIZARD · DUEL';
