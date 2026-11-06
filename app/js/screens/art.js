@@ -179,6 +179,7 @@ function openViewer(app, g, it, F) {
         <div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Art' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(it.name)}</span><span class="sub">${esc(g.name)} · ${esc(it.kind === 'symbol' ? '8×8 symbol' : it.file)}</span></span>
+          ${it.kind === 'image' ? iconBtn('paint', A(() => { app.close(); openDraw(app, g, it, F); }), { color: '#fff', label: 'Draw on it' }) : ''}
           ${iconBtn('edit', A(() => { app.close(); jump(app, g, it); }), { color: '#fff', label: 'Where it is used' })}
         </div>
         <div class="screen fit gap20 checker"><canvas class="pix" id="artv" role="img" aria-label="${esc(it.name)}, drawn big"></canvas></div>

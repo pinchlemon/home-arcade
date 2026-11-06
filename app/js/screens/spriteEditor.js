@@ -3,6 +3,7 @@
 // Screen, top to bottom: the top bar (back, layer and size, undo, redo, ⋯ Sprite menu); the canvas; the tools (like the
 // Studio's tabs: the chosen one shows its name); a context bar (the palette, or while selecting the selection's buttons, or
 // while pixels float how to change them); the timeline. Settings open as a sheet over the lower half.
+// Controller: the ring moves over the buttons (not the timeline cells); LB/RB step frames, Start plays, X undoes, B goes back.
 // Canvas: one finger uses the tool; two fingers pinch to zoom and drag to move; a quick two-finger tap undoes.
 // Tools: pencil, eraser, fill, picker, select (box, lasso, magic wand; NEW, ADD or SUB), move, hand.
 // Selecting: drawing stays inside the selection. Move lifts the selected pixels (or the whole layer) so they float; while they
@@ -101,6 +102,9 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     return { ...s, cels };
   }
   function changed() { ed.saved = false; status(); clearTimeout(saveT); saveT = setTimeout(save, 700); }
+  // leaving the app (home screen, app switcher) saves straight away, so the last stroke is never lost
+  const flush = () => { if (document.visibilityState === 'hidden' && saveT && !ed.discarded) save(); };
+  document.addEventListener('visibilitychange', flush); addEventListener('pagehide', flush);
 
   // ---------------------------------------------------------------- undo (each step keeps the old cels; cels are never changed in place once made)
   function snap() {
@@ -702,7 +706,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     s.tags.forEach((t, i) => {
       h += `<button class="se-tag${ed.playTag === i ? ' sel' : ''}" style="top:${tagLane[i] * 14}px;grid-row:${tagLane[i] + 1};grid-column:${t.from + 2}/${t.to + 3};--tc:${rgbHex(t.color)}" ${A(() => setTag(i))} aria-label="Tag ${esc(t.name)}">${esc(t.name)}</button>`;
     });
-    for (let f = 0; f < n; f++) h += `<button class="se-fh${f === ed.frame ? ' cur' : ''}" data-f="${f}" style="top:${nl * 14}px;grid-row:${nl + 1};grid-column:${f + 2}" ${A(() => setFrame(f))} aria-label="Frame ${f + 1}">${f + 1}</button>`;
+    for (let f = 0; f < n; f++) h += `<button class="se-fh${f === ed.frame ? ' cur' : ''}" data-pad="skip" data-f="${f}" style="top:${nl * 14}px;grid-row:${nl + 1};grid-column:${f + 2}" ${A(() => setFrame(f))} aria-label="Frame ${f + 1}">${f + 1}</button>`;
     for (let r = 0; r < s.layers.length; r++) {
       const l = s.layers.length - 1 - r, L = s.layers[l], row = nl + 2 + r;
       h += `<div class="se-ln${l === ed.layer ? ' sel' : ''}" style="grid-row:${row}">
@@ -711,7 +715,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       </div>`;
       for (let f = 0; f < n; f++) {
         if (L.group) { h += `<span class="se-cel grp" style="grid-row:${row};grid-column:${f + 2}"></span>`; continue; }
-        h += `<button class="se-cel${hasPixels(s.cels.get(celKey(l, f))) ? ' on' : ''}${l === ed.layer ? ' lrow' : ''}${f === ed.frame ? ' cur' : ''}" data-f="${f}" data-c="${l}:${f}" style="grid-row:${row};grid-column:${f + 2}" ${A(() => setCell(l, f))} aria-label="${esc(L.name)}, frame ${f + 1}"></button>`;
+        h += `<button data-pad="skip" class="se-cel${hasPixels(s.cels.get(celKey(l, f))) ? ' on' : ''}${l === ed.layer ? ' lrow' : ''}${f === ed.frame ? ' cur' : ''}" data-f="${f}" data-c="${l}:${f}" style="grid-row:${row};grid-column:${f + 2}" ${A(() => setCell(l, f))} aria-label="${esc(L.name)}, frame ${f + 1}"></button>`;
       }
     }
     return h + '</div>';
@@ -889,7 +893,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ${s.palette.some(c => sameColor(c, ed.color)) ? '' : iconBtn('plus', A(() => { step(); s.palette.push(ed.color.slice()); ed.sw = 1e6; changed(); rer(); }), { color: PINK, label: 'Add this colour to the palette' })}
       </div>`;
       const tl = `<div class="plate se-tl">
-        <div class="se-tlbar">
+        <div class="se-tlbar" data-pad="pager">
           ${iconBtn(ed.playing ? 'pause' : 'play', A(play), { color: '#fff', label: ed.playing ? 'Stop' : 'Play' + (s.tags[ed.playTag] ? ' ' + s.tags[ed.playTag].name : '') })}
           ${iconBtn('left', A(() => setCell(ed.layer, (ed.frame + s.frames.length - 1) % s.frames.length)), { color: '#fff', label: 'Previous frame' })}
           <button class="se-fbtn" ${A(() => setFrame(ed.frame))} aria-label="Frame settings"><span class="cap acc" id="se-fn">Frame ${ed.frame + 1} / ${s.frames.length}</span><span class="sub ell" id="se-fl">${esc(frameLine())}</span></button>
@@ -937,10 +941,18 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     frame(t) {
       if (ed.playing && ed.spr) tickPlay(performance.now());
       else if ((ed.sel || ed.preview || act) && ed.spr && performance.now() - antsT > 120) { antsT = performance.now(); draw(true); }
-      if (input.pressed('b')) { if (ed.sheet) { ed.sheet = null; rer(); } else app.close(); }
-      else padFrame(document.getElementById('app'), nav, input);
+      // controller: B closes a sheet or the editor; LB and RB step frames; Start plays; X undoes; the ring does the rest
+      if (input.pressed('b')) { if (ed.sheet) { ed.sheet = null; rer(); } else app.close(); return; }
+      if (ed.spr) {
+        const n = ed.spr.frames.length;
+        if (input.pressed('lb')) { setCell(ed.layer, (ed.frame + n - 1) % n); return; }
+        if (input.pressed('rb')) { setCell(ed.layer, (ed.frame + 1) % n); return; }
+        if (input.pressed('start')) { play(); return; }
+        if (input.pressed('x')) { undo(); return; }
+      }
+      padFrame(document.getElementById('app'), nav, input);
     },
-    onClose() { if (saveT && !ed.discarded) save(); if (opts.onClose) saving.then(opts.onClose); }
+    onClose() { document.removeEventListener('visibilitychange', flush); removeEventListener('pagehide', flush); if (saveT && !ed.discarded) save(); if (opts.onClose) saving.then(opts.onClose); }
   };
   app.open(ov);
 }
