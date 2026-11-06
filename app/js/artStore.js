@@ -83,7 +83,7 @@ export function blankSprite(w, h, name) {
 }
 
 // A game picture becomes a sprite: one layer; a sprite sheet is cut into its frames, and its animations become tags.
-function fromImage(img, item, ticksOf) {
+export function spriteFromImage(img, item, ticksOf) {
   const all = imageData(img), cw = item.cell ? item.cell[0] : all.width, ch = item.cell ? item.cell[1] : all.height;
   const cols = Math.max(1, Math.floor(all.width / cw)), rows = Math.max(1, Math.floor(all.height / ch));
   const n = item.cell ? Math.min(item.frames || cols * rows, cols * rows) : 1;
@@ -114,7 +114,7 @@ export async function openSprite(game, item, ticksOf) {
     const res = await fetch('../' + game + '/' + ase, { cache: 'no-cache' });
     if (res.ok && (res.headers.get('content-type') || '').indexOf('html') < 0) return await readAse(await res.arrayBuffer());
   } catch (e) { /* offline or not there: start from the picture */ }
-  return fromImage(await loadImage('../' + game + '/' + item.file), item, ticksOf);
+  return spriteFromImage(await loadImage('../' + game + '/' + item.file), item, ticksOf);
 }
 
 // The PNG the game reads. A sprite sheet keeps its old layout (as many frames across as before); a single picture is frame 1.

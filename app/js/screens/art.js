@@ -11,6 +11,7 @@ import * as input from '../input.js';
 import { makeNav, padFrame } from '../padnav.js';
 import * as store from '../artStore.js';
 import { openSpriteEditor } from './spriteEditor.js';
+import { readAse } from '../ase.js';
 
 const PINK = '#ff4fd8';
 const loaded = {}, sizes = {};
@@ -226,16 +227,36 @@ function openNew(app, g, f) {
   const v = { name: '', w: 32, h: 32, sheet: false };
   const nav = makeNav(), rer = () => { if (app.overlay === ov) app.render(); };
   const bump = (k, d) => { const i = SIZES.indexOf(v[k]); v[k] = SIZES[Math.max(0, Math.min(SIZES.length - 1, (i < 0 ? 4 : i) + d))]; rer(); };
-  function create() {
-    const name = (v.name || '').trim() || 'Sprite';
+  function create(spr, fileName) {
+    spr = spr && spr.cels ? spr : null;
+    const name = (v.name || '').trim() || (fileName ? fileName.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/^./, c => c.toUpperCase()) : 'Sprite');
     const x = folders(app, g), taken = new Set(x ? x.list.flatMap(ff => ff.items.map(it => it.id)) : []);
     let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sprite', id = slug, n = 2;
     while (taken.has(id)) id = slug + '-' + n++;
-    const item = { id, name, file: 'assets/' + id + '.png', help: 'Drawn on the phone' };
-    if (v.sheet) { item.cell = [v.w, v.h]; item.frames = 1; item.anims = []; }
+    const item = { id, name, file: 'assets/' + id + '.png', help: fileName ? 'From ' + fileName : 'Drawn on the phone' };
+    if (v.sheet || (spr && spr.frames.length > 1)) { item.cell = [spr ? spr.w : v.w, spr ? spr.h : v.h]; item.frames = spr ? spr.frames.length : 1; item.anims = []; }
     app.ui.artFolder = f.id; app.ui.artSel = id; app.saveUI();
     app.close();
-    openSpriteEditor(app, g, item, { spr: store.blankSprite(v.w, v.h), extra: { isNew: true, folder: f.id, item } });
+    openSpriteEditor(app, g, item, { spr: spr || store.blankSprite(v.w, v.h), extra: { isNew: true, folder: f.id, item } });
+  }
+  // start from a file: an .aseprite as it is; a picture as one frame, or (Animated on) cut into frames of the size set above
+  async function fromFile(file) {
+    if (!file) return;
+    try {
+      let spr;
+      if (/\.(aseprite|ase)$/i.test(file.name)) spr = await readAse(await file.arrayBuffer());
+      else {
+        const url = URL.createObjectURL(file), img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('not a picture')); im.src = url; });
+        const cut = v.sheet && img.naturalWidth % v.w === 0 && img.naturalHeight % v.h === 0 && (img.naturalWidth > v.w || img.naturalHeight > v.h);
+        if (v.sheet && !cut) app.toast('The picture is not a whole number of ' + v.w + '×' + v.h + ' frames, so it comes in as one frame');
+        spr = store.spriteFromImage(img, cut ? { cell: [v.w, v.h] } : {});
+        if (cut) { // leave out empty frames at the end
+          while (spr.frames.length > 1 && ![...spr.cels.keys()].some(k => +k.split(':')[1] === spr.frames.length - 1)) spr.frames.pop();
+        }
+        URL.revokeObjectURL(url);
+      }
+      create(spr, file.name);
+    } catch (e) { app.toast('Could not open ' + file.name + ': ' + (e.message || e)); }
   }
   const ov = {
     render() {
@@ -251,10 +272,14 @@ function openNew(app, g, f) {
           <div class="grow"><span class="t"><span class="cap">Height</span><span class="sub">Pixels down</span></span>${stepper(String(v.h), A(() => bump('h', -1)), A(() => bump('h', 1)), 'height')}</div>
           <div class="grow"><span class="t"><span class="cap">Animated</span><span class="sub" style="white-space:normal">A sprite sheet: its frames are saved side by side</span></span>${toggleBtn(v.sheet, A(() => { v.sheet = !v.sheet; rer(); }))}</div>
         </div>
-        <div class="plate bar">${plateBtn('plus', 'Create', A(create))}</div>
+        <div class="plate bar" style="gap:8px">${plateBtn('plus', 'Create', A(() => create()))}
+          <label class="plate btn se-file" style="flex:1">${well(28, icon('down', '#fff'))}<span>Open a file</span><input type="file" id="nw-file" accept="image/png,image/gif,image/jpeg,image/webp,.aseprite,.ase"></label></div>
       </div>`;
     },
-    mount(root) { const i = root.querySelector('#nw-name'); if (i) i.addEventListener('input', () => { v.name = i.value; }); },
+    mount(root) {
+      const i = root.querySelector('#nw-name'); if (i) i.addEventListener('input', () => { v.name = i.value; });
+      const fi = root.querySelector('#nw-file'); if (fi) fi.addEventListener('change', () => { const f = fi.files && fi.files[0]; fi.value = ''; fromFile(f); });
+    },
     frame() { if (input.pressed('b')) app.close(); else padFrame(document.getElementById('app'), nav, input); }
   };
   app.open(ov);

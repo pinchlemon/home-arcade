@@ -321,6 +321,14 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .se-pick{display:block;width:100%;flex:none;border-radius:6px;margin-top:8px;touch-action:none}
 .se-hexrow{display:flex;align-items:flex-end;gap:10px;margin-top:4px}
 .se-note{margin-top:8px;white-space:normal}
+.se-file{position:relative;cursor:pointer}
+.se-file input{position:absolute;inset:0;opacity:0;width:100%;height:100%;font-size:0}
+.se-cvrow{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.se-cvrow input{width:100%}
+.se-anchor{display:grid;grid-template-columns:repeat(3,14px);gap:3px;padding:2px 0 5px}
+.se-anc{width:14px;height:14px;border-radius:3px;background:#2a2a30;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+.se-anc.on{background:var(--acc)}
+.se-ready{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;border-radius:8px;background:#000;box-shadow:inset 0 0 0 1px rgba(255,79,216,.35);justify-content:space-between}
 @media (orientation:landscape) and (max-height:520px){
   /* the canvas on the left, full height; the bars and the timeline in a column on the right */
   #app .sprite-ed{display:grid;grid-template-columns:minmax(0,1fr) 362px;grid-template-rows:auto auto auto minmax(0,1fr);column-gap:16px;row-gap:8px}

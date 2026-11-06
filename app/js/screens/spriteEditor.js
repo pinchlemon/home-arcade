@@ -4,7 +4,10 @@
 // Tools: pencil, eraser, fill, colour picker, select (box, lasso, magic wand; replace, add or take away), move, hand (move the view).
 // Selecting: drawing stays inside the selection. Move lifts the selected pixels (or the whole layer) so they float; while they
 // float they can be flipped, turned and scaled (always from the original, so nothing is lost), and they are put down when you
-// draw, change frame or layer, or press Drop. Copy, cut and paste work between sprites. The zoom label in the corner fits the sprite back on screen.
+// draw, change frame or layer, or press Drop. Copy, cut and paste work between sprites.
+// The ⋯ menu: Canvas (size with an anchor, scale, trim, crop to the selection, flip or turn everything), Import (a picture comes
+// in as floating pixels; an .aseprite file replaces the sprite) and Export (PNG frame or sheet, animated GIF, .aseprite; shared
+// through the phone's share sheet). The zoom label in the corner fits the sprite back on screen.
 // Colours: the big swatch opens the colour picker (add or remove palette colours there); the strip is the palette.
 // Timeline (like Aseprite's): layers down the side (top layer first), frames across. Tap a cell to go there; tap the
 // current frame number, layer name or tag again for its settings. Tags are named runs of frames (the game's animations).
@@ -16,6 +19,8 @@ import { makeNav, padFrame } from '../padnav.js';
 import { celKey, flatten, visibleLayers } from '../ase.js';
 import * as store from '../artStore.js';
 import * as SEL from '../spriteSel.js';
+import { encodeGif } from '../gif.js';
+import { readAse, writeAse } from '../ase.js';
 
 let CLIP = null;   // copied pixels { data, w, h, mask, x, y }, kept while the app is open so they can go to another sprite
 
@@ -45,7 +50,8 @@ function hsvToRgb(h, s, v) {
 export function openSpriteEditor(app, g, item, opts = {}) {
   const ed = { spr: null, err: null, layer: 0, frame: 0, tool: 'pencil', after: 'pencil', color: [0, 0, 0, 255], zoom: 0, ox: 0, oy: 0,
     onion: false, grid: true, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0],
-    sel: null, float: null, shape: 'box', mode: 0, contiguous: true, preview: null };
+    sel: null, float: null, shape: 'box', mode: 0, contiguous: true, preview: null,
+    cv: null, exScale: 4, exCols: 0, out: null, gameCols: opts.sheetCols || 0 };
   const nav = makeNav();
   let cv = null, ctx = null, dpr = 1, CW = 0, CH = 0;
   const rer = () => { if (app.overlay === ov) app.render(); };
@@ -69,7 +75,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   let saveT = 0, saving = Promise.resolve();
   function extra() {
     const x = { ...(opts.extra || {}) };
-    if (opts.sheetCols) x.sheetCols = opts.sheetCols;
+    if (ed.gameCols) x.sheetCols = ed.gameCols;
     if (x.item) {
       // a new sprite: its entry in the Art list follows the drawing (frames, and its tags as animations)
       const spr = ed.spr, it = { ...x.item };
@@ -96,11 +102,12 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   // ---------------------------------------------------------------- undo (each step keeps the old cels; cels are never changed in place once made)
   function snap() {
     const s = ed.spr;
-    return { layers: s.layers.map(l => ({ ...l })), frames: s.frames.map(f => ({ ...f })), tags: s.tags.map(t => ({ ...t, color: t.color.slice() })),
+    return { w: s.w, h: s.h, layers: s.layers.map(l => ({ ...l })), frames: s.frames.map(f => ({ ...f })), tags: s.tags.map(t => ({ ...t, color: t.color.slice() })),
       palette: s.palette.map(c => c.slice()), cels: new Map(s.cels), layer: ed.layer, frame: ed.frame, sel: ed.sel, float: ed.float };
   }
   function restore(x) {
-    Object.assign(ed.spr, { layers: x.layers, frames: x.frames, tags: x.tags, palette: x.palette, cels: x.cels });
+    if (x.w !== ed.spr.w || x.h !== ed.spr.h) ed.zoom = 0;
+    Object.assign(ed.spr, { w: x.w, h: x.h, layers: x.layers, frames: x.frames, tags: x.tags, palette: x.palette, cels: x.cels });
     ed.layer = Math.min(x.layer, x.layers.length - 1); ed.frame = Math.min(x.frame, x.frames.length - 1); ed.sel = x.sel || null; ed.float = x.float || null;
   }
   function step() { ed.hist.push(snap()); if (ed.hist.length > 200) ed.hist.shift(); ed.fut = []; }
@@ -321,6 +328,109 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     const s = ed.spr, cel = curCel(), data = cel ? cel.data : new Uint8ClampedArray(s.w * s.h * 4);
     if (x < 0 || y < 0 || x >= s.w || y >= s.h) return;
     step(); ed.sel = SEL.combine(ed.sel, SEL.wandMask(data, s.w, s.h, x, y, ed.contiguous), ed.mode); changed(); rer();
+  }
+
+  // ---------------------------------------------------------------- the whole canvas
+  // every cel redrawn at a new size: from(x, y) gives where each new pixel comes from in the old picture (or null)
+  function remap(w2, h2, from) {
+    stop(); settle(); step();
+    const s = ed.spr, m = new Map();
+    for (const [k, c] of s.cels) {
+      const d = new Uint8ClampedArray(w2 * h2 * 4); let any = false;
+      for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+        const q = from(x, y); if (!q || q[0] < 0 || q[1] < 0 || q[0] >= s.w || q[1] >= s.h) continue;
+        const i = (q[1] * s.w + q[0]) * 4, j = (y * w2 + x) * 4; if (!c.data[i + 3]) continue;
+        d[j] = c.data[i]; d[j + 1] = c.data[i + 1]; d[j + 2] = c.data[i + 2]; d[j + 3] = c.data[i + 3]; any = true;
+      }
+      if (any) m.set(k, { data: d, opacity: c.opacity, v: 1 });
+    }
+    s.cels = m; s.w = w2; s.h = h2; ed.sel = null; ed.zoom = 0; ed.cv = null; ed.sheet = null; changed(); rer();
+  }
+  const MAXSIDE = 1024;
+  function resizeCanvas(w2, h2, ax, ay) {
+    const s = ed.spr; w2 = Math.max(1, Math.min(MAXSIDE, w2 | 0)); h2 = Math.max(1, Math.min(MAXSIDE, h2 | 0));
+    if (w2 === s.w && h2 === s.h) { toast('That is the size it is'); return; }
+    const dx = Math.round((w2 - s.w) * ax), dy = Math.round((h2 - s.h) * ay);
+    remap(w2, h2, (x, y) => [x - dx, y - dy]);
+  }
+  function crop(b) { if (!b) return; remap(b.w, b.h, (x, y) => [x + b.x, y + b.y]); }
+  function trim() {
+    const s = ed.spr, any = new Uint8Array(s.w * s.h);
+    for (const c of s.cels.values()) for (let i = 0; i < any.length; i++) if (c.data[i * 4 + 3]) any[i] = 1;
+    const b = SEL.maskBounds(any, s.w, s.h);
+    if (!b) { toast('Nothing drawn yet'); return; }
+    if (b.w === s.w && b.h === s.h) { toast('Nothing to trim'); return; }
+    crop(b);
+  }
+  function scaleSprite(f) {
+    const s = ed.spr, w2 = Math.round(s.w * f), h2 = Math.round(s.h * f);
+    if (w2 < 1 || h2 < 1 || w2 > MAXSIDE || h2 > MAXSIDE) { toast(f > 1 ? 'That would be too big' : 'That would be too small'); return; }
+    remap(w2, h2, (x, y) => [Math.floor(x * s.w / w2), Math.floor(y * s.h / h2)]);
+  }
+  const flipCanvas = (hz) => { const s = ed.spr, w = s.w, h = s.h; remap(w, h, hz ? (x, y) => [w - 1 - x, y] : (x, y) => [x, h - 1 - y]); };
+  const turnCanvas = (q) => { const s = ed.spr, w = s.w, h = s.h; remap(h, w, q > 0 ? (x, y) => [y, h - 1 - x] : (x, y) => [w - 1 - y, x]); };
+
+  // ---------------------------------------------------------------- import and export
+  async function importFile(file) {
+    if (!file) return;
+    try {
+      if (/\.(aseprite|ase)$/i.test(file.name)) {
+        const n = await readAse(await file.arrayBuffer());
+        if (!confirm('Replace ' + item.name + ' with ' + file.name + ' (' + n.w + '×' + n.h + ', ' + n.frames.length + (n.frames.length === 1 ? ' frame' : ' frames') + ')? Undo brings it back.')) return;
+        stop(); settle(); step();
+        Object.assign(ed.spr, { w: n.w, h: n.h, layers: n.layers, frames: n.frames, cels: n.cels, tags: n.tags, palette: n.palette.length ? n.palette : ed.spr.palette });
+        ed.layer = Math.max(0, n.layers.findIndex(l => !l.group)); ed.frame = 0; ed.sel = null; ed.zoom = 0; ed.playTag = -1; ed.sheet = null;
+        changed(); rer(); toast('Opened ' + file.name);
+        return;
+      }
+      const why = blocked(ed.layer); if (why) { toast(why); return; }
+      const bmp = await createImageBitmap(file), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const x = c.getContext('2d'); x.drawImage(bmp, 0, 0); const data = x.getImageData(0, 0, c.width, c.height).data;
+      stop(); settle(); step();
+      const s = ed.spr;
+      ed.float = { orig: { data, w: c.width, h: c.height, mask: new Uint8Array(c.width * c.height).fill(1) }, cx: s.w / 2, cy: s.h / 2, s: 1, r: 0, fx: false, fy: false, layer: ed.layer, frame: ed.frame, noSel: false };
+      follow(); ed.tool = 'move'; ed.sheet = null; changed(); rer();
+      toast(c.width > s.w || c.height > s.h ? 'Bigger than the canvas: drag it, size it down, or make the canvas bigger' : 'Drag it into place, then Drop');
+    } catch (e) { toast('Could not open ' + file.name + ': ' + (e.message || e)); }
+  }
+  // a picture made bigger by whole pixels
+  function upscale(d, w, h, k) {
+    if (k === 1) return d;
+    const W = w * k, out = new Uint8ClampedArray(W * h * k * 4);
+    for (let y = 0; y < h * k; y++) for (let x = 0; x < W; x++) { const i = ((y / k | 0) * w + (x / k | 0)) * 4; out.set(d.subarray(i, i + 4), (y * W + x) * 4); }
+    return out;
+  }
+  const pngBlob = (d, w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').putImageData(new ImageData(d, w, h), 0, 0); return new Promise(r => c.toBlob(r, 'image/png')); };
+  const baseName = () => item.file.split('/').pop().replace(/\.png$/i, '');
+  async function prepare(kind) {
+    const s = withFloat(), k = ed.exScale, n = s.frames.length, t = s.tags[ed.playTag];
+    ed.out = { busy: true }; rer();
+    try {
+      let blob, name;
+      if (kind === 'frame') { blob = await pngBlob(upscale(flatten(s, ed.frame), s.w, s.h, k), s.w * k, s.h * k); name = baseName() + (n > 1 ? '-' + (ed.frame + 1) : '') + (k > 1 ? '@' + k + 'x' : '') + '.png'; }
+      else if (kind === 'sheet') {
+        const cols = Math.max(1, Math.min(n, ed.exCols || n)), rows = Math.ceil(n / cols), W = s.w * cols, H = s.h * rows, all = new Uint8ClampedArray(W * H * 4);
+        for (let f = 0; f < n; f++) { const d = flatten(s, f), ox = (f % cols) * s.w, oy = Math.floor(f / cols) * s.h; for (let y = 0; y < s.h; y++) all.set(d.subarray(y * s.w * 4, (y + 1) * s.w * 4), ((oy + y) * W + ox) * 4); }
+        blob = await pngBlob(upscale(all, W, H, k), W * k, H * k); name = baseName() + '-sheet' + (k > 1 ? '@' + k + 'x' : '') + '.png';
+      } else if (kind === 'gif') {
+        const from = t ? t.from : 0, to = t ? t.to : n - 1, list = [];
+        for (let f = from; f <= to; f++) list.push(f);
+        if (t && t.dir === 1) list.reverse();
+        if (t && t.dir === 2) for (let f = to - 1; f > from; f--) list.push(f);
+        const frames = list.map(f => ({ data: upscale(flatten(s, f), s.w, s.h, k), delay: s.frames[f].dur }));
+        blob = new Blob([encodeGif(frames, s.w * k, s.h * k)], { type: 'image/gif' }); name = baseName() + (t ? '-' + t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '') + '.gif';
+      } else { blob = new Blob([await writeAse(s)], { type: 'application/octet-stream' }); name = baseName() + '.aseprite'; }
+      ed.out = { file: new File([blob], name, { type: blob.type || 'application/octet-stream' }) };
+    } catch (e) { ed.out = null; toast('Could not make it: ' + (e.message || e)); }
+    rer();
+  }
+  // hand the file to the phone's share sheet (Save to Files, AirDrop, Messages…); a computer downloads it
+  async function share(file) {
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
   // ---------------------------------------------------------------- touch on the canvas
@@ -579,8 +689,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function sheetHtml() {
     const sh = ed.sheet; if (!sh) return '';
     const s = ed.spr, close = iconBtn('check', A(() => { ed.sheet = null; rer(); }), { color: '#fff', label: 'Done' });
-    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(SHAPE_ICONS.box, PINK) : icon(sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
-    const btns = (list) => `<div class="se-btns">${list.map(([ic, label, fn, dis]) => `<button class="btn bare" ${A(fn)}${dis ? ' disabled' : ''}>${well(28, icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
+    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(SHAPE_ICONS.box, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
+    const btns = (list) => `<div class="se-btns">${list.map(([ic, label, fn, dis, rows]) => `<button class="btn bare" ${A(fn)}${dis ? ' disabled' : ''}>${well(28, rows ? svgRows(rows, '#e4e2dc') : icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
     const field = (id, val, label) => `<label class="se-field"><span class="cap">${esc(label)}</span><input id="${id}" value="${esc(val)}" maxlength="40" autocomplete="off" spellcheck="false"></label>`;
     let body = '';
     if (sh.kind === 'color') {
@@ -624,12 +734,40 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ['trash', 'Delete', del], ['fill', 'Fill', fillSel], [null, 'Flip ↔', flipH, FLIP_H],
         [null, 'Flip ↕', flipV, FLIP_V], ['undo', 'Turn left', () => turn(3)], ['redo', 'Turn right', () => turn(1)]]) + `
         <div class="grow"><span class="t"><span class="cap">Magic wand</span><span class="sub">${ed.contiguous ? 'Only the touching pixels of that colour' : 'That colour anywhere on the layer'}</span></span>${toggle(ed.contiguous, A(() => { ed.contiguous = !ed.contiguous; rer(); }), 'Touching only')}</div>`;
+    } else if (sh.kind === 'canvas') {
+      const c = ed.cv || (ed.cv = { w: s.w, h: s.h, ax: 0.5, ay: 0.5 }), b = ed.sel && SEL.maskBounds(ed.sel.mask, s.w, s.h);
+      const gameCell = item.cell && !(opts.extra && opts.extra.item) ? item.cell : null, game = gameCell ? gameCell[0] + '×' + gameCell[1] : !(opts.extra && opts.extra.item) ? 'this size' : '';
+      const anchor = [0, 0.5, 1].map(ay => [0, 0.5, 1].map(ax => `<button class="se-anc${c.ax === ax && c.ay === ay ? ' on' : ''}" ${A(() => { c.ax = ax; c.ay = ay; rer(); })} aria-label="Keep the picture ${['top', 'middle', 'bottom'][ay * 2]} ${['left', 'centre', 'right'][ax * 2]}" aria-pressed="${c.ax === ax && c.ay === ay}"></button>`).join('')).join('');
+      body = head('Canvas', s.w + '×' + s.h + (game ? ' · the game expects ' + game : '')) + `
+        <div class="se-cvrow">
+          <label class="se-field"><span class="cap">Width</span><input id="se-cw" type="number" inputmode="numeric" min="1" max="${MAXSIDE}" value="${c.w}"></label>
+          <label class="se-field"><span class="cap">Height</span><input id="se-ch" type="number" inputmode="numeric" min="1" max="${MAXSIDE}" value="${c.h}"></label>
+          <div class="se-field"><span class="cap">Anchor</span><div class="se-anchor">${anchor}</div></div>
+        </div>
+        ${btns([['check', 'Use this size', () => { const w = +document.getElementById('se-cw').value, h = +document.getElementById('se-ch').value; resizeCanvas(w, h, c.ax, c.ay); }],
+          ['select', 'Trim', trim], ['scene', 'Crop to selection', () => (b ? crop(b) : toast('Select something first'))],
+          ['plus', 'Scale ×2', () => scaleSprite(2)], ['minus', 'Scale ×½', () => scaleSprite(0.5)],
+          [null, 'Flip all ↔', () => flipCanvas(true), FLIP_H], [null, 'Flip all ↕', () => flipCanvas(false), FLIP_V], ['redo', 'Turn all', () => turnCanvas(1)]].map(x => x.slice(0, 3).concat([false, x[3]])))}`;
+    } else if (sh.kind === 'export') {
+      const n = s.frames.length, t = s.tags[ed.playTag], o = ed.out, newSheet = opts.extra && opts.extra.item && opts.extra.item.cell;
+      body = head('Export', 'Save or send a copy · ' + s.w * ed.exScale + '×' + s.h * ed.exScale + ' per frame') + `
+        <div class="grow"><span class="t"><span class="cap">Size</span><span class="sub">Every pixel made bigger</span></span>${stepper(ed.exScale + '×', A(() => { const L = [1, 2, 3, 4, 6, 8, 10, 16]; ed.exScale = L[Math.max(0, L.indexOf(ed.exScale) - 1)]; ed.out = null; rer(); }), A(() => { const L = [1, 2, 3, 4, 6, 8, 10, 16]; ed.exScale = L[Math.min(L.length - 1, L.indexOf(ed.exScale) + 1)]; ed.out = null; rer(); }), 'size')}</div>
+        ${n > 1 ? `<div class="grow"><span class="t"><span class="cap">Sheet</span><span class="sub">Frames across in a sprite sheet</span></span>${stepper(String(Math.min(n, ed.exCols || n)), A(() => { ed.exCols = Math.max(1, Math.min(n, ed.exCols || n) - 1); ed.out = null; rer(); }), A(() => { ed.exCols = Math.min(n, (ed.exCols || n) + 1); ed.out = null; rer(); }), 'frames across')}</div>` : ''}
+        ${newSheet && n > 1 ? `<div class="grow"><span class="t"><span class="cap">Game picture</span><span class="sub">Frames across in the PNG the game reads</span></span>${stepper(String(Math.min(n, ed.gameCols || n)), A(() => { ed.gameCols = Math.max(1, Math.min(n, ed.gameCols || n) - 1); changed(); rer(); }), A(() => { ed.gameCols = Math.min(n, (ed.gameCols || n) + 1); changed(); rer(); }), 'game frames across')}</div>` : ''}
+        ${btns([['select', 'PNG · this frame', () => prepare('frame')], ['tiles', 'PNG · sheet', () => prepare('sheet'), n < 2],
+          ['play', 'GIF' + (t ? ' · ' + t.name : ''), () => prepare('gif'), n < 2], ['dup', '.aseprite', () => prepare('ase')]])}
+        ${o ? `<div class="se-ready">${o.busy ? '<span class="sub">Making it…</span>' : `<span class="t" style="min-width:0;display:flex;flex-direction:column"><span class="cap ell" style="text-transform:none">${esc(o.file.name)}</span><span class="sub">${Math.max(1, Math.round(o.file.size / 1024))} KB · ready</span></span>${bareBtn('up', 'Share', A(() => share(o.file)))}`}</div>` : `<div class="se-note sub">${n > 1 ? 'The GIF plays ' + (t ? 'the tag ' + esc(t.name) : 'every frame') + ' with each frame’s duration. ' : ''}Then Share saves it to Files, AirDrops it, and so on.</div>`}`;
     } else if (sh.kind === 'menu') {
       const r = store.record(g.file, item.id);
       body = head(item.name, s.w + '×' + s.h + ' · ' + s.frames.length + ' frames · ' + s.layers.length + ' layers') + `
         <div class="grow"><span class="t"><span class="cap">Pixel grid</span><span class="sub">Lines between pixels when zoomed in</span></span>${toggle(ed.grid, A(() => { ed.grid = !ed.grid; rer(); }), 'Pixel grid')}</div>
         <div class="grow"><span class="t"><span class="cap">Onion skin</span><span class="sub">The frames before (red) and after (blue)</span></span>${toggle(ed.onion, A(() => { ed.onion = !ed.onion; rer(); }), 'Onion skin')}</div>
         <div class="se-note sub">${r && r.dirty ? 'Saved on this phone, not pushed yet. Push it from Settings › Sync.' : r ? 'Pushed. The site shows it in a minute or two.' : 'Matches GitHub.'} Saved as ${esc(store.asePath(item.file).split('/').pop())} (opens in Aseprite) and ${esc(item.file.split('/').pop())} (what the game reads).</div>
+        <div class="se-btns se-btns3">
+          <button class="btn bare" ${A(() => { ed.cv = { w: s.w, h: s.h, ax: 0.5, ay: 0.5 }; ed.sheet = { kind: 'canvas' }; rer(); })}>${well(28, icon('scene', '#e4e2dc'))}<span>Canvas</span></button>
+          <label class="btn bare se-file">${well(28, icon('down', '#e4e2dc'))}<span>Import</span><input type="file" id="se-import" accept="image/png,image/gif,image/jpeg,image/webp,.aseprite,.ase"></label>
+          <button class="btn bare" ${A(() => { ed.out = null; ed.exCols = ed.exCols || Math.min(s.frames.length, 8); ed.sheet = { kind: 'export' }; rer(); })}>${well(28, icon('up', '#e4e2dc'))}<span>Export</span></button>
+        </div>
         ${btns([['select', 'Fit to screen', () => { fit(); ed.sheet = null; rer(); }], ['trash', r && r.isNew ? 'Delete sprite' : 'Discard changes', async () => {
           if (!r) { toast('Nothing to discard'); return; }
           if (!confirm(r.isNew ? 'Delete ' + item.name + '? It has not been pushed.' : 'Discard the changes to ' + item.name + '? It goes back to the version on GitHub.')) return;
@@ -764,6 +902,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       if (nm) nm.addEventListener('change', () => { const v = nm.value.trim(); if (v && v !== S().layers[ed.layer].name) { step(); S().layers[ed.layer].name = v; changed(); rer(); } });
       if (tn) tn.addEventListener('change', () => { const t = S().tags[ed.sheet.i], v = tn.value.trim(); if (t && v && v !== t.name) { step(); t.name = v; changed(); rer(); } });
       if (ed.sheet && ed.sheet.kind === 'color') pickerMount(root);
+      const imp = root.querySelector('#se-import'); if (imp) imp.addEventListener('change', () => { const f = imp.files && imp.files[0]; imp.value = ''; importFile(f); });
     },
     frame(t) {
       if (ed.playing && ed.spr) tickPlay(performance.now());
