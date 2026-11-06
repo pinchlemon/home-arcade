@@ -23,7 +23,7 @@ const srow = (label, sub, control) => `<div class="plate setrow">
 const info = (text, act, label) => `<span style="display:flex;align-items:center;gap:2px;flex:none;min-width:0"><span class="sub" style="color:var(--text);max-width:170px">${esc(text)}</span>${act ? iconBtn('rename', act, { label }) : '<span style="width:6px"></span>'}</span>`;
 
 function setToken(app) {
-  const t = prompt('Paste a GitHub token with Contents read and write access to ' + app.settings.repo + '. It stays on this phone.', '');
+  const t = prompt('Paste a GitHub token with read and write access to ' + app.settings.repo + ' contents. It is stored only on this phone.', '');
   if (t === null) return;
   app.setSettings({ token: t.trim() });
   app.toast(t.trim() ? 'Token saved' : 'Token removed');
@@ -38,34 +38,34 @@ export default {
     const sy = S.getSync(), pad = input.padConnected();
     let title, sub, a, b, rows;
     if (g === 'controller') {
-      title = pad ? input.padName() : 'No controller'; sub = pad ? 'Connected' : 'Press a button on it';
+      title = pad ? input.padName() : 'No controller'; sub = pad ? 'Connected' : 'Press any button';
       a = plateBtn('controller', 'Test', A(() => openTester(app)));
-      b = plateBtn('controller', 'Rumble', A(() => { if (!input.rumble(300, 1, true)) app.toast(pad ? 'This controller or browser cannot rumble' : 'No controller connected'); }));
-      rows = cyc('labels', 'Button labels', 'Match your controller', ['XBOX', 'PS', 'SWITCH']) + tog('rumble', 'Vibration', 'Rumble when you get hit') + num('deadzone', 'Stick deadzone', 'Ignore small stick drift', 0, 9) + tog('swapAB', 'Swap A and B', 'Jump and confirm with B instead');
+      b = plateBtn('controller', 'Rumble', A(() => { if (!input.rumble(300, 1, true)) app.toast(pad ? 'Vibration is not supported here' : 'No controller connected'); }));
+      rows = cyc('labels', 'Button labels', 'Match your controller', ['XBOX', 'PS', 'SWITCH']) + tog('rumble', 'Vibration', 'Rumble on hits') + num('deadzone', 'Stick deadzone', 'Ignore small stick drift', 0, 9) + tog('swapAB', 'Swap A and B', 'Use B to jump and confirm');
     } else if (g === 'sync') {
       ({ title, sub, a, b, rows } = syncGroup(app, plateBtn, A, rowCount()));
     } else if (g === 'github') {
-      title = st.token ? 'Token saved' : 'Not signed in'; sub = st.token ? 'Pushing is on' : 'Needed to push';
+      title = st.token ? 'Token saved' : 'Not signed in'; sub = st.token ? 'Ready to push' : 'Required to push';
       a = plateBtn('key', st.token ? 'Change token' : 'Add token', A(() => setToken(app)));
       b = plateBtn('out', 'Sign out', A(() => { if (!st.token) { app.toast('No token saved'); return; } if (confirm('Remove the GitHub token from this phone?')) { put({ token: '' }); app.toast('Signed out'); } }));
-      rows = srow('Repository', 'Where games are pushed', info(st.repo, A(() => { const v = prompt('Repository (owner/name)', st.repo); if (v && /^[\w.-]+\/[\w.-]+$/.test(v.trim())) put({ repo: v.trim() }); else if (v) app.toast('Use owner/name, like pinchlemon/home-arcade'); }), 'Change repository'))
-        + srow('Branch', 'Pushes go here', info(st.branch, A(() => { const v = prompt('Branch', st.branch); if (v && v.trim()) put({ branch: v.trim() }); }), 'Change branch'))
-        + tog('autoPush', 'Auto push', 'Push when you leave the editor')
-        + srow('Last sync', 'From this phone', info(sy.lastAt ? new Date(sy.lastAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Never'));
+      rows = srow('Repository', 'Push destination', info(st.repo, A(() => { const v = prompt('Repository (owner/name)', st.repo); if (v && /^[\w.-]+\/[\w.-]+$/.test(v.trim())) put({ repo: v.trim() }); else if (v) app.toast('Use the form owner/name'); }), 'Change repository'))
+        + srow('Branch', 'The branch that receives pushes', info(st.branch, A(() => { const v = prompt('Branch', st.branch); if (v && v.trim()) put({ branch: v.trim() }); }), 'Change branch'))
+        + tog('autoPush', 'Auto push', 'Push on leaving the Studio')
+        + srow('Last sync', 'Last push from this phone', info(sy.lastAt ? new Date(sy.lastAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Never'));
     } else if (g === 'audio') {
       title = 'Audio'; sub = st.sfx ? 'Sound on · ' + st.sfx + ' of 9' : 'Muted';
       a = plateBtn('play', 'Test sound', A(() => { snd.unlock(); snd.play({ wave: 'square', pitch: 8, slide: 2, len: 3 }); }));
       b = plateBtn('mute', st.sfx ? 'Mute all' : 'Unmute', A(() => (st.sfx ? put({ sfx: 0, lastSfx: st.sfx }) : put({ sfx: st.lastSfx || 7 }))));
-      rows = num('sfx', 'Sound effects', 'Game and editor sounds', 0, 9) + tog('menuSounds', 'Menu sounds', 'Clicks as you move around');
+      rows = num('sfx', 'Sound effects', 'Game and editor sounds', 0, 9) + tog('menuSounds', 'Menu sounds', 'A click on each press');
     } else {
       title = 'Display'; sub = 'Build ' + buildDate(CODE_BUILD) + (navigator.onLine ? '' : ' · offline');
-      a = plateBtn('reset', 'Update', A(() => { app.toast('Getting the newest version…'); setTimeout(hardUpdate, 400); }));
+      a = plateBtn('reset', 'Update', A(() => { app.toast('Updating…'); setTimeout(hardUpdate, 400); }));
       b = plateBtn('reset', 'Reset', A(() => put({ reduceMotion: false, launchAnim: true, dots: true, textSize: 'NORMAL', spriteBg: 'CHECKER' })));
       // one row for both motion settings, so this page stays at four rows (more is cut off on the phone)
       const MOTION = ['FULL', 'NO LAUNCH', 'REDUCED'], mi = st.reduceMotion ? 2 : (st.launchAnim === false ? 1 : 0);
       const setMotion = (m) => put(m === 2 ? { reduceMotion: true } : { reduceMotion: false, launchAnim: m === 0 });
-      rows = srow('Motion', 'Launch and spin', stepper(MOTION[mi], A(() => setMotion((mi + 2) % 3)), A(() => setMotion((mi + 1) % 3)), 'motion', true)) + tog('dots', 'Dot grid', 'Texture behind the plates') + cyc('textSize', 'Text size', 'Labels and details', ['NORMAL', 'LARGE'])
-        + cyc('spriteBg', 'Art background', 'Behind sprites, to see them', SPRITE_BGS);
+      rows = srow('Motion', 'Animations', stepper(MOTION[mi], A(() => setMotion((mi + 2) % 3)), A(() => setMotion((mi + 1) % 3)), 'motion', true)) + tog('dots', 'Dot grid', 'Background texture') + cyc('textSize', 'Text size', 'Labels and descriptions', ['NORMAL', 'LARGE'])
+        + cyc('spriteBg', 'Art background', 'Shown behind sprites', SPRITE_BGS);
     }
     const name = (GROUPS.find(x => x[0] === g) || GROUPS[0])[1];
     const right = `<span class="cap acc">${esc(name)}</span><span class="title clamp2">${esc(title)}</span><span class="sub">${esc(sub)}</span><div class="actions">${a}${b}</div>`;
@@ -115,12 +115,12 @@ function openTester(app) {
         <h1 class="sr">Test buttons</h1>
         <div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Settings' })}
-          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">Test buttons</span><span class="sub">${esc(input.padConnected() ? input.padName() : 'No controller · the keyboard works too')}</span></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">Test buttons</span><span class="sub">${esc(input.padConnected() ? input.padName() : 'No controller · the keyboard also works')}</span></span>
         </div>
         <div class="plate inspector gap20" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;align-content:start">
           ${KEYS.map(([k, l]) => `<div class="irow" style="border:0"><span class="cap" style="color:var(--muted)">${esc(k === 'a' || k === 'b' || k === 'x' ? input.label(k) : l)}</span><span class="vscreen" data-key="${k}">${svgText('OFF', '#6f6d69')}</span></div>`).join('')}
         </div>
-        <div class="plate bar text-start"><span class="sub" style="white-space:normal">Hold B for two seconds to go back.</span></div>
+        <div class="plate bar text-start"><span class="sub" style="white-space:normal">Hold B for two seconds to exit.</span></div>
       </div>`;
     },
     mount(r) { root = r; last = ''; },

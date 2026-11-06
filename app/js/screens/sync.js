@@ -12,7 +12,6 @@ import * as store from '../artStore.js';
 
 const BLUE = '#4d7cff';
 let busy = false, remoteLog = null, remoteAt = 0;
-export const isBusy = () => busy;
 
 export const when = (t) => {
   const s = (Date.now() - t) / 1000;
@@ -67,7 +66,7 @@ export async function pushAll(app, quiet) {
   const items = changeList();
   if (!items.length) { if (!quiet) app.toast('Everything is pushed'); return; }
   if (!app.settings.token) { if (!quiet) { app.toast('Add a GitHub token to push'); app.ui.setGroup = 'github'; app.saveUI(); if (app.overlay) app.close(); app.setTab(4); } return; }
-  if (!navigator.onLine) { app.toast('Offline. Your changes are saved here and will push later'); return; }
+  if (!navigator.onLine) { app.toast('Offline. Changes are saved on this phone; push them once online'); return; }
   busy = true; app.toast('Pushing ' + items.length + (items.length === 1 ? ' game…' : ' games…')); app.render();
   try {
     const branch = app.settings.branch, ref = await gh(app, `git/ref/heads/${encodeURIComponent(branch)}`), head = ref.object.sha;
@@ -135,7 +134,7 @@ export function syncGroup(app, plateBtn, A, n) {
   const st = app.settings, sy = S.getSync(), changes = changeList(), k = changes.length, view = app.ui.syncView || 'changes';
   const last = sy.lastAt ? 'Pushed ' + when(sy.lastAt).toLowerCase() : 'Not pushed yet';
   const title = busy ? 'Talking to GitHub…' : k ? k + (k === 1 ? ' game to push' : ' games to push') : 'All pushed';
-  const sub = !st.token ? 'Add a token under GitHub' : last;
+  const sub = !st.token ? 'Token required' : last;
   const a = plateBtn('up', k ? 'Push ' + k : 'Pushed', A(() => pushAll(app)));
   const b = plateBtn(view === 'changes' ? 'history' : 'changes', view === 'changes' ? 'History' : 'Changes', A(() => { app.ui.syncView = view === 'changes' ? 'history' : 'changes'; app.saveUI(); app.render(); }));
   let items;
@@ -149,6 +148,6 @@ export function syncGroup(app, plateBtn, A, n) {
   const one = (it) => row({ ...it, still: !it.act });
   let rows = items.slice(0, n).map(one).join('');
   if (items.length > n) rows = items.slice(0, n - 1).map(one).join('') + `<div class="plate row-empty"><span class="sub">And ${items.length - n + 1} more</span></div>`;
-  if (!items.length) rows = `<div class="plate row-empty"><span class="sub" style="white-space:normal">${view === 'changes' ? 'Nothing to push. Changes you make in the Studio show up here; tap one to review it.' : 'No history yet.'}</span></div>`;
+  if (!items.length) rows = `<div class="plate row-empty"><span class="sub" style="white-space:normal">${view === 'changes' ? 'Nothing to push. Changes made in the Studio and Art appear here.' : 'No history yet.'}</span></div>`;
   return { title, sub, a, b, rows };
 }

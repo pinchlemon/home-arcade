@@ -34,9 +34,9 @@ addEventListener('message', (e) => { if (frame && e.source === frame.contentWind
 function HA(app, g) {
   listener(g);
   const ha = ready && frame.contentWindow && frame.contentWindow.HA;
-  if (!ha) { app.toast('Getting the sounds ready…'); return null; }
+  if (!ha) { app.toast('Loading sounds…'); return null; }
   const ctx = snd.context();
-  if (!ctx) { app.toast('Sound effects are off in Settings'); return null; }
+  if (!ctx) { app.toast('Sound effects are off in Settings › Audio'); return null; }
   ha.use(ctx); return ha;
 }
 function stopMusic() {
@@ -75,7 +75,7 @@ export default {
   render(app) {
     const s = state(app);
     if (s.off) return notReady(app, s.g, 'sounds', 'Sound');
-    if (!s.L) return { right: `<span class="cap acc">Sound</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sounds', 'Loading the sounds…')}</div>` };
+    if (!s.L) return { right: `<span class="cap acc">Sound</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sounds', 'Loading sounds…')}</div>` };
     const { g, L, fi, f, si, it } = s;
     listener(g); // start loading the game's sound code now, so the first tap plays
     const on = it && it.kind === 'music' && playing === it.id;
@@ -86,7 +86,7 @@ export default {
       <div class="actions">
         ${plateBtn(on ? 'pause' : 'play', on ? 'Stop' : 'Play', A(() => hear(app, g, it)))}
         ${plateBtn('right', 'Next', A(() => setSel(app, si + 1, true)))}
-      </div>` : `<span class="cap acc">${esc(g.name)}</span><span class="title clamp2">${esc(f.name)}</span><span class="sub">Nothing here yet</span>`;
+      </div>` : `<span class="cap acc">${esc(g.name)}</span><span class="title clamp2">${esc(f.name)}</span><span class="sub">Empty</span>`;
     const per = rows(), pg = pageOf(f.items, Math.floor(si / per));
     const rowHtml = pg.slice.map((x, j) => {
       const i = pg.p * per + j, sel = i === si, ic = x.kind === 'music' ? (playing === x.id ? 'pause' : 'play') : 'sounds';

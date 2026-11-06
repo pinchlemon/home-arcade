@@ -71,7 +71,7 @@ function thumb(g, it, size, color, app) {
 }
 const meta = (it, s, g) => {
   if (it.kind === 'symbol') return '8×8 symbol · ' + it.help;
-  const r = g && store.record(g.file, it.id), mark = r && r.dirty ? (it.fresh ? ' · new, not pushed' : ' · drawn here, not pushed') : '';
+  const r = g && store.record(g.file, it.id), mark = r && r.dirty ? (it.fresh ? ' · new · not pushed' : ' · not pushed') : '';
   return (it.cell ? it.cell[0] + '×' + it.cell[1] + ' · ' + it.frames + ' frames' : s ? s[0] + '×' + s[1] + ' px' : '…') + mark + ' · ' + it.help;
 };
 
@@ -98,7 +98,7 @@ export default {
   render(app) {
     const s = state(app);
     if (s.off) return notReady(app, s.g, 'sprites', 'Art');
-    if (!s.F) return { right: `<span class="cap acc">Art</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sprites', 'Loading the art…')}</div>` };
+    if (!s.F) return { right: `<span class="cap acc">Art</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sprites', 'Loading art…')}</div>` };
     const { g, F, fi, f, si, it } = s, size = it && it.kind === 'image' ? sizeOf(app, g, it) : null;
     const right = it ? `
       <span class="cap acc ell">${esc(g.name)}</span>
@@ -122,7 +122,7 @@ export default {
         ${f.id !== 'symbols' ? iconBtn('plus', A(() => openNew(app, g, f)), { color: '#fff', label: 'New sprite in ' + f.name }) : ''}
         ${pager(pg.range, A(() => setSel(app, Math.max(0, pg.p - 1) * per)), A(() => setSel(app, Math.min(pg.pages - 1, pg.p + 1) * per)))}
       </div>
-      ${rowHtml || emptyRow('folder', 'Nothing in this folder yet.')}
+      ${rowHtml || emptyRow('folder', 'This folder is empty.')}
     </div>`;
     return { right, body };
   },
@@ -165,13 +165,13 @@ function openViewer(app, g, it, F) {
         panel = `<div class="plate inspector gap20">
           <div class="ihead">${well(40, icon('sprites', PINK))}<span class="t"><span class="title acc ell">${esc(a ? a.name : 'Frames')}</span><span class="sub">${a ? a.count + ' frames · ' + ticks(a) + ' game frames each' : ''}</span></span>
             ${iconBtn(v.playing ? 'pause' : 'play', A(() => { v.playing = !v.playing; rer(); }), { color: '#fff', label: v.playing ? 'Pause' : 'Play' })}</div>
-          <div class="grow"><span class="t"><span class="cap">Animation</span><span class="sub">Runs of frames the game plays</span></span>${stepper(String(v.anim + 1) + '/' + anims.length, A(() => { v.anim = (v.anim + anims.length - 1) % anims.length; v.frame = 0; rer(); }), A(() => { v.anim = (v.anim + 1) % anims.length; v.frame = 0; rer(); }), 'Animation')}</div>
-          <div class="grow"><span class="t"><span class="cap">Frame</span><span class="sub">Step through one at a time</span></span>${stepper(String((v.frame % (a ? a.count : 1)) + 1), A(() => { v.playing = false; v.frame = (v.frame + (a ? a.count : 1) - 1) % (a ? a.count : 1); rer(); }), A(() => { v.playing = false; v.frame = (v.frame + 1) % (a ? a.count : 1); rer(); }), 'Frame')}</div>
+          <div class="grow"><span class="t"><span class="cap">Animation</span><span class="sub">Frame sequences the game plays</span></span>${stepper(String(v.anim + 1) + '/' + anims.length, A(() => { v.anim = (v.anim + anims.length - 1) % anims.length; v.frame = 0; rer(); }), A(() => { v.anim = (v.anim + 1) % anims.length; v.frame = 0; rer(); }), 'Animation')}</div>
+          <div class="grow"><span class="t"><span class="cap">Frame</span><span class="sub">Step through frames</span></span>${stepper(String((v.frame % (a ? a.count : 1)) + 1), A(() => { v.playing = false; v.frame = (v.frame + (a ? a.count : 1) - 1) % (a ? a.count : 1); rer(); }), A(() => { v.playing = false; v.frame = (v.frame + 1) % (a ? a.count : 1); rer(); }), 'Frame')}</div>
         </div>`;
       } else {
         panel = `<div class="plate inspector gap20">
           <div class="grow"><span class="t"><span class="cap">Zoom</span><span class="sub">Screen pixels per art pixel</span></span>${stepper((v.k || v.fit) + '×', A(() => { v.scale = Math.max(1, (v.k || v.fit) - 1); draw(); rer(); }), A(() => { v.scale = Math.min(v.fit, (v.k || v.fit) + 1); draw(); rer(); }), 'Zoom')}</div>
-          <div class="grow"><span class="t"><span class="cap">${esc(it.kind === 'symbol' ? 'Symbol' : 'Picture')}</span><span class="sub" style="white-space:normal">${esc(it.help)}.${it.kind === 'symbol' ? ' Objects in the Studio are drawn with it.' : ' Draw (the brush above) opens it in the sprite editor.'}</span></span></div>
+          <div class="grow"><span class="t"><span class="cap">${esc(it.kind === 'symbol' ? 'Symbol' : 'Picture')}</span><span class="sub" style="white-space:normal">${esc(it.help)}</span></span></div>
         </div>`;
       }
       return `<div class="screen-tool" style="--acc:${PINK}">
@@ -217,7 +217,7 @@ async function openDraw(app, g, it, F) {
     const k = g.file + '/' + it.file, url = await store.urlFor(g.file, it.file);
     const w = Array.isArray(sizes[k]) ? sizes[k][0] : await new Promise(res => { const im = new Image(); im.onload = () => res(im.naturalWidth); im.onerror = () => res(0); im.src = url; });
     cols = w ? Math.max(1, Math.floor(w / it.cell[0])) : 0;
-    if (!cols) { app.toast('Could not open ' + it.name + ' (its picture did not load)'); return; }
+    if (!cols) { app.toast('Could not load the picture for ' + it.name); return; }
   }
   openSpriteEditor(app, g, it, { ticksOf: ticks, sheetCols: cols, extra: r && r.item ? { isNew: r.isNew, folder: r.folder, item: r.item } : undefined });
 }
@@ -234,7 +234,7 @@ function openNew(app, g, f) {
     const x = folders(app, g), taken = new Set(x ? x.list.flatMap(ff => ff.items.map(it => it.id)) : []);
     let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sprite', id = slug, n = 2;
     while (taken.has(id)) id = slug + '-' + n++;
-    const item = { id, name, file: 'assets/' + id + '.png', help: fileName ? 'From ' + fileName : 'Drawn on the phone' };
+    const item = { id, name, file: 'assets/' + id + '.png', help: fileName ? 'Imported from ' + fileName : 'Drawn in Hedron' };
     if (v.sheet || (spr && spr.frames.length > 1)) { item.cell = [spr ? spr.w : v.w, spr ? spr.h : v.h]; item.frames = spr ? spr.frames.length : 1; item.anims = []; }
     app.ui.artFolder = f.id; app.ui.artSel = id; app.saveUI();
     app.close();
@@ -249,7 +249,7 @@ function openNew(app, g, f) {
       else {
         const url = URL.createObjectURL(file), img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('not a picture')); im.src = url; });
         const cut = v.sheet && img.naturalWidth % v.w === 0 && img.naturalHeight % v.h === 0 && (img.naturalWidth > v.w || img.naturalHeight > v.h);
-        if (v.sheet && !cut) app.toast('The picture is not a whole number of ' + v.w + '×' + v.h + ' frames, so it comes in as one frame');
+        if (v.sheet && !cut) app.toast('The picture does not divide into ' + v.w + '×' + v.h + ' frames, so it opens as one frame');
         spr = store.spriteFromImage(img, cut ? { cell: [v.w, v.h] } : {});
         if (cut) { // leave out empty frames at the end
           while (spr.frames.length > 1 && ![...spr.cels.keys()].some(k => +k.split(':')[1] === spr.frames.length - 1)) spr.frames.pop();
@@ -270,8 +270,8 @@ function openNew(app, g, f) {
         <div class="screen nw-prev" aria-hidden="true">${(() => { const k = Math.max(1, Math.min(8, Math.floor(Math.min(300 / v.w, 200 / v.h)))); return `<div class="nw-box" style="width:${v.w * k}px;height:${v.h * k}px;--px:${k * 2}px"></div><span class="sub">${v.w}×${v.h}${v.sheet ? ' · animated' : ''} · shown ${k}× · each square is 2×2 pixels</span>`; })()}</div>
         <div class="plate inspector" style="flex:none">
           <label class="se-field"><span class="cap">Name</span><input id="nw-name" value="${esc(v.name)}" placeholder="Sprite" maxlength="40" autocomplete="off" spellcheck="false"></label>
-          <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">Pixels across</span></span>${stepper(String(v.w), A(() => bump('w', -1)), A(() => bump('w', 1)), 'width')}</div>
-          <div class="grow"><span class="t"><span class="cap">Height</span><span class="sub">Pixels down</span></span>${stepper(String(v.h), A(() => bump('h', -1)), A(() => bump('h', 1)), 'height')}</div>
+          <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">In pixels</span></span>${stepper(String(v.w), A(() => bump('w', -1)), A(() => bump('w', 1)), 'width')}</div>
+          <div class="grow"><span class="t"><span class="cap">Height</span><span class="sub">In pixels</span></span>${stepper(String(v.h), A(() => bump('h', -1)), A(() => bump('h', 1)), 'height')}</div>
           <div class="grow"><span class="t"><span class="cap">Animated</span><span class="sub">Frames saved side by side</span></span>${toggleBtn(v.sheet, A(() => { v.sheet = !v.sheet; rer(); }))}</div>
         </div>
         <div class="plate bar" style="gap:8px">${plateBtn('plus', 'Create', A(() => create()))}

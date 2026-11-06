@@ -73,7 +73,6 @@ export function poll() {
 }
 export const isHeld = (k) => held[k];
 export const pressed = (k) => edge[k];
-export const consume = (k) => { const v = edge[k]; edge[k] = false; return v; };
 
 export function rumble(ms = 120, strong = 0.6, force = false) {
   if ((!settings.rumble && !force) || !pad || !pad.vibrationActuator || !pad.vibrationActuator.playEffect) return false;

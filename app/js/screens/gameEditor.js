@@ -294,7 +294,7 @@ export function openGameEditor(app, g) {
     return `<div class="plate inspector gap20">
           <div class="ihead">${well(40, svgRows(BG_ART[l.id] || ART.sun, GREEN))}<span class="t"><span class="title acc ell">${esc(l.name)}</span><span class="sub">Background layer ${i + 1} of ${schema.background.length}</span></span>
             ${iconBtn('down', A(() => { ed.bg = schema.background[Math.max(0, i - 1)].id; refreshBg(); }), { color: '#fff', label: 'Layer behind' })}${iconBtn('up', A(() => { ed.bg = schema.background[Math.min(schema.background.length - 1, i + 1)].id; refreshBg(); }), { color: '#fff', label: 'Layer in front' })}</div>
-          ${l.fields.length ? l.fields.map(field).join('') : `<div class="grow"><span class="sub">Moves with the world, like the player.</span></div>`}</div>`;
+          ${l.fields.length ? l.fields.map(field).join('') : `<div class="grow"><span class="sub">Scrolls with the world.</span></div>`}</div>`;
   }
 
   // ---------------------------------------------------------------- Objects: the templates, and the behaviors they're made of
@@ -332,7 +332,7 @@ export function openGameEditor(app, g) {
             }))}
           </div></div>
         <div class="plate inspector" style="margin-top:8px">${rowsHtml}
-          <div class="grow"><span class="t"><span class="sub">An object is a template. Place copies in any level; change the object and every copy changes.</span></span></div></div>`;
+          <div class="grow"><span class="t"><span class="sub">Objects are templates. Editing one updates every copy.</span></span></div></div>`;
     }
     // one object
     const id = ed.obj, o = all[id], actor = isActor(o), k = placedCount(id);
@@ -340,10 +340,10 @@ export function openGameEditor(app, g) {
     const cyc = (label, help, list, cur, show, onPick) => { const i = Math.max(0, list.indexOf(cur)); return `<div class="grow"><span class="t"><span class="cap">${label}</span><span class="sub">${help}</span></span>${stepper(show(cur), A(() => onPick(list[(i - 1 + list.length) % list.length])), A(() => onPick(list[(i + 1) % list.length])), label)}</div>`; };
     const symbols = Object.keys(ed.game.symbols || {});
     let rows = '';
-    rows += cyc('Color', 'Its color in the Studio' + (actor ? ' and in the game' : ''), PALETTE_COLORS, o.color, c => COLOR_NAMES[PALETTE_COLORS.indexOf(c)] || 'CUSTOM', c => setObj(x => { x.color = c; }));
+    rows += cyc('Color', actor ? 'Color in the Studio and the game' : 'Color in the Studio', PALETTE_COLORS, o.color, c => COLOR_NAMES[PALETTE_COLORS.indexOf(c)] || 'CUSTOM', c => setObj(x => { x.color = c; }));
     if (actor) {
-      rows += cyc('Symbol', 'The pixel shape it uses', symbols, o.symbol, c => c, c => setObj(x => { x.symbol = c; }));
-      rows += cyc('Size', 'How many screen pixels per symbol pixel', [1, 2, 3, 4], o.scale || 2, c => c + '×', c => setObj(x => { x.scale = c; }));
+      rows += cyc('Symbol', 'Pixel shape', symbols, o.symbol, c => c, c => setObj(x => { x.symbol = c; }));
+      rows += cyc('Size', 'Screen pixels per symbol pixel', [1, 2, 3, 4], o.scale || 2, c => c + '×', c => setObj(x => { x.scale = c; }));
       // its behaviors, each with its own settings
       (o.behaviors || []).forEach((bh, bi) => {
         const def = BEH()[bh.type] || { name: bh.type, help: '', params: {} };
@@ -354,22 +354,22 @@ export function openGameEditor(app, g) {
           rows += `<div class="grow"><span class="t"><span class="cap">${esc(pdef.label)}</span><span class="sub">${esc(pdef.help)}</span></span>${stepper(show, A(() => setObj(x => { x.behaviors[bi][pk] = pdef.show === 'onoff' ? (v ? 0 : 1) : nudge(f, v, -1); })), A(() => setObj(x => { x.behaviors[bi][pk] = pdef.show === 'onoff' ? (v ? 0 : 1) : nudge(f, v, 1); })), pdef.label)}</div>`;
         }
       });
-      rows += `<div class="grow"><span class="t"><span class="sub">Its symbol is in Art, under Symbols.</span></span>${artJump(o)}</div>`;
+      rows += `<div class="grow"><span class="t"><span class="sub">The symbol is in Art › Symbols.</span></span>${artJump(o)}</div>`;
       if (ed.addingBehavior) {
         const have = new Set((o.behaviors || []).map(b => b.type));
-        rows += `<div class="bhead"><span class="t"><span class="cap acc">Add a behavior</span><span class="sub">Tap one to add it</span></span>${iconBtn('back', A(() => { ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'Cancel' })}</div>`;
+        rows += `<div class="bhead"><span class="t"><span class="cap acc">Add a behavior</span><span class="sub">Tap to add</span></span>${iconBtn('back', A(() => { ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'Cancel' })}</div>`;
         for (const [bk, def] of Object.entries(BEH())) if (!have.has(bk)) rows += `<button class="orow" ${A(() => { ed.addingBehavior = false; setObj(x => { (x.behaviors = x.behaviors || []).push({ type: bk }); }); })}><span class="t"><span class="cap">${esc(def.name)}</span><span class="sub" style="white-space:normal">${esc(def.help)}</span></span>${well(28, svgRows(G.plus, BONE))}</button>`;
       } else rows += `<div class="grow">${bareBtn('plus', 'Add behavior', A(() => { ed.addingBehavior = true; rerender(); }))}</div>`;
     } else if (o.base === 'eye') {
       // an eye object can change any of the game's eye settings just for itself
       const grp = ed.game.schema.groups.find(x => x.id === 'eyes');
-      rows += `<div class="bhead"><span class="t"><span class="cap acc">Eye settings</span><span class="sub">These apply to this object only. A setting turns green once you change it from the game's normal eye</span></span></div>`;
+      rows += `<div class="bhead"><span class="t"><span class="cap acc">Eye settings</span><span class="sub">For this object only. Changed settings turn green.</span></span></div>`;
       for (const f of grp ? grp.fields : []) {
         const key = f.path.replace(/^eyes\./, ''), base = games.getPath(data(), f.path), mine = games.getPath(o.settings || {}, key), v = mine ?? base;
         const put = (nv) => setObj(x => { x.settings = x.settings || {}; const ks = key.split('.'); if (ks.length === 2) { x.settings[ks[0]] = [...(x.settings[ks[0]] || games.getPath(data(), 'eyes.' + ks[0]))]; x.settings[ks[0]][+ks[1]] = nv; } else x.settings[key] = nv; });
         rows += `<div class="grow"><span class="t"><span class="cap" style="color:${mine !== undefined ? GREEN : 'var(--text)'}">${esc(f.label)}</span><span class="sub">${esc(f.help)}</span></span>${stepper(fmt(f, v), A(() => put(nudge(f, v, -1))), A(() => put(nudge(f, v, 1))), f.label)}</div>`;
       }
-    } else rows += `<div class="grow"><span class="t"><span class="sub">Built in: the game draws it with its own art${o.base === 'castle' ? ', and the player can stand on it' : ''}.</span></span>${artJump(o)}</div>`;
+    } else rows += `<div class="grow"><span class="t"><span class="sub">Built in, drawn with the game's own art${o.base === 'castle' ? '. The player can stand on top' : ''}.</span></span>${artJump(o)}</div>`;
     return `<div class="plate bar gap20" style="flex:none">
         ${iconBtn('back', A(() => { ed.obj = null; ed.addingBehavior = false; rerender(); }), { color: '#fff', label: 'All objects' })}
         <button class="namebtn" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left" ${A(() => { const nm = prompt('Object name', o.name); if (nm && nm.trim()) setObj(x => { x.name = nm.trim().slice(0, 20); }); })} aria-label="Rename ${esc(o.name)}">
@@ -481,11 +481,11 @@ export function openGameEditor(app, g) {
         let body;
         if (!isLevel) {
           const s = ed.sel, grp = schema.groups.find(x => x.id === sc.fieldsGroup);
-          body = `<div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : cur.name || sc.name)}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed by the scatter rule' : sc.summary)}</span></span></div>
+          body = `<div class="ihead">${well(40, svgRows(s ? ART[s.glyph] : ART.beach, GREEN))}<span class="t"><span class="title acc ell">${esc(s ? s.name : cur.name || sc.name)}</span><span class="sub">${esc(s ? 'Prop slot ' + s.i + ' · placed automatically' : sc.summary)}</span></span></div>
             ${grp ? grp.fields.map(field).join('') : ''}`;
         } else if (ed.tool === 'place') {
           const pd = placeDef(ed.placeType) || placeList()[0]; if (pd) ed.placeType = pd.type;
-          body = `<div class="ihead">${well(40, svgRows(glyph(pd.glyph), GREEN))}<span class="t"><span class="title acc ell">Place · ${esc(pd.name)}</span><span class="sub">Tap the level to put one there</span></span></div>
+          body = `<div class="ihead">${well(40, svgRows(glyph(pd.glyph), GREEN))}<span class="t"><span class="title acc ell">Place · ${esc(pd.name)}</span><span class="sub">Tap the level to place one</span></span></div>
             <div class="tray" style="margin-top:4px">${placeList().map(d => { const on = d.type === ed.placeType, g2 = glyph(d.glyph); return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" ${A(() => { ed.placeType = d.type; rerender(); })}>${well(40, (on ? '<span class="ring"></span>' : '') + (on ? `<span class="art-on">${svgRows(g2, GREEN)}</span><span class="art-off">${svgRows(g2, d.color)}</span>` : svgRows(g2, d.color)))}<span class="cap">${esc(d.name)}</span></button>`; }).join('')}</div>`;
         } else if (ed.lsel) {
           const it = itemsOf(cur).find(x => sameItem(x, ed.lsel));
@@ -494,10 +494,10 @@ export function openGameEditor(app, g) {
             const d = it.def, move = (k, v) => changeLevel(L2 => { const o = it.list === 'start' || it.list === 'exit' ? L2[it.list] : L2[it.list][it.index]; o[k] = v; if (it.list === 'checkpoints') L2.checkpoints.sort((a, b) => a.x - b.x); });
             const num = (label, help, v, step, lo, hi, k) => `<div class="grow"><span class="t"><span class="cap">${label}</span><span class="sub">${help}</span></span>${stepper(String(v), A(() => move(k, Math.max(lo, v - step))), A(() => move(k, Math.min(hi, v + step))), label)}</div>`;
             const isThing = it.list === 'things', tid = isThing ? thingsOf(cur)[it.index].obj : null;
-            body = `<div class="ihead">${well(40, svgRows(glyph(d.glyph), GREEN))}<span class="t"><span class="title acc ell">${esc(d.name)}</span><span class="sub">${isThing ? 'A copy · drag it to move it' : 'Drag it to move it'}</span></span>
+            body = `<div class="ihead">${well(40, svgRows(glyph(d.glyph), GREEN))}<span class="t"><span class="title acc ell">${esc(d.name)}</span><span class="sub">${isThing ? 'A copy · drag to move' : 'Drag to move'}</span></span>
                 ${isThing ? iconBtn('edit', A(() => { ed.tab = 'objects'; ed.obj = tid; app.ui.geTab = 'objects'; app.saveUI(); rerender(); }), { label: 'Edit the ' + d.name + ' object' }) : ''}
                 ${it.list !== 'start' ? iconBtn('trash', A(() => { changeLevel(L2 => { if (it.list === 'exit') delete L2.exit; else L2[it.list].splice(it.index, 1); }); ed.lsel = null; rerender(); }), { label: 'Remove ' + d.name }) : ''}</div>
-              ${num('Across', 'Pixels from the left of the level', it.x, 4, 0, cur.width - 1, 'x')}
+              ${num('Across', 'Pixels from the left edge', it.x, 4, 0, cur.width - 1, 'x')}
               ${d.height ? num('Height', 'Pixels above the ground', it.h, 2, d.height[0], d.height[1], 'h') : ''}`;
           }
         }
@@ -506,8 +506,8 @@ export function openGameEditor(app, g) {
           body = `<div class="ihead">${well(40, svgRows(ART.level, GREEN))}<span class="t"><span class="title acc ell">${esc(cur.name)}</span><span class="sub">Level · ${itemsOf(cur).length} things · ${cur.width} px</span></span>
               ${iconBtn('rename', A(() => { const n = prompt('Level name', cur.name); if (n && n.trim()) setL(L2 => { L2.name = n.trim().slice(0, 24); }); }), { label: 'Rename level' })}
               ${iconBtn('trash', A(() => { if (!confirm('Delete ' + cur.name + '?')) return; changeScenes(l2 => { const i = l2.findIndex(x => x.id === cur.id); if (i > 0) l2.splice(i, 1); }); ed.scene = null; ed.camX = null; rerender(); }), { label: 'Delete level' })}</div>
-            <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">How long the level is, in pixels</span></span>${stepper(String(cur.width), A(() => setL(L2 => { L2.width = Math.max(160, L2.width - 32); })), A(() => setL(L2 => { L2.width = Math.min(4000, L2.width + 32); })), 'Width')}</div>
-            <div class="grow"><span class="t"><span class="cap">Tip</span><span class="sub">Select a thing to move it, Place to add, Erase to remove. Play starts this level.</span></span></div>`;
+            <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">Level length in pixels</span></span>${stepper(String(cur.width), A(() => setL(L2 => { L2.width = Math.max(160, L2.width - 32); })), A(() => setL(L2 => { L2.width = Math.min(4000, L2.width + 32); })), 'Width')}</div>
+            <div class="grow"><span class="t"><span class="cap">Tip</span><span class="sub">Select to move, Place to add, Erase to remove. Play starts this level.</span></span></div>`;
         }
         panel = `${toolbar}<div class="plate inspector gap20">${body}</div>`;
       } else if (ed.tab === 'objects') {
@@ -522,11 +522,11 @@ export function openGameEditor(app, g) {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
         panel = `<div class="plate bar gap20" style="flex:none" data-pad="pager">
             ${iconBtn('left', A(() => { ed.group = (k + groups.length - 1) % groups.length; rerender(); }), { color: '#fff', label: 'Previous group' })}
-            <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center"><span class="cap acc">${esc(gr.name)}</span><span class="sub" style="font-size:11px">${gr.scope === 'universal' ? 'Every game has these' : esc(g.name) + ' extras'} · ${k + 1}/${groups.length}</span></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center"><span class="cap acc">${esc(gr.name)}</span><span class="sub" style="font-size:11px">${gr.scope === 'universal' ? 'Shared by all games' : 'Only in ' + esc(g.name)} · ${k + 1}/${groups.length}</span></span>
             ${iconBtn('right', A(() => { ed.group = (k + 1) % groups.length; rerender(); }), { color: '#fff', label: 'Next group' })}
           </div>
           <div class="plate inspector" style="margin-top:8px">${gr.fields.map(field).join('')}
-            ${n ? `<div class="grow"><span class="t"><span class="cap">Start over</span><span class="sub">Put all ${n} changes back to the version on GitHub</span></span>${bareBtn('reset', 'Reset', A(() => { if (confirm('Put all ' + n + ' changes to ' + g.name + ' back to the GitHub version? Undo can bring them back.')) { record(); games.resetEdits(folder); rerender(); } }))}</div>` : ''}</div>`;
+            ${n ? `<div class="grow"><span class="t"><span class="cap">Start over</span><span class="sub">Undo all ${n} changes and restore the GitHub version</span></span>${bareBtn('reset', 'Reset', A(() => { if (confirm('Undo all ' + n + ' changes to ' + g.name + ' and restore the GitHub version? Undo can reverse this.')) { record(); games.resetEdits(folder); rerender(); } }))}</div>` : ''}</div>`;
       }
       return `<div class="screen-tool" style="--acc:${GREEN}">
         <h1 class="sr">Studio · ${esc(g.name)}</h1>

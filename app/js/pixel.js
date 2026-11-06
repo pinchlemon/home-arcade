@@ -161,19 +161,6 @@ export function drawRows(ctx, rows, x, y, color, flip = false) {
 }
 export function drawText(ctx, str, x, y, color) { drawRows(ctx, textRows(str), x, y, color); return textWidth(str); }
 
-// cache 8x8 bitmaps as tiny canvases so the game can blit them fast
-const spriteCache = new Map();
-export function bitmapCanvas(rows, color, flip = false) {
-  const key = rows.join('') + color + flip;
-  let c = spriteCache.get(key);
-  if (!c) {
-    c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
-    drawRows(c.getContext('2d'), rows, 0, 0, color, flip);
-    if (spriteCache.size > 400) spriteCache.clear();
-    spriteCache.set(key, c);
-  }
-  return c;
-}
 
 // Scale a 1:1 pixel canvas onto a display canvas, leaving a hairline gap between pixels (the LCD look).
 export function present(src, dst, sw, sh) {
@@ -191,4 +178,3 @@ export function present(src, dst, sw, sh) {
 }
 
 export const PALETTE = { white: '#ffffff', bone: '#e4e2dc', gray: '#8f8d88', orange: '#ff5a1f', green: '#7dff6a', pink: '#ff4fd8', blue: '#4d7cff', yellow: '#ffd23f' };
-export const PALETTE_NAMES = Object.keys(PALETTE);

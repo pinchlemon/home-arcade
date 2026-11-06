@@ -58,14 +58,14 @@ export function openReview(app, g) {
         </div>`;
       const rows = items.map(it => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(it.label)}</span><span class="sub ell">${esc(it.where)} · was ${esc(it.from)} → now <span style="color:var(--acc)">${esc(it.to)}</span></span></span>
           ${iconBtn('undo', A(() => putBack([it.path])), { label: 'Put back ' + it.label })}</div>`).join('')
-        + art.map(r => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(r.name)}</span><span class="sub ell">Art · ${r.item && r.isNew ? 'new sprite' : 'drawn on the phone'} · ${esc(r.png.split('/').pop())} and ${esc(r.ase.split('/').pop())}</span></span>
-          ${iconBtn('undo', A(() => { if (confirm((r.isNew ? 'Delete the new sprite ' : 'Put back ') + r.name + '? ' + (r.isNew ? 'It has not been pushed.' : 'It goes back to the version on GitHub.'))) store.discard(g.file, r.itemId).then(rer); }), { label: 'Put back ' + r.name })}</div>`).join('');
+        + art.map(r => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(r.name)}</span><span class="sub ell">Art · ${r.item && r.isNew ? 'new sprite' : 'redrawn'}</span></span>
+          ${iconBtn('undo', A(() => { if (confirm(r.isNew ? 'Delete the new sprite ' + r.name + '? It has not been pushed.' : 'Restore ' + r.name + ' to the GitHub version?')) store.discard(g.file, r.itemId).then(rer); }), { label: 'Put back ' + r.name })}</div>`).join('');
       return `<div class="screen-tool" style="--acc:${BLUE}">
         <h1 class="sr">Changes to ${esc(g.name)}</h1>
         ${top}
-        <div class="plate inspector">${rows || `<div class="center-note">${well(40, icon('check', BLUE))}<span class="sub">${game ? 'No changes left. ' + esc(g.name) + ' matches GitHub.' : 'Loading…'}</span></div>`}</div>
+        <div class="plate inspector">${rows || `<div class="center-note">${well(40, icon('check', BLUE))}<span class="sub">${game ? 'No changes. ' + esc(g.name) + ' matches GitHub.' : 'Loading…'}</span></div>`}</div>
         <div class="plate bar">
-          ${bareBtn('trash', 'Discard all', A(async () => { if (n && confirm('Discard all ' + n + ' changes to ' + g.name + '? They go back to the version on GitHub.')) { for (const r of art) await store.discard(g.file, r.itemId); putBack(Object.keys(games.getEdits(g.file).overrides)); } }))}
+          ${bareBtn('trash', 'Discard all', A(async () => { if (n && confirm('Discard all ' + n + ' changes and restore the GitHub version of ' + g.name + '?')) { for (const r of art) await store.discard(g.file, r.itemId); putBack(Object.keys(games.getEdits(g.file).overrides)); } }))}
           ${bareBtn('up', n ? 'Push' : 'Pushed', A(() => { if (n) pushAll(app).then(() => rer()); }), n ? BLUE : undefined)}
         </div>
       </div>`;
