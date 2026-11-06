@@ -17,6 +17,7 @@ import settings from './screens/settings.js';
 import { unseenCount } from './screens/sync.js';
 import * as launch from './launch.js';
 import * as artStore from './artStore.js';
+import { openIconEditor } from './iconEditor.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -31,6 +32,7 @@ export const app = {
   ui: S.getUI(),
   settings: S.getSettings(),
   overlay: null,
+  modal: null,   // a small editor over the current screen (the icon editor)
   busy: false,
 
   saveUI() { S.setUI(this.ui); },
@@ -186,6 +188,25 @@ addEventListener('pointerup', (e) => {
   if (!over || !held.contains(over)) letGo(); // slid off: no click is coming
 });
 addEventListener('pointercancel', letGo);
+// Hold an icon button for half a second to redraw its icon. The touch that opened the editor must not also press the button.
+let holdT = 0, holdAt = null, swallow = false;
+const stopHold = () => { clearTimeout(holdT); holdT = 0; };
+root.addEventListener('pointerdown', (e) => {
+  swallow = false; stopHold();
+  const el = e.target.closest('[data-icon]');
+  if (!el || el.disabled || app.modal) return;
+  holdAt = [e.clientX, e.clientY];
+  holdT = setTimeout(() => {
+    holdT = 0; swallow = true; letGo(); el.classList.remove('pressed');
+    snd.click();
+    openIconEditor(app, el.dataset.icon, getComputedStyle(el).getPropertyValue('--acc').trim() || undefined);
+  }, 500);
+});
+root.addEventListener('pointermove', (e) => { if (holdT && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) stopHold(); });
+addEventListener('pointerup', () => { stopHold(); if (swallow) setTimeout(() => { swallow = false; }, 400); });
+addEventListener('pointercancel', stopHold);
+root.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-icon]')) e.preventDefault(); });
+root.addEventListener('click', (e) => { if (swallow) { e.stopPropagation(); e.preventDefault(); } }, true);
 root.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]');
   if (!el || el.disabled || busyTap) return;
@@ -216,7 +237,8 @@ function frame(ms) {
   const t = ms / 1000;
   input.poll();
   if (launch.launching()) { lastT = t; requestAnimationFrame(frame); return; } // the launch animation has the controller
-  if (app.overlay) { if (app.overlay.frame) app.overlay.frame(t, app); }
+  if (app.modal) app.modal.frame();
+  else if (app.overlay) { if (app.overlay.frame) app.overlay.frame(t, app); }
   else {
     if (input.pressed('lb')) app.setTab(app.ui.tab - 1);
     else if (input.pressed('rb')) app.setTab(app.ui.tab + 1);
