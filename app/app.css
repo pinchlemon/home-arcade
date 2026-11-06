@@ -345,6 +345,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
   #app .sprite-ed>*{grid-column:2;width:auto;margin:0}
   #app .sprite-ed>.screen.fit.se-view{grid-column:1;grid-row:1/-1;width:auto;height:auto;min-height:0}
   #app .sprite-ed>.se-tl{height:auto;min-height:0}
+  #app .sprite-ed>.nw-prev{grid-column:1;grid-row:1/-1;width:auto;height:auto;min-height:0}
   #app .sprite-ed>.se-sheet{left:auto;right:calc(var(--ir,0px) + 20px);width:362px;top:max(env(safe-area-inset-top),16px);bottom:max(env(safe-area-inset-bottom),16px);height:auto}
 }
 

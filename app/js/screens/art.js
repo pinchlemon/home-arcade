@@ -171,7 +171,7 @@ function openViewer(app, g, it, F) {
       } else {
         panel = `<div class="plate inspector gap20">
           <div class="grow"><span class="t"><span class="cap">Zoom</span><span class="sub">Screen pixels per art pixel</span></span>${stepper((v.k || v.fit) + '×', A(() => { v.scale = Math.max(1, (v.k || v.fit) - 1); draw(); rer(); }), A(() => { v.scale = Math.min(v.fit, (v.k || v.fit) + 1); draw(); rer(); }), 'Zoom')}</div>
-          <div class="grow"><span class="t"><span class="cap">${esc(it.kind === 'symbol' ? 'Symbol' : 'Picture')}</span><span class="sub" style="white-space:normal">${esc(it.help)}. Drawing on it comes with the pixel editor.</span></span></div>
+          <div class="grow"><span class="t"><span class="cap">${esc(it.kind === 'symbol' ? 'Symbol' : 'Picture')}</span><span class="sub" style="white-space:normal">${esc(it.help)}.${it.kind === 'symbol' ? ' Objects in the Studio are drawn with it.' : ' Draw (the brush above) opens it in the sprite editor.'}</span></span></div>
         </div>`;
       }
       return `<div class="screen-tool" style="--acc:${PINK}">
@@ -180,7 +180,7 @@ function openViewer(app, g, it, F) {
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Art' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(it.name)}</span><span class="sub">${esc(g.name)} · ${esc(it.kind === 'symbol' ? '8×8 symbol' : it.file)}</span></span>
           ${it.kind === 'image' ? iconBtn('paint', A(() => { app.close(); openDraw(app, g, it, F); }), { color: '#fff', label: 'Draw on it' }) : ''}
-          ${iconBtn('edit', A(() => { app.close(); jump(app, g, it); }), { color: '#fff', label: 'Where it is used' })}
+          ${iconBtn('out', A(() => { app.close(); jump(app, g, it); }), { color: '#fff', label: 'Where it is used' })}
         </div>
         <div class="screen fit gap20 checker"><canvas class="pix" id="artv" role="img" aria-label="${esc(it.name)}, drawn big"></canvas></div>
         ${panel}
@@ -261,7 +261,7 @@ function openNew(app, g, f) {
   }
   const ov = {
     render() {
-      return `<div class="screen-tool" style="--acc:${PINK}">
+      return `<div class="screen-tool sprite-ed" style="--acc:${PINK}">
         <h1 class="sr">New sprite</h1>
         <div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Art' })}
@@ -272,7 +272,7 @@ function openNew(app, g, f) {
           <label class="se-field"><span class="cap">Name</span><input id="nw-name" value="${esc(v.name)}" placeholder="Sprite" maxlength="40" autocomplete="off" spellcheck="false"></label>
           <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">Pixels across</span></span>${stepper(String(v.w), A(() => bump('w', -1)), A(() => bump('w', 1)), 'width')}</div>
           <div class="grow"><span class="t"><span class="cap">Height</span><span class="sub">Pixels down</span></span>${stepper(String(v.h), A(() => bump('h', -1)), A(() => bump('h', 1)), 'height')}</div>
-          <div class="grow"><span class="t"><span class="cap">Animated</span><span class="sub" style="white-space:normal">A sprite sheet: its frames are saved side by side</span></span>${toggleBtn(v.sheet, A(() => { v.sheet = !v.sheet; rer(); }))}</div>
+          <div class="grow"><span class="t"><span class="cap">Animated</span><span class="sub">Frames saved side by side</span></span>${toggleBtn(v.sheet, A(() => { v.sheet = !v.sheet; rer(); }))}</div>
         </div>
         <div class="plate bar" style="gap:8px">${plateBtn('plus', 'Create', A(() => create()))}
           <label class="plate btn se-file" style="flex:1">${well(28, icon('down', '#fff'))}<span>Open a file</span><input type="file" id="nw-file" accept="image/png,image/gif,image/jpeg,image/webp,.aseprite,.ase"></label></div>
