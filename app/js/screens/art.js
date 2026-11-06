@@ -11,6 +11,7 @@ import * as input from '../input.js';
 import { makeNav, padFrame } from '../padnav.js';
 import * as store from '../artStore.js';
 import { openSpriteEditor } from './spriteEditor.js';
+import { readAse } from '../ase.js';
 
 const PINK = '#ff4fd8';
 const loaded = {}, sizes = {};
@@ -170,7 +171,7 @@ function openViewer(app, g, it, F) {
       } else {
         panel = `<div class="plate inspector gap20">
           <div class="grow"><span class="t"><span class="cap">Zoom</span><span class="sub">Screen pixels per art pixel</span></span>${stepper((v.k || v.fit) + '×', A(() => { v.scale = Math.max(1, (v.k || v.fit) - 1); draw(); rer(); }), A(() => { v.scale = Math.min(v.fit, (v.k || v.fit) + 1); draw(); rer(); }), 'Zoom')}</div>
-          <div class="grow"><span class="t"><span class="cap">${esc(it.kind === 'symbol' ? 'Symbol' : 'Picture')}</span><span class="sub" style="white-space:normal">${esc(it.help)}. Drawing on it comes with the pixel editor.</span></span></div>
+          <div class="grow"><span class="t"><span class="cap">${esc(it.kind === 'symbol' ? 'Symbol' : 'Picture')}</span><span class="sub" style="white-space:normal">${esc(it.help)}.${it.kind === 'symbol' ? ' Objects in the Studio are drawn with it.' : ' Draw (the brush above) opens it in the sprite editor.'}</span></span></div>
         </div>`;
       }
       return `<div class="screen-tool" style="--acc:${PINK}">
@@ -178,7 +179,8 @@ function openViewer(app, g, it, F) {
         <div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Art' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(it.name)}</span><span class="sub">${esc(g.name)} · ${esc(it.kind === 'symbol' ? '8×8 symbol' : it.file)}</span></span>
-          ${iconBtn('edit', A(() => { app.close(); jump(app, g, it); }), { color: '#fff', label: 'Where it is used' })}
+          ${it.kind === 'image' ? iconBtn('paint', A(() => { app.close(); openDraw(app, g, it, F); }), { color: '#fff', label: 'Draw on it' }) : ''}
+          ${iconBtn('out', A(() => { app.close(); jump(app, g, it); }), { color: '#fff', label: 'Where it is used' })}
         </div>
         <div class="screen fit gap20 checker"><canvas class="pix" id="artv" role="img" aria-label="${esc(it.name)}, drawn big"></canvas></div>
         ${panel}
@@ -226,35 +228,60 @@ function openNew(app, g, f) {
   const v = { name: '', w: 32, h: 32, sheet: false };
   const nav = makeNav(), rer = () => { if (app.overlay === ov) app.render(); };
   const bump = (k, d) => { const i = SIZES.indexOf(v[k]); v[k] = SIZES[Math.max(0, Math.min(SIZES.length - 1, (i < 0 ? 4 : i) + d))]; rer(); };
-  function create() {
-    const name = (v.name || '').trim() || 'Sprite';
+  function create(spr, fileName) {
+    spr = spr && spr.cels ? spr : null;
+    const name = (v.name || '').trim() || (fileName ? fileName.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/^./, c => c.toUpperCase()) : 'Sprite');
     const x = folders(app, g), taken = new Set(x ? x.list.flatMap(ff => ff.items.map(it => it.id)) : []);
     let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sprite', id = slug, n = 2;
     while (taken.has(id)) id = slug + '-' + n++;
-    const item = { id, name, file: 'assets/' + id + '.png', help: 'Drawn on the phone' };
-    if (v.sheet) { item.cell = [v.w, v.h]; item.frames = 1; item.anims = []; }
+    const item = { id, name, file: 'assets/' + id + '.png', help: fileName ? 'From ' + fileName : 'Drawn on the phone' };
+    if (v.sheet || (spr && spr.frames.length > 1)) { item.cell = [spr ? spr.w : v.w, spr ? spr.h : v.h]; item.frames = spr ? spr.frames.length : 1; item.anims = []; }
     app.ui.artFolder = f.id; app.ui.artSel = id; app.saveUI();
     app.close();
-    openSpriteEditor(app, g, item, { spr: store.blankSprite(v.w, v.h), extra: { isNew: true, folder: f.id, item } });
+    openSpriteEditor(app, g, item, { spr: spr || store.blankSprite(v.w, v.h), extra: { isNew: true, folder: f.id, item } });
+  }
+  // start from a file: an .aseprite as it is; a picture as one frame, or (Animated on) cut into frames of the size set above
+  async function fromFile(file) {
+    if (!file) return;
+    try {
+      let spr;
+      if (/\.(aseprite|ase)$/i.test(file.name)) spr = await readAse(await file.arrayBuffer());
+      else {
+        const url = URL.createObjectURL(file), img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('not a picture')); im.src = url; });
+        const cut = v.sheet && img.naturalWidth % v.w === 0 && img.naturalHeight % v.h === 0 && (img.naturalWidth > v.w || img.naturalHeight > v.h);
+        if (v.sheet && !cut) app.toast('The picture is not a whole number of ' + v.w + '×' + v.h + ' frames, so it comes in as one frame');
+        spr = store.spriteFromImage(img, cut ? { cell: [v.w, v.h] } : {});
+        if (cut) { // leave out empty frames at the end
+          while (spr.frames.length > 1 && ![...spr.cels.keys()].some(k => +k.split(':')[1] === spr.frames.length - 1)) spr.frames.pop();
+        }
+        URL.revokeObjectURL(url);
+      }
+      create(spr, file.name);
+    } catch (e) { app.toast('Could not open ' + file.name + ': ' + (e.message || e)); }
   }
   const ov = {
     render() {
-      return `<div class="screen-tool" style="--acc:${PINK}">
+      return `<div class="screen-tool sprite-ed" style="--acc:${PINK}">
         <h1 class="sr">New sprite</h1>
         <div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Art' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">New sprite</span><span class="sub ell">${esc(g.name)} · ${esc(f.name)}</span></span>
         </div>
-        <div class="plate inspector">
+        <div class="screen nw-prev" aria-hidden="true">${(() => { const k = Math.max(1, Math.min(8, Math.floor(Math.min(300 / v.w, 200 / v.h)))); return `<div class="nw-box" style="width:${v.w * k}px;height:${v.h * k}px;--px:${k * 2}px"></div><span class="sub">${v.w}×${v.h}${v.sheet ? ' · animated' : ''} · shown ${k}× · each square is 2×2 pixels</span>`; })()}</div>
+        <div class="plate inspector" style="flex:none">
           <label class="se-field"><span class="cap">Name</span><input id="nw-name" value="${esc(v.name)}" placeholder="Sprite" maxlength="40" autocomplete="off" spellcheck="false"></label>
           <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">Pixels across</span></span>${stepper(String(v.w), A(() => bump('w', -1)), A(() => bump('w', 1)), 'width')}</div>
           <div class="grow"><span class="t"><span class="cap">Height</span><span class="sub">Pixels down</span></span>${stepper(String(v.h), A(() => bump('h', -1)), A(() => bump('h', 1)), 'height')}</div>
-          <div class="grow"><span class="t"><span class="cap">Animated</span><span class="sub" style="white-space:normal">A sprite sheet: its frames are saved side by side</span></span>${toggleBtn(v.sheet, A(() => { v.sheet = !v.sheet; rer(); }))}</div>
+          <div class="grow"><span class="t"><span class="cap">Animated</span><span class="sub">Frames saved side by side</span></span>${toggleBtn(v.sheet, A(() => { v.sheet = !v.sheet; rer(); }))}</div>
         </div>
-        <div class="plate bar">${plateBtn('plus', 'Create', A(create))}</div>
+        <div class="plate bar" style="gap:8px">${plateBtn('plus', 'Create', A(() => create()))}
+          <label class="plate btn se-file" style="flex:1">${well(28, icon('down', '#fff'))}<span>Open a file</span><input type="file" id="nw-file" accept="image/png,image/gif,image/jpeg,image/webp,.aseprite,.ase"></label></div>
       </div>`;
     },
-    mount(root) { const i = root.querySelector('#nw-name'); if (i) i.addEventListener('input', () => { v.name = i.value; }); },
+    mount(root) {
+      const i = root.querySelector('#nw-name'); if (i) i.addEventListener('input', () => { v.name = i.value; });
+      const fi = root.querySelector('#nw-file'); if (fi) fi.addEventListener('change', () => { const f = fi.files && fi.files[0]; fi.value = ''; fromFile(f); });
+    },
     frame() { if (input.pressed('b')) app.close(); else padFrame(document.getElementById('app'), nav, input); }
   };
   app.open(ov);

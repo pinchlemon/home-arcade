@@ -1,4 +1,4 @@
-// Controller navigation for the full-screen tools (the game editor, the art viewer, the changes screen).
+// Controller navigation for the full-screen tools (the game editor, the art viewer, the sprite editor, the changes screen).
 // The D-pad (or stick) moves a ring between things you can press, towards where you push it. On a row with a
 // stepper or a switch, left and right change its value instead. A presses the thing the ring is on.
 // The scene can be focused too; A on it hands the controller over to the scene (see gameEditor.js).
@@ -11,7 +11,7 @@ function targets(root) {
   const scope = root.querySelector('.screen-tool') || root;
   const out = [];
   for (const el of scope.querySelectorAll('button, .grow, #scn, [data-pad=pager]')) {
-    if (el.disabled || el.classList.contains('plane')) continue;
+    if (el.disabled || el.classList.contains('plane') || el.dataset.pad === 'skip') continue;   // data-pad="skip": too many to step through (the sprite editor's timeline cells)
     const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
     if (el.matches('[data-pad=pager]')) { out.push(el); continue; }
     // a pager's previous and next buttons are turned by left and right; anything else on the bar (like New) stays its own stop
