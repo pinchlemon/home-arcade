@@ -1,6 +1,6 @@
 // Hedron offline support: keeps the launcher, games, libraries and fonts on the phone.
-const CACHE='arcade-1793843720';
-const PRE=["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "lib/three.min.js", "lib/OrbitControls.js", "lib/cannon.min.js", "void-wizard/", "purgatory-bowl/", "phosphor/", "crab-platformer/", "circuit-crush/", "app/", "app/index.html", "app/app.css", "app/manifest.webmanifest", "app/js/input.js", "app/js/main.js", "app/js/pixel.js", "app/js/sound.js", "app/js/store.js", "app/js/ui.js", "app/js/screens/arcade.js", "app/js/screens/settings.js", "app/js/screens/studio.js", "app/js/screens/sync.js", "engine/boot.js", "engine/audio.js", "engine/input.js", "engine/loop.js", "engine/pixels.js", "engine/screen.js", "crab-platformer/game.json", "crab-platformer/scripts/art.js", "crab-platformer/scripts/beach.js", "crab-platformer/scripts/crab-look.js", "crab-platformer/scripts/crab.js", "crab-platformer/scripts/eye-look.js", "crab-platformer/scripts/eyes.js", "crab-platformer/scripts/juice-look.js", "crab-platformer/scripts/juice.js", "crab-platformer/scripts/music.js", "crab-platformer/scripts/particles.js", "crab-platformer/scripts/render.js", "crab-platformer/scripts/settings.js", "crab-platformer/scripts/sounds.js", "crab-platformer/scripts/state.js", "crab-platformer/assets/castle.png", "crab-platformer/assets/city.png", "crab-platformer/assets/cloud.png", "crab-platformer/assets/palm.png", "crab-platformer/assets/sand.png", "crab-platformer/assets/sheet.png", "crab-platformer/assets/umbrella.png", "app/js/games.js", "app/js/screens/gameEditor.js", "crab-platformer/studio.json", "engine/actors.js", "engine/behaviors.json", "engine/symbols.json", "app/js/screens/art.js", "app/js/screens/soundTab.js", "engine/listen.html", "app/js/screens/review.js", "app/js/padnav.js", "app/js/build.js", "app/js/update.js", "app/js/launch.js"];
+const CACHE='arcade-1793946028';
+const PRE=["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "lib/three.min.js", "lib/OrbitControls.js", "lib/cannon.min.js", "void-wizard/", "purgatory-bowl/", "phosphor/", "crab-platformer/", "circuit-crush/", "app/", "app/index.html", "app/app.css", "app/manifest.webmanifest", "app/js/input.js", "app/js/main.js", "app/js/pixel.js", "app/js/sound.js", "app/js/store.js", "app/js/ui.js", "app/js/screens/arcade.js", "app/js/screens/settings.js", "app/js/screens/studio.js", "app/js/screens/sync.js", "engine/boot.js", "engine/audio.js", "engine/input.js", "engine/loop.js", "engine/pixels.js", "engine/screen.js", "crab-platformer/game.json", "crab-platformer/scripts/art.js", "crab-platformer/scripts/beach.js", "crab-platformer/scripts/crab-look.js", "crab-platformer/scripts/crab.js", "crab-platformer/scripts/eye-look.js", "crab-platformer/scripts/eyes.js", "crab-platformer/scripts/juice-look.js", "crab-platformer/scripts/juice.js", "crab-platformer/scripts/music.js", "crab-platformer/scripts/particles.js", "crab-platformer/scripts/render.js", "crab-platformer/scripts/settings.js", "crab-platformer/scripts/sounds.js", "crab-platformer/scripts/state.js", "crab-platformer/assets/castle.png", "crab-platformer/assets/city.png", "crab-platformer/assets/cloud.png", "crab-platformer/assets/palm.png", "crab-platformer/assets/sand.png", "crab-platformer/assets/sheet.png", "crab-platformer/assets/umbrella.png", "app/js/games.js", "app/js/screens/gameEditor.js", "crab-platformer/studio.json", "engine/actors.js", "engine/behaviors.json", "engine/symbols.json", "app/js/screens/art.js", "app/js/screens/soundTab.js", "engine/listen.html", "app/js/screens/review.js", "app/js/padnav.js", "app/js/build.js", "app/js/update.js", "app/js/launch.js", "app/js/ase.js", "app/js/artStore.js", "app/js/screens/spriteEditor.js"];
 const FONTS=["https://fonts.googleapis.com/css2?family=Saira:wght@400;600;700&display=swap", "https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap", "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap", "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Silkscreen&family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@600&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&display=swap", "https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&display=swap", "https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap"];
 
 async function cacheFonts(cache){
@@ -34,9 +34,38 @@ self.addEventListener('activate',e=>{
 
 function timeout(ms){return new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));}
 
+// Art drawn on the phone and not yet on the site lives in IndexedDB (app/js/artStore.js), stored under its path in the repo.
+// Pictures and .aseprite files are looked up there first, so the games and the app show the phone's version.
+function phoneArt(path){
+  return new Promise(res=>{
+    try{
+      const r=indexedDB.open('hedron-art',1);
+      r.onupgradeneeded=()=>{r.transaction.abort();};   // nothing drawn on this phone yet: don't create it here
+      r.onerror=()=>res(null);
+      r.onsuccess=()=>{
+        const d=r.result;
+        if(!d.objectStoreNames.contains('files')){d.close();res(null);return;}
+        const g=d.transaction('files').objectStore('files').get(path);
+        g.onsuccess=()=>{d.close();res(g.result||null);};g.onerror=()=>{d.close();res(null);};
+      };
+    }catch(err){res(null);}
+  });
+}
+
 self.addEventListener('fetch',e=>{
   const req=e.request;if(req.method!=='GET')return;
   const url=new URL(req.url);
+  if(url.origin===self.location.origin&&/\.(png|aseprite)$/i.test(url.pathname)){
+    const path=decodeURIComponent(url.pathname.slice(new URL(self.registration.scope).pathname.length));
+    e.respondWith((async()=>{
+      const f=await phoneArt(path);
+      if(f)return new Response(f.bytes,{headers:{'content-type':f.type||'image/png','cache-control':'no-store'}});
+      const cache=await caches.open(CACHE),hit=await cache.match(req,{ignoreSearch:true});
+      if(hit)return hit;
+      try{const res=await fetch(req);if(res.ok)cache.put(url.pathname,res.clone());return res;}catch(err){return Response.error();}
+    })());
+    return;
+  }
   const isFont=url.hostname==='fonts.googleapis.com'||url.hostname==='fonts.gstatic.com';
   const same=url.origin===self.location.origin;
   if(!same&&!isFont)return;

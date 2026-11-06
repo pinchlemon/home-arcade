@@ -7,6 +7,7 @@ import * as input from '../input.js';
 import { makeNav, padFrame } from '../padnav.js';
 import { fmt } from './gameEditor.js';
 import { pushAll, markSeen } from './sync.js';
+import * as store from '../artStore.js';
 
 const BLUE = '#4d7cff';
 
@@ -49,20 +50,22 @@ export function openReview(app, g) {
   const nav = makeNav();
   const ov = {
     render() {
-      const items = game ? list() : [], n = items.length;
+      const items = game ? list() : [], art = store.dirtyFor(g.file), n = items.length + art.length;
       const top = `<div class="plate bar">
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Sync' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">Changes · ${esc(g.name)}</span><span class="sub">${game ? (n ? n + (n === 1 ? ' change' : ' changes') + ' not pushed' : 'Nothing to push') : error ? 'Could not load: ' + esc(error) : 'Loading…'}</span></span>
           ${iconBtn('edit', A(() => { app.close(); import('./gameEditor.js').then(m => m.openGameEditor(app, g)); }), { color: '#fff', label: 'Open in the Studio' })}
         </div>`;
       const rows = items.map(it => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(it.label)}</span><span class="sub ell">${esc(it.where)} · was ${esc(it.from)} → now <span style="color:var(--acc)">${esc(it.to)}</span></span></span>
-          ${iconBtn('undo', A(() => putBack([it.path])), { label: 'Put back ' + it.label })}</div>`).join('');
+          ${iconBtn('undo', A(() => putBack([it.path])), { label: 'Put back ' + it.label })}</div>`).join('')
+        + art.map(r => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(r.name)}</span><span class="sub ell">Art · ${r.item && r.isNew ? 'new sprite' : 'drawn on the phone'} · ${esc(r.png.split('/').pop())} and ${esc(r.ase.split('/').pop())}</span></span>
+          ${iconBtn('undo', A(() => { if (confirm((r.isNew ? 'Delete the new sprite ' : 'Put back ') + r.name + '? ' + (r.isNew ? 'It has not been pushed.' : 'It goes back to the version on GitHub.'))) store.discard(g.file, r.itemId).then(rer); }), { label: 'Put back ' + r.name })}</div>`).join('');
       return `<div class="screen-tool" style="--acc:${BLUE}">
         <h1 class="sr">Changes to ${esc(g.name)}</h1>
         ${top}
         <div class="plate inspector">${rows || `<div class="center-note">${well(40, icon('check', BLUE))}<span class="sub">${game ? 'No changes left. ' + esc(g.name) + ' matches GitHub.' : 'Loading…'}</span></div>`}</div>
         <div class="plate bar">
-          ${bareBtn('trash', 'Discard all', A(() => { if (n && confirm('Discard all ' + n + ' changes to ' + g.name + '? They go back to the version on GitHub.')) putBack(Object.keys(games.getEdits(g.file).overrides)); }))}
+          ${bareBtn('trash', 'Discard all', A(async () => { if (n && confirm('Discard all ' + n + ' changes to ' + g.name + '? They go back to the version on GitHub.')) { for (const r of art) await store.discard(g.file, r.itemId); putBack(Object.keys(games.getEdits(g.file).overrides)); } }))}
           ${bareBtn('up', n ? 'Push' : 'Pushed', A(() => { if (n) pushAll(app).then(() => rer()); }), n ? BLUE : undefined)}
         </div>
       </div>`;

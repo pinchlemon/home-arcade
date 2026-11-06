@@ -16,6 +16,7 @@ import sound from './screens/soundTab.js';
 import settings from './screens/settings.js';
 import { unseenCount } from './screens/sync.js';
 import * as launch from './launch.js';
+import * as artStore from './artStore.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -248,6 +249,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 applySettings();
 render();
 games.preload(() => { if (!app.overlay) render(); });
+artStore.load().then(() => { if (!app.overlay) render(); });   // sprites drawn on this phone (their dots and thumbnails)
 checkVersion();
 requestAnimationFrame(frame);
 function playLaunch(preview) {
