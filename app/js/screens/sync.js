@@ -1,12 +1,14 @@
 // Sync: send the changes made on this phone to GitHub. Lives in Settings (the Sync group); the Settings
 // tab shows a dot while there is something to push. Each game's changes are applied on top of the
 // game.json that is on GitHub at that moment, so anything changed elsewhere (by Claude, or on the computer)
-// is kept. Everything goes up in one commit (git data API).
+// is kept. Sprites drawn on the phone go up as files (their .aseprite and .png; new ones are added to studio.json).
+// Everything goes up in one commit (git data API).
 import { icon } from '../pixel.js';
 import * as S from '../store.js';
 import { row } from '../ui.js';
 import * as games from '../games.js';
 import { openReview } from './review.js';
+import * as store from '../artStore.js';
 
 const BLUE = '#4d7cff';
 let busy = false, remoteLog = null, remoteAt = 0;
@@ -25,8 +27,11 @@ export const when = (t) => {
 export function changeList() {
   const out = [];
   for (const g of games.editableGames()) {
-    const e = games.getEdits(g.file), n = games.editCount(g.file);
-    if (e.dirty && n) out.push({ game: g, name: g.name, meta: n + (n === 1 ? ' change' : ' changes') + ' · edited ' + games.ago(e.edited), act: 'Changed' });
+    const e = games.getEdits(g.file), n = e.dirty ? games.editCount(g.file) : 0, art = store.dirtyFor(g.file);
+    if (!n && !art.length) continue;
+    const parts = [n ? n + (n === 1 ? ' change' : ' changes') : '', art.length ? art.length + (art.length === 1 ? ' sprite' : ' sprites') : ''].filter(Boolean);
+    const when = Math.max(n ? e.edited : 0, ...art.map(r => r.edited));
+    out.push({ game: g, name: g.name, settings: n, art, meta: parts.join(' · ') + ' · edited ' + games.ago(when), act: 'Changed' });
   }
   return out;
 }
@@ -35,7 +40,7 @@ export function changeList() {
 // what is there as seen; a new change brings the dot back. (The changes themselves stay listed until pushed or discarded.)
 // What a game's changes amount to right now (only settings that really differ from GitHub). The dot compares this with what you last
 // looked at, so changing something and changing it back leaves it as it was and brings nothing back.
-const signature = (file) => { const o = games.getEdits(file).overrides; return JSON.stringify(games.realChanges(file).sort().map(p => [p, o[p]])); };
+const signature = (file) => { const o = games.getEdits(file).overrides; return JSON.stringify([games.realChanges(file).sort().map(p => [p, o[p]]), store.dirtyFor(file).map(r => [r.itemId, r.edited])]); };
 export const unseenCount = () => { const seen = S.getSync().seen || {}; return changeList().filter(c => seen[c.game.file] !== signature(c.game.file)).length; };
 export function markSeen(g) { const sy = S.getSync(); sy.seen = { ...(sy.seen || {}), [g.file]: signature(g.file) }; S.setSync(sy); }
 
@@ -66,17 +71,44 @@ export async function pushAll(app, quiet) {
   busy = true; app.toast('Pushing ' + items.length + (items.length === 1 ? ' game…' : ' games…')); app.render();
   try {
     const branch = app.settings.branch, ref = await gh(app, `git/ref/heads/${encodeURIComponent(branch)}`), head = ref.object.sha;
-    const base = await gh(app, `git/commits/${head}`), tree = [], pushed = [];
+    const base = await gh(app, `git/commits/${head}`), tree = [], pushed = [], art = [], schemaChanged = [];
     for (const it of items) {
-      const path = `${it.game.file}/game.json`, cur = await gh(app, `contents/${path}?ref=${encodeURIComponent(branch)}`);
-      const merged = games.applyOverrides(JSON.parse(b64decode(cur.content)), games.getEdits(it.game.file).overrides);
-      tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(merged, null, 2) + '\n' }); pushed.push(it.game.file);
+      if (it.settings) {
+        const path = `${it.game.file}/game.json`, cur = await gh(app, `contents/${path}?ref=${encodeURIComponent(branch)}`);
+        const merged = games.applyOverrides(JSON.parse(b64decode(cur.content)), games.getEdits(it.game.file).overrides);
+        tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(merged, null, 2) + '\n' }); pushed.push(it.game.file);
+      }
+      // sprites: both files of each, as they are on the phone
+      for (const r of it.art) {
+        for (const p of [r.png, r.ase]) {
+          const f = await store.file(it.game.file + '/' + p); if (!f) continue;
+          const b = await gh(app, 'git/blobs', { content: store.toBase64(f.bytes), encoding: 'base64' });
+          tree.push({ path: it.game.file + '/' + p, mode: '100644', type: 'blob', sha: b.sha });
+        }
+        art.push(r);
+      }
+      // new sprites join the game's Art list (studio.json), in their folder
+      const fresh = it.art.filter(r => r.item && r.isNew);
+      if (fresh.length) {
+        const path = `${it.game.file}/studio.json`, cur = await gh(app, `contents/${path}?ref=${encodeURIComponent(branch)}`), schema = JSON.parse(b64decode(cur.content));
+        schema.art = schema.art || { folders: [] }; schema.art.folders = schema.art.folders || [];
+        for (const r of fresh) {
+          let f = schema.art.folders.find(x => x.id === r.folder);
+          if (!f) schema.art.folders.push(f = { id: r.folder, name: r.folder[0].toUpperCase() + r.folder.slice(1), items: [] });
+          const i = f.items.findIndex(x => x.id === r.item.id);
+          if (i >= 0) f.items[i] = r.item; else f.items.push(r.item);
+        }
+        tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(schema, null, 2) + '\n' }); schemaChanged.push(it.game.file);
+      }
     }
     const t = await gh(app, 'git/trees', { base_tree: base.tree.sha, tree });
-    const message = items.length === 1 ? `Studio: update ${items[0].name}` : `Studio: update ${items.length} games (${items.slice(0, 3).map(i => i.name).join(', ')}${items.length > 3 ? '…' : ''})`;
+    const what = (i) => [i.settings ? 'settings' : '', i.art.length ? i.art.map(r => r.name).slice(0, 3).join(', ') + (i.art.length > 3 ? '…' : '') : ''].filter(Boolean).join(' and ');
+    const message = items.length === 1 ? `Studio: update ${items[0].name} (${what(items[0])})` : `Studio: update ${items.length} games (${items.slice(0, 3).map(i => i.name).join(', ')}${items.length > 3 ? '…' : ''})`;
     const c = await gh(app, 'git/commits', { message: message + '\n\nPushed from Hedron on the phone.', tree: t.sha, parents: [head] });
     await gh(app, `git/refs/heads/${encodeURIComponent(branch)}`, { sha: c.sha }, 'PATCH');
     for (const f of pushed) { const e = games.getEdits(f); e.dirty = false; games.setEdits(f, e); games.forgetGame(f); }
+    if (art.length) await store.markPushed(art);
+    schemaChanged.forEach(f => games.forgetGame(f));
     const sy = S.getSync();
     sy.history = [{ msg: message, files: tree.length, hash: c.sha.slice(0, 7), when: Date.now() }, ...(sy.history || [])].slice(0, 30);
     sy.lastSync = 'Pushed ' + new Date().toISOString(); sy.lastAt = Date.now(); S.setSync(sy); remoteAt = 0;
