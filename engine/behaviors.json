@@ -3,7 +3,7 @@
  "behaviors": {
   "patrol": {
    "name": "Patrol",
-   "help": "Walks back and forth around where it was placed, turning at walls",
+   "help": "Walks back and forth around its start, turning at walls",
    "params": {
     "speed": {
      "label": "Speed",
@@ -29,7 +29,7 @@
    "params": {
     "bob": {
      "label": "Bob",
-     "help": "How far it bobs up and down",
+     "help": "How far it bobs",
      "min": 0,
      "max": 20,
      "step": 1,
@@ -47,7 +47,7 @@
   },
   "chase": {
    "name": "Chase",
-   "help": "Goes after the player when they come near, then drifts back home",
+   "help": "Chases the player when near, then returns home",
    "params": {
     "range": {
      "label": "Sight",
@@ -59,7 +59,7 @@
     },
     "speed": {
      "label": "Speed",
-     "help": "How fast it closes in",
+     "help": "Chase speed",
      "min": 0.1,
      "max": 4,
      "step": 0.1,
@@ -67,7 +67,7 @@
     },
     "fly": {
      "label": "Flies",
-     "help": "On: chases through the air. Off: along the ground",
+     "help": "On: chases through the air. Off: stays on the ground",
      "min": 0,
      "max": 1,
      "step": 1,
@@ -78,7 +78,7 @@
   },
   "shooter": {
    "name": "Shooter",
-   "help": "Fires at the player when they're in range",
+   "help": "Fires at the player when in range",
    "params": {
     "range": {
      "label": "Range",
@@ -109,12 +109,12 @@
   },
   "touchDamage": {
    "name": "Hurts on touch",
-   "help": "The player loses a heart touching it",
+   "help": "Touching it costs the player a heart",
    "params": {}
   },
   "health": {
    "name": "Can be defeated",
-   "help": "The player's shots wear it down; at zero it pops and counts as a defeat",
+   "help": "Player shots wear it down. At zero it pops and counts as a defeat.",
    "params": {
     "hp": {
      "label": "Hit points",
@@ -150,11 +150,11 @@
   },
   "bouncer": {
    "name": "Bouncer",
-   "help": "Launches the player up when they land on it",
+   "help": "Launches the player upward on landing",
    "params": {
     "strength": {
      "label": "Strength",
-     "help": "How high it throws them",
+     "help": "How high it launches the player",
      "min": 1,
      "max": 10,
      "step": 0.1,
@@ -164,12 +164,12 @@
   },
   "solid": {
    "name": "Solid",
-   "help": "The player can stand on top of it",
+   "help": "The player can stand on top",
    "params": {}
   },
   "mover": {
    "name": "Mover",
-   "help": "Glides back and forth along a path, carrying anyone standing on it",
+   "help": "Glides back and forth along a path, carrying riders",
    "params": {
     "dx": {
      "label": "Across",
@@ -180,7 +180,7 @@
      "default": 48
     },
     "dy": {
-     "label": "Up and down",
+     "label": "Vertical",
      "help": "How far it travels up (+) or down (-)",
      "min": -120,
      "max": 120,
@@ -189,7 +189,7 @@
     },
     "period": {
      "label": "Round trip",
-     "help": "Time for one there-and-back",
+     "help": "Time for one round trip",
      "min": 30,
      "max": 900,
      "step": 10,

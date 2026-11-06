@@ -5,7 +5,6 @@ import { well, icon, svgRows, svgText, G } from './pixel.js';
 let actions = [];
 export const resetActions = () => { actions = []; };
 export const A = (fn) => { actions.push(fn); return `data-a="${actions.length - 1}"`; };
-export const runAction = (i, ev) => { const f = actions[i]; if (f) f(ev); };
 export const getAction = (i) => actions[i];
 
 // how many 64px rows fit on this screen; main.js measures and sets it

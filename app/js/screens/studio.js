@@ -23,8 +23,8 @@ function parts(app, g, k) {
   const edit = (tab) => () => { app.ui.geTab = tab; app.saveUI(); openGameEditor(app, g); };
   return [
     { id: 'scene', icon: 'scene', name: 'Scenes', meta: k ? plural(k.scenes, 'scene', 'scenes') + (k.levels ? ' · ' + plural(k.levels, 'level', 'levels') : '') + ' · backdrop' : '…', tag: 'Edit', go: edit('scene') },
-    { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' and their behaviors' : '…', tag: 'Edit', go: edit('objects') },
-    { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump and more' : '…', tag: 'Edit', go: edit('settings') }
+    { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' · behaviors' : '…', tag: 'Edit', go: edit('objects') },
+    { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump, health' : '…', tag: 'Edit', go: edit('settings') }
   ];
 }
 // the way to pick another game: back to the Arcade, where the selected game is the one being edited
@@ -76,6 +76,6 @@ export function notReady(app, g, iconName, what) {
   return {
     right: `<span class="cap acc">Selected</span><span class="title clamp2">${esc(name)}</span><span class="sub">Not in the Studio yet</span>
       <div class="actions">${g ? plateBtn('play', 'Play', A(() => games.launch(g))) : ''}${plateBtn('left', 'Change game', A(() => app.setTab(0)))}</div>`,
-    body: `<div class="group">${emptyRow(iconName, what + ' works with games that have a game.json, like Crab Platformer. Pick one in the Arcade.')}</div>`
+    body: `<div class="group">${emptyRow(iconName, what + ' supports games built on the shared engine, such as Crab Platformer. Choose one in the Arcade.')}</div>`
   };
 }
