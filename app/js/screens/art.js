@@ -266,7 +266,8 @@ function openNew(app, g, f) {
           ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Art' })}
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">New sprite</span><span class="sub ell">${esc(g.name)} · ${esc(f.name)}</span></span>
         </div>
-        <div class="plate inspector">
+        <div class="screen nw-prev" aria-hidden="true">${(() => { const k = Math.max(1, Math.min(8, Math.floor(Math.min(300 / v.w, 200 / v.h)))); return `<div class="nw-box" style="width:${v.w * k}px;height:${v.h * k}px;--px:${k * 2}px"></div><span class="sub">${v.w}×${v.h}${v.sheet ? ' · animated' : ''} · shown ${k}× · each square is 2×2 pixels</span>`; })()}</div>
+        <div class="plate inspector" style="flex:none">
           <label class="se-field"><span class="cap">Name</span><input id="nw-name" value="${esc(v.name)}" placeholder="Sprite" maxlength="40" autocomplete="off" spellcheck="false"></label>
           <div class="grow"><span class="t"><span class="cap">Width</span><span class="sub">Pixels across</span></span>${stepper(String(v.w), A(() => bump('w', -1)), A(() => bump('w', 1)), 'width')}</div>
           <div class="grow"><span class="t"><span class="cap">Height</span><span class="sub">Pixels down</span></span>${stepper(String(v.h), A(() => bump('h', -1)), A(() => bump('h', 1)), 'height')}</div>
