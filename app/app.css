@@ -311,6 +311,9 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .se-sheet{position:absolute;left:20px;right:20px;bottom:max(env(safe-area-inset-bottom),16px);height:min(372px,58%);z-index:20;min-height:0;padding:14px 16px}
 .se-btns{display:grid;grid-template-columns:1fr 1fr;gap:2px 6px;margin-top:8px}
 .se-btns .btn{height:40px}
+.se-btns3{grid-template-columns:1fr 1fr 1fr;gap:2px 4px}
+.se-btns3 .btn{gap:6px;padding:0;font-size:10px;letter-spacing:.06em}
+.se-btns3 .btn span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .se-btns .btn:disabled{opacity:.35}
 .se-field{display:flex;flex-direction:column;gap:4px;margin:6px 0 4px}
 .se-field input{height:36px;border-radius:6px;background:#000;border:1px solid rgba(255,255,255,.22);color:var(--text);font:600 16px Saira,system-ui,sans-serif;padding:0 10px;min-width:0}

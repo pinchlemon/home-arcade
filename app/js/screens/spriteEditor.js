@@ -1,7 +1,10 @@
 // The sprite editor (Art tab): draw a game's pictures, Aseprite style, by touch.
 //
 // Canvas: one finger uses the tool; two fingers pinch to zoom and drag to move; a quick two-finger tap undoes.
-// Tools: pencil, eraser, fill, colour picker, hand (move the view). The zoom label in the corner fits the sprite back on screen.
+// Tools: pencil, eraser, fill, colour picker, select (box, lasso, magic wand; replace, add or take away), move, hand (move the view).
+// Selecting: drawing stays inside the selection. Move lifts the selected pixels (or the whole layer) so they float; while they
+// float they can be flipped, turned and scaled (always from the original, so nothing is lost), and they are put down when you
+// draw, change frame or layer, or press Drop. Copy, cut and paste work between sprites. The zoom label in the corner fits the sprite back on screen.
 // Colours: the big swatch opens the colour picker (add or remove palette colours there); the strip is the palette.
 // Timeline (like Aseprite's): layers down the side (top layer first), frames across. Tap a cell to go there; tap the
 // current frame number, layer name or tag again for its settings. Tags are named runs of frames (the game's animations).
@@ -12,10 +15,15 @@ import * as input from '../input.js';
 import { makeNav, padFrame } from '../padnav.js';
 import { celKey, flatten, visibleLayers } from '../ase.js';
 import * as store from '../artStore.js';
+import * as SEL from '../spriteSel.js';
+
+let CLIP = null;   // copied pixels { data, w, h, mask, x, y }, kept while the app is open so they can go to another sprite
 
 const PINK = '#ff4fd8';
 const ZOOMS = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
-const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['picker', 'Pick a colour'], ['pan', 'Move the view']];
+const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['picker', 'Pick a colour'], ['select', 'Select'], ['move', 'Move pixels'], ['pan', 'Move the view']];
+const SHAPES = [['box', 'Select a box'], ['lasso', 'Select by drawing round it'], ['wand', 'Select a colour (magic wand)']];
+const MODES = ['Replace the selection', 'Add to the selection', 'Take away from the selection'];
 const DIRS = ['FORWARD', 'REVERSE', 'PING-PONG'];
 const TAG_COLORS = [[255, 90, 31], [125, 255, 106], [255, 79, 216], [77, 124, 255], [255, 210, 63], [180, 180, 180]];
 
@@ -36,7 +44,8 @@ function hsvToRgb(h, s, v) {
 
 export function openSpriteEditor(app, g, item, opts = {}) {
   const ed = { spr: null, err: null, layer: 0, frame: 0, tool: 'pencil', after: 'pencil', color: [0, 0, 0, 255], zoom: 0, ox: 0, oy: 0,
-    onion: false, grid: true, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0] };
+    onion: false, grid: true, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0],
+    sel: null, float: null, shape: 'box', mode: 0, contiguous: true, preview: null };
   const nav = makeNav();
   let cv = null, ctx = null, dpr = 1, CW = 0, CH = 0;
   const rer = () => { if (app.overlay === ov) app.render(); };
@@ -71,9 +80,16 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   }
   function save() {
     clearTimeout(saveT); saveT = 0;
-    const spr = ed.spr; if (!spr) return saving;
+    const spr = withFloat(); if (!spr) return saving;
     saving = saving.then(() => store.save(g.file, item, spr, extra())).then(() => { ed.saved = !saveT; status(); }).catch(e => toast('Could not save: ' + e.message));
     return saving;
+  }
+  // the sprite as it would be with floating pixels put down (for saving)
+  function withFloat() {
+    const s = ed.spr; if (!s || !ed.float) return s;
+    const F = ed.float, k = celKey(F.layer, F.frame), old = s.cels.get(k), cels = new Map(s.cels);
+    cels.set(k, { data: SEL.drop(F, old ? old.data : new Uint8ClampedArray(s.w * s.h * 4), s.w, s.h), opacity: old ? old.opacity : 255 });
+    return { ...s, cels };
   }
   function changed() { ed.saved = false; status(); clearTimeout(saveT); saveT = setTimeout(save, 700); }
 
@@ -81,11 +97,11 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function snap() {
     const s = ed.spr;
     return { layers: s.layers.map(l => ({ ...l })), frames: s.frames.map(f => ({ ...f })), tags: s.tags.map(t => ({ ...t, color: t.color.slice() })),
-      palette: s.palette.map(c => c.slice()), cels: new Map(s.cels), layer: ed.layer, frame: ed.frame };
+      palette: s.palette.map(c => c.slice()), cels: new Map(s.cels), layer: ed.layer, frame: ed.frame, sel: ed.sel, float: ed.float };
   }
   function restore(x) {
     Object.assign(ed.spr, { layers: x.layers, frames: x.frames, tags: x.tags, palette: x.palette, cels: x.cels });
-    ed.layer = Math.min(x.layer, x.layers.length - 1); ed.frame = Math.min(x.frame, x.frames.length - 1);
+    ed.layer = Math.min(x.layer, x.layers.length - 1); ed.frame = Math.min(x.frame, x.frames.length - 1); ed.sel = x.sel || null; ed.float = x.float || null;
   }
   function step() { ed.hist.push(snap()); if (ed.hist.length > 200) ed.hist.shift(); ed.fut = []; }
   function undo() { if (!ed.hist.length) return; stop(); ed.fut.push(snap()); restore(ed.hist.pop()); changed(); rer(); }
@@ -106,6 +122,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     let on = false; const d = cel.data; for (let i = 3; i < d.length; i += 4) if (d[i]) { on = true; break; }
     filled.set(cel, { v: cel.v || 0, on }); return on;
   }
+  const fpics = new WeakMap();
+  function floatPic(p) { let c = fpics.get(p); if (!c) { c = document.createElement('canvas'); c.width = p.w; c.height = p.h; c.getContext('2d').putImageData(new ImageData(p.data, p.w, p.h), 0, 0); fpics.set(p, c); } return c; }
   let frameC = null, tintC = null;
   // every visible layer of a frame onto a small canvas
   function frameCanvas(f, into) {
@@ -117,6 +135,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       x.globalAlpha = (l.opacity === undefined ? 255 : l.opacity) / 255 * (cel.opacity === undefined ? 255 : cel.opacity) / 255;
       x.drawImage(picOf(cel), 0, 0);
     });
+    const F = ed.float;
+    if (F && F.frame === f && vis[F.layer]) { const l = s.layers[F.layer], p = SEL.floatPixels(F); x.globalAlpha = (l.opacity === undefined ? 255 : l.opacity) / 255; x.drawImage(floatPic(p), p.x, p.y); }
     x.globalAlpha = 1; return into;
   }
 
@@ -151,6 +171,18 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.lineWidth = 1 / dpr; ctx.stroke();
     }
     ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1 / dpr; ctx.strokeRect(ox - 0.5 / dpr, oy - 0.5 / dpr, s.w * z + 1 / dpr, s.h * z + 1 / dpr);
+    // the selection (or the one being drawn): marching ants along its edge
+    const sel = ed.preview || ed.sel;
+    if (sel && !ed.playing) {
+      ctx.beginPath();
+      SEL.outline(sel, s.w, s.h).forEach(([x1, y1, x2, y2]) => { ctx.moveTo(ox + x1 * z, oy + y1 * z); ctx.lineTo(ox + x2 * z, oy + y2 * z); });
+      ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.setLineDash([4, 4]); ctx.lineDashOffset = -((performance.now() / 60) | 0) % 8; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (lasso && lasso.length > 1) {
+      ctx.beginPath(); lasso.forEach(([x, y], i) => (i ? ctx.lineTo(ox + x * z, oy + y * z) : ctx.moveTo(ox + x * z, oy + y * z)));
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+    }
   }
 
   // ---------------------------------------------------------------- drawing
@@ -169,7 +201,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   }
   function plot(x, y) {
     const s = ed.spr; if (x < 0 || y < 0 || x >= s.w || y >= s.h) return;
-    const i = y * s.w + x; if (stroke.done[i]) return; stroke.done[i] = 1;
+    const i = y * s.w + x; if (stroke.done[i] || (ed.sel && !ed.sel.mask[i])) return; stroke.done[i] = 1;
     const d = stroke.cel.data, j = i * 4;
     if (ed.tool === 'eraser') { d[j] = d[j + 1] = d[j + 2] = d[j + 3] = 0; }
     else {
@@ -188,11 +220,11 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     const old = s.cels.get(celKey(ed.layer, ed.frame)), src = old ? old.data : new Uint8ClampedArray(s.w * s.h * 4), j0 = (y * s.w + x) * 4;
     const t = [src[j0], src[j0 + 1], src[j0 + 2], src[j0 + 3]], c = ed.color;
     const same = (j) => (t[3] === 0 ? src[j + 3] === 0 : src[j] === t[0] && src[j + 1] === t[1] && src[j + 2] === t[2] && src[j + 3] === t[3]);
-    if (t[3] && sameColor(t, c)) return false;
+    if ((t[3] && sameColor(t, c)) || (ed.sel && !ed.sel.mask[y * s.w + x])) return false;
     step(); const cel = editableCel(), d = cel.data, seen = new Uint8Array(s.w * s.h), q = [x, y];
     while (q.length) {
       const yy = q.pop(), xx = q.pop(), i = yy * s.w + xx;
-      if (xx < 0 || yy < 0 || xx >= s.w || yy >= s.h || seen[i] || !same(i * 4)) continue;
+      if (xx < 0 || yy < 0 || xx >= s.w || yy >= s.h || seen[i] || !same(i * 4) || (ed.sel && !ed.sel.mask[i])) continue;
       seen[i] = 1; const j = i * 4; d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = c[3] === undefined ? 255 : c[3];
       q.push(xx + 1, yy, xx - 1, yy, xx, yy + 1, xx, yy - 1);
     }
@@ -205,6 +237,92 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     ed.color = [d[j], d[j + 1], d[j + 2], d[j + 3]]; ed.tool = ed.after; rer();
   }
 
+  // ---------------------------------------------------------------- selecting, and floating pixels
+  let lasso = null, act = null;   // act: a one-finger select or move in progress
+  const all1 = () => new Uint8Array(ed.spr.w * ed.spr.h).fill(1);
+  const curCel = () => ed.spr.cels.get(celKey(ed.layer, ed.frame));
+  // lift the selected pixels (or, with nothing selected, everything on the layer) so they float; false if there is nothing to lift
+  function lift() {
+    if (ed.float) return true;
+    const why = blocked(ed.layer); if (why) { toast(why); return false; }
+    const s = ed.spr, cel = curCel();
+    if (!cel) { toast('Nothing on this layer here'); return false; }
+    let mask = ed.sel ? ed.sel.mask : null;
+    if (!mask) { mask = new Uint8Array(s.w * s.h); for (let i = 0; i < mask.length; i++) mask[i] = cel.data[i * 4 + 3] ? 1 : 0; }
+    const cut = SEL.cutOut(cel.data, s.w, s.h, mask);
+    if (!cut) { toast('Nothing on this layer here'); return false; }
+    step();
+    s.cels.set(celKey(ed.layer, ed.frame), { data: cut.rest, opacity: cel.opacity, v: 1 });
+    ed.float = { orig: cut.orig, cx: cut.x + cut.orig.w / 2, cy: cut.y + cut.orig.h / 2, s: 1, r: 0, fx: false, fy: false, layer: ed.layer, frame: ed.frame, noSel: !ed.sel };
+    return true;
+  }
+  // put floating pixels down where they are
+  function settle() {
+    const F = ed.float; if (!F) return;
+    step(); const s = ed.spr, k = celKey(F.layer, F.frame), old = s.cels.get(k);
+    s.cels.set(k, { data: SEL.drop(F, old ? old.data : new Uint8ClampedArray(s.w * s.h * 4), s.w, s.h), opacity: old ? old.opacity : 255, v: 1 });
+    ed.float = null; if (F.noSel) ed.sel = null; changed();
+  }
+  const follow = () => { if (ed.float && !ed.float.noSel) ed.sel = SEL.floatSel(ed.float, ed.spr.w, ed.spr.h); };
+  // flip, turn or scale: what floats, else the selection (lifted first), else the whole layer
+  function transform(fn) {
+    stop(); if (!lift()) return;
+    step(); ed.float = { ...ed.float, ...fn(ed.float) }; follow(); changed(); rer();
+  }
+  const flipH = () => transform(F => ({ fx: !F.fx }));
+  const flipV = () => transform(F => ({ fy: !F.fy }));
+  // turning swaps the flips (a flip and then a quarter turn is the same as the quarter turn and then the other flip)
+  const turn = (q) => transform(F => ({ r: (F.r + q + 4) % 4, fx: F.fy, fy: F.fx }));
+  const scaleBy = (d) => transform(F => { const i = SEL.SCALES.indexOf(F.s); return { s: SEL.SCALES[Math.max(0, Math.min(SEL.SCALES.length - 1, (i < 0 ? 3 : i) + d))] }; });
+  function selectAll() { stop(); settle(); step(); ed.sel = { mask: all1() }; changed(); rer(); }
+  function deselect() { stop(); settle(); if (!ed.sel) return; step(); ed.sel = null; changed(); rer(); }
+  function invertSel() { stop(); settle(); step(); ed.sel = SEL.invert(ed.sel, ed.spr.w, ed.spr.h); changed(); rer(); }
+  function copy(quiet) {
+    const s = ed.spr;
+    if (ed.float) { const p = SEL.floatPixels(ed.float); CLIP = { data: p.data, w: p.w, h: p.h, mask: p.mask, x: p.x, y: p.y }; }
+    else {
+      const cel = curCel(); if (!cel) { toast('Nothing on this layer here'); return false; }
+      let mask = ed.sel ? ed.sel.mask : null;
+      if (!mask) { mask = new Uint8Array(s.w * s.h); for (let i = 0; i < mask.length; i++) mask[i] = cel.data[i * 4 + 3] ? 1 : 0; }
+      const cut = SEL.cutOut(cel.data, s.w, s.h, mask); if (!cut) { toast('Nothing selected on this layer'); return false; }
+      CLIP = { ...cut.orig, x: cut.x, y: cut.y };
+    }
+    if (!quiet) toast('Copied ' + CLIP.w + '×' + CLIP.h);
+    rer(); return true;
+  }
+  function del() {
+    stop();
+    if (ed.float) { step(); const F = ed.float; ed.float = null; if (F.noSel) ed.sel = null; changed(); paintCells(); rer(); return; }
+    if (!ed.sel) { toast('Select something first'); return; }
+    const why = blocked(ed.layer); if (why) { toast(why); return; }
+    if (!curCel()) return;
+    step(); const d = editableCel().data, m = ed.sel.mask;
+    for (let i = 0; i < m.length; i++) if (m[i]) d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = d[i * 4 + 3] = 0;
+    changed(); paintCells(); draw();
+  }
+  function cut() { if (ed.float || copy(true)) { if (CLIP) toast('Cut ' + CLIP.w + '×' + CLIP.h); del(); } }
+  function paste() {
+    if (!CLIP) { toast('Copy something first'); return; }
+    const why = blocked(ed.layer); if (why) { toast(why); return; }
+    stop(); settle();
+    const s = ed.spr, fits = CLIP.x >= 0 && CLIP.y >= 0 && CLIP.x + CLIP.w <= s.w && CLIP.y + CLIP.h <= s.h;
+    step();
+    ed.float = { orig: { data: CLIP.data, w: CLIP.w, h: CLIP.h, mask: CLIP.mask }, cx: fits ? CLIP.x + CLIP.w / 2 : s.w / 2, cy: fits ? CLIP.y + CLIP.h / 2 : s.h / 2, s: 1, r: 0, fx: false, fy: false, layer: ed.layer, frame: ed.frame, noSel: false };
+    follow(); ed.tool = 'move'; changed(); rer();
+  }
+  function fillSel() {
+    if (!ed.sel) { toast('Select something first'); return; }
+    const why = blocked(ed.layer); if (why) { toast(why); return; }
+    stop(); settle(); step(); const d = editableCel().data, m = ed.sel.mask, c = ed.color;
+    for (let i = 0; i < m.length; i++) if (m[i]) { d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = c[3]; }
+    changed(); paintCells(); draw();
+  }
+  function wand(x, y) {
+    const s = ed.spr, cel = curCel(), data = cel ? cel.data : new Uint8ClampedArray(s.w * s.h * 4);
+    if (x < 0 || y < 0 || x >= s.w || y >= s.h) return;
+    step(); ed.sel = SEL.combine(ed.sel, SEL.wandMask(data, s.w, s.h, x, y, ed.contiguous), ed.mode); changed(); rer();
+  }
+
   // ---------------------------------------------------------------- touch on the canvas
   const ptrs = new Map(); let gest = null, lock = false, panning = null, tap = null;   // tap: a fill or pick that happens when the finger lifts (unless it became a pinch)
   const at = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
@@ -214,6 +332,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) { /* not a real pointer */ } ptrs.set(e.pointerId, at(e));
     if (ptrs.size === 2) {
       if (stroke) { restore(ed.hist.pop()); stroke = null; draw(); }   // the first finger's dot was the start of a pinch
+      if (act) { for (let k = 0; k < (act.steps || 0); k++) restore(ed.hist.pop()); act = null; lasso = null; ed.preview = null; draw(); }
       panning = null; tap = null;
       const [a, b] = [...ptrs.values()];
       gest = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, m0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, z0: ed.zoom, ox0: ed.ox, oy0: ed.oy, t0: performance.now(), moved: false };
@@ -224,6 +343,15 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     const p = at(e), [x, y] = cell(p);
     if (ed.tool === 'pan') { panning = { p, ox: ed.ox, oy: ed.oy }; return; }
     if (ed.tool === 'picker' || ed.tool === 'fill') { tap = { x, y }; return; }
+    if (ed.tool === 'select') {
+      settle();
+      if (ed.shape === 'wand') { tap = { x, y }; return; }
+      act = { kind: ed.shape, x0: x, y0: y, x1: x, y1: y, moved: false };
+      if (ed.shape === 'lasso') lasso = [[(p.x - ed.ox) / ed.zoom, (p.y - ed.oy) / ed.zoom]];
+      return;
+    }
+    if (ed.tool === 'move') { act = { kind: 'move', p0: p, steps: 0, F0: null }; return; }
+    if (ed.float) settle();
     const why = blocked(ed.layer); if (why) { toast(why); return; }
     step(); stroke = { cel: editableCel(), done: new Uint8Array(ed.spr.w * ed.spr.h), last: [x, y] };
     plot(x, y); draw();
@@ -240,6 +368,26 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       draw(); zoomLabel(); return;
     }
     if (panning) { const p = at(e); ed.ox = panning.ox + p.x - panning.p.x; ed.oy = panning.oy + p.y - panning.p.y; draw(); return; }
+    if (act) {
+      const p = at(e), [x, y] = cell(p), s = ed.spr;
+      if (act.kind === 'box') {
+        if (x !== act.x1 || y !== act.y1) { act.x1 = x; act.y1 = y; act.moved = true; }
+        if (act.moved) { ed.preview = SEL.combine(ed.sel, SEL.rectMask(s.w, s.h, act.x0, act.y0, act.x1, act.y1), ed.mode) || { mask: new Uint8Array(s.w * s.h) }; draw(); }
+      } else if (act.kind === 'lasso') {
+        const q = [(p.x - ed.ox) / ed.zoom, (p.y - ed.oy) / ed.zoom], l = lasso[lasso.length - 1];
+        if (Math.hypot(q[0] - l[0], q[1] - l[1]) > 0.35) { lasso.push(q); act.moved = true; draw(); }
+      } else if (act.kind === 'move') {
+        const dx = Math.round((p.x - act.p0.x) / ed.zoom), dy = Math.round((p.y - act.p0.y) / ed.zoom);
+        if (!act.F0) {
+          if (!dx && !dy) return;
+          const had = !!ed.float; if (!lift()) { act = null; return; }
+          if (!had) act.steps++;
+          step(); act.steps++; act.F0 = ed.float;
+        }
+        ed.float = { ...act.F0, cx: act.F0.cx + dx, cy: act.F0.cy + dy }; follow(); draw();
+      }
+      return;
+    }
     if (stroke) { const [x, y] = cell(at(e)); if (x !== stroke.last[0] || y !== stroke.last[1]) { line(stroke.last[0], stroke.last[1], x, y); stroke.last = [x, y]; draw(); } }
   }
   function up(e) {
@@ -252,8 +400,21 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     }
     if (!ptrs.size) lock = false;
     panning = null;
+    if (act) {
+      const a = act, s = ed.spr; act = null; ed.preview = null;
+      if (a.kind === 'move') { if (a.F0) { changed(); paintCells(); rer(); } return; }
+      let m = null;
+      if (a.kind === 'box' && a.moved) m = SEL.rectMask(s.w, s.h, a.x0, a.y0, a.x1, a.y1);
+      if (a.kind === 'lasso' && a.moved && lasso.length > 2) m = SEL.lassoMask(s.w, s.h, lasso);
+      lasso = null;
+      if (m) { step(); ed.sel = SEL.combine(ed.sel, m, ed.mode); changed(); rer(); }
+      else if (ed.mode === 0 && ed.sel) deselect();   // a tap without dragging lets go of the selection
+      else draw();
+      return;
+    }
     if (tap) {
       const t = tap; tap = null;
+      if (ed.tool === 'select') { wand(t.x, t.y); return; }
       if (ed.tool === 'picker') pick(t.x, t.y);
       else { const why = blocked(ed.layer); if (why) toast(why); else if (fill(t.x, t.y)) { draw(); strokeDone(); } }
       return;
@@ -268,13 +429,14 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function remapFrames(fn) { const m = new Map(); for (const [k, c] of S().cels) { const [l, f] = k.split(':').map(Number), n = fn(f); if (n >= 0) m.set(celKey(l, n), c); } S().cels = m; }
   const drawable = () => S().layers.filter(l => !l.group).length;
   function addLayer() {
-    step(); const s = S(), at = ed.layer + 1, lv = s.layers[ed.layer] ? s.layers[ed.layer].level || 0 : 0;
+    stop(); settle(); step(); const s = S(), at = ed.layer + 1, lv = s.layers[ed.layer] ? s.layers[ed.layer].level || 0 : 0;
     let n = s.layers.length + 1; while (s.layers.some(l => l.name === 'Layer ' + n)) n++;
     remapLayers(l => (l >= at ? l + 1 : l));
     s.layers.splice(at, 0, { name: 'Layer ' + n, visible: true, locked: false, opacity: 255, blend: 0, group: false, level: lv, bg: false });
     ed.layer = at; changed(); rer();
   }
   function delLayer() {
+    settle();
     const s = S(), L = s.layers[ed.layer];
     if (L.group) { toast('Groups can be changed in desktop Aseprite'); return; }
     if (drawable() < 2) { toast('A sprite needs one layer'); return; }
@@ -282,6 +444,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     ed.layer = Math.max(0, at - 1); ed.sheet = null; changed(); rer();
   }
   function dupLayer() {
+    settle();
     const s = S(), L = s.layers[ed.layer]; if (L.group) { toast('Groups can be changed in desktop Aseprite'); return; }
     step(); const at = ed.layer, copies = [];
     for (const [k, c] of s.cels) { const [l, f] = k.split(':').map(Number); if (l === at) copies.push([f, c]); }
@@ -292,12 +455,14 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   }
   const sibling = (a, b) => { const s = S(); return s.layers[a] && s.layers[b] && !s.layers[a].group && !s.layers[b].group && (s.layers[a].level || 0) === (s.layers[b].level || 0); };
   function moveLayer(dir) {
+    settle();
     const a = ed.layer, b = a + dir;
     if (!sibling(a, b)) { toast(dir > 0 ? 'Already at the top' : 'Already at the bottom'); return; }
     step(); const s = S(); [s.layers[a], s.layers[b]] = [s.layers[b], s.layers[a]];
     remapLayers(l => (l === a ? b : l === b ? a : l)); ed.layer = b; changed(); rer();
   }
   function mergeDown() {
+    settle();
     const a = ed.layer, b = a - 1;
     if (!sibling(a, b)) { toast('No layer below to merge into'); return; }
     step(); const s = S(), L = s.layers[a], B = s.layers[b];
@@ -312,7 +477,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     remapLayers(l => (l === a ? -1 : l > a ? l - 1 : l)); s.layers.splice(a, 1); ed.layer = b; ed.sheet = null; changed(); rer();
   }
   function addFrame(empty) {
-    step(); const s = S(), f = ed.frame, at = f + 1;
+    stop(); settle(); step(); const s = S(), f = ed.frame, at = f + 1;
     const copies = []; if (!empty) for (const [k, c] of s.cels) { const [l, ff] = k.split(':').map(Number); if (ff === f) copies.push([l, c]); }
     remapFrames(x => (x >= at ? x + 1 : x));
     s.frames.splice(at, 0, { dur: s.frames[f].dur });
@@ -321,6 +486,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     ed.frame = at; changed(); rer();
   }
   function delFrame() {
+    settle();
     const s = S(); if (s.frames.length < 2) { toast('A sprite needs one frame'); return; }
     step(); const f = ed.frame;
     remapFrames(x => (x === f ? -1 : x > f ? x - 1 : x)); s.frames.splice(f, 1);
@@ -328,6 +494,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     ed.frame = Math.min(f, s.frames.length - 1); changed(); rer();
   }
   function moveFrame(dir) {
+    settle();
     const s = S(), a = ed.frame, b = a + dir; if (b < 0 || b >= s.frames.length) return;
     step(); [s.frames[a], s.frames[b]] = [s.frames[b], s.frames[a]]; remapFrames(x => (x === a ? b : x === b ? a : x)); ed.frame = b; changed(); rer();
   }
@@ -339,6 +506,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   // ---------------------------------------------------------------- playback
   let playAt = 0, pong = 1;
   function play() {
+    settle();
     if (ed.playing) { stop(); return; }
     const s = S(); if (s.frames.length < 2) { toast('Add a frame to animate'); return; }
     ed.playing = true; playAt = performance.now(); pong = 1;
@@ -374,12 +542,12 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   const subLine = () => { const s = ed.spr; if (!s) return ''; const r = store.record(g.file, item.id); return `${s.w}×${s.h} · frame ${ed.frame + 1}/${s.frames.length}` + (!ed.saved ? ' · saving…' : r && r.dirty ? ' · saved on phone' : ''); };
 
   // ---------------------------------------------------------------- pieces of the screen
-  function setFrame(f) { stop(); if (f === ed.frame) ed.sheet = { kind: 'frame' }; else ed.frame = f; rer(); }
-  function setLayer(l) { stop(); if (l === ed.layer) ed.sheet = { kind: 'layer' }; else ed.layer = l; rer(); }
-  function setCell(l, f) { stop(); ed.layer = l; ed.frame = f; rer(); }
-  function setTag(i) { if (ed.playTag === i) ed.sheet = { kind: 'tag', i }; else { ed.playTag = i; const t = S().tags[i]; stop(); ed.frame = t.from; } rer(); }
+  function setFrame(f) { stop(); settle(); if (f === ed.frame) ed.sheet = { kind: 'frame' }; else ed.frame = f; rer(); }
+  function setLayer(l) { stop(); settle(); if (l === ed.layer) ed.sheet = { kind: 'layer' }; else ed.layer = l; rer(); }
+  function setCell(l, f) { stop(); settle(); ed.layer = l; ed.frame = f; rer(); }
+  function setTag(i) { settle(); if (ed.playTag === i) ed.sheet = { kind: 'tag', i }; else { ed.playTag = i; const t = S().tags[i]; stop(); ed.frame = t.from; } rer(); }
   function setColor(c) { ed.color = c.slice(); if (ed.color.length < 4) ed.color.push(255); if (ed.tool !== 'pencil' && ed.tool !== 'fill') ed.tool = 'pencil'; rer(); }
-  function setTool(t) { if (t === 'picker' && ed.tool !== 'picker') ed.after = ed.tool === 'eraser' || ed.tool === 'pan' ? 'pencil' : ed.tool; ed.tool = t; rer(); }
+  function setTool(t) { if (ed.float && t !== 'move' && t !== 'pan') settle(); if (t === 'picker' && ed.tool !== 'picker') ed.after = ed.tool === 'eraser' || ed.tool === 'pan' ? 'pencil' : ed.tool; ed.tool = t; rer(); }
 
   const swatch = (c, size) => `<span class="se-sw" style="width:${size}px;height:${size}px"><span style="background:${rgba(c)}"></span></span>`;
 
@@ -411,7 +579,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function sheetHtml() {
     const sh = ed.sheet; if (!sh) return '';
     const s = ed.spr, close = iconBtn('check', A(() => { ed.sheet = null; rer(); }), { color: '#fff', label: 'Done' });
-    const head = (t, sub) => `<div class="ihead">${well(40, icon(sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
+    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(SHAPE_ICONS.box, PINK) : icon(sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
     const btns = (list) => `<div class="se-btns">${list.map(([ic, label, fn, dis]) => `<button class="btn bare" ${A(fn)}${dis ? ' disabled' : ''}>${well(28, icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
     const field = (id, val, label) => `<label class="se-field"><span class="cap">${esc(label)}</span><input id="${id}" value="${esc(val)}" maxlength="40" autocomplete="off" spellcheck="false"></label>`;
     let body = '';
@@ -447,6 +615,15 @@ export function openSpriteEditor(app, g, item, opts = {}) {
           ['paint', 'Colour', () => { step(); const k = TAG_COLORS.findIndex(c => sameColor(c, t.color)); t.color = TAG_COLORS[(k + 1) % TAG_COLORS.length].slice(); changed(); rer(); }],
           ['select', 'Play all frames', () => { ed.playTag = -1; ed.sheet = null; rer(); }, ed.playTag === -1],
           ['trash', 'Delete', () => { step(); s.tags.splice(sh.i, 1); if (ed.playTag >= s.tags.length) ed.playTag = -1; ed.sheet = null; changed(); rer(); }]])}`;
+    } else if (sh.kind === 'sel') {
+      const b = ed.sel && SEL.maskBounds(ed.sel.mask, s.w, s.h), F = ed.float;
+      const btn3 = (list) => `<div class="se-btns se-btns3">${list.map(([ic, label, fn, rows]) => `<button class="btn bare" ${A(fn)}>${well(28, rows ? svgRows(rows, '#e4e2dc') : icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
+      body = head('Selection', F ? 'Floating · ' + Math.round(F.s * 100) + '%' + (F.r ? ' · turned' : '') : b ? b.w + '×' + b.h + ' selected' : 'Nothing selected: changes apply to the whole layer') + btn3([
+        ['select', 'All', selectAll], ['erase', 'None', deselect], [null, 'Invert', invertSel, INVERT],
+        ['dup', 'Copy', () => copy()], [null, 'Cut', cut, CUT], [null, 'Paste', paste, PASTE],
+        ['trash', 'Delete', del], ['fill', 'Fill', fillSel], [null, 'Flip ↔', flipH, FLIP_H],
+        [null, 'Flip ↕', flipV, FLIP_V], ['undo', 'Turn left', () => turn(3)], ['redo', 'Turn right', () => turn(1)]]) + `
+        <div class="grow"><span class="t"><span class="cap">Magic wand</span><span class="sub">${ed.contiguous ? 'Only the touching pixels of that colour' : 'That colour anywhere on the layer'}</span></span>${toggle(ed.contiguous, A(() => { ed.contiguous = !ed.contiguous; rer(); }), 'Touching only')}</div>`;
     } else if (sh.kind === 'menu') {
       const r = store.record(g.file, item.id);
       body = head(item.name, s.w + '×' + s.h + ' · ' + s.frames.length + ' frames · ' + s.layers.length + ' layers') + `
@@ -503,6 +680,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   }
 
   // ---------------------------------------------------------------- the screen
+  let antsT = 0;
   const ov = {
     render() {
       const s = ed.spr;
@@ -516,9 +694,26 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       if (!s) return `<div class="screen-tool sprite-ed" style="--acc:${PINK}"><h1 class="sr">Draw · ${esc(item.name)}</h1>${top}<div class="screen fit se-view"><span class="sub">${ed.err ? esc(ed.err) : 'Opening…'}</span></div></div>`;
       const tools = `<div class="plate bar se-tools" role="toolbar" aria-label="Tools">
         <div style="display:flex;gap:2px">${TOOLS.map(([t, label]) => iconBtn(null, A(() => setTool(t)), { on: ed.tool === t, label, pressed: ed.tool === t, rows: TOOL_ICONS[t] })).join('')}</div>
-        <div style="display:flex;gap:2px">${iconBtn('grid', A(() => { ed.grid = !ed.grid; rer(); }), { on: ed.grid, label: 'Pixel grid', pressed: ed.grid })}</div>
       </div>`;
-      const colors = `<div class="plate bar se-colors">
+      // under the tools: the palette, or (selecting and moving) the selection's own buttons, or (while pixels float) how to change them
+      const F = ed.float;
+      const selBar = `<div class="plate bar se-colors" role="toolbar" aria-label="Selection">
+        <div style="display:flex;gap:0">${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; setTool('select'); }), { on: ed.tool === 'select' && ed.shape === k, label, pressed: ed.tool === 'select' && ed.shape === k, rows: SHAPE_ICONS[k] })).join('')}</div>
+        ${iconBtn(null, A(() => { ed.mode = (ed.mode + 1) % 3; rer(); }), { color: '#fff', label: MODES[ed.mode] + ' (tap to change)', rows: MODE_ICONS[ed.mode] })}
+        <span style="flex:1"></span>
+        ${iconBtn('dup', A(() => copy()), { color: '#fff', label: 'Copy' })}
+        ${iconBtn(null, A(paste), { color: '#fff', label: 'Paste', rows: PASTE, disabled: !CLIP })}
+        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'sel' ? null : { kind: 'sel' }; rer(); }), { color: '#fff', label: 'More for the selection', rows: DOTS })}
+      </div>`;
+      const floatBar = F ? `<div class="plate bar se-colors" role="toolbar" aria-label="Floating pixels">
+        ${iconBtn('check', A(() => { settle(); paintCells(); rer(); }), { color: PINK, label: 'Drop (put the pixels down)' })}
+        ${iconBtn(null, A(flipH), { color: '#fff', label: 'Flip horizontally', rows: FLIP_H })}
+        ${iconBtn(null, A(flipV), { color: '#fff', label: 'Flip vertically', rows: FLIP_V })}
+        ${iconBtn('redo', A(() => turn(1)), { color: '#fff', label: 'Turn a quarter right' })}
+        <span style="flex:1"></span>
+        ${stepper(Math.round(F.s * 100) + '%', A(() => scaleBy(-1)), A(() => scaleBy(1)), 'size')}
+      </div>` : '';
+      const colors = F ? floatBar : ed.tool === 'select' || ed.tool === 'move' ? selBar : `<div class="plate bar se-colors">
         <button class="se-cur" id="se-cur" ${A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'color' ? null : { kind: 'color' }; rer(); })} aria-label="Colour ${rgbHex(ed.color)}, change it">${swatch(ed.color, 36)}</button>
         <div class="se-pal" id="se-pal">${s.palette.map((c, i) => `<button class="se-pc${sameColor(c, ed.color) ? ' sel' : ''}" ${A(() => setColor(c))} aria-label="Palette colour ${i + 1}">${swatch(c, 24)}</button>`).join('')}</div>
       </div>`;
@@ -572,6 +767,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     },
     frame(t) {
       if (ed.playing && ed.spr) tickPlay(performance.now());
+      else if ((ed.sel || ed.preview) && ed.spr && performance.now() - antsT > 120) { antsT = performance.now(); draw(); }
       if (input.pressed('b')) { if (ed.sheet) { ed.sheet = null; rer(); } else app.close(); }
       else padFrame(document.getElementById('app'), nav, input);
     },
@@ -586,7 +782,23 @@ const EYE_OFF = ['1000000', '0111110', '1110011', '1011101', '1100111', '0111110
 const LOCK = ['01110', '10001', '11111', '11011', '11111'];
 const ONION = ['1010100', '0000000', '0011111', '0010001', '0010001', '0010001', '0011111'];
 const DOTS = ['0000000', '0000000', '1101011', '1101011', '0000000', '0000000', '0000000'];
+const SHAPE_ICONS = {
+  box: ['1101011', '0000000', '1000001', '0000000', '1000001', '0000000', '1101011'],
+  lasso: ['0011100', '0100010', '1000001', '1000001', '0110010', '0101100', '0010000'],
+  wand: ['1010000', '0100000', '1010000', '0001000', '0000100', '0000010', '0000001']
+};
+const MODE_ICONS = [
+  ['0000000', '0000000', '1111111', '0000000', '1111111', '0000000', '0000000'],
+  ['0001000', '0001000', '0001000', '1111111', '0001000', '0001000', '0001000'],
+  ['0000000', '0000000', '0000000', '1111111', '0000000', '0000000', '0000000']];
+const PASTE = ['0011100', '1111111', '1000001', '1011101', '1000001', '1011101', '1111111'];
+const CUT = ['1000001', '0100010', '0010100', '0001000', '0110110', '1001001', '0110110'];
+const INVERT = ['1111111', '1000001', '1011101', '1010101', '1011101', '1000001', '1111111'];
+const FLIP_H = ['0001000', '1001001', '1101011', '1111111', '1101011', '1001001', '0001000'];
+const FLIP_V = ['0111110', '0011100', '0001000', '1111111', '0001000', '0011100', '0111110'];
 const TOOL_ICONS = {
+  select: SHAPE_ICONS.box,
+  move: ['0001000', '0011100', '1001001', '1111111', '1001001', '0011100', '0001000'],
   pencil: ['0000011', '0000111', '0001110', '0011100', '0111000', '1110000', '1100000'],
   eraser: ['0001100', '0011110', '0111111', '1111110', '1011100', '1111000', '0000000'],
   fill: ['0011000', '0100100', '1000010', '1111111', '0111110', '0011100', '0000001'],
