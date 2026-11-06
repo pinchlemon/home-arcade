@@ -92,6 +92,21 @@ export const G = {
 };
 export const icon = (name, color = '#e4e2dc') => svgRows(G[name], color);
 
+// ---- icons you have redrawn: kept on this phone and applied over the built-in ones at startup
+const ORIGINAL = Object.fromEntries(Object.entries(G).map(([k, v]) => [k, v.slice()]));
+const EDITS_KEY = 'ha.icons';
+const readEdits = () => { try { return JSON.parse(localStorage.getItem(EDITS_KEY)) || {}; } catch (e) { return {}; } };
+const same = (a, b) => a.length === b.length && a.every((r, i) => r === b[i]);
+for (const [k, v] of Object.entries(readEdits())) if (ORIGINAL[k] && Array.isArray(v) && v.length) G[k] = v;
+export const originalRows = (name) => ORIGINAL[name];
+export const isEdited = (name) => !same(G[name], ORIGINAL[name]);
+export function setIcon(name, rows) {
+  G[name] = rows;
+  const e = readEdits();
+  if (same(rows, ORIGINAL[name])) delete e[name]; else e[name] = rows;
+  try { localStorage.setItem(EDITS_KEY, JSON.stringify(e)); } catch (err) { /* storage full: the change lasts until the app closes */ }
+}
+
 // ---- wells: a black screen set into the plate, with the surface sloping up to a lit lip
 const MOUNT = { 28: [40, 6], 40: [58, 9], 164: [236, 36] };
 export function well(size, inner = '', extraClass = '') {
