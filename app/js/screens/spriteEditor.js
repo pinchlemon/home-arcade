@@ -870,7 +870,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       if (!s) return `<div class="screen-tool sprite-ed" style="--acc:${PINK}"><h1 class="sr">Draw · ${esc(item.name)}</h1>${top}<div class="screen fit se-view"><span class="sub">${ed.err ? esc(ed.err) : 'Opening…'}</span></div></div>`;
       // the tools, like the Studio's tabs: the chosen one wide, with its name
       const tools = `<div class="plate bar se-tools" role="tablist" aria-label="Tools" style="grid-template-columns:${TOOLS.map(([t]) => (ed.tool === t ? '2.6fr' : '1fr')).join(' ')}">
-        ${TOOLS.map(([t, label]) => { const on = ed.tool === t; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${TOOL_HELP[t]}" ${A(() => setTool(t))}>${well(28, svgRows(G[TOOL_ICON[t]], on ? PINK : '#e4e2dc'))}${on ? label + '<span class="selring"></span>' : ''}</button>`; }).join('')}
+        ${TOOLS.map(([t, label]) => { const on = ed.tool === t; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${TOOL_HELP[t]}" ${A(() => setTool(t))}>${well(28, svgRows(G[TOOL_ICON[t]], on ? PINK : '#e4e2dc'))}<span class="lbl"${on ? '' : ' hidden'}>${label}</span>${on ? '<span class="selring"></span>' : ''}</button>`; }).join('')}
       </div>`;
       // under the tools: the palette, or (selecting and moving) the selection's own buttons, or (while pixels float) how to change them
       const F = ed.float;

@@ -533,7 +533,7 @@ export function openGameEditor(app, g) {
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
         ${topBar()}
         <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${TABS.map(([k2]) => (tabOf() === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
-          ${TABS.map(([k2, l2, ic]) => { const on = tabOf() === k2; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], on ? GREEN : BONE))}${on ? l2 + '<span class="selring"></span>' : ''}</button>`; }).join('')}
+          ${TABS.map(([k2, l2, ic]) => { const on = tabOf() === k2; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], on ? GREEN : BONE))}<span class="lbl"${on ? '' : ' hidden'}>${l2}</span>${on ? '<span class="selring"></span>' : ''}</button>`; }).join('')}
         </div>
         ${screen}${panel}
       </div>`;
