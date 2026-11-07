@@ -29,6 +29,8 @@ const PINK = '#ff4fd8';
 const ZOOMS = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
 const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['picker', 'Picker'], ['select', 'Select'], ['move', 'Move'], ['pan', 'Hand']];
 const TOOL_HELP = { pencil: 'Pencil', eraser: 'Eraser', fill: 'Fill', picker: 'Pick a colour', select: 'Select', move: 'Move pixels', pan: 'Hand: move the view' };
+const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', picker: 'picker', select: 'boxSelect', move: 'movePixels', pan: 'pan' };
+const SHAPE_ICON = { box: 'boxSelect', lasso: 'lasso', wand: 'wand' };
 const SHAPES = [['box', 'Box select'], ['lasso', 'Lasso select'], ['wand', 'Magic wand: select a colour']];
 const MODES = ['Replace the selection', 'Add to the selection', 'Take away from the selection'], MODE_TEXT = ['NEW', 'ADD', 'SUB'];
 const DIRS = ['FORWARD', 'REVERSE', 'PING-PONG'];
@@ -710,8 +712,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     for (let r = 0; r < s.layers.length; r++) {
       const l = s.layers.length - 1 - r, L = s.layers[l], row = nl + 2 + r;
       h += `<div class="se-ln${l === ed.layer ? ' sel' : ''}" style="grid-row:${row}">
-        <button class="se-eye" ${A(() => { step(); L.visible = !L.visible; changed(); rer(); })} aria-label="${L.visible ? 'Hide' : 'Show'} ${esc(L.name)}">${svgRows(L.visible ? EYE : EYE_OFF, vis[l] ? '#e4e2dc' : '#6f6d69')}</button>
-        <button class="se-lname" style="padding-left:${4 + (L.level || 0) * 8}px" ${A(() => setLayer(l))} aria-pressed="${l === ed.layer}">${L.group ? svgRows(['1110000', '1111111', '1000001', '1000001', '1111111'], '#9a98a0') + ' ' : ''}${esc(L.name)}${L.locked ? ' ' + svgRows(LOCK, '#9a98a0') : ''}</button>
+        <button class="se-eye" ${A(() => { step(); L.visible = !L.visible; changed(); rer(); })} aria-label="${L.visible ? 'Hide' : 'Show'} ${esc(L.name)}">${svgRows(L.visible ? G.eye : G.eyeOff, vis[l] ? '#e4e2dc' : '#6f6d69')}</button>
+        <button class="se-lname" style="padding-left:${4 + (L.level || 0) * 8}px" ${A(() => setLayer(l))} aria-pressed="${l === ed.layer}">${L.group ? svgRows(G.group, '#9a98a0') + ' ' : ''}${esc(L.name)}${L.locked ? ' ' + svgRows(G.lock, '#9a98a0') : ''}</button>
       </div>`;
       for (let f = 0; f < n; f++) {
         if (L.group) { h += `<span class="se-cel grp" style="grid-row:${row};grid-column:${f + 2}"></span>`; continue; }
@@ -724,7 +726,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function sheetHtml() {
     const sh = ed.sheet; if (!sh) return '';
     const s = ed.spr, close = iconBtn('check', A(() => { ed.sheet = null; rer(); }), { color: '#fff', label: 'Done' });
-    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(SHAPE_ICONS.box, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
+    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(G.boxSelect, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
     const btns = (list, three) => `<div class="se-btns${three ? ' se-btns3' : ''}">${list.map(([ic, label, fn, dis, rows]) => `<button class="btn bare" ${A(fn)}${dis ? ' disabled' : ''}>${well(28, rows ? svgRows(rows, '#e4e2dc') : icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
     const field = (id, val, label) => `<label class="se-field"><span class="cap">${esc(label)}</span><input id="${id}" value="${esc(val)}" maxlength="40" autocomplete="off" spellcheck="false"></label>`;
     let body = '';
@@ -742,7 +744,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         <div class="grow"><span class="t"><span class="cap">Visible</span><span class="sub">Hidden layers are not exported</span></span>${toggle(L.visible, A(() => { step(); L.visible = !L.visible; changed(); rer(); }), 'Visible')}</div>
         <div class="grow"><span class="t"><span class="cap">Locked</span><span class="sub">Prevents drawing</span></span>${toggle(L.locked, A(() => { step(); L.locked = !L.locked; changed(); rer(); }), 'Locked')}</div>
         <div class="grow"><span class="t"><span class="cap">Opacity</span><span class="sub">How solid the layer is</span></span>${stepper(Math.round(L.opacity / 2.55) + '%', A(() => { step(); L.opacity = Math.max(0, Math.round(L.opacity - 25.5)); changed(); rer(); }), A(() => { step(); L.opacity = Math.min(255, Math.round(L.opacity + 25.5)); changed(); rer(); }), 'opacity')}</div>
-        ${btns([['up', 'Move up', () => moveLayer(1)], ['down', 'Move down', () => moveLayer(-1)], ['dup', 'Duplicate', dupLayer], [null, 'Merge down', mergeDown, false, MERGE], ['plus', 'New layer', addLayer], ['trash', 'Delete', () => { if (confirm('Delete the layer ' + L.name + '?')) delLayer(); }]])}`;
+        ${btns([['up', 'Move up', () => moveLayer(1)], ['down', 'Move down', () => moveLayer(-1)], ['dup', 'Duplicate', dupLayer], [null, 'Merge down', mergeDown, false, G.merge], ['plus', 'New layer', addLayer], ['trash', 'Delete', () => { if (confirm('Delete the layer ' + L.name + '?')) delLayer(); }]])}`;
     } else if (sh.kind === 'frame') {
       const fr = s.frames[ed.frame], expect = item.cell && !opts.extra ? item.frames : 0;
       body = head('Frame ' + (ed.frame + 1), s.frames.length + (s.frames.length === 1 ? ' frame' : ' frames') + (expect && expect !== s.frames.length ? ' · the game expects ' + expect : '')) + `
@@ -763,10 +765,10 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     } else if (sh.kind === 'sel') {
       const b = ed.sel && SEL.maskBounds(ed.sel.mask, s.w, s.h), F = ed.float;
       body = head('Selection', F ? 'Floating · ' + Math.round(F.s * 100) + '%' + (F.r ? ' · turned' : '') : b ? b.w + '×' + b.h + ' selected' : 'Nothing selected: changes apply to the whole layer') + btns([
-        ['select', 'All', selectAll], ['erase', 'None', deselect], [null, 'Invert', invertSel, false, INVERT],
-        ['dup', 'Copy', () => copy()], [null, 'Cut', cut, false, CUT], [null, 'Paste', paste, !CLIP, PASTE],
-        ['trash', 'Delete', del], ['fill', 'Fill', fillSel], [null, 'Flip ↔', flipH, false, FLIP_H],
-        [null, 'Flip ↕', flipV, false, FLIP_V], ['undo', 'Turn left', () => turn(3)], ['redo', 'Turn right', () => turn(1)]], true) + `
+        ['select', 'All', selectAll], ['erase', 'None', deselect], [null, 'Invert', invertSel, false, G.invert],
+        ['dup', 'Copy', () => copy()], [null, 'Cut', cut, false, G.cut], [null, 'Paste', paste, !CLIP, G.paste],
+        ['trash', 'Delete', del], ['fill', 'Fill', fillSel], [null, 'Flip ↔', flipH, false, G.flipH],
+        [null, 'Flip ↕', flipV, false, G.flipV], ['undo', 'Turn left', () => turn(3)], ['redo', 'Turn right', () => turn(1)]], true) + `
         <div class="grow"><span class="t"><span class="cap">Magic wand</span><span class="sub">${ed.contiguous ? 'Connected pixels only' : 'Every pixel of that colour'}</span></span>${toggle(ed.contiguous, A(() => { ed.contiguous = !ed.contiguous; rer(); }), 'Touching only')}</div>`;
     } else if (sh.kind === 'canvas') {
       const c = ed.cv || (ed.cv = { w: s.w, h: s.h, ax: 0.5, ay: 0.5 }), b = ed.sel && SEL.maskBounds(ed.sel.mask, s.w, s.h);
@@ -781,7 +783,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ${btns([['check', 'Use this size', () => { const w = +document.getElementById('se-cw').value, h = +document.getElementById('se-ch').value; resizeCanvas(w, h, c.ax, c.ay); }],
           ['select', 'Trim', trim], ['scene', 'Crop to selection', () => (b ? crop(b) : toast('Select something first'))],
           ['plus', 'Scale ×2', () => scaleSprite(2)], ['minus', 'Scale ×½', () => scaleSprite(0.5)],
-          [null, 'Flip all ↔', () => flipCanvas(true), FLIP_H], [null, 'Flip all ↕', () => flipCanvas(false), FLIP_V], ['redo', 'Turn all', () => turnCanvas(1)]].map(x => x.slice(0, 3).concat([false, x[3]])))}`;
+          [null, 'Flip all ↔', () => flipCanvas(true), G.flipH], [null, 'Flip all ↕', () => flipCanvas(false), G.flipV], ['redo', 'Turn all', () => turnCanvas(1)]].map(x => x.slice(0, 3).concat([false, x[3]])))}`;
     } else if (sh.kind === 'export') {
       const n = s.frames.length, t = s.tags[ed.playTag], o = ed.out, newSheet = opts.extra && opts.extra.item && opts.extra.item.cell;
       body = head('Export', 'Save or send a copy · ' + s.w * ed.exScale + '×' + s.h * ed.exScale + ' per frame') + `
@@ -862,27 +864,27 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(item.name)}</span><span class="sub ell" id="se-sub">${s ? esc(subLine()) : ed.err ? 'Could not open: ' + esc(ed.err) : 'Opening…'}</span></span>
         ${iconBtn('undo', A(undo), { color: '#fff', label: 'Undo', disabled: !ed.hist.length })}
         ${iconBtn('redo', A(redo), { color: '#fff', label: 'Redo', disabled: !ed.fut.length })}
-        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'menu' ? null : { kind: 'menu' }; rer(); }), { color: '#fff', label: 'Sprite: canvas, import, export', rows: DOTS })}
+        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'menu' ? null : { kind: 'menu' }; rer(); }), { color: '#fff', label: 'Sprite: canvas, import, export', rows: G.dots })}
       </div>`;
       if (!s) return `<div class="screen-tool sprite-ed" style="--acc:${PINK}"><h1 class="sr">Draw · ${esc(item.name)}</h1>${top}<div class="screen fit se-view"><span class="sub">${ed.err ? esc(ed.err) : 'Opening…'}</span></div></div>`;
       // the tools, like the Studio's tabs: the chosen one wide, with its name
       const tools = `<div class="plate bar se-tools" role="tablist" aria-label="Tools" style="grid-template-columns:${TOOLS.map(([t]) => (ed.tool === t ? '2.6fr' : '1fr')).join(' ')}">
-        ${TOOLS.map(([t, label]) => { const on = ed.tool === t; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${TOOL_HELP[t]}" ${A(() => setTool(t))}>${well(28, svgRows(TOOL_ICONS[t], on ? PINK : '#e4e2dc'))}${on ? label + '<span class="selring"></span>' : ''}</button>`; }).join('')}
+        ${TOOLS.map(([t, label]) => { const on = ed.tool === t; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${TOOL_HELP[t]}" ${A(() => setTool(t))}>${well(28, svgRows(G[TOOL_ICON[t]], on ? PINK : '#e4e2dc'))}${on ? label + '<span class="selring"></span>' : ''}</button>`; }).join('')}
       </div>`;
       // under the tools: the palette, or (selecting and moving) the selection's own buttons, or (while pixels float) how to change them
       const F = ed.float;
       const selBar = `<div class="plate bar se-colors" role="toolbar" aria-label="Selection">
-        <div style="display:flex;gap:0">${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; setTool('select'); }), { on: ed.tool === 'select' && ed.shape === k, label, pressed: ed.tool === 'select' && ed.shape === k, rows: SHAPE_ICONS[k] })).join('')}</div>
+        <div style="display:flex;gap:0">${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; setTool('select'); }), { on: ed.tool === 'select' && ed.shape === k, label, pressed: ed.tool === 'select' && ed.shape === k, rows: G[SHAPE_ICON[k]] })).join('')}</div>
         <button class="vscreen se-mode" ${A(() => { ed.mode = (ed.mode + 1) % 3; rer(); })} aria-label="${MODES[ed.mode]} (tap to change)">${svgText(MODE_TEXT[ed.mode], PINK)}</button>
         <span style="flex:1"></span>
         ${iconBtn('dup', A(() => copy()), { color: '#fff', label: 'Copy' })}
-        ${iconBtn(null, A(paste), { color: '#fff', label: 'Paste', rows: PASTE, disabled: !CLIP })}
-        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'sel' ? null : { kind: 'sel' }; rer(); }), { color: '#fff', label: 'More for the selection', rows: DOTS })}
+        ${iconBtn(null, A(paste), { color: '#fff', label: 'Paste', rows: G.paste, disabled: !CLIP })}
+        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'sel' ? null : { kind: 'sel' }; rer(); }), { color: '#fff', label: 'More for the selection', rows: G.dots })}
       </div>`;
       const floatBar = F ? `<div class="plate bar se-colors" role="toolbar" aria-label="Floating pixels">
         ${iconBtn('check', A(() => { settle(); paintCells(); rer(); }), { color: PINK, label: 'Drop (put the pixels down)' })}
-        ${iconBtn(null, A(flipH), { color: '#fff', label: 'Flip horizontally', rows: FLIP_H })}
-        ${iconBtn(null, A(flipV), { color: '#fff', label: 'Flip vertically', rows: FLIP_V })}
+        ${iconBtn(null, A(flipH), { color: '#fff', label: 'Flip horizontally', rows: G.flipH })}
+        ${iconBtn(null, A(flipV), { color: '#fff', label: 'Flip vertically', rows: G.flipV })}
         ${iconBtn('redo', A(() => turn(1)), { color: '#fff', label: 'Turn a quarter right' })}
         <span style="flex:1"></span>
         ${stepper(Math.round(F.s * 100) + '%', A(() => scaleBy(-1)), A(() => scaleBy(1)), 'size')}
@@ -898,7 +900,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
           ${iconBtn('left', A(() => setCell(ed.layer, (ed.frame + s.frames.length - 1) % s.frames.length)), { color: '#fff', label: 'Previous frame' })}
           <button class="se-fbtn" ${A(() => setFrame(ed.frame))} aria-label="Frame settings"><span class="cap acc" id="se-fn">Frame ${ed.frame + 1} / ${s.frames.length}</span><span class="sub ell" id="se-fl">${esc(frameLine())}</span></button>
           ${iconBtn('right', A(() => setCell(ed.layer, (ed.frame + 1) % s.frames.length)), { color: '#fff', label: 'Next frame' })}
-          ${iconBtn(null, A(() => { ed.onion = !ed.onion; rer(); }), { on: ed.onion, label: 'Onion skin', pressed: ed.onion, rows: ONION })}
+          ${iconBtn(null, A(() => { ed.onion = !ed.onion; rer(); }), { on: ed.onion, label: 'Onion skin', pressed: ed.onion, rows: G.onion })}
         </div>
         <div class="se-scroll" id="se-tl">${timeline()}</div>
       </div>`;
@@ -956,30 +958,3 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   };
   app.open(ov);
 }
-
-// icons only the editor uses
-const EYE = ['0000000', '0111110', '1100011', '1011101', '1100011', '0111110', '0000000'];
-const EYE_OFF = ['1000000', '0111110', '1110011', '1011101', '1100111', '0111110', '0000001'];
-const LOCK = ['01110', '10001', '11111', '11011', '11111'];
-const ONION = ['1010100', '0000000', '0011111', '0010001', '0010001', '0010001', '0011111'];
-const DOTS = ['0000000', '0000000', '1101011', '1101011', '0000000', '0000000', '0000000'];
-const SHAPE_ICONS = {
-  box: ['1101011', '0000000', '1000001', '0000000', '1000001', '0000000', '1101011'],
-  lasso: ['0011100', '0100010', '1000001', '1000001', '0110010', '0101100', '0010000'],
-  wand: ['1010000', '0100000', '1010000', '0001000', '0000100', '0000010', '0000001']
-};
-const MERGE = ['1111111', '1000001', '1111111', '0001000', '0101010', '0011100', '0001000'];
-const PASTE = ['0011100', '1111111', '1000001', '1011101', '1000001', '1011101', '1111111'];
-const CUT = ['1000001', '0100010', '0010100', '0001000', '0110110', '1001001', '0110110'];
-const INVERT = ['1111111', '1000001', '1011101', '1010101', '1011101', '1000001', '1111111'];
-const FLIP_H = ['0001000', '1001001', '1101011', '1111111', '1101011', '1001001', '0001000'];
-const FLIP_V = ['0111110', '0011100', '0001000', '1111111', '0001000', '0011100', '0111110'];
-const TOOL_ICONS = {
-  select: SHAPE_ICONS.box,
-  move: ['0001000', '0011100', '1001001', '1111111', '1001001', '0011100', '0001000'],
-  pencil: ['0000011', '0000111', '0001110', '0011100', '0111000', '1110000', '1100000'],
-  eraser: ['0001100', '0011110', '0111111', '1111110', '1011100', '1111000', '0000000'],
-  fill: ['0011000', '0100100', '1000010', '1111111', '0111110', '0011100', '0000001'],
-  picker: ['0000110', '0001111', '0001111', '0011100', '0101000', '1010000', '1100000'],
-  pan: ['0101010', '0101010', '0111110', '1111110', '0111110', '0111100', '0011100']
-};
