@@ -363,10 +363,10 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .ie-list{display:grid;grid-template-columns:repeat(6,1fr);align-content:start;justify-items:center;gap:4px;padding:10px;overflow-y:auto;scrollbar-width:none}
 .ie-list::-webkit-scrollbar{display:none}
 .ie-item{position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;padding:0;border-radius:var(--r-btn)}
-.ie-item.on::after,.ie-item.pf::after{content:'';position:absolute;inset:0;border-radius:inherit;border:1.5px solid var(--acc)}
-.ie-item.pf::after{border-color:#fff}
-.ie-dot{position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--acc)}
+.ie-item.on::after{content:'';position:absolute;inset:0;border-radius:inherit;border:1.5px solid var(--acc)}
+.ie-acts.se-btns{grid-template-columns:1fr 1fr;margin-top:0;padding:6px 8px;flex:0 0 auto;border-radius:var(--r-bar)}
 .icon-ed .vscreen{width:44px}
 .icon-ed .bar .stepper{margin-right:auto}
 #app{-webkit-touch-callout:none}
 #app button:disabled{pointer-events:none}   /* Safari drops touches on them; main.js finds their icon by position */
+.ie-info{height:auto;min-height:52px;padding-top:6px;padding-bottom:6px}

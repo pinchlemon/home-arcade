@@ -459,6 +459,7 @@ export function openGameEditor(app, g) {
   // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
   const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
   const ov = {
+    place: 'Studio editor',
     render() {
       if (!ed.game) return `<div class="screen-tool" style="--acc:${GREEN}"><div class="plate bar">${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back' })}<span class="title" style="flex:1">${esc(g.name)}</span></div>
         <div class="center-note"><span class="sub">${ed.error ? 'Could not load the game settings: ' + esc(ed.error) : 'Loading…'}</span></div></div>`;

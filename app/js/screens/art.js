@@ -158,6 +158,7 @@ function openViewer(app, g, it, F) {
   }
   const rer = () => { if (app.overlay === ov) app.render(); };
   const ov = {
+    place: 'Art viewer',
     render() {
       const a = anims[v.anim];
       let panel = '';
@@ -260,6 +261,7 @@ function openNew(app, g, f) {
     } catch (e) { app.toast('Could not open ' + file.name + ': ' + (e.message || e)); }
   }
   const ov = {
+    place: 'New sprite',
     render() {
       return `<div class="screen-tool sprite-ed" style="--acc:${PINK}">
         <h1 class="sr">New sprite</h1>

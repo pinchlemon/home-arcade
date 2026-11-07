@@ -14,7 +14,7 @@ export function bitmapPath(rows, ox = 0, oy = 0) {
 
 export function svgRows(rows, color, scale = 2, extra = '') {
   const w = rows[0].length, h = rows.length, n = NAMES.get(rows);
-  if (n) extra += ` data-icon="${n}"`;   // a built-in icon: hold its button to redraw it (iconEditor.js)
+  if (n) { extra += ` data-icon="${n}"`; note(n); }   // a known icon: hold it to redraw it (iconEditor.js)
   return `<svg viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges" aria-hidden="true"${extra}><path d="${bitmapPath(rows)}" fill="${color}"/></svg>`;
 }
 
@@ -116,21 +116,133 @@ export const G = {
 };
 export const icon = (name, color = '#e4e2dc') => svgRows(G[name], color);
 
-// ---- icons you have redrawn: kept on this phone and applied over the built-in ones at startup
+// ---- icons on this phone: redrawn built-ins (ha.icons), icons you made (ha.icons.mine), names (ha.icons.names),
+// and the screens each icon has been seen on (ha.icons.seen). None of it is pushed to GitHub.
 const ORIGINAL = Object.fromEntries(Object.entries(G).map(([k, v]) => [k, v.slice()]));
-const EDITS_KEY = 'ha.icons';
-const readEdits = () => { try { return JSON.parse(localStorage.getItem(EDITS_KEY)) || {}; } catch (e) { return {}; } };
+const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (err) { /* storage full: the change lasts until the app closes */ } };
 const same = (a, b) => a.length === b.length && a.every((r, i) => r === b[i]);
-for (const [k, v] of Object.entries(readEdits())) if (ORIGINAL[k] && Array.isArray(v) && v.length) G[k] = v;
+const good = (v) => Array.isArray(v) && v.length && v.every(r => typeof r === 'string' && /^[01]+$/.test(r));
+for (const [k, v] of Object.entries(read('ha.icons'))) if (ORIGINAL[k] && good(v)) G[k] = v;
+for (const [k, v] of Object.entries(read('ha.icons.mine'))) if (!ORIGINAL[k] && good(v)) G[k] = v;
 for (const [k, v] of Object.entries(G)) NAMES.set(v, k);
+const swap = (name, rows) => { NAMES.delete(G[name]); G[name] = rows; NAMES.set(rows, name); };
+
+export const isMine = (name) => !ORIGINAL[name];
 export const originalRows = (name) => ORIGINAL[name];
-export const isEdited = (name) => !same(G[name], ORIGINAL[name]);
 export function setIcon(name, rows) {
-  NAMES.delete(G[name]); G[name] = rows; NAMES.set(rows, name);
-  const e = readEdits();
+  swap(name, rows);
+  if (isMine(name)) { const m = read('ha.icons.mine'); m[name] = rows; write('ha.icons.mine', m); return; }
+  const e = read('ha.icons');
   if (same(rows, ORIGINAL[name])) delete e[name]; else e[name] = rows;
-  try { localStorage.setItem(EDITS_KEY, JSON.stringify(e)); } catch (err) { /* storage full: the change lasts until the app closes */ }
+  write('ha.icons', e);
 }
+// a new icon of your own; it is only kept once saved (setIcon), so dropIcon forgets an unsaved one
+export function newIcon(w = 7, h = 7) {
+  const id = 'my' + Date.now().toString(36);
+  swap(id, Array.from({ length: h }, () => '0'.repeat(w)));
+  return id;
+}
+export function dropIcon(name) {
+  if (!isMine(name)) return;
+  NAMES.delete(G[name]); delete G[name];
+  const m = read('ha.icons.mine'); delete m[name]; write('ha.icons.mine', m);
+  const n = read('ha.icons.names'); delete n[name]; write('ha.icons.names', n);
+}
+export const isSaved = (name) => !isMine(name) || name in read('ha.icons.mine');
+
+// names: built-ins start with their code name in words; yours start as "my icon"
+export function iconLabel(name) {
+  const n = read('ha.icons.names')[name];
+  return n || (isMine(name) ? 'my icon' : name.replace(/([A-Z])/g, ' $1').toLowerCase());
+}
+export function renameIcon(name, label) {
+  const n = read('ha.icons.names');
+  if (label) n[name] = label; else delete n[name];
+  write('ha.icons.names', n);
+}
+
+// where icons show: each time a built-in icon is drawn, the screen it is on is noted (main.js says which screen that is)
+const USED_ON = Object.fromEntries(Object.entries({
+  back: 'Studio editor,Art viewer,New sprite,Sprite editor',
+  boxSelect: 'Sprite editor',
+  changes: 'Settings',
+  check: 'Sprite editor',
+  code: 'Arcade,Studio',
+  controller: 'Studio,Studio editor,Settings',
+  cut: 'Sprite editor',
+  display: 'Studio editor,Art,Sprite editor,Settings',
+  dots: 'Sprite editor',
+  down: 'Studio editor,New sprite,Sprite editor',
+  dup: 'Studio editor,Sprite editor',
+  edit: 'Arcade,Studio,Art',
+  erase: 'Studio editor,Sprite editor',
+  eraser: 'Sprite editor',
+  events: 'Sprite editor',
+  eye: 'Sprite editor',
+  eyeOff: 'Sprite editor',
+  fill: 'Sprite editor',
+  flipH: 'Sprite editor',
+  flipV: 'Sprite editor',
+  folder: 'Art',
+  github: 'Settings',
+  grid: 'Studio editor,Art',
+  group: 'Sprite editor',
+  history: 'Settings',
+  invert: 'Sprite editor',
+  key: 'Settings',
+  lasso: 'Sprite editor',
+  left: 'Arcade,Studio,Studio editor,Art,Sprite editor,Sound',
+  lock: 'Sprite editor',
+  merge: 'Sprite editor',
+  minus: 'Studio editor,Art viewer,New sprite,Sprite editor,Settings',
+  movePixels: 'Sprite editor',
+  mute: 'Settings',
+  objects: 'Studio,Studio editor,Art',
+  onion: 'Sprite editor',
+  out: 'Art viewer,Settings',
+  paint: 'Art,Art viewer,Sprite editor',
+  pan: 'Sprite editor',
+  paste: 'Sprite editor',
+  pause: 'Art viewer',
+  pencil: 'Sprite editor',
+  picker: 'Sprite editor',
+  place: 'Studio editor',
+  play: 'Arcade,Studio,Studio editor,Art,Art viewer,Sprite editor,Sound,Settings',
+  plus: 'Studio editor,Art,Art viewer,New sprite,Sprite editor,Settings',
+  redo: 'Studio editor,Sprite editor',
+  rename: 'Studio editor,Settings',
+  reset: 'Studio editor,Settings',
+  right: 'Arcade,Studio,Studio editor,Art,Sprite editor,Sound',
+  scene: 'Studio,Studio editor,Sprite editor',
+  select: 'Studio editor,Art,Sprite editor',
+  sounds: 'Sound,Settings',
+  sprites: 'Studio editor,Art,Art viewer',
+  tiles: 'Sprite editor',
+  trash: 'Studio editor,Sprite editor',
+  undo: 'Studio editor,Sprite editor',
+  up: 'Studio editor,Sprite editor',
+  wand: 'Sprite editor'
+}).map(([k, v]) => [k, v.split(',')]));
+let seen = null, whereNow = () => '', saveSeen = 0;
+export const iconPlace = (fn) => { whereNow = fn; };
+function note(name) {
+  const at = whereNow();
+  if (!at) return;
+  if (!seen) seen = read('ha.icons.seen');
+  const list = seen[name] || (seen[name] = []);
+  if (list.includes(at)) return;
+  list.push(at);
+  clearTimeout(saveSeen); saveSeen = setTimeout(() => write('ha.icons.seen', seen), 500);
+}
+// USED_ON: where each icon was found by tapping through every screen in a browser (rebuild it when screens change);
+// what this phone notes is added to it
+export const seenOn = (name) => {
+  if (!seen) seen = read('ha.icons.seen');
+  return [...new Set([...(USED_ON[name] || []), ...(seen[name] || [])])];
+};
+// draw without noting (the icon editor's own list shows every icon)
+export function quietly(fn) { const w = whereNow; whereNow = () => ''; try { return fn(); } finally { whereNow = w; } }
 
 // ---- wells: a black screen set into the plate, with the surface sloping up to a lit lip
 const MOUNT = { 28: [40, 6], 40: [58, 9], 164: [236, 36] };

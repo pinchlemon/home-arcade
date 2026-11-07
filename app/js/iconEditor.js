@@ -1,20 +1,20 @@
 // Icon editor: hold any pixel icon to redraw it. Opens over whatever screen you are on (it is not a full-screen tool of its own).
-// The list button shows every icon; choosing one copies its picture into the icon being edited. New art is kept on this phone (setIcon in pixel.js)
+// The list button shows every icon: use one's picture here, edit it, rename it, see where it shows, make a new one,
+// or delete one you made. New art is kept on this phone (setIcon in pixel.js)
 // and shown everywhere that icon is used.
-import { G, well, svgRows, svgText, originalRows, setIcon, isEdited } from './pixel.js';
+import { G, well, svgRows, svgText, originalRows, setIcon, isMine, newIcon, dropIcon, isSaved, iconLabel, renameIcon, seenOn, quietly } from './pixel.js';
 import { iconBtn, esc } from './ui.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
 
 const MIN = 3, MAX = 12, COLS = 6;
-const pretty = (name) => name.replace(/([A-Z])/g, ' $1').toLowerCase();
 const toGrid = (rows) => rows.map(r => [...r].map(c => c === '1' ? 1 : 0));
 const toRows = (grid) => grid.map(r => r.join(''));
 const json = (x) => JSON.stringify(x);
 
 export function openIconEditor(app, first, acc = '#ffd23f') {
   if (app.modal || !G[first]) return;
-  let name, start, grid, past, future, list = false, pick = 0;
+  let name, start, grid, past, future, list = false, sel = first;
   const cur = { x: 0, y: 0, on: false };   // the controller's cell (shown once the controller is used)
   const W = () => grid[0].length, H = () => grid.length;
   const names = () => Object.keys(G);
@@ -44,18 +44,30 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   const top = () => list
     ? `<div class="plate bar">
         ${iconBtn('back', 'data-k="list"', { color: '#fff', label: 'Back to the drawing' })}
-        <span class="ie-name"><span class="title ell">Icons</span><span class="sub ell">Choose one to use here</span></span>
+        <span class="ie-name"><span class="title ell">Icons</span><span class="sub ell">${names().length} icons</span></span>
+        ${iconBtn('plus', 'data-k="new"', { color: '#fff', label: 'New icon' })}
       </div>`
     : `<div class="plate bar">
         ${iconBtn('back', 'data-k="cancel"', { color: '#fff', label: 'Cancel' })}
-        <span class="ie-name"><span class="title ell">Edit icon</span><span class="sub ell">${esc(pretty(name))}</span></span>
+        <span class="ie-name"><span class="title ell">Edit icon</span><span class="sub ell">${esc(iconLabel(name))}</span></span>
         ${iconBtn('tiles', 'data-k="list"', { color: '#fff', label: 'All icons' })}
         ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save icon' })}
       </div>`;
-  const listHtml = () => `<div class="plate ie-main ie-list" role="listbox" aria-label="Icons">${names().map((n, i) => {
-    const on = n === name, ring = i === pick && cur.on;
-    return `<button class="ie-item${on ? ' on' : ''}${ring ? ' pf' : ''}" data-k="pick" data-n="${n}" role="option" aria-selected="${on}" aria-label="${esc(pretty(n))}">${well(28, svgRows(G[n], on ? acc : '#e4e2dc'))}${isEdited(n) ? '<span class="ie-dot"></span>' : ''}</button>`;
-  }).join('')}</div>`;
+  const where = (n) => {
+    if (isMine(n)) return 'Made on this phone';
+    const at = seenOn(n);
+    return at.length ? 'Used on ' + at.join(', ') : 'Not used';
+  };
+  const act = (k, ic, label, dis) => `<button class="btn bare" data-k="${k}"${dis ? ' disabled' : ''}>${well(28, svgRows(G[ic], '#e4e2dc'))}<span>${label}</span></button>`;
+  const listHtml = () => `<div class="plate ie-main ie-list" role="listbox" aria-label="Icons">${names().map((n) => {
+    const on = n === sel;
+    return `<button class="ie-item${on ? ' on' : ''}" data-k="pick" data-n="${n}" role="option" aria-selected="${on}" aria-label="${esc(iconLabel(n))}">${well(28, svgRows(G[n], on ? acc : '#e4e2dc'))}</button>`;
+  }).join('')}</div>
+    <div class="plate bar ie-info">${well(28, svgRows(G[sel], acc))}<span class="ie-name" style="margin-left:8px"><span class="title ell">${esc(iconLabel(sel))}</span><span class="sub clamp2">${esc(where(sel))}</span></span></div>
+    <div class="plate ie-acts se-btns">
+      ${act('use', 'check', 'Use here', sel === name)}${act('edit', 'edit', 'Edit', sel === name)}
+      ${act('rename', 'rename', 'Rename')}${act('del', 'trash', 'Delete', !isMine(sel) || sel === name)}
+    </div>`;
   const drawHtml = () => `
     <div class="plate ie-main"><canvas id="ie-cv" aria-label="Icon pixels"></canvas></div>
     <div class="plate bar">
@@ -90,14 +102,14 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   const prev = () => { const p = el.querySelector('#ie-prev'); if (p) p.innerHTML = well(28, svgRows(toRows(grid), '#e4e2dc')); };
   function rer() {
     const scroll = list && el.querySelector('.ie-list') ? el.querySelector('.ie-list').scrollTop : null;
-    el.innerHTML = top() + (list ? listHtml() : drawHtml());
+    el.innerHTML = quietly(() => top() + (list ? listHtml() : drawHtml()));   // the editor's own buttons don't count as uses
     cv = el.querySelector('#ie-cv'); main = el.querySelector('.ie-main'); ctx = cv && cv.getContext('2d');
     if (cv) { cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); }
     if (list) {
       const box = el.querySelector('.ie-list');
       if (scroll !== null) box.scrollTop = scroll;
-      const target = box.querySelector('.pf') || (scroll === null && box.querySelector('.on'));
-      if (target) target.scrollIntoView({ block: 'nearest' });
+      const target = box.querySelector('.on');
+      if (target && (scroll === null || cur.on)) target.scrollIntoView({ block: 'nearest' });
     }
     draw();
   }
@@ -156,7 +168,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
     setIcon(name, toRows(grid));
     return true;
   };
-  const close = () => { removeEventListener('resize', onResize); el.remove(); app.modal = null; };
+  const close = () => { if (!isSaved(name)) dropIcon(name); removeEventListener('resize', onResize); el.remove(); app.modal = null; };
   const save = () => {
     const did = changed();
     if (!keep()) return;
@@ -167,17 +179,34 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
     if (changed() && !confirm('Discard the changes to this icon?')) return;
     close();
   };
-  const openList = () => { list = true; pick = Math.max(0, names().indexOf(name)); rer(); };
+  const openList = () => { list = true; sel = name; rer(); };
   // use another icon's picture for this one (undo brings the old one back); the other icon is not changed
-  const choose = (n) => {
+  const useHere = (n) => {
     push(); grid = toGrid(G[n]);
     cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
     list = false; rer();
   };
+  // switch to editing another icon (offers to save this one first)
+  const editOther = (n) => {
+    if (changed() && confirm('Save the changes to ' + iconLabel(name) + ' first?') && !keep()) return;
+    if (!isSaved(name)) dropIcon(name);
+    loadIcon(n); sel = n; list = false; rer();
+  };
+  const make = () => { const n = newIcon(); editOther(n); };
+  const rename = () => {
+    const v = prompt('Icon name', iconLabel(sel));
+    if (v === null) return;
+    renameIcon(sel, v.trim().slice(0, 30)); rer();
+  };
+  const del = () => {
+    if (!isMine(sel) || sel === name || !confirm('Delete ' + iconLabel(sel) + '?')) return;
+    dropIcon(sel); sel = name; rer();
+  };
   const ACT = {
     cancel, save,
     list() { if (list) { list = false; rer(); } else openList(); },
-    pick: (b) => choose(b.dataset.n),
+    pick(b) { sel = b.dataset.n; cur.on = false; rer(); },
+    use: () => useHere(sel), edit: () => editOther(sel), new: make, rename, del,
     undo() { if (!past.length) return; future.push(snap()); load(past.pop()); rer(); },
     redo() { if (!future.length) return; past.push(snap()); load(future.pop()); rer(); },
     clear() { push(); grid = grid.map(r => r.map(() => 0)); rer(); },
@@ -204,14 +233,14 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   addEventListener('resize', onResize);
 
   // ---- controller. Drawing: D-pad moves the white square, A flips that pixel, X saves, B cancels.
-  // List: D-pad moves through the icons, A uses one, B goes back to the drawing.
+  // List: D-pad moves through the icons, A uses one here, B goes back to the drawing.
   app.modal = {
     frame() {
       const dx = (input.pressed('right') ? 1 : 0) - (input.pressed('left') ? 1 : 0), dy = (input.pressed('down') ? 1 : 0) - (input.pressed('up') ? 1 : 0);
       if (list) {
         const n = names().length;
-        if (dx || dy) { cur.on = true; pick = Math.max(0, Math.min(n - 1, pick + dx + dy * COLS)); rer(); }
-        if (input.pressed('a')) choose(names()[pick]);
+        if (dx || dy) { cur.on = true; sel = names()[Math.max(0, Math.min(n - 1, names().indexOf(sel) + dx + dy * COLS))]; rer(); }
+        if (input.pressed('a') && sel !== name) useHere(sel);
         else if (input.pressed('b')) { list = false; rer(); }
         return;
       }
