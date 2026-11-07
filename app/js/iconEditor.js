@@ -1,5 +1,5 @@
 // Icon editor: hold any pixel icon to redraw it. Opens over whatever screen you are on (it is not a full-screen tool of its own).
-// The list button shows every icon, so any of them can be edited from here. New art is kept on this phone (setIcon in pixel.js)
+// The list button shows every icon; choosing one copies its picture into the icon being edited. New art is kept on this phone (setIcon in pixel.js)
 // and shown everywhere that icon is used.
 import { G, well, svgRows, svgText, originalRows, setIcon, isEdited } from './pixel.js';
 import { iconBtn, esc } from './ui.js';
@@ -44,7 +44,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   const top = () => list
     ? `<div class="plate bar">
         ${iconBtn('back', 'data-k="list"', { color: '#fff', label: 'Back to the drawing' })}
-        <span class="ie-name"><span class="title ell">Icons</span><span class="sub ell">Choose one to edit</span></span>
+        <span class="ie-name"><span class="title ell">Icons</span><span class="sub ell">Choose one to use here</span></span>
       </div>`
     : `<div class="plate bar">
         ${iconBtn('back', 'data-k="cancel"', { color: '#fff', label: 'Cancel' })}
@@ -150,30 +150,28 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
     grid = Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => grid[(y - dy + h) % h][(x - dx + w) % w]));
     rer();
   };
-  const keep = () => {   // save the icon being drawn (asks nothing); false if it is blank
+  const keep = () => {   // save the icon being drawn; false if it is blank
     if (!changed()) return true;
     if (empty()) { app.toast('Draw at least one pixel'); return false; }
-    setIcon(name, toRows(grid)); start = toRows(grid);
+    setIcon(name, toRows(grid));
     return true;
   };
   const close = () => { removeEventListener('resize', onResize); el.remove(); app.modal = null; };
-  let saved = false;   // any icon saved this time (the screen behind redraws on close)
   const save = () => {
     const did = changed();
     if (!keep()) return;
-    close(); if (did || saved) app.render();
+    close(); if (did) app.render();
     if (did) app.toast('Icon saved');
   };
   const cancel = () => {
     if (changed() && !confirm('Discard the changes to this icon?')) return;
-    close(); if (saved) app.render();
+    close();
   };
   const openList = () => { list = true; pick = Math.max(0, names().indexOf(name)); rer(); };
+  // use another icon's picture for this one (undo brings the old one back); the other icon is not changed
   const choose = (n) => {
-    if (n !== name && changed()) {
-      if (confirm('Save the changes to ' + pretty(name) + ' first?')) { if (!keep()) return; saved = true; }
-    }
-    if (n !== name || !changed()) loadIcon(n);
+    push(); grid = toGrid(G[n]);
+    cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
     list = false; rer();
   };
   const ACT = {
@@ -206,7 +204,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   addEventListener('resize', onResize);
 
   // ---- controller. Drawing: D-pad moves the white square, A flips that pixel, X saves, B cancels.
-  // List: D-pad moves through the icons, A edits one, B goes back to the drawing.
+  // List: D-pad moves through the icons, A uses one, B goes back to the drawing.
   app.modal = {
     frame() {
       const dx = (input.pressed('right') ? 1 : 0) - (input.pressed('left') ? 1 : 0), dy = (input.pressed('down') ? 1 : 0) - (input.pressed('up') ? 1 : 0);
