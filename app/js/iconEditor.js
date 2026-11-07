@@ -3,7 +3,7 @@
 // or delete one you made. New art is kept on this phone (setIcon in pixel.js)
 // and shown everywhere that icon is used.
 import { G, well, svgRows, bitmapPath, placeNow, svgText, originalRows, setIcon, isMine, newIcon, dropIcon, isSaved, iconLabel, renameIcon, seenOn, quietly } from './pixel.js';
-import { iconBtn, esc } from './ui.js';
+import { iconBtn, esc, toggle } from './ui.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
 
@@ -99,11 +99,13 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
   const hasIcon = !!G[first];
   if (app.modal || (!hasIcon && !(host && hasText(host)))) return;
   let name, start, grid, past, future, list = false, textView = !hasIcon, sel = first;
+  // for a single button: the icon its picture came from, and whether saving also updates that icon in the list (on every button using it)
+  let from = first, alsoList = false;
   const cur = { x: 0, y: 0, on: false };   // the controller's cell (shown once the controller is used)
   const W = () => grid[0].length, H = () => grid.length;
   const names = () => Object.keys(G);
   function loadIcon(n) {
-    name = n; start = ((slot && readSlots()[slot]) || G[n]).slice(); grid = toGrid(start); past = []; future = [];
+    name = n; from = n; alsoList = false; start = ((slot && readSlots()[slot]) || G[n]).slice(); grid = toGrid(start); past = []; future = [];
     cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
   }
   if (hasIcon) loadIcon(first); else { name = null; start = ['0']; grid = [[0]]; past = []; future = []; }
@@ -184,7 +186,8 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
     <div class="plate bar"><span class="cap" style="color:var(--muted);margin-left:8px">Slide</span><span style="display:flex;gap:2px">
       ${iconBtn('left', 'data-k="sl"', { label: 'Slide left', disabled: empty() })}${iconBtn('up', 'data-k="su"', { label: 'Slide up', disabled: empty() })}${iconBtn('down', 'data-k="sd"', { label: 'Slide down', disabled: empty() })}${iconBtn('right', 'data-k="sr"', { label: 'Slide right', disabled: empty() })}
     </span></div>
-    <div class="plate bar">${sizeStep('W', W(), 'w-', 'w+')}${sizeStep('H', H(), 'h-', 'h+')}</div>`;
+    <div class="plate bar">${sizeStep('W', W(), 'w-', 'w+')}${sizeStep('H', H(), 'h-', 'h+')}</div>
+    ${slot ? `<div class="plate bar"><span class="ie-name" style="margin-left:8px"><span class="title ell">Update list icon</span><span class="sub ell">${esc(alsoList ? iconLabel(from) + ' changes on every button' : 'This button only')}</span></span>${toggle(alsoList, 'data-k="also"', 'Update list icon')}</div>` : ''}`;
 
   let cv = null, ctx = null, main = null, cell = 20;
   function draw() {
@@ -270,8 +273,10 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
     if (textChanged()) { setText(tKey, tNow); tSaved = { ...tNow }; }
     if (!hasIcon || !changed()) return true;
     if (empty()) { app.toast('Draw at least one pixel'); return false; }
-    if (slot) setSlot(slot, json(toRows(grid)) === json(G[name]) ? null : toRows(grid));
-    else setIcon(name, toRows(grid));
+    const rows = toRows(grid);
+    if (slot && alsoList && json(rows) !== json(G[from])) setIcon(from, rows);   // the list shows the new picture
+    if (slot) setSlot(slot, json(rows) === json(G[name]) ? null : rows);
+    else setIcon(name, rows);
     return true;
   };
   const close = () => { if (name && !isSaved(name)) dropIcon(name); removeEventListener('resize', onResize); el.remove(); app.modal = null; };
@@ -288,7 +293,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
   const openList = () => { list = true; sel = name; rer(); };
   // use another icon's picture for this one (undo brings the old one back); the other icon is not changed
   const useHere = (n) => {
-    push(); grid = toGrid(G[n]);
+    push(); grid = toGrid(G[n]); from = n; alsoList = n !== name;   // picked from the list: starts on "update the list"
     cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
     list = false; rer();
   };
@@ -311,6 +316,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
   const ACT = {
     cancel, save,
     list() { if (list) { list = false; rer(); } else openList(); },
+    also() { alsoList = !alsoList; rer(); },
     text() { textView = !textView; list = false; rer(); },
     tx(b) {
       const k = b.dataset.f, v = prompt(k === 'sub' ? 'Description (leave blank for none)' : FIELD[k], tVal(k));

@@ -375,3 +375,12 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .ie-texts{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow-y:auto}
 .ie-field{display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 6px 8px 12px;background:rgba(255,255,255,.03);border:0;border-radius:var(--r-btn);text-align:left;color:inherit;font:inherit}
 .ie-field .ie-name{gap:3px}
+.icon-ed .vscreen[role=switch]{width:72px}
+/* landscape: the drawing on the left, the controls on the right (there is not enough height to stack them) */
+@media (orientation:landscape) and (max-height:520px){
+  .icon-ed.screen-tool{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,46%);grid-template-rows:auto;grid-auto-rows:auto;align-content:start;column-gap:8px;row-gap:8px}
+  .icon-ed>*{grid-column:2;max-width:none}
+  .icon-ed>.bar:first-child{grid-column:1/-1}
+  .icon-ed>.ie-main{grid-column:1;grid-row:2/span 6;height:100%;min-height:0}
+  .icon-ed>.ie-info,.icon-ed>.ie-acts{grid-column:2}
+}
