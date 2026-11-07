@@ -2,7 +2,7 @@
 // The list button shows every icon: use one's picture here, edit it, rename it, see where it shows, make a new one,
 // or delete one you made. New art is kept on this phone (setIcon in pixel.js)
 // and shown everywhere that icon is used.
-import { G, well, svgRows, svgText, originalRows, setIcon, isMine, newIcon, dropIcon, isSaved, iconLabel, renameIcon, seenOn, quietly } from './pixel.js';
+import { G, well, svgRows, bitmapPath, placeNow, svgText, originalRows, setIcon, isMine, newIcon, dropIcon, isSaved, iconLabel, renameIcon, seenOn, quietly } from './pixel.js';
 import { iconBtn, esc } from './ui.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
@@ -12,14 +12,50 @@ const toGrid = (rows) => rows.map(r => [...r].map(c => c === '1' ? 1 : 0));
 const toRows = (grid) => grid.map(r => r.join(''));
 const json = (x) => JSON.stringify(x);
 
-export function openIconEditor(app, first, acc = '#ffd23f') {
+// ---- one button's own picture. Holding a button redraws only that button: its picture is kept under a key made of the
+// screen, the icon and the button's label (ha.icons.slots), and laid over the icon each time the button is drawn.
+const SLOTS = 'ha.icons.slots';
+let slots = null;
+const readSlots = () => slots || (slots = (() => { try { return JSON.parse(localStorage.getItem(SLOTS)) || {}; } catch (e) { return {}; } })());
+function setSlot(key, rows) {
+  const m = readSlots();
+  if (rows) m[key] = rows; else delete m[key];
+  try { localStorage.setItem(SLOTS, JSON.stringify(m)); } catch (e) { /* storage full: lasts until the app closes */ }
+}
+// the key for an icon on screen. Numbers are left out, so a count in a label doesn't make it a different button.
+export function slotOf(svg) {
+  const b = svg.closest('button,[data-a],.row,.row-empty');
+  let label = b ? (b.getAttribute('aria-label') || '') : '';
+  if (!label && b) { const t = b.querySelector('.title') || b.querySelector(':scope > span:not(.mount)'); label = t ? t.textContent : ''; }
+  return [placeNow(), svg.dataset.icon, label.trim().replace(/\d+/g, '#').slice(0, 40)].join('|');
+}
+// lay each button's own picture over its icon (main.js calls this whenever the screen changes)
+export function applySlots(root) {
+  const m = readSlots();
+  if (!Object.keys(m).length && !root.querySelector('svg[data-slotted]')) return;
+  const all = root.matches && root.matches('svg[data-icon]') ? [root] : root.querySelectorAll('svg[data-icon]');
+  for (const svg of all) {
+    const own = m[slotOf(svg)];
+    if (!own && !svg.dataset.slotted) continue;
+    const rows = own || G[svg.dataset.icon];
+    if (!rows) continue;
+    const vb = svg.getAttribute('viewBox').split(' '), scale = svg.getAttribute('width') / vb[2];
+    const w = rows[0].length, h = rows.length;
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`); svg.setAttribute('width', w * scale); svg.setAttribute('height', h * scale);
+    svg.querySelector('path').setAttribute('d', bitmapPath(rows));
+    if (own) svg.dataset.slotted = '1'; else delete svg.dataset.slotted;
+  }
+}
+
+// slot: the button being redrawn (from holding it). Without one, the icon itself is edited, everywhere it is used.
+export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
   if (app.modal || !G[first]) return;
   let name, start, grid, past, future, list = false, sel = first;
   const cur = { x: 0, y: 0, on: false };   // the controller's cell (shown once the controller is used)
   const W = () => grid[0].length, H = () => grid.length;
   const names = () => Object.keys(G);
   function loadIcon(n) {
-    name = n; start = G[n].slice(); grid = toGrid(start); past = []; future = [];
+    name = n; start = ((slot && readSlots()[slot]) || G[n]).slice(); grid = toGrid(start); past = []; future = [];
     cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
   }
   loadIcon(first);
@@ -28,6 +64,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   const load = (s) => { grid = JSON.parse(s); cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1); };
   const empty = () => !grid.some(r => r.includes(1));
   const changed = () => json(toRows(grid)) !== json(start);
+  const base = () => slot ? G[name] : originalRows(name);   // what "Original" goes back to
 
   const el = document.createElement('div');
   el.className = 'icon-ed screen-tool';
@@ -49,7 +86,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
       </div>`
     : `<div class="plate bar">
         ${iconBtn('back', 'data-k="cancel"', { color: '#fff', label: 'Cancel' })}
-        <span class="ie-name"><span class="title ell">Edit icon</span><span class="sub ell">${esc(iconLabel(name))}</span></span>
+        <span class="ie-name"><span class="title ell">${slot ? 'Edit button' : 'Edit icon'}</span><span class="sub ell">${esc(slot ? iconLabel(name) + ' · this button only' : iconLabel(name) + ' · everywhere')}</span></span>
         ${iconBtn('tiles', 'data-k="list"', { color: '#fff', label: 'All icons' })}
         ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save icon' })}
       </div>`;
@@ -65,7 +102,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   }).join('')}</div>
     <div class="plate bar ie-info">${well(28, svgRows(G[sel], acc))}<span class="ie-name" style="margin-left:8px"><span class="title ell">${esc(iconLabel(sel))}</span><span class="sub clamp2">${esc(where(sel))}</span></span></div>
     <div class="plate ie-acts se-btns">
-      ${act('use', 'check', 'Use here', sel === name)}${act('edit', 'edit', 'Edit', sel === name)}
+      ${act('use', 'check', 'Use here', sel === name)}${act('edit', 'edit', 'Edit', !slot && sel === name)}
       ${act('rename', 'rename', 'Rename')}${act('del', 'trash', 'Delete', !isMine(sel) || sel === name)}
     </div>`;
   const drawHtml = () => `
@@ -74,7 +111,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
       ${iconBtn('undo', 'data-k="undo"', { label: 'Undo', disabled: !past.length })}
       ${iconBtn('redo', 'data-k="redo"', { label: 'Redo', disabled: !future.length })}
       ${iconBtn('trash', 'data-k="clear"', { label: 'Clear', disabled: empty() })}
-      ${iconBtn('reset', 'data-k="orig"', { label: 'Original icon', disabled: json(toRows(grid)) === json(originalRows(name)) })}
+      ${iconBtn('reset', 'data-k="orig"', { label: slot ? 'Same as the icon' : 'Original icon', disabled: json(toRows(grid)) === json(base()) })}
       <span id="ie-prev" class="ie-prev">${well(28, svgRows(toRows(grid), '#e4e2dc'))}</span>
     </div>
     <div class="plate bar"><span class="cap" style="color:var(--muted);margin-left:8px">Slide</span><span style="display:flex;gap:2px">
@@ -165,7 +202,8 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   const keep = () => {   // save the icon being drawn; false if it is blank
     if (!changed()) return true;
     if (empty()) { app.toast('Draw at least one pixel'); return false; }
-    setIcon(name, toRows(grid));
+    if (slot) setSlot(slot, json(toRows(grid)) === json(G[name]) ? null : toRows(grid));
+    else setIcon(name, toRows(grid));
     return true;
   };
   const close = () => { if (!isSaved(name)) dropIcon(name); removeEventListener('resize', onResize); el.remove(); app.modal = null; };
@@ -190,7 +228,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
   const editOther = (n) => {
     if (changed() && confirm('Save the changes to ' + iconLabel(name) + ' first?') && !keep()) return;
     if (!isSaved(name)) dropIcon(name);
-    loadIcon(n); sel = n; list = false; rer();
+    slot = null; loadIcon(n); sel = n; list = false; rer();
   };
   const make = () => { const n = newIcon(); editOther(n); };
   const rename = () => {
@@ -210,7 +248,7 @@ export function openIconEditor(app, first, acc = '#ffd23f') {
     undo() { if (!past.length) return; future.push(snap()); load(past.pop()); rer(); },
     redo() { if (!future.length) return; past.push(snap()); load(future.pop()); rer(); },
     clear() { push(); grid = grid.map(r => r.map(() => 0)); rer(); },
-    orig() { push(); grid = toGrid(originalRows(name)); rer(); },
+    orig() { push(); grid = toGrid(base()); rer(); },
     sl: () => slide(-1, 0), sr: () => slide(1, 0), su: () => slide(0, -1), sd: () => slide(0, 1),
     'w-': () => resize(-1, 0), 'w+': () => resize(1, 0), 'h-': () => resize(0, -1), 'h+': () => resize(0, 1)
   };
