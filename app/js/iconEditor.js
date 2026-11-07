@@ -37,7 +37,8 @@ function fieldsOf(host) {
   const f = {}, t = host.querySelector('.title'), d = host.querySelector('.sub');
   if (t) f.title = t;
   else if (host.matches('button')) { const l = host.querySelector(':scope > span:not(.mount):not(.ring):not(.selring)'); if (l && l.textContent.trim()) f.title = l; }
-  if (d && d.textContent.trim() && !(d.closest('button') && d.closest('button') !== host && host.matches('.setrow'))) f.sub = d;
+  const seen = host.dataset.orig && 'sub' in JSON.parse(host.dataset.orig);   // a description we emptied is still there to refill
+  if (d && (seen || d.textContent.trim() || host.matches('.row,.setrow')) && !(d.closest('button') && d.closest('button') !== host && host.matches('.setrow'))) f.sub = d;
   return f;
 }
 // the button's text as the app drew it (kept on the element, so changed text doesn't change its key)
@@ -168,7 +169,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
       ${act('rename', 'rename', 'Rename')}${act('del', 'trash', 'Delete', !isMine(sel) || sel === name)}
     </div>`;
   const textHtml = () => `<div class="plate ie-main ie-texts">
-      ${tFields.map(k => `<button class="ie-field" data-k="tx" data-f="${k}"><span class="ie-name"><span class="cap" style="color:var(--muted)">${FIELD[k]}</span><span class="${k === 'title' ? 'title' : 'sub'} clamp2" style="color:var(--text)">${esc(tVal(k))}</span></span>${well(28, svgRows(G.rename, '#e4e2dc'))}</button>`).join('')}
+      ${tFields.map(k => `<button class="ie-field" data-k="tx" data-f="${k}"><span class="ie-name"><span class="cap" style="color:var(--muted)">${FIELD[k]}</span><span class="${k === 'title' ? 'title' : 'sub'} clamp2" style="color:${tVal(k) === '' ? 'var(--muted)' : 'var(--text)'}">${tVal(k) === '' ? 'None' : esc(tVal(k))}</span></span>${well(28, svgRows(G.rename, '#e4e2dc'))}</button>`).join('')}
     </div>
     <div class="plate ie-acts se-btns">${act('txreset', 'reset', 'Original text', !Object.keys(tNow).length)}</div>`;
   const drawHtml = () => `
@@ -312,9 +313,12 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
     list() { if (list) { list = false; rer(); } else openList(); },
     text() { textView = !textView; list = false; rer(); },
     tx(b) {
-      const k = b.dataset.f, v = prompt(FIELD[k], tVal(k));
+      const k = b.dataset.f, v = prompt(k === 'sub' ? 'Description (leave blank for none)' : FIELD[k], tVal(k));
       if (v === null) return;
-      if (v.trim() === '' || v === tOrig[k]) delete tNow[k]; else tNow[k] = v.slice(0, 80);
+      if (k === 'title' && v.trim() === '') delete tNow[k];                   // a name can't be empty
+      else if (k === 'sub' && v.trim() === '') { if (tOrig.sub === '') delete tNow.sub; else tNow.sub = ''; }   // blank: no description
+      else if (v === tOrig[k]) delete tNow[k];
+      else tNow[k] = v.slice(0, 80);
       rer();
     },
     txreset() { tNow = {}; rer(); },
