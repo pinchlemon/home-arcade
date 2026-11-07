@@ -18,6 +18,7 @@ import { unseenCount } from './screens/sync.js';
 import * as launch from './launch.js';
 import * as artStore from './artStore.js';
 import { openIconEditor, slotOf, applySlots, HOST, hasText } from './iconEditor.js';
+import { applyOrder } from './arrange.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -192,9 +193,9 @@ addEventListener('pointerup', (e) => {
 addEventListener('pointercancel', letGo);
 // buttons with a picture of their own (iconEditor.js): lay it on whenever something is drawn
 new MutationObserver((list) => {
-  for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) applySlots(n);
+  for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1 && n.isConnected) { applySlots(n); applyOrder(n); }
 }).observe(root, { childList: true, subtree: true });
-applySlots(root);
+applySlots(root); applyOrder(root);
 
 // Hold a button for half a second to redraw its icon and change its text. The touch that opened the editor must not also press the button.
 let holdT = 0, holdAt = null, swallow = false;

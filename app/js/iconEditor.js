@@ -6,6 +6,7 @@ import { G, well, svgRows, bitmapPath, placeNow, svgText, originalRows, setIcon,
 import { iconBtn, esc, toggle } from './ui.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
+import { canMove, startMove } from './arrange.js';
 
 const MIN = 3, MAX = 12, COLS = 6;
 const toGrid = (rows) => rows.map(r => [...r].map(c => c === '1' ? 1 : 0));
@@ -51,6 +52,11 @@ function origOf(host) {
   for (const [k, e] of Object.entries(fieldsOf(host))) o[k] = e.textContent;
   host.dataset.orig = JSON.stringify(o);
   return o;
+}
+// what a button is called for moving it: its name as the app drew it, else its label or icon
+export function buttonId(host) {
+  const o = origOf(host), svg = host.querySelector('svg[data-icon]');
+  return norm(o.title || host.getAttribute('aria-label') || (svg && svg.dataset.icon) || host.textContent);
 }
 const norm = (t) => (t || '').trim().replace(/\d+/g, '#').slice(0, 40);   // numbers left out, so a count doesn't make it a different button
 const textKey = (host) => { const o = origOf(host); return o.title ? placeNow() + '|' + norm(o.title) : null; };
@@ -144,11 +150,12 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
   // ---- drawing view and list view
   const sizeStep = (label, v, dec, inc) => `<span class="cap" style="color:var(--muted)">${label}</span><span class="stepper">${iconBtn('minus', `data-k="${dec}"`, { label: 'Less ' + label.toLowerCase(), disabled: v <= MIN })}<span class="vscreen">${svgText(String(v), 'var(--acc)')}</span>${iconBtn('plus', `data-k="${inc}"`, { label: 'More ' + label.toLowerCase(), disabled: v >= MAX })}</span>`;
   const FIELD = { title: 'Name', sub: 'Description' };
+  const mv = () => host && (slot || !hasIcon) && canMove(host) ? iconBtn('move', 'data-k="move"', { color: '#fff', label: 'Move' }) : '';
   const top = () => textView
     ? `<div class="plate bar">
         ${iconBtn('back', hasIcon ? 'data-k="text"' : 'data-k="cancel"', { color: '#fff', label: hasIcon ? 'Back to the drawing' : 'Cancel' })}
         <span class="ie-name"><span class="title ell">Edit text</span><span class="sub ell">${esc(tOrig.title || '')} · this button only</span></span>
-        ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save' })}
+        ${mv()}${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save' })}
       </div>`
     : list
     ? `<div class="plate bar">
@@ -161,7 +168,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
         <span class="ie-name"><span class="title ell">${slot ? 'Edit button' : 'Edit icon'}</span><span class="sub ell">${esc(slot ? iconLabel(from) + ' · this button only' : iconLabel(name) + ' · everywhere')}</span></span>
         ${tKey ? iconBtn('rename', 'data-k="text"', { color: '#fff', label: 'Name and description' }) : ''}
         ${iconBtn('tiles', 'data-k="list"', { color: '#fff', label: 'All icons' })}
-        ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save icon' })}
+        ${mv()}${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save icon' })}
       </div>`;
   const where = (n) => {
     if (isMine(n)) return 'Made on this phone';
@@ -326,6 +333,13 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
     list() { if (list) { list = false; rer(); } else openList(); },
     also() { alsoList = !alsoList; rer(); },
     text() { textView = !textView; list = false; rer(); },
+    move() {
+      if (dirty() && confirm('Save the changes first?') && !keep()) return;
+      close(); app.render(); applySlots(document.getElementById('app'));
+      // the screen was drawn again: find the held button in the new drawing
+      const now = [...document.getElementById('app').querySelectorAll(HOST)].find(h => h.parentElement && buttonId(h) === buttonId(host) && canMove(h)) || host;
+      startMove(app, now.isConnected ? now : host);
+    },
     tx(b) {
       const k = b.dataset.f, v = prompt(k === 'sub' ? 'Description (leave blank for none)' : FIELD[k], tVal(k));
       if (v === null) return;
