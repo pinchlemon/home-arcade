@@ -22,15 +22,60 @@ function setSlot(key, rows) {
   if (rows) m[key] = rows; else delete m[key];
   try { localStorage.setItem(SLOTS, JSON.stringify(m)); } catch (e) { /* storage full: lasts until the app closes */ }
 }
-// the key for an icon on screen. Numbers are left out, so a count in a label doesn't make it a different button.
-export function slotOf(svg) {
-  const b = svg.closest('button,[data-a],.row,.row-empty');
-  let label = b ? (b.getAttribute('aria-label') || '') : '';
-  if (!label && b) { const t = b.querySelector('.title') || b.querySelector(':scope > span:not(.mount)'); label = t ? t.textContent : ''; }
-  return [placeNow(), svg.dataset.icon, label.trim().replace(/\d+/g, '#').slice(0, 40)].join('|');
+// ---- a button's own text: its name and description, kept under the screen + its original name (ha.text.slots)
+const TEXTS = 'ha.text.slots';
+let texts = null;
+const readTexts = () => texts || (texts = (() => { try { return JSON.parse(localStorage.getItem(TEXTS)) || {}; } catch (e) { return {}; } })());
+function setText(key, t) {
+  const m = readTexts();
+  if (t && Object.keys(t).length) m[key] = t; else delete m[key];
+  try { localStorage.setItem(TEXTS, JSON.stringify(m)); } catch (e) { /* storage full: lasts until the app closes */ }
 }
+export const HOST = 'button,[data-a],.row,.row-empty,.setrow';   // things that can be held
+// the text parts of a button: name (.title, or a plate button's label) and description (.sub)
+function fieldsOf(host) {
+  const f = {}, t = host.querySelector('.title'), d = host.querySelector('.sub');
+  if (t) f.title = t;
+  else if (host.matches('button')) { const l = host.querySelector(':scope > span:not(.mount):not(.ring):not(.selring)'); if (l && l.textContent.trim()) f.title = l; }
+  if (d && d.textContent.trim() && !(d.closest('button') && d.closest('button') !== host && host.matches('.setrow'))) f.sub = d;
+  return f;
+}
+// the button's text as the app drew it (kept on the element, so changed text doesn't change its key)
+function origOf(host) {
+  if (host.dataset.orig) return JSON.parse(host.dataset.orig);
+  const o = {};
+  for (const [k, e] of Object.entries(fieldsOf(host))) o[k] = e.textContent;
+  host.dataset.orig = JSON.stringify(o);
+  return o;
+}
+const norm = (t) => (t || '').trim().replace(/\d+/g, '#').slice(0, 40);   // numbers left out, so a count doesn't make it a different button
+const textKey = (host) => { const o = origOf(host); return o.title ? placeNow() + '|' + norm(o.title) : null; };
+export const hasText = (host) => !!origOf(host).title;
+// the key for an icon on screen
+export function slotOf(svg) {
+  const b = svg.closest(HOST);
+  const label = b ? (b.getAttribute('aria-label') || origOf(b).title || '') : '';
+  return [placeNow(), svg.dataset.icon, norm(label)].join('|');
+}
+function applyText(root) {
+  const m = readTexts();
+  if (!Object.keys(m).length && !root.querySelector('[data-txt]') && !(root.dataset && root.dataset.txt)) return;
+  const hosts = root.matches && root.matches(HOST) ? [root, ...root.querySelectorAll(HOST)] : root.querySelectorAll(HOST);
+  for (const h of hosts) {
+    if (!origOf(h).title) continue;
+    const own = m[textKey(h)], o = origOf(h);
+    if (!own && !h.dataset.txt) continue;
+    for (const [k, e] of Object.entries(fieldsOf(h))) {
+      const v = own && own[k] != null ? own[k] : o[k];
+      if (v != null && e.textContent !== v) e.textContent = v;
+    }
+    if (own) h.dataset.txt = '1'; else delete h.dataset.txt;
+  }
+}
+
 // lay each button's own picture over its icon (main.js calls this whenever the screen changes)
 export function applySlots(root) {
+  applyText(root);
   const m = readSlots();
   if (!Object.keys(m).length && !root.querySelector('svg[data-slotted]')) return;
   const all = root.matches && root.matches('svg[data-icon]') ? [root] : root.querySelectorAll('svg[data-icon]');
@@ -48,9 +93,11 @@ export function applySlots(root) {
 }
 
 // slot: the button being redrawn (from holding it). Without one, the icon itself is edited, everywhere it is used.
-export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
-  if (app.modal || !G[first]) return;
-  let name, start, grid, past, future, list = false, sel = first;
+// host: the held button, whose name and description can be changed too. With no icon (first = null) only its text is edited.
+export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = null) {
+  const hasIcon = !!G[first];
+  if (app.modal || (!hasIcon && !(host && hasText(host)))) return;
+  let name, start, grid, past, future, list = false, textView = !hasIcon, sel = first;
   const cur = { x: 0, y: 0, on: false };   // the controller's cell (shown once the controller is used)
   const W = () => grid[0].length, H = () => grid.length;
   const names = () => Object.keys(G);
@@ -58,13 +105,20 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
     name = n; start = ((slot && readSlots()[slot]) || G[n]).slice(); grid = toGrid(start); past = []; future = [];
     cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
   }
-  loadIcon(first);
+  if (hasIcon) loadIcon(first); else { name = null; start = ['0']; grid = [[0]]; past = []; future = []; }
+  // text: what the app shows, what this button has saved, and the edits not yet saved
+  const tKey = host && hasText(host) ? textKey(host) : null, tOrig = tKey ? origOf(host) : {};
+  const tFields = tKey ? Object.keys(tOrig) : [];
+  let tSaved = tKey ? { ...(readTexts()[tKey] || {}) } : {}, tNow = { ...tSaved };
+  const textChanged = () => json(tNow) !== json(tSaved);
+  const tVal = (k) => tNow[k] != null ? tNow[k] : tOrig[k];
   const snap = () => json(grid);
   const push = () => { past.push(snap()); if (past.length > 60) past.shift(); future = []; };
   const load = (s) => { grid = JSON.parse(s); cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1); };
   const empty = () => !grid.some(r => r.includes(1));
   const changed = () => json(toRows(grid)) !== json(start);
-  const base = () => slot ? G[name] : originalRows(name);   // what "Original" goes back to
+  const base = () => slot ? G[name] : originalRows(name);
+  const dirty = () => (hasIcon && changed()) || textChanged();   // what "Original" goes back to
 
   const el = document.createElement('div');
   el.className = 'icon-ed screen-tool';
@@ -78,7 +132,14 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
 
   // ---- drawing view and list view
   const sizeStep = (label, v, dec, inc) => `<span class="cap" style="color:var(--muted)">${label}</span><span class="stepper">${iconBtn('minus', `data-k="${dec}"`, { label: 'Less ' + label.toLowerCase(), disabled: v <= MIN })}<span class="vscreen">${svgText(String(v), 'var(--acc)')}</span>${iconBtn('plus', `data-k="${inc}"`, { label: 'More ' + label.toLowerCase(), disabled: v >= MAX })}</span>`;
-  const top = () => list
+  const FIELD = { title: 'Name', sub: 'Description' };
+  const top = () => textView
+    ? `<div class="plate bar">
+        ${iconBtn('back', hasIcon ? 'data-k="text"' : 'data-k="cancel"', { color: '#fff', label: hasIcon ? 'Back to the drawing' : 'Cancel' })}
+        <span class="ie-name"><span class="title ell">Edit text</span><span class="sub ell">${esc(tOrig.title || '')} · this button only</span></span>
+        ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save' })}
+      </div>`
+    : list
     ? `<div class="plate bar">
         ${iconBtn('back', 'data-k="list"', { color: '#fff', label: 'Back to the drawing' })}
         <span class="ie-name"><span class="title ell">Icons</span><span class="sub ell">${names().length} icons</span></span>
@@ -87,6 +148,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
     : `<div class="plate bar">
         ${iconBtn('back', 'data-k="cancel"', { color: '#fff', label: 'Cancel' })}
         <span class="ie-name"><span class="title ell">${slot ? 'Edit button' : 'Edit icon'}</span><span class="sub ell">${esc(slot ? iconLabel(name) + ' · this button only' : iconLabel(name) + ' · everywhere')}</span></span>
+        ${tKey ? iconBtn('rename', 'data-k="text"', { color: '#fff', label: 'Name and description' }) : ''}
         ${iconBtn('tiles', 'data-k="list"', { color: '#fff', label: 'All icons' })}
         ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save icon' })}
       </div>`;
@@ -105,6 +167,10 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
       ${act('use', 'check', 'Use here', sel === name)}${act('edit', 'edit', 'Edit', !slot && sel === name)}
       ${act('rename', 'rename', 'Rename')}${act('del', 'trash', 'Delete', !isMine(sel) || sel === name)}
     </div>`;
+  const textHtml = () => `<div class="plate ie-main ie-texts">
+      ${tFields.map(k => `<button class="ie-field" data-k="tx" data-f="${k}"><span class="ie-name"><span class="cap" style="color:var(--muted)">${FIELD[k]}</span><span class="${k === 'title' ? 'title' : 'sub'} clamp2" style="color:var(--text)">${esc(tVal(k))}</span></span>${well(28, svgRows(G.rename, '#e4e2dc'))}</button>`).join('')}
+    </div>
+    <div class="plate ie-acts se-btns">${act('txreset', 'reset', 'Original text', !Object.keys(tNow).length)}</div>`;
   const drawHtml = () => `
     <div class="plate ie-main"><canvas id="ie-cv" aria-label="Icon pixels"></canvas></div>
     <div class="plate bar">
@@ -121,7 +187,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
 
   let cv = null, ctx = null, main = null, cell = 20;
   function draw() {
-    if (list || !cv) return;
+    if (list || textView || !cv) return;
     const w = W(), h = H(), dpr = Math.min(devicePixelRatio || 1, 3);
     const avail = main.getBoundingClientRect();
     cell = Math.max(8, Math.floor(Math.min((avail.width - 16) / w, (avail.height - 16) / h)));
@@ -139,7 +205,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
   const prev = () => { const p = el.querySelector('#ie-prev'); if (p) p.innerHTML = well(28, svgRows(toRows(grid), '#e4e2dc')); };
   function rer() {
     const scroll = list && el.querySelector('.ie-list') ? el.querySelector('.ie-list').scrollTop : null;
-    el.innerHTML = quietly(() => top() + (list ? listHtml() : drawHtml()));   // the editor's own buttons don't count as uses
+    el.innerHTML = quietly(() => top() + (textView ? textHtml() : list ? listHtml() : drawHtml()));   // the editor's own buttons don't count as uses
     cv = el.querySelector('#ie-cv'); main = el.querySelector('.ie-main'); ctx = cv && cv.getContext('2d');
     if (cv) { cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); }
     if (list) {
@@ -199,22 +265,23 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
     grid = Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => grid[(y - dy + h) % h][(x - dx + w) % w]));
     rer();
   };
-  const keep = () => {   // save the icon being drawn; false if it is blank
-    if (!changed()) return true;
+  const keep = () => {   // save the icon being drawn and the text; false if the icon is blank
+    if (textChanged()) { setText(tKey, tNow); tSaved = { ...tNow }; }
+    if (!hasIcon || !changed()) return true;
     if (empty()) { app.toast('Draw at least one pixel'); return false; }
     if (slot) setSlot(slot, json(toRows(grid)) === json(G[name]) ? null : toRows(grid));
     else setIcon(name, toRows(grid));
     return true;
   };
-  const close = () => { if (!isSaved(name)) dropIcon(name); removeEventListener('resize', onResize); el.remove(); app.modal = null; };
+  const close = () => { if (name && !isSaved(name)) dropIcon(name); removeEventListener('resize', onResize); el.remove(); app.modal = null; };
   const save = () => {
-    const did = changed();
+    const did = dirty();
     if (!keep()) return;
-    close(); if (did) app.render();
-    if (did) app.toast('Icon saved');
+    close(); if (did) { app.render(); applySlots(document.getElementById('app')); }
+    if (did) app.toast('Saved');
   };
   const cancel = () => {
-    if (changed() && !confirm('Discard the changes to this icon?')) return;
+    if (dirty() && !confirm('Discard the changes?')) return;
     close();
   };
   const openList = () => { list = true; sel = name; rer(); };
@@ -226,7 +293,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
   };
   // switch to editing another icon (offers to save this one first)
   const editOther = (n) => {
-    if (changed() && confirm('Save the changes to ' + iconLabel(name) + ' first?') && !keep()) return;
+    if (dirty() && confirm('Save the changes first?') && !keep()) return;
     if (!isSaved(name)) dropIcon(name);
     slot = null; loadIcon(n); sel = n; list = false; rer();
   };
@@ -243,6 +310,14 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
   const ACT = {
     cancel, save,
     list() { if (list) { list = false; rer(); } else openList(); },
+    text() { textView = !textView; list = false; rer(); },
+    tx(b) {
+      const k = b.dataset.f, v = prompt(FIELD[k], tVal(k));
+      if (v === null) return;
+      if (v.trim() === '' || v === tOrig[k]) delete tNow[k]; else tNow[k] = v.slice(0, 80);
+      rer();
+    },
+    txreset() { tNow = {}; rer(); },
     pick(b) { sel = b.dataset.n; cur.on = false; rer(); },
     use: () => useHere(sel), edit: () => editOther(sel), new: make, rename, del,
     undo() { if (!past.length) return; future.push(snap()); load(past.pop()); rer(); },
@@ -274,6 +349,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null) {
   // List: D-pad moves through the icons, A uses one here, B goes back to the drawing.
   app.modal = {
     frame() {
+      if (textView) { if (input.pressed('x') || input.pressed('start')) save(); else if (input.pressed('b')) (hasIcon ? ACT.text() : cancel()); return; }
       const dx = (input.pressed('right') ? 1 : 0) - (input.pressed('left') ? 1 : 0), dy = (input.pressed('down') ? 1 : 0) - (input.pressed('up') ? 1 : 0);
       if (list) {
         const n = names().length;
