@@ -17,7 +17,7 @@ import settings from './screens/settings.js';
 import { unseenCount } from './screens/sync.js';
 import * as launch from './launch.js';
 import * as artStore from './artStore.js';
-import { openIconEditor } from './iconEditor.js';
+import { openIconEditor, slotOf, applySlots } from './iconEditor.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -190,6 +190,12 @@ addEventListener('pointerup', (e) => {
   if (!over || !held.contains(over)) letGo(); // slid off: no click is coming
 });
 addEventListener('pointercancel', letGo);
+// buttons with a picture of their own (iconEditor.js): lay it on whenever something is drawn
+new MutationObserver((list) => {
+  for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) applySlots(n);
+}).observe(root, { childList: true, subtree: true });
+applySlots(root);
+
 // Hold an icon button for half a second to redraw its icon. The touch that opened the editor must not also press the button.
 let holdT = 0, holdAt = null, swallow = false;
 const stopHold = () => { clearTimeout(holdT); holdT = 0; };
@@ -204,7 +210,7 @@ root.addEventListener('pointerdown', (e) => {
   holdT = setTimeout(() => {
     holdT = 0; swallow = true; letGo();
     snd.click();
-    openIconEditor(app, el.dataset.icon, getComputedStyle(el).getPropertyValue('--acc').trim() || undefined);
+    openIconEditor(app, el.dataset.icon, getComputedStyle(el).getPropertyValue('--acc').trim() || undefined, slotOf(el));
   }, 500);
 });
 root.addEventListener('pointermove', (e) => { if (holdT && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) stopHold(); });

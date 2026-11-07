@@ -226,6 +226,7 @@ const USED_ON = Object.fromEntries(Object.entries({
 }).map(([k, v]) => [k, v.split(',')]));
 let seen = null, whereNow = () => '', saveSeen = 0;
 export const iconPlace = (fn) => { whereNow = fn; };
+export const placeNow = () => whereNow();
 function note(name) {
   const at = whereNow();
   if (!at) return;
