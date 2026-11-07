@@ -49,6 +49,7 @@ export function openReview(app, g) {
   }
   const nav = makeNav();
   const ov = {
+    place: 'Review',
     render() {
       const items = game ? list() : [], art = store.dirtyFor(g.file), n = items.length + art.length;
       const top = `<div class="plate bar">

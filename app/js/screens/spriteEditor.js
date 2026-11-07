@@ -857,6 +857,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   // ---------------------------------------------------------------- the screen
   let antsT = 0;
   const ov = {
+    place: 'Sprite editor',
     render() {
       const s = ed.spr;
       const top = `<div class="plate bar">

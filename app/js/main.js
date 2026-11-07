@@ -1,6 +1,6 @@
 // Hedron: app shell. Tabs (Arcade, Studio, Art, Sound, Settings) and full-screen tools (the game editor, the art viewer).
 // Studio, Art and Sound all work on one game at a time: the one selected in the Arcade (see games.js).
-import { well, solidSvg, rasterSolid, paintSolid, icon } from './pixel.js';
+import { well, solidSvg, rasterSolid, paintSolid, icon, iconPlace } from './pixel.js';
 import * as S from './store.js';
 import * as input from './input.js';
 import * as snd from './sound.js';
@@ -58,6 +58,8 @@ export const app = {
   },
   render
 };
+// the screen icons are seen on (the icon editor's "Seen on")
+iconPlace(() => app.overlay ? (app.overlay.place || '') : (SECTIONS[app.ui.tab] || {}).name || '');
 window.__app = app; // handy for debugging in the browser console
 const leave = () => { const pg = SECTIONS[app.ui.tab] && SECTIONS[app.ui.tab].page; if (pg && pg.leave) pg.leave(app); };
 if (!SECTIONS[app.ui.tab]) app.ui.tab = 0;

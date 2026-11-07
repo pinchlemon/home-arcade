@@ -110,6 +110,7 @@ function openTester(app) {
   const KEYS = [['up', 'Up'], ['down', 'Down'], ['left', 'Left'], ['right', 'Right'], ['a', 'A'], ['b', 'B'], ['x', 'X'], ['start', 'Start'], ['lb', 'LB'], ['rb', 'RB']];
   let root = null, last = '', holdB = 0;
   const ov = {
+    place: 'Controller test',
     render() {
       return `<div class="screen-tool" style="--acc:${YELLOW}">
         <h1 class="sr">Test buttons</h1>
