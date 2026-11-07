@@ -17,9 +17,12 @@ const json = (x) => JSON.stringify(x);
 const SLOTS = 'ha.icons.slots';
 let slots = null;
 const readSlots = () => slots || (slots = (() => { try { return JSON.parse(localStorage.getItem(SLOTS)) || {}; } catch (e) { return {}; } })());
-function setSlot(key, rows) {
+// a slot is the button's rows, or {rows, from} when the picture was picked from another icon in the list (older saves are just the rows)
+const slotRows = (v) => v && (Array.isArray(v) ? v : v.rows);
+const slotFrom = (v) => (v && !Array.isArray(v) && v.from) || null;
+function setSlot(key, rows, from) {
   const m = readSlots();
-  if (rows) m[key] = rows; else delete m[key];
+  if (rows) m[key] = from ? { rows, from } : rows; else delete m[key];
   try { localStorage.setItem(SLOTS, JSON.stringify(m)); } catch (e) { /* storage full: lasts until the app closes */ }
 }
 // ---- a button's own text: its name and description, kept under the screen + its original name (ha.text.slots)
@@ -81,7 +84,7 @@ export function applySlots(root) {
   if (!Object.keys(m).length && !root.querySelector('svg[data-slotted]')) return;
   const all = root.matches && root.matches('svg[data-icon]') ? [root] : root.querySelectorAll('svg[data-icon]');
   for (const svg of all) {
-    const own = m[slotOf(svg)];
+    const own = slotRows(m[slotOf(svg)]);
     if (!own && !svg.dataset.slotted) continue;
     const rows = own || G[svg.dataset.icon];
     if (!rows) continue;
@@ -105,7 +108,11 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
   const W = () => grid[0].length, H = () => grid.length;
   const names = () => Object.keys(G);
   function loadIcon(n) {
-    name = n; from = n; alsoList = false; start = ((slot && readSlots()[slot]) || G[n]).slice(); grid = toGrid(start); past = []; future = [];
+    name = n; from = n; alsoList = false; const saved = slot && readSlots()[slot];
+    start = (slotRows(saved) || G[n]).slice(); grid = toGrid(start); past = []; future = [];
+    // reopening a button: the icon its picture was picked from (if it still exists) is the one shown and highlighted
+    const was = slotFrom(saved);
+    if (was && G[was] && was !== n) { from = was; alsoList = true; }
     cur.x = Math.min(cur.x, W() - 1); cur.y = Math.min(cur.y, H() - 1);
   }
   if (hasIcon) loadIcon(first); else { name = null; start = ['0']; grid = [[0]]; past = []; future = []; }
@@ -150,7 +157,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
       </div>`
     : `<div class="plate bar">
         ${iconBtn('back', 'data-k="cancel"', { color: '#fff', label: 'Cancel' })}
-        <span class="ie-name"><span class="title ell">${slot ? 'Edit button' : 'Edit icon'}</span><span class="sub ell">${esc(slot ? iconLabel(name) + ' · this button only' : iconLabel(name) + ' · everywhere')}</span></span>
+        <span class="ie-name"><span class="title ell">${slot ? 'Edit button' : 'Edit icon'}</span><span class="sub ell">${esc(slot ? iconLabel(from) + ' · this button only' : iconLabel(name) + ' · everywhere')}</span></span>
         ${tKey ? iconBtn('rename', 'data-k="text"', { color: '#fff', label: 'Name and description' }) : ''}
         ${iconBtn('tiles', 'data-k="list"', { color: '#fff', label: 'All icons' })}
         ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save icon' })}
@@ -167,7 +174,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
   }).join('')}</div>
     <div class="plate bar ie-info">${well(28, svgRows(G[sel], acc))}<span class="ie-name" style="margin-left:8px"><span class="title ell">${esc(iconLabel(sel))}</span><span class="sub clamp2">${esc(where(sel))}</span></span></div>
     <div class="plate ie-acts se-btns">
-      ${act('use', 'check', 'Use here', sel === name)}${act('edit', 'edit', 'Edit', !slot && sel === name)}
+      ${act('use', 'check', 'Use here', !slot && sel === name)}${act('edit', 'edit', 'Edit', !slot && sel === name)}
       ${act('rename', 'rename', 'Rename')}${act('del', 'trash', 'Delete', !isMine(sel) || sel === name)}
     </div>`;
   const textHtml = () => `<div class="plate ie-main ie-texts">
@@ -275,7 +282,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
     if (empty()) { app.toast('Draw at least one pixel'); return false; }
     const rows = toRows(grid);
     if (slot && alsoList && json(rows) !== json(G[from])) setIcon(from, rows);   // the list shows the new picture
-    if (slot) setSlot(slot, json(rows) === json(G[name]) ? null : rows);
+    if (slot) setSlot(slot, json(rows) === json(G[name]) ? null : rows, from !== name ? from : null);
     else setIcon(name, rows);
     return true;
   };
@@ -290,7 +297,7 @@ export function openIconEditor(app, first, acc = '#ffd23f', slot = null, host = 
     if (dirty() && !confirm('Discard the changes?')) return;
     close();
   };
-  const openList = () => { list = true; sel = name; rer(); };
+  const openList = () => { list = true; sel = slot ? from : name; rer(); };
   // use another icon's picture for this one (undo brings the old one back); the other icon is not changed
   const useHere = (n) => {
     push(); grid = toGrid(G[n]); from = n; alsoList = n !== name;   // picked from the list: starts on "update the list"
