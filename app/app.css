@@ -384,3 +384,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
   .icon-ed>.ie-main{grid-column:1;grid-row:2/span 6;height:100%;min-height:0}
   .icon-ed>.ie-info,.icon-ed>.ie-acts{grid-column:2}
 }
+/* moving buttons (arrange.js) */
+.mv-bar{position:fixed;z-index:45;bottom:max(calc(env(safe-area-inset-bottom) + 16px),24px);box-shadow:0 8px 30px rgba(0,0,0,.6)}
+.mv-zone>.mv-src{outline:2px solid var(--acc,#ffd23f);outline-offset:2px;border-radius:var(--r-btn)}
+.mv-zone>:not(.mv-src){outline:1.5px dashed rgba(255,255,255,.35);outline-offset:2px;border-radius:var(--r-btn)}
