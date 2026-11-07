@@ -355,10 +355,17 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 
 /* icon editor (hold an icon button) */
 .icon-ed.screen-tool{position:fixed;z-index:40;background:var(--bg);max-width:none;margin:0;-webkit-touch-callout:none}
-.icon-ed>*,.icon-ed #ie-bars>*{width:100%;max-width:560px;margin-left:auto;margin-right:auto}
+.icon-ed>*{width:100%;max-width:560px;margin-left:auto;margin-right:auto}
 .ie-main{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;border-radius:var(--r-bar)}
 .ie-main canvas{touch-action:none;image-rendering:pixelated;border-radius:4px}
 .ie-prev{margin-left:auto;margin-right:6px;display:inline-flex}
+.ie-name{flex:1;min-width:0;display:flex;flex-direction:column}
+.ie-list{display:grid;grid-template-columns:repeat(6,1fr);align-content:start;justify-items:center;gap:4px;padding:10px;overflow-y:auto;scrollbar-width:none}
+.ie-list::-webkit-scrollbar{display:none}
+.ie-item{position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;padding:0;border-radius:var(--r-btn)}
+.ie-item.on::after,.ie-item.pf::after{content:'';position:absolute;inset:0;border-radius:inherit;border:1.5px solid var(--acc)}
+.ie-item.pf::after{border-color:#fff}
+.ie-dot{position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--acc)}
 .icon-ed .vscreen{width:44px}
 .icon-ed .bar .stepper{margin-right:auto}
 #app{-webkit-touch-callout:none}
