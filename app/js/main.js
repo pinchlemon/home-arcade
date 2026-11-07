@@ -17,7 +17,7 @@ import settings from './screens/settings.js';
 import { unseenCount } from './screens/sync.js';
 import * as launch from './launch.js';
 import * as artStore from './artStore.js';
-import { openIconEditor, slotOf, applySlots } from './iconEditor.js';
+import { openIconEditor, slotOf, applySlots, HOST, hasText } from './iconEditor.js';
 
 export const SECTIONS = [
   { name: 'Arcade', solid: 'dodeca', color: '#ff5a1f', page: arcade },
@@ -196,21 +196,24 @@ new MutationObserver((list) => {
 }).observe(root, { childList: true, subtree: true });
 applySlots(root);
 
-// Hold an icon button for half a second to redraw its icon. The touch that opened the editor must not also press the button.
+// Hold a button for half a second to redraw its icon and change its text. The touch that opened the editor must not also press the button.
 let holdT = 0, holdAt = null, swallow = false;
 const stopHold = () => { clearTimeout(holdT); holdT = 0; };
 root.addEventListener('pointerdown', (e) => {
   swallow = false; stopHold();
-  const box = e.target.closest('[data-a],button,.mount,.row,.grow');
+  if (app.modal || e.target.closest('input,textarea,canvas')) return;
   // greyed-out buttons let touches through (see app.css), so also look for one under the finger
   const under = () => [...root.querySelectorAll('button:disabled svg[data-icon]')].find(s => { const r = (s.closest('button') || s).getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
-  const el = e.target.closest('svg[data-icon]') || (box && box.querySelector('svg[data-icon]')) || under();
-  if (!el || app.modal) return;
+  let host = e.target.closest(HOST);
+  // a button's icon (a settings row's own icons belong to its controls, so its text part opens just the text)
+  const el = e.target.closest('svg[data-icon]') || (host && !host.matches('.setrow') && host.querySelector('svg[data-icon]')) || (!host && under()) || null;
+  if (el) host = el.closest(HOST);
+  if (!el && !(host && hasText(host))) return;
   holdAt = [e.clientX, e.clientY];
   holdT = setTimeout(() => {
     holdT = 0; swallow = true; letGo();
     snd.click();
-    openIconEditor(app, el.dataset.icon, getComputedStyle(el).getPropertyValue('--acc').trim() || undefined, slotOf(el));
+    openIconEditor(app, el ? el.dataset.icon : null, getComputedStyle(el || host).getPropertyValue('--acc').trim() || undefined, el ? slotOf(el) : null, host);
   }, 500);
 });
 root.addEventListener('pointermove', (e) => { if (holdT && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) stopHold(); });

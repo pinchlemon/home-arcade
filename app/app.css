@@ -370,3 +370,6 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 #app{-webkit-touch-callout:none}
 #app button:disabled{pointer-events:none}   /* Safari drops touches on them; main.js finds their icon by position */
 .ie-info{height:auto;min-height:52px;padding-top:6px;padding-bottom:6px}
+.ie-texts{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow-y:auto}
+.ie-field{display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 6px 8px 12px;background:rgba(255,255,255,.03);border:0;border-radius:var(--r-btn);text-align:left;color:inherit;font:inherit}
+.ie-field .ie-name{gap:3px}
