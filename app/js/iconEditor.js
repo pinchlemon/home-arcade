@@ -37,7 +37,7 @@ function setText(key, t) {
 export const HOST = 'button,[data-a],.row,.row-empty,.setrow';   // things that can be held
 // the text parts of a button: name (.title, or a plate button's label) and description (.sub)
 function fieldsOf(host) {
-  const f = {}, t = host.querySelector('.title'), d = host.querySelector('.sub');
+  const f = {}, t = host.querySelector('.title') || host.querySelector(':scope > .lbl'), d = host.querySelector('.sub');   // .lbl: a tab's label
   if (t) f.title = t;
   else if (host.matches('button')) { const l = host.querySelector(':scope > span:not(.mount):not(.ring):not(.selring)'); if (l && l.textContent.trim()) f.title = l; }
   const seen = host.dataset.orig && 'sub' in JSON.parse(host.dataset.orig);   // a description we emptied is still there to refill
@@ -73,6 +73,7 @@ function applyText(root) {
       const v = own && own[k] != null ? own[k] : o[k];
       if (v != null && e.textContent !== v) e.textContent = v;
     }
+    if (h.dataset.al === '1' || h.getAttribute('aria-label') === o.title) { h.dataset.al = '1'; h.setAttribute('aria-label', (own && own.title) || o.title); }   // a label that is just the name follows it
     if (own) h.dataset.txt = '1'; else delete h.dataset.txt;
   }
 }
