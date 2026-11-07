@@ -361,4 +361,5 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .ie-prev{margin-left:auto;margin-right:6px;display:inline-flex}
 .icon-ed .vscreen{width:44px}
 .icon-ed .bar .stepper{margin-right:auto}
-[data-icon]{-webkit-touch-callout:none}
+#app{-webkit-touch-callout:none}
+#app button:disabled{pointer-events:none}   /* Safari drops touches on them; main.js finds their icon by position */

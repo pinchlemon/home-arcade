@@ -15,12 +15,12 @@ export const setRows = (n) => { per = Math.max(1, Math.min(4, n)); };
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export const iconWell = (name, color) => well(28, icon(name, color));
-export const plateBtn = (iconName, label, act, color) => `<button class="plate btn" ${act} data-icon="${iconName}">${iconWell(iconName, color)}<span>${esc(label)}</span></button>`;
-export const bareBtn = (iconName, label, act, color) => `<button class="btn bare" ${act} data-icon="${iconName}">${iconWell(iconName, color)}<span>${esc(label)}</span></button>`;
+export const plateBtn = (iconName, label, act, color) => `<button class="plate btn" ${act}>${iconWell(iconName, color)}<span>${esc(label)}</span></button>`;
+export const bareBtn = (iconName, label, act, color) => `<button class="btn bare" ${act}>${iconWell(iconName, color)}<span>${esc(label)}</span></button>`;
 export function iconBtn(name, act, opts = {}) {
   const on = !!opts.on, color = opts.color || (on ? 'var(--acc)' : '#e4e2dc');
   const inner = (on ? '<span class="ring"></span>' : '') + (opts.rows ? svgRows(opts.rows, color) : name ? svgRows(G[name], color) : '');   // opts.rows: an icon of its own
-  return `<button class="btn icon bare" ${act}${!opts.rows && name ? ` data-icon="${name}"` : ''} aria-label="${esc(opts.label || name)}"${opts.pressed !== undefined ? ` aria-pressed="${!!opts.pressed}"` : ''}${opts.disabled ? ' disabled' : ''}>${well(28, inner)}</button>`;
+  return `<button class="btn icon bare" ${act} aria-label="${esc(opts.label || name)}"${opts.pressed !== undefined ? ` aria-pressed="${!!opts.pressed}"` : ''}${opts.disabled ? ' disabled' : ''}>${well(28, inner)}</button>`;
 }
 
 export function digits(n, color) {

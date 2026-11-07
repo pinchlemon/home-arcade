@@ -3,6 +3,9 @@
 
 export const sq = (x, y) => 'M' + (x + 0.06).toFixed(2) + ' ' + (y + 0.06).toFixed(2) + 'h0.88v0.88h-0.88z';
 
+// which icon a rows array is (filled in once the icon list exists)
+const NAMES = new Map();
+
 export function bitmapPath(rows, ox = 0, oy = 0) {
   let d = '';
   rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (r[x] === '1') d += sq(ox + x, oy + y); });
@@ -10,7 +13,8 @@ export function bitmapPath(rows, ox = 0, oy = 0) {
 }
 
 export function svgRows(rows, color, scale = 2, extra = '') {
-  const w = rows[0].length, h = rows.length;
+  const w = rows[0].length, h = rows.length, n = NAMES.get(rows);
+  if (n) extra += ` data-icon="${n}"`;   // a built-in icon: hold its button to redraw it (iconEditor.js)
   return `<svg viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges" aria-hidden="true"${extra}><path d="${bitmapPath(rows)}" fill="${color}"/></svg>`;
 }
 
@@ -88,7 +92,27 @@ export const G = {
   pause: ['11011','11011','11011','11011','11011'],
   rename: ['1110111','0100100','0100100','0100100','0100100','0100100','1110111'],
   draw: ['1100000','1100000','0000000','0000000','0000000','0000000','0000000'],
-  grid: ['1111111','1001001','1001001','1111111','1001001','1001001','1111111']
+  grid: ['1111111','1001001','1001001','1111111','1001001','1001001','1111111'],
+  // the sprite editor's
+  eye: ['0000000','0111110','1100011','1011101','1100011','0111110','0000000'],
+  eyeOff: ['1000000','0111110','1110011','1011101','1100111','0111110','0000001'],
+  lock: ['01110','10001','11111','11011','11111'],
+  group: ['1110000','1111111','1000001','1000001','1111111'],
+  onion: ['1010100','0000000','0011111','0010001','0010001','0010001','0011111'],
+  dots: ['0000000','0000000','1101011','1101011','0000000','0000000','0000000'],
+  boxSelect: ['1101011','0000000','1000001','0000000','1000001','0000000','1101011'],
+  lasso: ['0011100','0100010','1000001','1000001','0110010','0101100','0010000'],
+  wand: ['1010000','0100000','1010000','0001000','0000100','0000010','0000001'],
+  merge: ['1111111','1000001','1111111','0001000','0101010','0011100','0001000'],
+  paste: ['0011100','1111111','1000001','1011101','1000001','1011101','1111111'],
+  cut: ['1000001','0100010','0010100','0001000','0110110','1001001','0110110'],
+  invert: ['1111111','1000001','1011101','1010101','1011101','1000001','1111111'],
+  flipH: ['0001000','1001001','1101011','1111111','1101011','1001001','0001000'],
+  flipV: ['0111110','0011100','0001000','1111111','0001000','0011100','0111110'],
+  movePixels: ['0001000','0011100','1001001','1111111','1001001','0011100','0001000'],
+  pencil: ['0000011','0000111','0001110','0011100','0111000','1110000','1100000'],
+  eraser: ['0001100','0011110','0111111','1111110','1011100','1111000','0000000'],
+  picker: ['0000110','0001111','0001111','0011100','0101000','1010000','1100000']
 };
 export const icon = (name, color = '#e4e2dc') => svgRows(G[name], color);
 
@@ -98,10 +122,11 @@ const EDITS_KEY = 'ha.icons';
 const readEdits = () => { try { return JSON.parse(localStorage.getItem(EDITS_KEY)) || {}; } catch (e) { return {}; } };
 const same = (a, b) => a.length === b.length && a.every((r, i) => r === b[i]);
 for (const [k, v] of Object.entries(readEdits())) if (ORIGINAL[k] && Array.isArray(v) && v.length) G[k] = v;
+for (const [k, v] of Object.entries(G)) NAMES.set(v, k);
 export const originalRows = (name) => ORIGINAL[name];
 export const isEdited = (name) => !same(G[name], ORIGINAL[name]);
 export function setIcon(name, rows) {
-  G[name] = rows;
+  NAMES.delete(G[name]); G[name] = rows; NAMES.set(rows, name);
   const e = readEdits();
   if (same(rows, ORIGINAL[name])) delete e[name]; else e[name] = rows;
   try { localStorage.setItem(EDITS_KEY, JSON.stringify(e)); } catch (err) { /* storage full: the change lasts until the app closes */ }

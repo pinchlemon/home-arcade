@@ -193,11 +193,14 @@ let holdT = 0, holdAt = null, swallow = false;
 const stopHold = () => { clearTimeout(holdT); holdT = 0; };
 root.addEventListener('pointerdown', (e) => {
   swallow = false; stopHold();
-  const el = e.target.closest('[data-icon]');
-  if (!el || el.disabled || app.modal) return;
+  const box = e.target.closest('[data-a],button,.mount,.row,.grow');
+  // greyed-out buttons let touches through (see app.css), so also look for one under the finger
+  const under = () => [...root.querySelectorAll('button:disabled svg[data-icon]')].find(s => { const r = (s.closest('button') || s).getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+  const el = e.target.closest('svg[data-icon]') || (box && box.querySelector('svg[data-icon]')) || under();
+  if (!el || app.modal) return;
   holdAt = [e.clientX, e.clientY];
   holdT = setTimeout(() => {
-    holdT = 0; swallow = true; letGo(); el.classList.remove('pressed');
+    holdT = 0; swallow = true; letGo();
     snd.click();
     openIconEditor(app, el.dataset.icon, getComputedStyle(el).getPropertyValue('--acc').trim() || undefined);
   }, 500);
@@ -205,7 +208,7 @@ root.addEventListener('pointerdown', (e) => {
 root.addEventListener('pointermove', (e) => { if (holdT && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) stopHold(); });
 addEventListener('pointerup', () => { stopHold(); if (swallow) setTimeout(() => { swallow = false; }, 400); });
 addEventListener('pointercancel', stopHold);
-root.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-icon]')) e.preventDefault(); });
+root.addEventListener('contextmenu', (e) => e.preventDefault());
 root.addEventListener('click', (e) => { if (swallow) { e.stopPropagation(); e.preventDefault(); } }, true);
 root.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]');
