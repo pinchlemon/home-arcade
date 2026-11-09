@@ -3,7 +3,7 @@
 // One finger uses the tool; two fingers pan and pinch to zoom (any tool). A stroke or a drag is one undo step.
 import { well, svgRows, G } from '../pixel.js';
 import { A, esc, iconBtn, stepper } from '../ui.js';
-import { openTileEditor } from '../tileEditor.js';
+import { openTileEditor, planRows, planColor, svgPlan } from '../tileEditor.js';
 
 const T = 8, GREEN = '#7dff6a', MAXW = 256, MAXH = 128;
 const TOOLS = [['paint', 'Paint tiles', 'paint'], ['box', 'Box of tiles', 'shapeBoxF'], ['erase', 'Erase', 'erase'], ['place', 'Place', 'place'], ['select', 'Select', 'select'], ['hand', 'Hand: move the view', 'pan']];
@@ -26,15 +26,16 @@ export function tileScene(c) {
   const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.tsel = null; c.rerender(); };
   const toolbar = `<div class="plate bar ts-tools" role="toolbar" aria-label="Scene tools">${toolBtns}</div>`;
   const screen = `<div class="screen fit gap20 ts-view"><canvas class="pix" id="tsc" role="img" aria-label="${esc(cur.name)}: tiles and things. One finger uses the tool, two fingers move and zoom."></canvas>
-    <button class="se-zoom" id="ts-fit" ${A(() => { delete ed.views[cur.id]; c.rerender(); })} aria-label="Fit the scene">FIT</button></div>`;
-  const tileArt = (ch, size) => { const t = tiles[ch]; return t ? svgTile(t, size) : ''; };
+    <button class="se-zoom" id="ts-fit" ${A(() => { delete ed.views[cur.id]; c.rerender(); })} aria-label="Fit the scene">FIT</button>
+    <button class="se-zoom ts-look${ed.gameLook ? ' on' : ''}" ${A(() => { ed.gameLook = !ed.gameLook; c.rerender(); })} aria-pressed="${!!ed.gameLook}" aria-label="${ed.gameLook ? 'Showing the game art: tap for the plan' : 'Showing the plan: tap for the game art'}">${ed.gameLook ? 'GAME' : 'PLAN'}</button></div>`;
+  const tileArt = (ch, size) => { const t = tiles[ch]; return t ? (ed.gameLook ? svgTile(t, size) : svgPlan(t, size)) : ''; };
   let body = '';
   const setL = (fn) => c.changeScenes(l2 => { const L = l2.find(x => x.id === cur.id); if (L) fn(L); });
   if (ed.tt === 'paint' || ed.tt === 'box' || ed.tt === 'erase') {
     const t = tiles[ed.tile];
     {
       body = `<div class="ihead">${well(40, ed.tt === 'erase' ? svgRows(G.erase, GREEN) : tileArt(ed.tile, 28))}<span class="t"><span class="title acc ell">${ed.tt === 'erase' ? 'Erase' : esc(t ? t.name : 'Tiles')}</span><span class="sub">${ed.tt === 'erase' ? 'Drag over tiles to clear them' : ed.tt === 'box' ? 'Drag a box to fill it' : 'Drag to paint'}${ed.tt !== 'erase' && t ? ' · ' + KINDS.find(x => x[0] === kindOf(t))[1].toLowerCase() : ''}</span></span>
-          ${ed.tt !== 'erase' && t ? iconBtn('edit', A(() => openTileEditor(c.app, c.g, ed.tile, c.data(), c.rerender)), { label: 'Draw this tile' }) : ''}</div>
+          ${ed.tt !== 'erase' && t ? iconBtn('edit', A(() => openTileEditor(c.app, c.g, ed.tile, c.data(), c.rerender, ed.gameLook ? 'game' : 'plan')), { label: 'Draw this tile' }) : ''}</div>
         <div class="tray ts-tray">${Object.keys(tiles).map(ch => { const on = ch === ed.tile && ed.tt !== 'erase'; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" aria-label="${esc(tiles[ch].name)}" ${A(() => { ed.tile = ch; if (ed.tt === 'erase') ed.tt = 'paint'; c.rerender(); })}>${well(34, (on ? '<span class="ring"></span>' : '') + tileArt(ch, 22))}</button>`; }).join('')}
           <button aria-label="New tile" ${A(() => { const ch = freeChar(tiles); if (!ch) { c.app.toast('No room for more tiles'); return; } c.changeTiles(all => { all[ch] = { name: 'Tile ' + (Object.keys(all).length + 1), color: COLORS[Object.keys(all).length % COLORS.length], solid: true, symbol: ['11111111', '12222221', '12222221', '12222221', '12222221', '12222221', '12222221', '11111111'] }; }); ed.tile = ch; ed.tt = 'paint'; c.rerender(); setTimeout(() => openTileEditor(c.app, c.g, ch, c.data(), c.rerender)); })}>${well(34, svgRows(G.plus, '#e4e2dc'))}</button></div>`;
     }
@@ -119,6 +120,8 @@ export function mountTileScene(root, c) {
     if (tileCv[ch]) return tileCv[ch];
     const t = tiles[ch], k = document.createElement('canvas'); k.width = k.height = T;
     const g = k.getContext('2d'), shade = t.shade || darken(t.color || '#888888', 0.6);
+    // plan view: one colour; game view: the tile's art
+    if (!ed.gameLook) { g.fillStyle = planColor(t); planRows(t).forEach((r, yy) => [...r].forEach((v, xx) => { if (v === '1') g.fillRect(xx, yy, 1, 1); })); return (tileCv[ch] = k); }
     (t.symbol || []).forEach((r, yy) => [...r].forEach((v, xx) => { if (v === '1' || v === '2') { g.fillStyle = v === '1' ? t.color : shade; g.fillRect(xx, yy, 1, 1); } }));
     return (tileCv[ch] = k);
   }
@@ -138,7 +141,7 @@ export function mountTileScene(root, c) {
     x.setTransform(dpr, 0, 0, dpr, 0, 0); x.imageSmoothingEnabled = false;
     x.fillStyle = '#000'; x.fillRect(0, 0, CW, CH);
     x.save(); x.translate(v.ox, v.oy); x.scale(v.z, v.z);
-    x.fillStyle = (D.colors || {}).sky || '#1d1b24'; x.fillRect(0, 0, S.w * T, S.h * T);
+    x.fillStyle = ed.gameLook ? (D.colors || {}).sky || '#1d1b24' : '#000'; x.fillRect(0, 0, S.w * T, S.h * T);
     S.map.forEach((r, ty) => { for (let tx = 0; tx < S.w; tx++) { const ch = r[tx]; if (ch && ch !== '.' && tiles[ch]) x.drawImage(tileArt(ch), tx * T, ty * T); } });
     (S.things || []).forEach((t, i) => { const b = thingBox(t); x.drawImage(symArt(b.rows, b.color), Math.round(t.x - b.w / 2) - b.s, Math.round(t.y - b.h) - b.s, (b.rows[0].length + 2) * b.s, (b.rows.length + 2) * b.s); });
     if (S.exit) x.drawImage(symArt(FLAG, GREEN), Math.round(S.exit.x - 2) - 1, Math.round(S.exit.y - 8) - 1);
