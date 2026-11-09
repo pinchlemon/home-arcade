@@ -29,7 +29,7 @@ const PINK = '#ff4fd8';
 const ZOOMS = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
 const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['shade', 'Shade'], ['shape', 'Shape'], ['picker', 'Picker'], ['select', 'Select'], ['move', 'Move'], ['pan', 'Hand']];
 const TOOL_HELP = { pencil: 'Pencil', eraser: 'Eraser', fill: 'Fill', shade: 'Shade: step pixels along the palette', shape: 'Shapes: line, box, oval', picker: 'Pick a colour', select: 'Select', move: 'Move pixels', pan: 'Hand: move the view' };
-const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', shade: 'shade', shape: 'shapes', picker: 'picker', select: 'boxSelect', move: 'movePixels', pan: 'pan' };
+const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', shade: 'shade', shape: 'shapes', picker: 'picker', select: 'selectTool', move: 'movePixels', pan: 'pan' };
 const SHAPE_KINDS = [['line', 'Line', 'shapeLine'], ['box', 'Box', 'shapeBox'], ['boxF', 'Filled box', 'shapeBoxF'], ['oval', 'Oval', 'shapeOval'], ['ovalF', 'Filled oval', 'shapeOvalF']];
 const SHAPE_ICON = { box: 'boxSelect', lasso: 'lasso', wand: 'wand' };
 const SHAPES = [['box', 'Box select'], ['lasso', 'Lasso select'], ['wand', 'Magic wand: select a colour']];
@@ -874,7 +874,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function sheetHtml() {
     const sh = ed.sheet; if (!sh) return '';
     const s = ed.spr, close = iconBtn('check', A(() => { ed.sheet = null; rer(); }), { color: '#fff', label: 'Done' });
-    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(G.boxSelect, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' || sh.kind === 'palette' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
+    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(G.selectTool, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' || sh.kind === 'palette' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
     const btns = (list, three) => `<div class="se-btns${three ? ' se-btns3' : ''}">${list.map(([ic, label, fn, dis, rows]) => `<button class="btn bare" ${A(fn)}${dis ? ' disabled' : ''}>${well(28, rows ? svgRows(rows, '#e4e2dc') : icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
     const field = (id, val, label) => `<label class="se-field"><span class="cap">${esc(label)}</span><input id="${id}" value="${esc(val)}" maxlength="40" autocomplete="off" spellcheck="false"></label>`;
     let body = '';
@@ -1038,13 +1038,22 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       </div>`;
       // under the tools: the palette, or (selecting and moving) the selection's own buttons, or (while pixels float) how to change them
       const F = ed.float;
+      const more = iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'sel' ? null : { kind: 'sel' }; rer(); }), { color: '#fff', label: 'More for the selection', rows: G.dots });
+      const clipBtns = `${iconBtn('dup', A(() => copy()), { color: '#fff', label: 'Copy' })}${iconBtn(null, A(paste), { color: '#fff', label: 'Paste', rows: G.paste, disabled: !CLIP })}`;
+      // Select: how to select (box, lasso, wand) and whether it replaces, adds or subtracts
       const selBar = `<div class="plate bar se-colors" role="toolbar" aria-label="Selection">
-        <div style="display:flex;gap:0">${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; setTool('select'); }), { on: ed.tool === 'select' && ed.shape === k, label, pressed: ed.tool === 'select' && ed.shape === k, rows: G[SHAPE_ICON[k]] })).join('')}</div>
+        <div style="display:flex;gap:0">${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; rer(); }), { on: ed.shape === k, label, pressed: ed.shape === k, rows: G[SHAPE_ICON[k]] })).join('')}</div>
         <button class="vscreen se-mode" ${A(() => { ed.mode = (ed.mode + 1) % 3; rer(); })} aria-label="${MODES[ed.mode]} (tap to change)">${svgText(MODE_TEXT[ed.mode], PINK)}</button>
         <span style="flex:1"></span>
-        ${iconBtn('dup', A(() => copy()), { color: '#fff', label: 'Copy' })}
-        ${iconBtn(null, A(paste), { color: '#fff', label: 'Paste', rows: G.paste, disabled: !CLIP })}
-        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'sel' ? null : { kind: 'sel' }; rer(); }), { color: '#fff', label: 'More for the selection', rows: G.dots })}
+        ${clipBtns}${more}
+      </div>`;
+      // Move: what to do with the selected pixels (or the whole layer)
+      const moveBar = `<div class="plate bar se-colors" role="toolbar" aria-label="Move">
+        ${iconBtn(null, A(flipH), { color: '#fff', label: 'Flip horizontally', rows: G.flipH })}
+        ${iconBtn(null, A(flipV), { color: '#fff', label: 'Flip vertically', rows: G.flipV })}
+        ${iconBtn('redo', A(() => turn(1)), { color: '#fff', label: 'Turn a quarter right' })}
+        <span style="flex:1"></span>
+        ${clipBtns}${more}
       </div>`;
       const floatBar = F ? `<div class="plate bar se-colors" role="toolbar" aria-label="Floating pixels">
         ${iconBtn('check', A(() => { settle(); paintCells(); rer(); }), { color: PINK, label: 'Drop (put the pixels down)' })}
@@ -1054,7 +1063,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         <span style="flex:1"></span>
         ${stepper(Math.round(F.s * 100) + '%', A(() => scaleBy(-1)), A(() => scaleBy(1)), 'size')}
       </div>` : '';
-      const colors = F ? floatBar : ed.tool === 'select' || ed.tool === 'move' ? selBar : `<div class="plate bar se-colors">
+      const colors = F ? floatBar : ed.tool === 'select' ? selBar : ed.tool === 'move' ? moveBar : `<div class="plate bar se-colors">
         ${ed.tool === 'shape' ? iconBtn(null, A(() => { ed.shapeKind = (ed.shapeKind + 1) % SHAPE_KINDS.length; rer(); }), { color: PINK, label: SHAPE_KINDS[ed.shapeKind][1] + ' (tap to change)', rows: G[SHAPE_KINDS[ed.shapeKind][2]] }) : ''}${ed.tool === 'shade' ? `<button class="vscreen se-mode" ${A(() => { ed.shadeDir = -ed.shadeDir; rer(); })} aria-label="${ed.shadeDir < 0 ? 'Darker' : 'Lighter'} (tap to change)">${svgText(ed.shadeDir < 0 ? 'DARK' : 'LIGHT', PINK)}</button>` : ''}<button class="se-cur" id="se-cur" ${A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'color' ? null : { kind: 'color', i: palIdx(ed.color), old: ed.color.slice() }; rer(); })} aria-label="Colour ${rgbHex(ed.color)}, change it">${swatch(ed.color, 36)}</button>
         <div class="se-pal" id="se-pal">${s.palette.map((c, i) => `<button class="se-pc${sameColor(c, ed.color) ? ' sel' : ''}" ${A(() => setColor(c))} aria-label="Palette colour ${i + 1}">${swatch(c, 24)}</button>`).join('')}</div>
         ${s.palette.some(c => sameColor(c, ed.color)) ? '' : iconBtn('plus', A(() => { step(); s.palette.push(ed.color.slice()); ed.sw = 1e6; changed(); rer(); }), { color: PINK, label: 'Add this colour to the palette' })}
