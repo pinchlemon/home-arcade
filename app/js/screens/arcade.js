@@ -1,6 +1,9 @@
 // Arcade: every game in the repo. The one you select here is the game the Studio, Art and Sound tabs work on.
 // Controller: D-pad picks, A plays, X edits.
-import { A, esc, row, digits, pager, plateBtn, pageOf, rows } from '../ui.js';
+import { A, esc, row, digits, pager, plateBtn, bareBtn, pageOf, rows, iconBtn } from '../ui.js';
+import { svgRows, G } from '../pixel.js';
+import * as made from '../newGame.js';
+import * as games from '../games.js';
 import { CODE_GAMES, launch, setCurrentGame, editLine } from '../games.js';
 import { openGameEditor } from './gameEditor.js';
 
@@ -40,7 +43,7 @@ export default {
     const body = `<div class="group">
       <div class="plate bar">
         ${pager('Games ' + pg.range, A(() => { app.ui.page = Math.max(0, pg.p - 1); app.saveUI(); app.render(); }), A(() => { app.ui.page = Math.min(pg.pages - 1, pg.p + 1); app.saveUI(); app.render(); }))}
-        <span class="cap" style="color:var(--muted);padding-right:10px">Tap again to play</span>
+        ${bareBtn('plus', 'New game', A(() => newGame(app)))}
       </div>
       ${rowHtml}
     </div>`;
@@ -56,3 +59,32 @@ export default {
     else if (input.pressed('x')) edit(app, all[app.ui.sel]);
   }
 };
+
+// New game: pick a template, name it; it is made on this phone (newGame.js) and opens in the Studio
+export function newGame(app) {
+  const ov = {
+    place: 'New game',
+    render() {
+      const opts = made.TEMPLATES.map(t => row({ art: svgRows(G[t.id === 'topdown' ? 'move' : 'up'], '#e4e2dc'), name: t.name, meta: t.help, tag: 'Make', tagColor: 'var(--acc)', act: A(() => make(t)) })).join('');
+      return `<div class="screen-tool" style="--acc:#ff5a1f">
+        <h1 class="sr">New game</h1>
+        <div class="plate bar">
+          ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Cancel' })}
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">New game</span><span class="sub">Choose a template</span></span>
+        </div>
+        <div class="group">${opts}</div>
+        <div class="plate row-empty"><span class="sub" style="white-space:normal">Made on this phone and playable offline. Push it from Settings › Sync to put it on GitHub.</span></div>
+      </div>`;
+    },
+    frame() {}
+  };
+  async function make(t) {
+    const name = (prompt('Game name', 'My ' + t.name.toLowerCase()) || '').trim().slice(0, 32);
+    if (!name) return;
+    try {
+      const g = await made.create(name, t.id), e = games.addMade(g) || games.CODE_GAMES.find(x => x.file === g.file);
+      games.setCurrentGame(app, e); app.close(); app.setTab(1); app.toast(name + ' is ready. Play it or edit it.');
+    } catch (err) { app.toast('Could not make the game: ' + (err.message || err)); }
+  }
+  app.open(ov);
+}

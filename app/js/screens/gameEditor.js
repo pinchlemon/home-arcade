@@ -7,6 +7,7 @@ import { well, icon, svgRows, G, drawRows, drawText, textRows, present } from '.
 import { A, esc, iconBtn, bareBtn, stepper } from '../ui.js';
 import * as games from '../games.js';
 import { pushAll } from './sync.js';
+import { tileScene, mountTileScene } from './tileScene.js';
 import * as input from '../input.js';
 import { makeNav, padFrame, clearNav, navEpoch } from '../padnav.js';
 
@@ -71,7 +72,7 @@ export function openGameEditor(app, g) {
     if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender();
   }
   const set = (path, v) => { record(); games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
-  const sceneLabel = () => { const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' ? 'Level' : 'Waves'); };
+  const sceneLabel = () => { const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
   function topBar() {
     const n = games.editCount(folder);
     return `<div class="plate bar ge-top">
@@ -114,7 +115,7 @@ export function openGameEditor(app, g) {
   }
   const thingsOf = (L) => L.things || [...(L.props || []).map(p => ({ obj: p.type, x: p.x })), ...(L.enemies || []).map(p => ({ obj: p.type, x: p.x, h: p.h }))];
   function changeObjects(fn) { const o = structuredClone(objects()); fn(o); record(); games.setValue(folder, 'objects', o); }
-  function placedCount(id) { let n = 0; for (const sc2 of scenes()) if (sc2.kind === 'level') n += thingsOf(sc2).filter(t => t.obj === id).length; return n; }
+  function placedCount(id) { let n = 0; for (const sc2 of scenes()) if (sc2.kind === 'level' || sc2.kind === 'tiles') n += thingsOf(sc2).filter(t => t.obj === id).length; return n; }
   // ---- scenes: the first is the endless Waves beach; Level scenes are laid out by hand
   const scenes = () => data().scenes || [{ id: 'main', name: ed.game.schema.scene.name, kind: 'waves' }];
   const scene = () => { const l = scenes(); return l.find(x => x.id === ed.scene) || l[0]; };
@@ -138,6 +139,12 @@ export function openGameEditor(app, g) {
     const y1 = d.actor ? GROUND - it.h : d.list === 'enemies' ? GROUND - it.h + d.h / 2 : GROUND;
     return { x0, y0: y1 - d.h, x1: x0 + d.w, y1 };
   }
+  // games on the tile engine (New game) have their own Scene tab (tileScene.js)
+  const tileGame = () => ed.game && ed.game.data.template;
+  const tileCtx = () => ({ app, ed, g, data, scenes, scene, changeScenes, objects, glyph, rerender,
+    changeTiles: (fn) => { const t = structuredClone(data().tiles || {}); fn(t); record(); games.setValue(folder, 'tiles', t); },
+    changeAll: (fn) => { const d2 = { tiles: structuredClone(data().tiles || {}), scenes: structuredClone(scenes()) }; fn(d2); record(); games.setValue(folder, 'tiles', d2.tiles); games.setValue(folder, 'scenes', d2.scenes); },
+    editObject: (id) => { ed.tab = 'objects'; ed.obj = id; app.ui.geTab = 'objects'; app.saveUI(); rerender(); } });
   function changeScenes(fn) { const list = structuredClone(scenes()); fn(list); record(); games.setValue(folder, 'scenes', list); }
   // older levels kept props and enemies apart; the first change moves them into one list of placed things
   function changeLevel(fn) { changeScenes(list => { const L = list.find(x => x.id === scene().id); if (!L) return; if (!L.things) { L.things = thingsOf(L); delete L.props; delete L.enemies; } fn(L); }); }
@@ -379,7 +386,7 @@ export function openGameEditor(app, g) {
           if (!confirm(k ? `Delete ${o.name}? Its ${k} placed ${k === 1 ? 'copy goes' : 'copies go'} too.` : `Delete ${o.name}?`)) return;
           record();
           const list = structuredClone(scenes());
-          for (const L of list) if (L.kind === 'level') { L.things = thingsOf(L).filter(t => t.obj !== id); delete L.props; delete L.enemies; }
+          for (const L of list) if (L.kind === 'level' || L.kind === 'tiles') { L.things = thingsOf(L).filter(t => t.obj !== id); delete L.props; delete L.enemies; }
           const o2 = structuredClone(all); delete o2[id];
           games.setValue(folder, 'scenes', list); games.setValue(folder, 'objects', o2); ed.obj = null; rerender();
         }), { label: 'Delete ' + o.name })}
@@ -465,7 +472,9 @@ export function openGameEditor(app, g) {
         <div class="center-note"><span class="sub">${ed.error ? 'Could not load the game settings: ' + esc(ed.error) : 'Loading…'}</span></div></div>`;
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
-      if (ed.tab === 'scene') {
+      if (ed.tab === 'scene' && tileGame()) {
+        ({ screen, panel } = tileScene(tileCtx()));
+      } else if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
         const go = (k) => { ed.scene = list[(si + k + list.length) % list.length].id; ed.camX = null; ed.lsel = null; ed.sel = null; rerender(); };
         screen = `<div class="screen fit gap20"><canvas class="pix" id="scn" style="aspect-ratio:160/144;cursor:grab" aria-label="${isLevel ? 'The level, drawn as symbols. Drag to move along it.' : 'The scene, drawn as symbols. Drag to move along it, tap a prop to see it.'}" role="img"></canvas><span class="xhair" aria-hidden="true"></span><span class="padhint cap" aria-hidden="true"></span></div>`;
@@ -540,6 +549,7 @@ export function openGameEditor(app, g) {
     },
     mount(root) {
       if (!ed.game) return;
+      if (ed.tab === 'scene' && tileGame()) { view = null; mountTileScene(root, tileCtx()); return; }
       if (ed.tab === 'scene') {
         view = root.querySelector('#scn');
         const r = view.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;

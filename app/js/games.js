@@ -10,6 +10,16 @@ export const CODE_GAMES = [
   { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' },
   { name: 'Circuit Crush', path: '../circuit-crush/', kind: '2D · Canvas · study game', size: '371 KB', file: 'circuit-crush' }
 ];
+// games made with New game (newGame.js): the ones on this phone, then (once loaded) the ones listed in games/index.json on GitHub
+import * as made from './newGame.js';
+const KINDS = { platformer: 'Platformer', topdown: 'Top-down' };
+export function addMade(g) {
+  if (CODE_GAMES.some(x => x.file === g.file)) return null;
+  const e = { name: g.name, path: '../' + g.file + '/', kind: (KINDS[g.template] || 'Tile game') + ' · tile engine', size: 'new', file: g.file, editable: true, made: true, template: g.template };
+  CODE_GAMES.push(e); return e;
+}
+made.local().forEach(addMade);
+export const listed = fetch('../games/index.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : { games: [] })).then(j => (j.games || []).map(addMade).filter(Boolean).length).catch(() => 0);
 export const editableGames = () => CODE_GAMES.filter(g => g.editable);
 
 // The game you're working on is the one selected in the Arcade; the Studio, Art and Sound tabs all show it.
