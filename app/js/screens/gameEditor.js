@@ -8,6 +8,7 @@ import { A, esc, iconBtn, bareBtn, stepper } from '../ui.js';
 import * as games from '../games.js';
 import { pushAll } from './sync.js';
 import { tileScene, mountTileScene } from './tileScene.js';
+import { logicGraph, mountLogicGraph, graphsOf } from './logicGraph.js';
 import * as input from '../input.js';
 import { makeNav, padFrame, clearNav, navEpoch } from '../padnav.js';
 
@@ -72,7 +73,14 @@ export function openGameEditor(app, g) {
     if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender();
   }
   const set = (path, v) => { record(); games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
-  const sceneLabel = () => { const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
+  const sceneLabel = () => { if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr ? gr.name : 'Logic') + ' · Logic'; } const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
+  // Play starts the scene on screen (from Logic: the scene the graph runs in)
+  function playScene() {
+    if (!ed.game) return null;
+    if (ed.tab === 'scene') return scene().id;
+    if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr && gr.scene) || null; }
+    return null;
+  }
   function topBar() {
     const n = games.editCount(folder);
     return `<div class="plate bar ge-top">
@@ -80,7 +88,7 @@ export function openGameEditor(app, g) {
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">${esc(g.name)}</span><span class="sub ge-sub">${esc(sceneLabel())}${n ? ' · ' + n + (n === 1 ? ' change' : ' changes') : ''}</span></span>
           ${iconBtn('undo', A(() => restore(hist, fut)), { color: hist.length ? '#fff' : '#555', label: 'Undo' })}
           ${iconBtn('redo', A(() => restore(fut, hist)), { color: fut.length ? '#fff' : '#555', label: 'Redo' })}
-          ${iconBtn('play', A(() => games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null)), { color: '#fff', label: 'Play' })}
+          ${iconBtn('play', A(() => games.launch(g, playScene())), { color: '#fff', label: 'Play' })}
         </div>`;
   }
   const refreshTitle = () => { const el = document.querySelector('.screen-tool .ge-top'); if (el) el.outerHTML = topBar(); };
@@ -141,7 +149,8 @@ export function openGameEditor(app, g) {
   }
   // games on the tile engine (New game) have their own Scene tab (tileScene.js)
   const tileGame = () => ed.game && ed.game.data.template;
-  const tileCtx = () => ({ app, ed, g, data, scenes, scene, changeScenes, objects, glyph, rerender,
+  const tileCtx = () => ({ app, ed, g, data, scenes, scene, changeScenes, objects, glyph, rerender, spec: ed.game.logic,
+    changeLogic: (fn) => { const l = structuredClone(Array.isArray(data().logic) ? data().logic : []); fn(l); record(); games.setValue(folder, 'logic', l); },
     changeTiles: (fn) => { const t = structuredClone(data().tiles || {}); fn(t); record(); games.setValue(folder, 'tiles', t); },
     changeAll: (fn) => { const d2 = { tiles: structuredClone(data().tiles || {}), scenes: structuredClone(scenes()) }; fn(d2); record(); games.setValue(folder, 'tiles', d2.tiles); games.setValue(folder, 'scenes', d2.scenes); },
     editObject: (id) => { ed.tab = 'objects'; ed.obj = id; app.ui.geTab = 'objects'; app.saveUI(); rerender(); } });
@@ -461,7 +470,10 @@ export function openGameEditor(app, g) {
 
   // ---------------------------------------------------------------- the screen
   // the Backdrop is a second view of the Scene tab (the switch is in the corner of the screen)
-  const TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
+  // games on the tile engine also have Logic (visual logic as a node graph, logicGraph.js)
+  const BASE_TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
+  const LOGIC_TABS = [BASE_TABS[0], BASE_TABS[1], ['logic', 'Logic', 'events'], BASE_TABS[2]];
+  const tabs = () => (tileGame() ? LOGIC_TABS : BASE_TABS);
   const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
   // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
   const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
@@ -472,7 +484,10 @@ export function openGameEditor(app, g) {
         <div class="center-note"><span class="sub">${ed.error ? 'Could not load the game settings: ' + esc(ed.error) : 'Loading…'}</span></div></div>`;
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
-      if (ed.tab === 'scene' && tileGame()) {
+      if (ed.tab === 'logic' && !tileGame()) ed.tab = 'scene';
+      if (ed.tab === 'logic') {
+        ({ screen, panel } = logicGraph(tileCtx()));
+      } else if (ed.tab === 'scene' && tileGame()) {
         ({ screen, panel } = tileScene(tileCtx()));
       } else if (ed.tab === 'scene') {
         const sc = schema.scene, cur = scene(), list = scenes(), si = Math.max(0, list.findIndex(x => x.id === cur.id)), isLevel = cur.kind === 'level';
@@ -541,14 +556,15 @@ export function openGameEditor(app, g) {
       return `<div class="screen-tool" style="--acc:${GREEN}">
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
         ${topBar()}
-        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${TABS.map(([k2]) => (tabOf() === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
-          ${TABS.map(([k2, l2, ic]) => { const on = tabOf() === k2; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], on ? GREEN : BONE))}<span class="lbl"${on ? '' : ' hidden'}>${l2}</span>${on ? '<span class="selring"></span>' : ''}</button>`; }).join('')}
+        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${tabs().map(([k2]) => (tabOf() === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
+          ${tabs().map(([k2, l2, ic]) => { const on = tabOf() === k2; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], on ? GREEN : BONE))}<span class="lbl"${on ? '' : ' hidden'}>${l2}</span>${on ? '<span class="selring"></span>' : ''}</button>`; }).join('')}
         </div>
         ${screen}${panel}
       </div>`;
     },
     mount(root) {
       if (!ed.game) return;
+      if (ed.tab === 'logic' && tileGame()) { view = null; mountLogicGraph(root, tileCtx()); return; }
       if (ed.tab === 'scene' && tileGame()) { view = null; mountTileScene(root, tileCtx()); return; }
       if (ed.tab === 'scene') {
         view = root.querySelector('#scn');
@@ -613,9 +629,9 @@ export function openGameEditor(app, g) {
       if (ed.pad && (ed.tab !== 'scene' || ed.pad.epoch !== navEpoch())) { ed.pad = null; placeCursor(); }
       if (ed.pad) { if (ed.game && view) capturePad(input); return; }
       if (input.pressed('b')) { if (ed.obj && ed.tab === 'objects') { ed.obj = null; ed.addingBehavior = false; clearNav(nav); rerender(); } else app.close(); return; }
-      if (input.pressed('start')) { games.launch(g, ed.tab === 'scene' && ed.game ? scene().id : null); return; }
+      if (input.pressed('start')) { games.launch(g, playScene()); return; }
       if (input.pressed('lb') || input.pressed('rb')) {
-        const keys = TABS.map(t => t[0]), i = keys.indexOf(tabOf()), d = input.pressed('rb') ? 1 : -1;
+        const keys = tabs().map(t => t[0]), i = keys.indexOf(tabOf()), d = input.pressed('rb') ? 1 : -1;
         ed.tab = keys[(i + d + keys.length) % keys.length]; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); clearNav(nav); rerender(); return;
       }
       if (!ed.game) return;

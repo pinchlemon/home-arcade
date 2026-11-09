@@ -1,0 +1,105 @@
+{
+ "about": "The boxes of the visual logic (node graphs) for tile games. The Studio draws them from this list and the engine (logic.js) runs them. A box can have a flow input (in), flow outputs (outs), one number output (value) and settings (params). Number settings can be wired from another box's number output. Setting types: num, obj (an object; any = may be every thing, it = may be the thing that set the graph off), tile (none = may be empty), scene, pick (a list), text, name (a number's or signal's name).",
+ "groups": [
+  { "id": "event", "name": "Events", "help": "What starts a chain of boxes", "color": "#ffd23f" },
+  { "id": "flow", "name": "Flow", "help": "Choose, wait and repeat", "color": "#e4e2dc" },
+  { "id": "action", "name": "Actions", "help": "Things the game does", "color": "#7dff6a" },
+  { "id": "value", "name": "Values", "help": "Numbers to wire into other boxes", "color": "#4d7cff" }
+ ],
+ "nodes": {
+  "start": { "group": "event", "name": "Scene starts", "help": "Runs once when the scene begins", "outs": ["Then"], "params": [] },
+  "always": { "group": "event", "name": "Every frame", "help": "Runs 60 times a second", "outs": ["Then"], "params": [] },
+  "timer": { "group": "event", "name": "On a timer", "help": "Runs again and again on a timer", "outs": ["Then"], "params": [
+   { "k": "secs", "name": "Seconds", "type": "num", "default": 2, "min": 0.1, "max": 600, "step": 0.5, "fixed": true } ] },
+  "touch": { "group": "event", "name": "Player touches", "help": "Runs when the player bumps a thing", "outs": ["Then"], "params": [
+   { "k": "obj", "name": "Thing", "type": "obj", "any": true, "default": "" } ] },
+  "collect": { "group": "event", "name": "Player collects", "help": "Runs when the player picks a thing up", "outs": ["Then"], "params": [
+   { "k": "obj", "name": "Thing", "type": "obj", "any": true, "default": "" } ] },
+  "defeat": { "group": "event", "name": "Thing defeated", "help": "Runs when a thing loses its last hit point", "outs": ["Then"], "params": [
+   { "k": "obj", "name": "Thing", "type": "obj", "any": true, "default": "" } ] },
+  "gone": { "group": "event", "name": "None left", "help": "Runs when the last one of a thing is gone", "outs": ["Then"], "params": [
+   { "k": "obj", "name": "Thing", "type": "obj", "default": "" } ] },
+  "tile": { "group": "event", "name": "Touches a tile", "help": "Runs when the player reaches a kind of tile", "outs": ["Then"], "params": [
+   { "k": "tile", "name": "Tile", "type": "tile", "default": "" } ] },
+  "press": { "group": "event", "name": "Button pressed", "help": "Runs when a button goes down", "outs": ["Then"], "params": [
+   { "k": "btn", "name": "Button", "type": "pick", "default": "a", "options": [["jump", "Jump"], ["a", "A"], ["b", "B"], ["up", "Up"], ["down", "Down"], ["left", "Left"], ["right", "Right"]] } ] },
+  "hurt": { "group": "event", "name": "Player hurt", "help": "Runs when an enemy, a shot or a tile hurts the player", "outs": ["Then"], "params": [] },
+  "dies": { "group": "event", "name": "Out of hearts", "help": "Runs when the player loses the last heart", "outs": ["Then"], "params": [] },
+  "signal": { "group": "event", "name": "Signal received", "help": "Runs when a Send signal box uses the same name", "outs": ["Then"], "params": [
+   { "k": "name", "name": "Signal", "type": "name", "default": "go" } ] },
+
+  "if": { "group": "flow", "name": "If", "help": "Goes one way when the test is true, the other when it is not", "in": true, "outs": ["Yes", "No"], "params": [
+   { "k": "a", "name": "A", "type": "num", "default": 0, "step": 1 },
+   { "k": "op", "name": "Is", "type": "pick", "default": ">", "options": [["=", "="], ["!=", "not ="], ["<", "<"], [">", ">"], ["<=", "< or ="], [">=", "> or ="]] },
+   { "k": "b", "name": "B", "type": "num", "default": 0, "step": 1 } ] },
+  "wait": { "group": "flow", "name": "Wait", "help": "Pauses this chain, then carries on", "in": true, "outs": ["Then"], "params": [
+   { "k": "secs", "name": "Seconds", "type": "num", "default": 1, "min": 0, "max": 600, "step": 0.5 } ] },
+  "repeat": { "group": "flow", "name": "Repeat", "help": "Runs Each a number of times, then Done", "in": true, "outs": ["Each", "Done"], "params": [
+   { "k": "times", "name": "Times", "type": "num", "default": 3, "min": 0, "max": 200, "step": 1 } ] },
+  "once": { "group": "flow", "name": "Only once", "help": "Lets the chain through the first time only", "in": true, "outs": ["Then"], "params": [] },
+  "chance": { "group": "flow", "name": "Chance", "help": "Rolls the dice each time", "in": true, "outs": ["Yes", "No"], "params": [
+   { "k": "pct", "name": "Percent", "type": "num", "default": 50, "min": 0, "max": 100, "step": 5 } ] },
+
+  "score": { "group": "action", "name": "Add to score", "help": "Use a minus number to take away", "in": true, "outs": ["Then"], "params": [
+   { "k": "n", "name": "Points", "type": "num", "default": 1, "step": 1 } ] },
+  "hearts": { "group": "action", "name": "Add hearts", "help": "A minus number hurts the player", "in": true, "outs": ["Then"], "params": [
+   { "k": "n", "name": "Hearts", "type": "num", "default": 1, "step": 1 } ] },
+  "setVar": { "group": "action", "name": "Change a number", "help": "A number of your own, kept between scenes", "in": true, "outs": ["Then"], "params": [
+   { "k": "name", "name": "Number", "type": "name", "default": "count" },
+   { "k": "how", "name": "How", "type": "pick", "default": "add", "options": [["add", "Add"], ["set", "Set to"]] },
+   { "k": "v", "name": "Value", "type": "num", "default": 1, "step": 1 } ] },
+  "spawn": { "group": "action", "name": "Make a thing", "help": "Adds a copy of an object. Across and Down shift it from Where", "in": true, "outs": ["Then"], "params": [
+   { "k": "obj", "name": "Thing", "type": "obj", "default": "" },
+   { "k": "at", "name": "Where", "type": "pick", "default": "player", "options": [["player", "Player"], ["it", "That thing"], ["start", "Start"], ["exit", "Exit"], ["corner", "Corner"]] },
+   { "k": "x", "name": "Across", "type": "num", "default": 0, "step": 4 },
+   { "k": "y", "name": "Down", "type": "num", "default": 0, "step": 4 } ] },
+  "remove": { "group": "action", "name": "Remove things", "help": "Takes things out of the scene", "in": true, "outs": ["Then"], "params": [
+   { "k": "obj", "name": "Which", "type": "obj", "it": true, "default": "@it" } ] },
+  "swapTiles": { "group": "action", "name": "Swap tiles", "help": "Every tile of one kind becomes another (open a door)", "in": true, "outs": ["Then"], "params": [
+   { "k": "from", "name": "From", "type": "tile", "default": "" },
+   { "k": "to", "name": "To", "type": "tile", "none": true, "default": "" } ] },
+  "setTile": { "group": "action", "name": "Put a tile", "help": "Sets one tile, counted from the top left", "in": true, "outs": ["Then"], "params": [
+   { "k": "tile", "name": "Tile", "type": "tile", "none": true, "default": "" },
+   { "k": "tx", "name": "Across", "type": "num", "default": 0, "min": 0, "step": 1 },
+   { "k": "ty", "name": "Down", "type": "num", "default": 0, "min": 0, "step": 1 } ] },
+  "move": { "group": "action", "name": "Move the player", "help": "Puts the player somewhere. Across and Down shift it from Where", "in": true, "outs": ["Then"], "params": [
+   { "k": "at", "name": "Where", "type": "pick", "default": "start", "options": [["start", "Start"], ["exit", "Exit"], ["it", "That thing"], ["player", "From here"], ["corner", "Corner"]] },
+   { "k": "x", "name": "Across", "type": "num", "default": 0, "step": 4 },
+   { "k": "y", "name": "Down", "type": "num", "default": 0, "step": 4 } ] },
+  "push": { "group": "action", "name": "Push the player", "help": "Sets the player's speed for a moment (up is minus)", "in": true, "outs": ["Then"], "params": [
+   { "k": "vx", "name": "Across", "type": "num", "default": 0, "step": 0.5 },
+   { "k": "vy", "name": "Down", "type": "num", "default": -4, "step": 0.5 } ] },
+  "setPlayer": { "group": "action", "name": "Player setting", "help": "Changes a player setting until the game restarts", "in": true, "outs": ["Then"], "params": [
+   { "k": "what", "name": "Setting", "type": "pick", "default": "speed", "options": [["speed", "Speed"], ["jump", "Jump"], ["gravity", "Gravity"], ["shoot", "Shooting"], ["cooldown", "Shot wait"]] },
+   { "k": "how", "name": "How", "type": "pick", "default": "set", "options": [["set", "Set to"], ["add", "Add"]] },
+   { "k": "v", "name": "Value", "type": "num", "default": 2, "step": 0.1 } ] },
+  "say": { "group": "action", "name": "Show text", "help": "A # in the text shows the number", "in": true, "outs": ["Then"], "params": [
+   { "k": "text", "name": "Text", "type": "text", "default": "HELLO" },
+   { "k": "v", "name": "Number", "type": "num", "default": 0, "step": 1 },
+   { "k": "secs", "name": "Seconds", "type": "num", "default": 2, "min": 0.1, "max": 60, "step": 0.5, "fixed": true } ] },
+  "sound": { "group": "action", "name": "Play a sound", "help": "One of the engine's sounds", "in": true, "outs": ["Then"], "params": [
+   { "k": "snd", "name": "Sound", "type": "pick", "default": "coin", "options": [["coin", "Coin"], ["jump", "Jump"], ["land", "Land"], ["hurt", "Hurt"], ["shoot", "Shoot"], ["hit", "Hit"], ["melt", "Melt"], ["win", "Win"], ["charge", "Charge"]] } ] },
+  "goScene": { "group": "action", "name": "Go to a scene", "help": "Leaves this scene at once", "in": true, "outs": [], "params": [
+   { "k": "scene", "name": "Scene", "type": "scene", "default": "@next" } ] },
+  "win": { "group": "action", "name": "Finish the scene", "help": "Shows Clear, then the next scene (like the flag)", "in": true, "outs": [], "params": [] },
+  "send": { "group": "action", "name": "Send a signal", "help": "Sets off every Signal received box with this name", "in": true, "outs": ["Then"], "params": [
+   { "k": "name", "name": "Signal", "type": "name", "default": "go" } ] },
+
+  "var": { "group": "value", "name": "Number", "help": "A number of your own (see Change a number)", "value": true, "params": [
+   { "k": "name", "name": "Number", "type": "name", "default": "count" } ] },
+  "scoreV": { "group": "value", "name": "Score", "help": "The score right now", "value": true, "params": [] },
+  "heartsV": { "group": "value", "name": "Hearts", "help": "The player's hearts right now", "value": true, "params": [] },
+  "count": { "group": "value", "name": "How many", "help": "Counts the copies of a thing in the scene", "value": true, "params": [
+   { "k": "obj", "name": "Thing", "type": "obj", "any": true, "default": "" } ] },
+  "playerV": { "group": "value", "name": "Player", "help": "Where the player is, or how fast", "value": true, "params": [
+   { "k": "what", "name": "What", "type": "pick", "default": "x", "options": [["x", "Across"], ["y", "Down"], ["tx", "Tile across"], ["ty", "Tile down"], ["vx", "Speed across"], ["vy", "Speed down"]] } ] },
+  "time": { "group": "value", "name": "Time", "help": "Seconds since the scene began", "value": true, "params": [] },
+  "random": { "group": "value", "name": "Random", "help": "A whole number between two numbers", "value": true, "params": [
+   { "k": "min", "name": "From", "type": "num", "default": 1, "step": 1 },
+   { "k": "max", "name": "To", "type": "num", "default": 6, "step": 1 } ] },
+  "math": { "group": "value", "name": "Math", "help": "Works out a number from two others", "value": true, "params": [
+   { "k": "a", "name": "A", "type": "num", "default": 0, "step": 1 },
+   { "k": "op", "name": "Do", "type": "pick", "default": "+", "options": [["+", "+"], ["-", "-"], ["*", "×"], ["/", "÷"], ["%", "Remainder"], ["min", "Smaller"], ["max", "Bigger"]] },
+   { "k": "b", "name": "B", "type": "num", "default": 0, "step": 1 } ] }
+ }
+}
