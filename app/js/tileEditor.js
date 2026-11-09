@@ -17,15 +17,22 @@ export function svgTile(t, size) {
   (t.symbol || []).forEach((r, y) => [...r].forEach((v, x) => { if (v === '1') a += `M${x} ${y}h1v1h-1z`; else if (v === '2') b += `M${x} ${y}h1v1h-1z`; }));
   return `<svg viewBox="0 0 8 8" width="${size}" height="${size}" shape-rendering="crispEdges"><path d="${b}" fill="${shadeOf(t)}"/><path d="${a}" fill="${t.color || '#888'}"/></svg>`;
 }
+// the level editor's plan view draws each tile as one colour: its own plan symbol, or the shape of its game art
+export const planRows = (t) => (Array.isArray(t.plan) ? t.plan : (t.symbol || []).map(r => r.replace(/[12]/g, '1')));
+export const planColor = (t) => t.planColor || t.color || '#e4e2dc';
+export function svgPlan(t, size) {
+  let a = ''; planRows(t).forEach((r, y) => [...r].forEach((v, x) => { if (v === '1') a += `M${x} ${y}h1v1h-1z`; }));
+  return `<svg viewBox="0 0 8 8" width="${size}" height="${size}" shape-rendering="crispEdges"><path d="${a}" fill="${planColor(t)}"/></svg>`;
+}
 export const tileUses = (scenes, ch) => (scenes || []).reduce((n, L) => n + (L.map || []).reduce((m, r) => m + r.split(ch).length - 1, 0), 0);
 export function freeTileChar(tiles) { for (const ch of '#BS=^"WT~:abcdefghijklmnopqrstuvwxyzACDEFGHIJKLMNOPQRUVXYZ0123456789+*%&@$!?') if (!tiles[ch]) return ch; return null; }
 function setKind(t, k) { delete t.solid; delete t.oneWay; delete t.hurt; if (k !== 'decor') t[k] = true; }
 
 // D: the game's data with edits; onDone(): called after closing (the screen behind redraws)
-export function openTileEditor(app, g, ch, D, onDone) {
+export function openTileEditor(app, g, ch, D, onDone, startMode = 'game') {
   if (app.modal || !D.tiles || !D.tiles[ch]) return;
   const acc = getComputedStyle(document.querySelector('.screen-tool') || document.body).getPropertyValue('--acc').trim() || '#ff4fd8';
-  let t = structuredClone(D.tiles[ch]), ink = '1', past = [], future = [], sheet = null;
+  let t = structuredClone(D.tiles[ch]), ink = '1', past = [], future = [], sheet = null, mode = startMode;   // mode: 'game' (its art) or 'plan' (the level editor's symbol)
   const start = JSON.stringify(t);
   t.symbol = (t.symbol || []).slice(0, 8).map(r => (r + '00000000').slice(0, 8)); while (t.symbol.length < 8) t.symbol.push('00000000');
   const push = () => { past.push(JSON.stringify(t)); if (past.length > 80) past.shift(); future = []; };
@@ -43,9 +50,13 @@ export function openTileEditor(app, g, ch, D, onDone) {
         ${iconBtn('back', 'data-k="cancel"', { color: '#fff', label: 'Cancel' })}
         <button class="ie-name namebtn" data-k="rename" style="text-align:left" aria-label="Rename the tile"><span class="title ell">${esc(t.name)}</span><span class="sub ell">Tile · ${TILE_KINDS[ki][1].toLowerCase()} · ${esc(g.name)}</span></button>
         ${iconBtn('check', 'data-k="save"', { color: '#fff', label: 'Save tile' })}
+      </div>
+      <div class="plate bar te-modes" role="tablist" aria-label="Which drawing">
+        <button class="seg${mode === 'game' ? ' on' : ''}" role="tab" aria-selected="${mode === 'game'}" data-k="mode" data-v="game"><span class="cap">Game art</span></button>
+        <button class="seg${mode === 'plan' ? ' on' : ''}" role="tab" aria-selected="${mode === 'plan'}" data-k="mode" data-v="plan"><span class="cap">Plan</span><span class="sub te-modesub">${Array.isArray(t.plan) ? 'own symbol' : 'matches art'}</span></button>
       </div>`;
     const draw = `<div class="plate ie-main te-main"><canvas id="te-cv" aria-label="Tile pixels"></canvas><canvas id="te-rep" aria-label="The tile repeated, as it looks in a level"></canvas></div>`;
-    const inks = `<div class="plate bar te-inks">${inkBtn('1', 'Colour', t.color)}${inkBtn('2', 'Shade', shadeOf(t))}${inkBtn('0', 'Clear', 'transparent')}
+    const inks = `<div class="plate bar te-inks">${mode === 'plan' ? inkBtn('1', 'Pixel', planColor(t)) + inkBtn('0', 'Clear', 'transparent') : inkBtn('1', 'Colour', t.color) + inkBtn('2', 'Shade', shadeOf(t)) + inkBtn('0', 'Clear', 'transparent')}
         ${iconBtn('undo', 'data-k="undo"', { label: 'Undo', disabled: !past.length })}${iconBtn('redo', 'data-k="redo"', { label: 'Redo', disabled: !future.length })}${iconBtn(null, 'data-k="more"', { label: 'More', on: sheet === 'more', rows: G.dots })}</div>`;
     let low;
     if (sheet === 'more') {
@@ -60,6 +71,11 @@ export function openTileEditor(app, g, ch, D, onDone) {
           <button class="btn bare" data-k="dup">${well(28, svgRows(G.dup, '#e4e2dc'))}<span>Duplicate</span></button>
           <button class="btn bare" data-k="del">${well(28, svgRows(G.trash, '#e4e2dc'))}<span>Delete tile</span></button>
         </div></div>`;
+    } else if (mode === 'plan') {
+      low = `<div class="plate te-low">
+        <div class="grow"><span class="t"><span class="cap">Plan symbol</span><span class="sub">${Array.isArray(t.plan) ? 'Drawn for the level editor' : 'The shape of the game art'}</span></span>${Array.isArray(t.plan) ? `<button class="btn bare" data-k="match">${well(28, svgRows(G.reset, '#e4e2dc'))}<span>Match art</span></button>` : ''}</div>
+        <span class="cap te-lab">Plan colour</span><div class="ts-cols">${sw(t.color, !t.planColor, 'pauto', 'Plan colour (same as the art)').replace('></button>', '><span class="te-a">A</span></button>')}${TILE_COLORS.slice(0, 15).map(c => sw(c, t.planColor === c, 'pcol', 'Plan colour')).join('')}</div>
+      </div>`;
     } else {
       low = `<div class="plate te-low">
         <div class="grow"><span class="t"><span class="cap">Kind</span><span class="sub">${TILE_KINDS[ki][2]}</span></span>${stepper(TILE_KINDS[ki][1].toUpperCase(), 'data-k="kind-"', 'data-k="kind+"', 'kind')}</div>
@@ -79,8 +95,8 @@ export function openTileEditor(app, g, ch, D, onDone) {
     cv.style.width = cv.style.height = sz + 'px'; cv.width = cv.height = Math.round(sz * dpr);
     const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
     for (let yy = 0; yy < 8; yy++) for (let xx = 0; xx < 8; xx++) {
-      const v = t.symbol[yy][xx];
-      x.fillStyle = v === '1' ? t.color : v === '2' ? shadeOf(t) : ((xx + yy) % 2 ? '#1b1b20' : '#26262c');
+      const v = rows()[yy][xx];
+      x.fillStyle = mode === 'plan' ? (v === '1' ? planColor(t) : '#000') : v === '1' ? t.color : v === '2' ? shadeOf(t) : ((xx + yy) % 2 ? '#1b1b20' : '#26262c');
       x.fillRect(xx * cell, yy * cell, cell, cell);
     }
     x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 1; x.beginPath();
@@ -90,10 +106,10 @@ export function openTileEditor(app, g, ch, D, onDone) {
     const rs = Math.max(24, Math.floor(repW / 24) * 24), k = rs / 24;
     rep.style.width = rep.style.height = rs + 'px'; rep.width = rep.height = Math.round(rs * dpr);
     const y = rep.getContext('2d'); y.setTransform(dpr, 0, 0, dpr, 0, 0);
-    y.fillStyle = (D.colors || {}).sky || '#1d1b24'; y.fillRect(0, 0, rs, rs);
+    y.fillStyle = mode === 'plan' ? '#000' : (D.colors || {}).sky || '#1d1b24'; y.fillRect(0, 0, rs, rs);
     for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) for (let yy = 0; yy < 8; yy++) for (let xx = 0; xx < 8; xx++) {
-      const v = t.symbol[yy][xx]; if (v === '0') continue;
-      y.fillStyle = v === '1' ? t.color : shadeOf(t); y.fillRect((tx * 8 + xx) * k, (ty * 8 + yy) * k, k, k);
+      const v = rows()[yy][xx]; if (v === '0') continue;
+      y.fillStyle = mode === 'plan' ? planColor(t) : v === '1' ? t.color : shadeOf(t); y.fillRect((tx * 8 + xx) * k, (ty * 8 + yy) * k, k, k);
     }
   }
   function rer() {
@@ -105,7 +121,10 @@ export function openTileEditor(app, g, ch, D, onDone) {
   // drawing with the chosen ink
   let stroke = null;
   const cellAt = (e) => { const r = cv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / cell), Math.floor((e.clientY - r.top) / cell)]; };
-  const setPx = (x0, y0) => { if (x0 < 0 || y0 < 0 || x0 > 7 || y0 > 7) return; const r = t.symbol[y0]; if (r[x0] === ink) return; t.symbol = [...t.symbol]; t.symbol[y0] = r.slice(0, x0) + ink + r.slice(x0 + 1); stroke.changed = true; };
+  // the rows being drawn: the game art, or the plan symbol (made from the art the first time it is drawn on)
+  const rows = () => (mode === 'plan' ? planRows(t) : t.symbol);
+  const key = () => { if (mode === 'plan' && !Array.isArray(t.plan)) t.plan = planRows(t); return mode === 'plan' ? 'plan' : 'symbol'; };
+  const setPx = (x0, y0) => { if (x0 < 0 || y0 < 0 || x0 > 7 || y0 > 7) return; const k = key(), r = t[k][y0], v = mode === 'plan' && ink === '2' ? '1' : ink; if (r[x0] === v) return; t[k] = [...t[k]]; t[k][y0] = r.slice(0, x0) + v + r.slice(x0 + 1); stroke.changed = true; };
   function down(e) { cv.setPointerCapture(e.pointerId); push(); stroke = { changed: false, last: cellAt(e) }; setPx(...stroke.last); paint(); }
   function move(e) {
     if (!stroke) return; const [x1, y1] = cellAt(e), [x0, y0] = stroke.last; if (x1 === x0 && y1 === y0) return;
@@ -121,12 +140,16 @@ export function openTileEditor(app, g, ch, D, onDone) {
     close();
   }
   const edit = (fn) => { push(); fn(); rer(); };
-  const slide = (dx, dy) => edit(() => { const s = t.symbol; t.symbol = s.map((_, y) => [...s[(y - dy + 8) % 8]].map((__, x) => s[(y - dy + 8) % 8][(x - dx + 8) % 8]).join('')); });
+  const slide = (dx, dy) => edit(() => { const k = key(), s = t[k]; t[k] = s.map((_, y) => [...s[(y - dy + 8) % 8]].map((__, x) => s[(y - dy + 8) % 8][(x - dx + 8) % 8]).join('')); });
   const ACT = {
     cancel() { if (changed() && !confirm('Discard the changes to this tile?')) return; close(); },
     save,
     rename() { const n = prompt('Tile name', t.name); if (n && n.trim()) edit(() => { t.name = n.trim().slice(0, 20); }); },
     ink(b) { ink = b.dataset.v; rer(); },
+    mode(b) { mode = b.dataset.v; sheet = null; if (mode === 'plan' && ink === '2') ink = '1'; rer(); },
+    match: () => edit(() => { delete t.plan; }),
+    pcol: (b) => edit(() => { t.planColor = b.dataset.c; }),
+    pauto: () => edit(() => { delete t.planColor; }),
     undo() { if (!past.length) return; future.push(JSON.stringify(t)); t = JSON.parse(past.pop()); rer(); },
     redo() { if (!future.length) return; past.push(JSON.stringify(t)); t = JSON.parse(future.pop()); rer(); },
     more() { sheet = sheet === 'more' ? null : 'more'; rer(); },
@@ -136,8 +159,8 @@ export function openTileEditor(app, g, ch, D, onDone) {
     shade: (b) => edit(() => { t.shade = b.dataset.c; }),
     auto: () => edit(() => { delete t.shade; }),
     sl: () => slide(-1, 0), sr: () => slide(1, 0), su: () => slide(0, -1), sd: () => slide(0, 1),
-    flip: () => edit(() => { t.symbol = t.symbol.map(r => [...r].reverse().join('')); }),
-    fill: () => edit(() => { t.symbol = t.symbol.map(() => ink.repeat(8)); }),
+    flip: () => edit(() => { const k = key(); t[k] = t[k].map(r => [...r].reverse().join('')); }),
+    fill: () => edit(() => { const k = key(); t[k] = t[k].map(() => (mode === 'plan' && ink === '2' ? '1' : ink).repeat(8)); }),
     dup() {
       const nc = freeTileChar(D.tiles); if (!nc) { app.toast('No room for more tiles'); return; }
       const all = structuredClone(D.tiles); all[ch] = t; all[nc] = { ...structuredClone(t), name: (t.name + ' 2').slice(0, 20) };
