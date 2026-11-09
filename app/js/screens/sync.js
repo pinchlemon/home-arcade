@@ -34,6 +34,8 @@ export function changeList() {
     const when = Math.max(n ? e.edited : 0, ...art.map(r => r.edited));
     out.push({ game: g, name: g.name, settings: n, art, fresh, meta: parts.join(' · ') + (when ? ' · edited ' + games.ago(when) : ''), act: 'Changed' });
   }
+  // games deleted in the Arcade that are still on GitHub
+  for (const d of made.toDelete()) out.push({ gone: d, game: { file: d.file, name: d.name }, name: d.name, settings: 0, art: [], meta: 'Deleted · comes off GitHub', act: 'Delete' });
   // the app's own customizations (icons, button text, order) go up as app/custom.json
   const cn = custom.count();
   if (cn) out.push({ custom: true, game: { file: '_custom' }, name: 'App customizations', settings: 0, art: [], meta: cn + (cn === 1 ? ' change' : ' changes') + ' · ' + custom.changes().map(c => c.label.toLowerCase()).join(', '), act: 'Changed' });
@@ -78,8 +80,9 @@ export async function pushAll(app, quiet) {
     const branch = app.settings.branch, ref = await gh(app, `git/ref/heads/${encodeURIComponent(branch)}`), head = ref.object.sha;
     const base = await gh(app, `git/commits/${head}`), tree = [], pushed = [], art = [], schemaChanged = [];
     let snap = null;
-    const newGames = [], madeDone = [];
+    const newGames = [], madeDone = [], goneGames = [];
     for (const it of items) {
+      if (it.gone) { goneGames.push(it.game.file); continue; }
       if (it.custom) { snap = custom.snapshot(); tree.push({ path: 'app/custom.json', mode: '100644', type: 'blob', content: custom.fileText(snap) }); continue; }
       if (it.fresh) {
         // a game made on this phone: all its files, game.json with the edits in, and a line in games/index.json
@@ -120,15 +123,20 @@ export async function pushAll(app, quiet) {
         tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(schema, null, 2) + '\n' }); schemaChanged.push(it.game.file);
       }
     }
-    if (newGames.length) {
+    if (goneGames.length) {   // every file in their folders goes
+      const all = await gh(app, `git/trees/${base.tree.sha}?recursive=1`);
+      for (const e of all.tree || []) if (e.type === 'blob' && goneGames.some(f => e.path.startsWith(f + '/'))) tree.push({ path: e.path, mode: e.mode, type: 'blob', sha: null });
+    }
+    if (newGames.length || goneGames.length) {
       let idx = { about: 'Games made with New game in Hedron and pushed from the phone. The app lists these next to the code games.', games: [] };
       try { idx = JSON.parse(b64decode((await gh(app, `contents/games/index.json?ref=${encodeURIComponent(branch)}`)).content)); } catch (e) { if (e.status !== 404) throw e; }
       for (const g of newGames) if (g && !idx.games.some(x => x.file === g.file)) idx.games.push({ file: g.file, name: g.name, template: g.template });
+      idx.games = (idx.games || []).filter(x => !goneGames.includes(x.file));
       tree.push({ path: 'games/index.json', mode: '100644', type: 'blob', content: JSON.stringify(idx, null, 1) + '\n' });
     }
     const t = await gh(app, 'git/trees', { base_tree: base.tree.sha, tree });
     const what = (i) => [i.fresh ? 'new game' : '', i.settings ? 'settings' : '', i.art.length ? i.art.map(r => r.name).slice(0, 3).join(', ') + (i.art.length > 3 ? '…' : '') : ''].filter(Boolean).join(' and ');
-    const message = items.length === 1 && items[0].custom ? 'Hedron: update app customizations' : items.length === 1 ? `Studio: update ${items[0].name} (${what(items[0])})` : `Studio: update ${items.length} games (${items.slice(0, 3).map(i => i.name).join(', ')}${items.length > 3 ? '…' : ''})`;
+    const message = items.length === 1 && items[0].gone ? `Hedron: delete ${items[0].name}` : items.length === 1 && items[0].custom ? 'Hedron: update app customizations' : items.length === 1 ? `Studio: update ${items[0].name} (${what(items[0])})` : `Studio: update ${items.length} games (${items.slice(0, 3).map(i => i.name).join(', ')}${items.length > 3 ? '…' : ''})`;
     const c = await gh(app, 'git/commits', { message: message + '\n\nPushed from Hedron on the phone.', tree: t.sha, parents: [head] });
     await gh(app, `git/refs/heads/${encodeURIComponent(branch)}`, { sha: c.sha }, 'PATCH');
     for (const f of pushed) { const e = games.getEdits(f); e.dirty = false; games.setEdits(f, e); games.forgetGame(f); }
@@ -137,6 +145,7 @@ export async function pushAll(app, quiet) {
     // games made on the phone: the phone's game.json becomes what was pushed, and its edits are now part of it
     for (const m of madeDone) { await store.putFile(m.file + '/game.json', new TextEncoder().encode(m.text), 'application/json'); games.resetEdits(m.file); games.forgetGame(m.file); }
     for (const g of newGames) if (g) made.markPushed(g.file);
+    if (goneGames.length) made.markDeletePushed(goneGames);
     schemaChanged.forEach(f => games.forgetGame(f));
     const sy = S.getSync();
     sy.history = [{ msg: message, files: tree.length, hash: c.sha.slice(0, 7), when: Date.now() }, ...(sy.history || [])].slice(0, 30);
@@ -169,7 +178,9 @@ export function syncGroup(app, plateBtn, A, n) {
   const b = plateBtn(view === 'changes' ? 'history' : 'changes', view === 'changes' ? 'History' : 'Changes', A(() => { app.ui.syncView = view === 'changes' ? 'history' : 'changes'; app.saveUI(); app.render(); }));
   let items;
   if (view === 'changes') {
-    items = changes.map(c => ({ art: icon(c.custom ? 'edit' : 'code', '#e4e2dc'), name: c.name, meta: c.meta, tag: 'Review', tagColor: BLUE, act: A(() => c.custom ? openCustomReview(app) : openReview(app, c.game)) }));
+    items = changes.map(c => c.gone
+      ? { art: icon('trash', '#e4e2dc'), name: c.name, meta: c.meta, tag: 'Keep', tagColor: BLUE, act: A(() => { if (!confirm(`Keep ${c.name}? It stays on GitHub and comes back to the Arcade.`)) return; games.undeleteMade(c.gone); app.render(); }) }
+      : { art: icon(c.custom ? 'edit' : 'code', '#e4e2dc'), name: c.name, meta: c.meta, tag: 'Review', tagColor: BLUE, act: A(() => c.custom ? openCustomReview(app) : openReview(app, c.game)) });
     // customizations with nothing to push still get a row, for export and import
     if (!changes.some(c => c.custom) && Object.keys(custom.snapshot()).length) items.push({ art: icon('edit', '#e4e2dc'), name: 'App customizations', meta: 'Pushed · export or import', tag: 'Open', tagColor: 'var(--muted)', act: A(() => openCustomReview(app)) });
   } else {

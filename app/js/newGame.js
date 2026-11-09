@@ -11,6 +11,16 @@ export const local = readLocal;
 export function markPushed(file) { writeLocal(readLocal().map(g => (g.file === file ? { ...g, pushed: true } : g))); }
 export const isUnpushed = (file) => readLocal().some(g => g.file === file && !g.pushed);
 export function forget(file) { writeLocal(readLocal().filter(g => g.file !== file)); }
+// games deleted in the Arcade: [{ file, name, pushed }]. One that was on GitHub stays listed (not pushed) until Sync takes it off;
+// after that it stays (pushed) so a games/index.json the site has not caught up with yet does not bring it back
+const GONE = 'ha.deletedgames';
+export const deleted = () => { try { return JSON.parse(localStorage.getItem(GONE)) || []; } catch (e) { return []; } };
+const writeGone = (l) => { try { localStorage.setItem(GONE, JSON.stringify(l.slice(-50))); } catch (e) { /* storage full */ } };
+export const isDeleted = (file) => deleted().some(g => g.file === file);
+export const toDelete = () => deleted().filter(g => !g.pushed);
+export function markDeleted(file, name, template) { writeGone([...deleted().filter(g => g.file !== file), { file, name, template, pushed: false }]); }
+export function markDeletePushed(files) { writeGone(deleted().map(g => (files.includes(g.file) ? { ...g, pushed: true } : g))); }
+export function undelete(file) { writeGone(deleted().filter(g => g.file !== file)); }
 
 // ---------------------------------------------------------------- tiles: one character each; rows use 1 (colour), 2 (shade), 0 (clear)
 const TILESETS = {
@@ -50,45 +60,21 @@ const OBJECTS = {
   }
 };
 
-// ---------------------------------------------------------------- starter levels
+// ---------------------------------------------------------------- the first level: a blank slate
+// Only what is needed to play it: a floor (platformer) or walls (top-down), the player start and the exit.
+// The tiles and objects are there to paint and place.
 function grid(w, h, ch = '.') { return Array.from({ length: h }, () => Array(w).fill(ch)); }
 const rows = (g) => g.map(r => r.join(''));
 function platformerLevel() {
-  const w = 48, h = 18, g = grid(w, h);
-  for (let x = 0; x < w; x++) if (x < 20 || x > 23) { g[16][x] = '#'; g[17][x] = '#'; }
-  for (let x = 7; x <= 11; x++) g[12][x] = '=';
-  for (let x = 26; x <= 31; x++) g[10][x] = '=';
-  for (let y = 13; y <= 15; y++) { g[y][14] = 'B'; g[y][15] = 'B'; }
-  g[12][14] = 'B'; g[12][15] = 'B';
-  for (const x of [34, 35]) g[15][x] = '^';
-  for (const x of [3, 5, 27, 39, 41]) g[15][x] = '"';
-  for (let y = 11; y <= 15; y++) g[y][44] = 'S';
-  const T = 8, ground = 16 * T;
-  return { id: 'level-1', name: 'Level 1', kind: 'tiles', w, h, map: rows(g), start: { x: 2 * T, y: ground }, exit: { x: 46 * T, y: ground },
-    things: [
-      ...[8, 9, 10].map(x => ({ obj: 'coin', x: x * T + 4, y: 11 * T })), ...[27, 29, 31].map(x => ({ obj: 'coin', x: x * T + 4, y: 9 * T })),
-      { obj: 'blob', x: 30 * T, y: ground }, { obj: 'bat', x: 38 * T, y: 9 * T }, { obj: 'heart', x: 43 * T, y: 8 * T }, { obj: 'spring', x: 18 * T + 4, y: ground },
-      { obj: 'lift', x: 20 * T, y: 13 * T }
-    ] };
+  const w = 40, h = 18, g = grid(w, h), T = 8, ground = 16 * T;
+  for (let x = 0; x < w; x++) { g[16][x] = '#'; g[17][x] = '#'; }
+  return { id: 'level-1', name: 'Level 1', kind: 'tiles', w, h, map: rows(g), start: { x: 2 * T, y: ground }, exit: { x: (w - 2) * T, y: ground }, things: [] };
 }
 function topdownLevel() {
-  const w = 32, h = 24, g = grid(w, h);
+  const w = 32, h = 24, g = grid(w, h), T = 8;
   for (let x = 0; x < w; x++) { g[0][x] = 'W'; g[h - 1][x] = 'W'; }
   for (let y = 0; y < h; y++) { g[y][0] = 'W'; g[y][w - 1] = 'W'; }
-  for (let x = 1; x < w - 1; x++) g[12][x] = ':';
-  for (let y = 1; y < h - 1; y++) g[y][16] = ':';
-  for (const [x, y] of [[4, 4], [6, 5], [9, 3], [22, 4], [25, 6], [27, 3], [4, 18], [7, 20], [24, 18], [27, 20]]) g[y][x] = 'T';
-  for (let y = 16; y <= 19; y++) for (let x = 10; x <= 13; x++) g[y][x] = '~';
-  for (const [x, y] of [[3, 9], [8, 15], [20, 9], [26, 15], [14, 4], [19, 20]]) g[y][x] = '"';
-  for (let x = 20; x <= 23; x++) g[16][x] = 'W';
-  g[6][12] = '^'; g[6][13] = '^';
-  const T = 8;
-  return { id: 'level-1', name: 'Level 1', kind: 'tiles', w, h, map: rows(g), start: { x: 4 * T, y: 13 * T }, exit: { x: 29 * T, y: 21 * T },
-    things: [
-      ...[[6, 12], [8, 12], [10, 12], [16, 7], [16, 9], [24, 12]].map(([x, y]) => ({ obj: 'coin', x: x * T + 4, y: y * T + 8 })),
-      { obj: 'blob', x: 22 * T, y: 10 * T }, { obj: 'blob', x: 8 * T, y: 8 * T }, { obj: 'skull', x: 26 * T, y: 21 * T }, { obj: 'bat', x: 6 * T, y: 21 * T },
-      { obj: 'heart', x: 18 * T, y: 4 * T }, { obj: 'rock', x: 16 * T + 4, y: 17 * T }
-    ] };
+  return { id: 'level-1', name: 'Level 1', kind: 'tiles', w, h, map: rows(g), start: { x: 3 * T, y: 3 * T }, exit: { x: (w - 3) * T, y: (h - 2) * T }, things: [] };
 }
 
 // ---------------------------------------------------------------- what the Studio shows (studio.json)
@@ -141,12 +127,7 @@ export function gameJson(name, template) {
     camera: { lookAhead: top ? 0 : 12, lookEase: 0.1 },
     tiles: TILESETS[template], objects: OBJECTS[template],
     scenes: [top ? topdownLevel() : platformerLevel()],
-    // visual logic (the Studio's Logic tab): a first graph to change or delete
-    logic: [{ id: 'g1', name: 'Logic 1', scene: '', nodes: [
-      { id: 'n1', t: 'gone', x: 16, y: 16, p: { obj: 'coin' } },
-      { id: 'n2', t: 'say', x: 196, y: 16, p: { text: 'ALL COINS', v: 0, secs: 2 } },
-      { id: 'n3', t: 'sound', x: 196, y: 124, p: { snd: 'win' } }
-    ], wires: [['n1', 'o0', 'n2', 'in'], ['n2', 'o0', 'n3', 'in']] }]
+    logic: []   // visual logic (the Studio's Logic tab)
   };
 }
 const slug = (s) => (s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'game').slice(0, 24);

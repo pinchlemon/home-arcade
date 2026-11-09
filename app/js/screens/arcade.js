@@ -43,7 +43,7 @@ export default {
     const body = `<div class="group">
       <div class="plate bar">
         ${pager('Games ' + pg.range, A(() => { app.ui.page = Math.max(0, pg.p - 1); app.saveUI(); app.render(); }), A(() => { app.ui.page = Math.min(pg.pages - 1, pg.p + 1); app.saveUI(); app.render(); }))}
-        ${bareBtn('plus', 'New game', A(() => newGame(app)))}
+        <span style="display:flex;align-items:center;gap:4px">${sel.made ? iconBtn('trash', A(() => removeGame(app, sel)), { label: 'Delete ' + sel.name }) : ''}${bareBtn('plus', 'New game', A(() => newGame(app)))}</span>
       </div>
       ${rowHtml}
     </div>`;
@@ -59,6 +59,15 @@ export default {
     else if (input.pressed('x')) edit(app, all[app.ui.sel]);
   }
 };
+
+// Delete: only games made with New game (the code games live in the repo)
+async function removeGame(app, g) {
+  const onPhone = made.isUnpushed(g.file);
+  if (!confirm(`Delete ${g.name}? ` + (onPhone ? 'It is only on this phone, so it will be gone for good.' : 'It goes from this phone now, and from GitHub on your next push.'))) return;
+  await games.deleteMade(app, g);
+  app.toast(g.name + ' deleted' + (onPhone ? '' : '. Push to take it off GitHub'));
+  app.render();
+}
 
 // New game: pick a template, name it; it is made on this phone (newGame.js) and opens in the Studio
 export function newGame(app) {

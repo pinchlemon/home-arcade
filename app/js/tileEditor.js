@@ -19,7 +19,21 @@ export function svgTile(t, size) {
 }
 // the level editor's plan view draws each tile as one colour: its own plan symbol, or the shape of its game art
 export const planRows = (t) => (Array.isArray(t.plan) ? t.plan : (t.symbol || []).map(r => r.replace(/[12]/g, '1')));
-export const planColor = (t) => t.planColor || t.color || '#e4e2dc';
+// plan colours are the app's own (the colours of the sections and of the objects' symbols)
+export const PLAN_COLORS = ['#7dff6a', '#ffd23f', '#ff5a1f', '#ff4f5e', '#ff4fd8', '#8b5cf6', '#4d7cff', '#e4e2dc'];
+const HUES = [[115, '#7dff6a'], [49, '#ffd23f'], [17, '#ff5a1f'], [355, '#ff4f5e'], [312, '#ff4fd8'], [262, '#8b5cf6'], [225, '#4d7cff']];
+// a tile without a plan colour of its own gets the app colour nearest its game colour (grey ones get bone, tiles that hurt get red)
+function autoPlan(t) {
+  if (t.hurt) return '#ff4f5e';
+  const n = parseInt((t.color || '#e4e2dc').slice(1), 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2, s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  if (s < 0.2 || d < 0.08) return '#e4e2dc';
+  const h = (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60;
+  let best = HUES[0][1], bd = 999;
+  for (const [hh, c] of HUES) { const dd = Math.min(Math.abs(h - hh), 360 - Math.abs(h - hh)); if (dd < bd) { bd = dd; best = c; } }
+  return best;
+}
+export const planColor = (t) => t.planColor || autoPlan(t);
 export function svgPlan(t, size) {
   let a = ''; planRows(t).forEach((r, y) => [...r].forEach((v, x) => { if (v === '1') a += `M${x} ${y}h1v1h-1z`; }));
   return `<svg viewBox="0 0 8 8" width="${size}" height="${size}" shape-rendering="crispEdges"><path d="${a}" fill="${planColor(t)}"/></svg>`;
@@ -74,7 +88,7 @@ export function openTileEditor(app, g, ch, D, onDone, startMode = 'game') {
     } else if (mode === 'plan') {
       low = `<div class="plate te-low">
         <div class="grow"><span class="t"><span class="cap">Plan symbol</span><span class="sub">${Array.isArray(t.plan) ? 'Drawn for the level editor' : 'The shape of the game art'}</span></span>${Array.isArray(t.plan) ? `<button class="btn bare" data-k="match">${well(28, svgRows(G.reset, '#e4e2dc'))}<span>Match art</span></button>` : ''}</div>
-        <span class="cap te-lab">Plan colour</span><div class="ts-cols">${sw(t.color, !t.planColor, 'pauto', 'Plan colour (same as the art)').replace('></button>', '><span class="te-a">A</span></button>')}${TILE_COLORS.slice(0, 15).map(c => sw(c, t.planColor === c, 'pcol', 'Plan colour')).join('')}</div>
+        <span class="cap te-lab">Plan colour</span><div class="ts-cols">${sw(autoPlan(t), !t.planColor, 'pauto', 'Plan colour (automatic)').replace('></button>', '><span class="te-a">A</span></button>')}${PLAN_COLORS.map(c => sw(c, t.planColor === c, 'pcol', 'Plan colour')).join('')}</div>
       </div>`;
     } else {
       low = `<div class="plate te-low">

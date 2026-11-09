@@ -1,8 +1,8 @@
 // Studio: the game selected in the Arcade (the Art and Sound tabs show the same one), and its parts.
-// Tap a part to open the editor there. Change game goes back to the Arcade to pick another.
+// Tap a part to open the editor there. Another game is picked in the Arcade.
 // Controller: D-pad picks a part, A opens, X plays.
 import { icon } from '../pixel.js';
-import { A, esc, row, plateBtn, bareBtn, pager, pageOf, emptyRow, rows } from '../ui.js';
+import { A, esc, row, plateBtn, pager, pageOf, emptyRow, rows } from '../ui.js';
 import * as games from '../games.js';
 import { openGameEditor } from './gameEditor.js';
 
@@ -15,20 +15,22 @@ function info(app, g) {
   const x = loaded[g.file];
   if (!x || x === 'loading') return null;
   const D = games.applyOverrides(x.data, games.getEdits(g.file).overrides), sc = D.scenes || [];
-  return { scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length };
+  const logic = Array.isArray(D.logic) ? D.logic : [];
+  return { tiles: !!D.template, scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length,
+    graphs: logic.length, boxes: logic.reduce((n, l) => n + ((l && l.nodes) || []).length, 0) };
 }
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
 function parts(app, g, k) {
   const edit = (tab) => () => { app.ui.geTab = tab; app.saveUI(); openGameEditor(app, g); };
   return [
-    { id: 'scene', icon: 'scene', name: 'Scenes', meta: k ? plural(k.scenes, 'scene', 'scenes') + (k.levels ? ' · ' + plural(k.levels, 'level', 'levels') : '') + ' · backdrop' : '…', tag: 'Edit', go: edit('scene') },
+    { id: 'scene', icon: 'scene', name: 'Scenes', meta: k ? plural(k.scenes, 'scene', 'scenes') + (k.levels ? ' · ' + plural(k.levels, 'level', 'levels') : '') + (k.tiles ? ' · tiles' : ' · backdrop') : '…', tag: 'Edit', go: edit('scene') },
     { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' · behaviors' : '…', tag: 'Edit', go: edit('objects') },
+    // games made with New game have visual logic (the Logic tab)
+    ...(k && k.tiles ? [{ id: 'logic', icon: 'events', name: 'Logic', meta: k.graphs ? plural(k.graphs, 'graph', 'graphs') + ' · ' + plural(k.boxes, 'box', 'boxes') : 'No boxes yet', tag: 'Edit', go: edit('logic') }] : []),
     { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump, health' : '…', tag: 'Edit', go: edit('settings') }
   ];
 }
-// the way to pick another game: back to the Arcade, where the selected game is the one being edited
-export const changeGame = (app) => bareBtn('left', 'Change game', A(() => app.setTab(0)));
 
 export default {
   render(app) {
@@ -53,7 +55,6 @@ export default {
     const body = `<div class="group">
       <div class="plate bar">
         ${pager('Parts ' + pg.range, A(() => pick(Math.max(0, pg.p - 1) * rows())), A(() => pick(Math.min(pg.pages - 1, pg.p + 1) * rows())))}
-        ${changeGame(app)}
       </div>
       ${rowHtml}
     </div>`;
