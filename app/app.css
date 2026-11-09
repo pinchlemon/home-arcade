@@ -391,4 +391,5 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .dsep:not(:empty)::before{content:' · '}
 .se-strip{display:flex;width:44px;height:16px;border-radius:3px;overflow:hidden;flex:0 0 auto}.se-strip i{flex:1}
 .se-palgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:2px;margin-top:10px;justify-items:center}
-.se-palgrid .se-pc{width:34px;height:34px}
+.se-palgrid .se-pc{width:36px;height:36px}
+.se-palgrid .se-pc.sel::after{inset:0}   /* square ring around the swatch (the colour bar's ring is shaped for its taller buttons) */
