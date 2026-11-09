@@ -25,7 +25,7 @@ export default {
     const sel = all[app.ui.sel] || all[0], pg = pageOf(all, app.ui.page ?? Math.floor(app.ui.sel / rows()));
     const right = `
       <span class="cap acc">${sel.editable ? 'Editing' : 'Selected'} · ${String(app.ui.sel + 1).padStart(2, '0')}/${String(all.length).padStart(2, '0')}</span>
-      <span class="title clamp2">${esc(sel.name)}</span>
+      <span class="title clamp2" data-of="${esc(sel.name)}" data-f="title">${esc(sel.name)}</span>
       <span class="sub clamp2" style="white-space:normal">${esc(sel.editable ? editLine(sel) : 'Not in the Studio yet')}</span>
       <div class="actions">
         ${plateBtn('play', 'Play', A(() => play(app, sel)))}

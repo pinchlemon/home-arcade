@@ -102,8 +102,8 @@ export default {
     const { g, F, fi, f, si, it } = s, size = it && it.kind === 'image' ? sizeOf(app, g, it) : null;
     const right = it ? `
       <span class="cap acc ell">${esc(g.name)}</span>
-      <span class="title clamp2">${esc(it.name)}</span>
-      <span class="sub clamp2" style="white-space:normal">${esc(f.name + ' · ' + meta(it, size, g))}</span>
+      <span class="title clamp2" data-of="${esc(it.name)}" data-f="title">${esc(it.name)}</span>
+      <span class="sub clamp2" style="white-space:normal">${esc(f.name)}<span class="dsep" data-of="${esc(it.name)}" data-f="sub">${esc(meta(it, size, g))}</span></span>
       <div class="actions">
         ${it.kind === 'symbol' ? plateBtn('select', 'View', A(() => openViewer(app, g, it, F))) : plateBtn('paint', 'Draw', A(() => openDraw(app, g, it, F)))}
         ${it.kind === 'symbol' ? plateBtn('edit', 'Objects', A(() => jump(app, g, it))) : plateBtn(it.cell ? 'play' : 'select', it.cell ? 'Animate' : 'View', A(() => openViewer(app, g, it, F)))}

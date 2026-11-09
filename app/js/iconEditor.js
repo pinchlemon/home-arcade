@@ -67,7 +67,18 @@ export function slotOf(svg) {
   const label = b ? (b.getAttribute('aria-label') || origOf(b).title || '') : '';
   return [placeNow(), svg.dataset.icon, norm(label)].join('|');
 }
+// the top panel repeats the selected row's name and description: it follows that row's text (data-of = the row's name)
+function mirror(root) {
+  const m = readTexts();
+  const all = root.matches && root.matches('[data-of]') ? [root] : root.querySelectorAll('[data-of]');
+  for (const e of all) {
+    if (!e.dataset.base) e.dataset.base = e.textContent;
+    const own = m[placeNow() + '|' + norm(e.dataset.of)], v = own && own[e.dataset.f] != null ? own[e.dataset.f] : e.dataset.base;
+    if (e.textContent !== v) e.textContent = v;
+  }
+}
 function applyText(root) {
+  mirror(root);
   const m = readTexts();
   if (!Object.keys(m).length && !root.querySelector('[data-txt]') && !(root.dataset && root.dataset.txt)) return;
   const hosts = root.matches && root.matches(HOST) ? [root, ...root.querySelectorAll(HOST)] : root.querySelectorAll(HOST);
