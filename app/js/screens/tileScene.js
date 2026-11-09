@@ -2,7 +2,8 @@
 // placed on top. Tools: Paint and Box (tiles), Erase, Place (objects, start, exit), Select (move or adjust a thing) and Hand.
 // One finger uses the tool; two fingers pan and pinch to zoom (any tool). A stroke or a drag is one undo step.
 import { well, svgRows, G } from '../pixel.js';
-import { A, esc, iconBtn, stepper, bareBtn } from '../ui.js';
+import { A, esc, iconBtn, stepper } from '../ui.js';
+import { openTileEditor } from '../tileEditor.js';
 
 const T = 8, GREEN = '#7dff6a', MAXW = 256, MAXH = 128;
 const TOOLS = [['paint', 'Paint tiles', 'paint'], ['box', 'Box of tiles', 'shapeBoxF'], ['erase', 'Erase', 'erase'], ['place', 'Place', 'place'], ['select', 'Select', 'select'], ['hand', 'Hand: move the view', 'pan']];
@@ -31,39 +32,18 @@ export function tileScene(c) {
   const setL = (fn) => c.changeScenes(l2 => { const L = l2.find(x => x.id === cur.id); if (L) fn(L); });
   if (ed.tt === 'paint' || ed.tt === 'box' || ed.tt === 'erase') {
     const t = tiles[ed.tile];
-    if (ed.tileSheet && t) {
-      const k = kindOf(t);
-      const setT = (fn) => { c.changeTiles(all => fn(all[ed.tile])); c.rerender(); };
-      const ki = KINDS.findIndex(x => x[0] === k);
-      body = `<div class="ihead">${well(40, tileArt(ed.tile, 28))}<span class="t"><span class="title acc ell">${esc(t.name)}</span><span class="sub">Tile · used ${count(list, ed.tile)} times</span></span>
-          ${iconBtn('back', A(() => { ed.tileSheet = false; c.rerender(); }), { label: 'Back to the tiles' })}</div>
-        <div class="ts-tile">
-          <div class="ts-grid" role="grid" aria-label="Tile pixels: tap for colour, shade, clear">${(t.symbol || []).map((r, y) => [...r].map((v, x) => `<button class="ts-px" aria-label="Pixel ${x + 1},${y + 1}" style="background:${v === '1' ? t.color : v === '2' ? (t.shade || darken(t.color, 0.6)) : 'transparent'}" ${A(() => setT(z => { const row = z.symbol[y], nv = v === '1' ? '2' : v === '2' ? '0' : '1'; z.symbol = [...z.symbol]; z.symbol[y] = row.slice(0, x) + nv + row.slice(x + 1); }))}></button>`).join('')).join('')}</div>
-          <div class="ts-side">
-            <span class="cap">Kind</span><span class="sub">${KINDS[ki][2]}</span>
-            ${stepper(KINDS[ki][1].toUpperCase(), A(() => setT(x => setKind(x, KINDS[(ki + KINDS.length - 1) % KINDS.length][0]))), A(() => setT(x => setKind(x, KINDS[(ki + 1) % KINDS.length][0]))), 'kind', true)}
-            <span class="cap" style="margin-top:6px">Colour</span>
-            <div class="ts-cols">${COLORS.map(col => `<button class="ts-col${col === t.color ? ' on' : ''}" aria-label="Colour ${col}" aria-pressed="${col === t.color}" style="background:${col}" ${A(() => setT(x => { x.color = col; delete x.shade; }))}></button>`).join('')}</div>
-          </div>
-        </div>
-        <div class="sub" style="margin:2px 0 0">Tap a pixel: colour, then shade, then clear.</div>
-        <div class="se-btns se-btns3">
-          <button class="btn bare" ${A(() => { const n = prompt('Tile name', t.name); if (n && n.trim()) setT(x => { x.name = n.trim().slice(0, 20); }); })}>${well(28, svgRows(G.rename, '#e4e2dc'))}<span>Rename</span></button>
-          <button class="btn bare" ${A(() => { const ch = freeChar(tiles); if (!ch) { c.app.toast('No room for more tiles'); return; } c.changeTiles(all => { all[ch] = { ...structuredClone(t), name: (t.name + ' 2').slice(0, 20) }; }); ed.tile = ch; c.rerender(); })}>${well(28, svgRows(G.dup, '#e4e2dc'))}<span>Duplicate</span></button>
-          <button class="btn bare" ${A(() => { const n = count(list, ed.tile); if (Object.keys(tiles).length < 2) { c.app.toast('A game needs one tile'); return; } if (!confirm(n ? `Delete ${t.name}? Its ${n} tiles are erased too.` : `Delete ${t.name}?`)) return; const ch = ed.tile; c.changeAll(d2 => { delete d2.tiles[ch]; for (const L of d2.scenes) if (L.map) L.map = L.map.map(r => r.split(ch).join('.')); }); ed.tileSheet = false; c.rerender(); })}>${well(28, svgRows(G.trash, '#e4e2dc'))}<span>Delete</span></button>
-        </div>`;
-    } else {
+    {
       body = `<div class="ihead">${well(40, ed.tt === 'erase' ? svgRows(G.erase, GREEN) : tileArt(ed.tile, 28))}<span class="t"><span class="title acc ell">${ed.tt === 'erase' ? 'Erase' : esc(t ? t.name : 'Tiles')}</span><span class="sub">${ed.tt === 'erase' ? 'Drag over tiles to clear them' : ed.tt === 'box' ? 'Drag a box to fill it' : 'Drag to paint'}${ed.tt !== 'erase' && t ? ' · ' + KINDS.find(x => x[0] === kindOf(t))[1].toLowerCase() : ''}</span></span>
-          ${ed.tt !== 'erase' && t ? iconBtn('edit', A(() => { ed.tileSheet = true; c.rerender(); }), { label: 'Edit this tile' }) : ''}</div>
-        <div class="tray ts-tray">${Object.keys(tiles).map(ch => { const on = ch === ed.tile && ed.tt !== 'erase'; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" aria-label="${esc(tiles[ch].name)}" ${A(() => { ed.tile = ch; if (ed.tt === 'erase') ed.tt = 'paint'; c.rerender(); })}>${well(40, (on ? '<span class="ring"></span>' : '') + tileArt(ch, 24))}</button>`; }).join('')}
-          <button aria-label="New tile" ${A(() => { const ch = freeChar(tiles); if (!ch) { c.app.toast('No room for more tiles'); return; } c.changeTiles(all => { all[ch] = { name: 'Tile ' + (Object.keys(all).length + 1), color: COLORS[Object.keys(all).length % COLORS.length], solid: true, symbol: ['11111111', '12222221', '12222221', '12222221', '12222221', '12222221', '12222221', '11111111'] }; }); ed.tile = ch; ed.tt = 'paint'; ed.tileSheet = true; c.rerender(); })}>${well(40, svgRows(G.plus, '#e4e2dc'))}</button></div>`;
+          ${ed.tt !== 'erase' && t ? iconBtn('edit', A(() => openTileEditor(c.app, c.g, ed.tile, c.data(), c.rerender)), { label: 'Draw this tile' }) : ''}</div>
+        <div class="tray ts-tray">${Object.keys(tiles).map(ch => { const on = ch === ed.tile && ed.tt !== 'erase'; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" aria-label="${esc(tiles[ch].name)}" ${A(() => { ed.tile = ch; if (ed.tt === 'erase') ed.tt = 'paint'; c.rerender(); })}>${well(34, (on ? '<span class="ring"></span>' : '') + tileArt(ch, 22))}</button>`; }).join('')}
+          <button aria-label="New tile" ${A(() => { const ch = freeChar(tiles); if (!ch) { c.app.toast('No room for more tiles'); return; } c.changeTiles(all => { all[ch] = { name: 'Tile ' + (Object.keys(all).length + 1), color: COLORS[Object.keys(all).length % COLORS.length], solid: true, symbol: ['11111111', '12222221', '12222221', '12222221', '12222221', '12222221', '12222221', '11111111'] }; }); ed.tile = ch; ed.tt = 'paint'; c.rerender(); setTimeout(() => openTileEditor(c.app, c.g, ch, c.data(), c.rerender)); })}>${well(34, svgRows(G.plus, '#e4e2dc'))}</button></div>`;
     }
   } else if (ed.tt === 'place') {
     const opts = [...objIds.map(id => ({ id, name: c.objects()[id].name, art: svgRows(c.glyph(c.objects()[id].symbol), c.objects()[id].color || '#e4e2dc') })),
       { id: 'start', name: 'Player start', art: svgRows(START, '#ff5a1f') }, { id: 'exit', name: 'Exit', art: svgRows(FLAG, GREEN) }];
     const pd = opts.find(o => o.id === ed.placeType) || opts[0];
     body = `<div class="ihead">${well(40, pd.art)}<span class="t"><span class="title acc ell">Place · ${esc(pd.name)}</span><span class="sub">${pd.id === 'start' || pd.id === 'exit' ? 'Tap to move it there' : 'Tap the scene to place one'}</span></span></div>
-      <div class="tray ts-tray">${opts.map(o => { const on = o.id === pd.id; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" aria-label="${esc(o.name)}" ${A(() => { ed.placeType = o.id; c.rerender(); })}>${well(40, (on ? '<span class="ring"></span>' : '') + o.art)}</button>`; }).join('')}</div>`;
+      <div class="tray ts-tray">${opts.map(o => { const on = o.id === pd.id; return `<button class="${on ? 'on' : ''}" aria-pressed="${on}" aria-label="${esc(o.name)}" ${A(() => { ed.placeType = o.id; c.rerender(); })}>${well(34, (on ? '<span class="ring"></span>' : '') + o.art)}</button>`; }).join('')}</div>`;
   } else if (ed.tt === 'select' && ed.tsel) {
     const s = ed.tsel, th = s.kind === 'thing' ? (cur.things || [])[s.i] : cur[s.kind];
     if (!th) ed.tsel = null;
@@ -95,7 +75,6 @@ export function tileScene(c) {
       </div></div>`;
   return { screen, panel: `${toolbar}<div class="plate inspector gap20 ts-insp">${body}</div>${scenesBar}` };
 }
-function setKind(t, k) { delete t.solid; delete t.oneWay; delete t.hurt; if (k !== 'decor') t[k] = true; }
 const count = (list, ch) => list.reduce((n, L) => n + (L.map || []).reduce((m, r) => m + r.split(ch).length - 1, 0), 0);
 function freeChar(tiles) { for (const ch of '#BS=^"WT~:abcdefghijklmnopqrstuvwxyzACDEFGHIJKLMNOPQRUVXYZ0123456789+*%&@$!?') if (!tiles[ch]) return ch; return null; }
 function resize(L, w, h) {

@@ -258,7 +258,7 @@ export function quietly(fn) { const w = whereNow; whereNow = () => ''; try { ret
 // ---- wells: a black screen set into the plate, with the surface sloping up to a lit lip
 const MOUNT = { 28: [40, 6], 40: [58, 9], 164: [236, 36] };
 export function well(size, inner = '', extraClass = '') {
-  const [m, off] = MOUNT[size];
+  const [m, off] = MOUNT[size] || [Math.round(size * 1.45 / 2) * 2, Math.round(size * 1.45 / 2) - size / 2];   // other sizes keep the same proportions
   return `<span class="mount" style="width:${m}px;height:${m}px;margin:-${off}px"><span class="slope"></span><span class="lip" style="width:${size + 4}px;height:${size + 4}px"></span><span class="well ${size === 164 ? 'well-lg' : ''} ${extraClass}" style="width:${size}px;height:${size}px">${inner}</span></span>`;
 }
 
