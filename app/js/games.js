@@ -84,7 +84,10 @@ export function applyOverrides(data, overrides) {
 const cache = {};
 export async function loadGame(folder) {
   if (!cache[folder]) {
-    const get = (f) => fetch(`../${folder}/${f}`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return r.json(); });
+    // a game made on this phone is read from the phone when the service worker isn't serving it yet (just after an update)
+    const phone = (f) => import('./artStore.js').then(st => st.file(folder + '/' + f)).then(rec => { if (!rec) throw new Error(f + ' missing'); return JSON.parse(new TextDecoder().decode(rec.bytes)); });
+    const get = (f) => fetch(`../${folder}/${f}`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return r.json(); })
+      .catch(e => (folder.startsWith('games/') ? phone(f) : Promise.reject(e)));
     const engine = (f) => fetch(`../engine/${f}`, { cache: 'no-cache' }).then(r => r.json()).catch(() => ({}));
     cache[folder] = Promise.all([get('game.json'), get('studio.json'), engine('behaviors.json'), engine('symbols.json')])
       .then(([data, schema, behaviors, symbols]) => (bases[folder] = data, { data, schema, behaviors: behaviors.behaviors || {}, symbols }))
