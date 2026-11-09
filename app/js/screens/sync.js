@@ -9,6 +9,7 @@ import { row } from '../ui.js';
 import * as games from '../games.js';
 import { openReview, openCustomReview } from './review.js';
 import * as custom from '../custom.js';
+import * as made from '../newGame.js';
 import * as store from '../artStore.js';
 
 const BLUE = '#4d7cff';
@@ -27,11 +28,11 @@ export const when = (t) => {
 export function changeList() {
   const out = [];
   for (const g of games.editableGames()) {
-    const e = games.getEdits(g.file), n = e.dirty ? games.editCount(g.file) : 0, art = store.dirtyFor(g.file);
-    if (!n && !art.length) continue;
-    const parts = [n ? n + (n === 1 ? ' change' : ' changes') : '', art.length ? art.length + (art.length === 1 ? ' sprite' : ' sprites') : ''].filter(Boolean);
+    const e = games.getEdits(g.file), n = e.dirty ? games.editCount(g.file) : 0, art = store.dirtyFor(g.file), fresh = made.isUnpushed(g.file);
+    if (!n && !art.length && !fresh) continue;
+    const parts = [fresh ? 'new game' : '', n ? n + (n === 1 ? ' change' : ' changes') : '', art.length ? art.length + (art.length === 1 ? ' sprite' : ' sprites') : ''].filter(Boolean);
     const when = Math.max(n ? e.edited : 0, ...art.map(r => r.edited));
-    out.push({ game: g, name: g.name, settings: n, art, meta: parts.join(' · ') + ' · edited ' + games.ago(when), act: 'Changed' });
+    out.push({ game: g, name: g.name, settings: n, art, fresh, meta: parts.join(' · ') + (when ? ' · edited ' + games.ago(when) : ''), act: 'Changed' });
   }
   // the app's own customizations (icons, button text, order) go up as app/custom.json
   const cn = custom.count();
@@ -77,12 +78,24 @@ export async function pushAll(app, quiet) {
     const branch = app.settings.branch, ref = await gh(app, `git/ref/heads/${encodeURIComponent(branch)}`), head = ref.object.sha;
     const base = await gh(app, `git/commits/${head}`), tree = [], pushed = [], art = [], schemaChanged = [];
     let snap = null;
+    const newGames = [], madeDone = [];
     for (const it of items) {
       if (it.custom) { snap = custom.snapshot(); tree.push({ path: 'app/custom.json', mode: '100644', type: 'blob', content: custom.fileText(snap) }); continue; }
-      if (it.settings) {
+      if (it.fresh) {
+        // a game made on this phone: all its files, game.json with the edits in, and a line in games/index.json
+        for (const f of await made.files(it.game.file)) {
+          if (!f.rec) continue;
+          let text = new TextDecoder().decode(f.rec.bytes);
+          if (f.path.endsWith('/game.json')) { text = JSON.stringify(games.applyOverrides(JSON.parse(text), games.getEdits(it.game.file).overrides), null, 1) + '\n'; madeDone.push({ file: it.game.file, text }); }
+          tree.push({ path: f.path, mode: '100644', type: 'blob', content: text });
+        }
+        newGames.push(made.local().find(x => x.file === it.game.file));
+      } else if (it.settings) {
         const path = `${it.game.file}/game.json`, cur = await gh(app, `contents/${path}?ref=${encodeURIComponent(branch)}`);
         const merged = games.applyOverrides(JSON.parse(b64decode(cur.content)), games.getEdits(it.game.file).overrides);
-        tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(merged, null, 2) + '\n' }); pushed.push(it.game.file);
+        const text = JSON.stringify(merged, null, it.game.made ? 1 : 2) + '\n';
+        tree.push({ path, mode: '100644', type: 'blob', content: text }); pushed.push(it.game.file);
+        if (it.game.made) madeDone.push({ file: it.game.file, text });
       }
       // sprites: both files of each, as they are on the phone
       for (const r of it.art) {
@@ -107,14 +120,23 @@ export async function pushAll(app, quiet) {
         tree.push({ path, mode: '100644', type: 'blob', content: JSON.stringify(schema, null, 2) + '\n' }); schemaChanged.push(it.game.file);
       }
     }
+    if (newGames.length) {
+      let idx = { about: 'Games made with New game in Hedron and pushed from the phone. The app lists these next to the code games.', games: [] };
+      try { idx = JSON.parse(b64decode((await gh(app, `contents/games/index.json?ref=${encodeURIComponent(branch)}`)).content)); } catch (e) { if (e.status !== 404) throw e; }
+      for (const g of newGames) if (g && !idx.games.some(x => x.file === g.file)) idx.games.push({ file: g.file, name: g.name, template: g.template });
+      tree.push({ path: 'games/index.json', mode: '100644', type: 'blob', content: JSON.stringify(idx, null, 1) + '\n' });
+    }
     const t = await gh(app, 'git/trees', { base_tree: base.tree.sha, tree });
-    const what = (i) => [i.settings ? 'settings' : '', i.art.length ? i.art.map(r => r.name).slice(0, 3).join(', ') + (i.art.length > 3 ? '…' : '') : ''].filter(Boolean).join(' and ');
+    const what = (i) => [i.fresh ? 'new game' : '', i.settings ? 'settings' : '', i.art.length ? i.art.map(r => r.name).slice(0, 3).join(', ') + (i.art.length > 3 ? '…' : '') : ''].filter(Boolean).join(' and ');
     const message = items.length === 1 && items[0].custom ? 'Hedron: update app customizations' : items.length === 1 ? `Studio: update ${items[0].name} (${what(items[0])})` : `Studio: update ${items.length} games (${items.slice(0, 3).map(i => i.name).join(', ')}${items.length > 3 ? '…' : ''})`;
     const c = await gh(app, 'git/commits', { message: message + '\n\nPushed from Hedron on the phone.', tree: t.sha, parents: [head] });
     await gh(app, `git/refs/heads/${encodeURIComponent(branch)}`, { sha: c.sha }, 'PATCH');
     for (const f of pushed) { const e = games.getEdits(f); e.dirty = false; games.setEdits(f, e); games.forgetGame(f); }
     if (art.length) await store.markPushed(art);
     if (snap) custom.markPushed(snap);
+    // games made on the phone: the phone's game.json becomes what was pushed, and its edits are now part of it
+    for (const m of madeDone) { await store.putFile(m.file + '/game.json', new TextEncoder().encode(m.text), 'application/json'); games.resetEdits(m.file); games.forgetGame(m.file); }
+    for (const g of newGames) if (g) made.markPushed(g.file);
     schemaChanged.forEach(f => games.forgetGame(f));
     const sy = S.getSync();
     sy.history = [{ msg: message, files: tree.length, hash: c.sha.slice(0, 7), when: Date.now() }, ...(sy.history || [])].slice(0, 30);

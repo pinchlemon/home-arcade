@@ -40,6 +40,9 @@ export const record = (game, itemId) => index[game + '/' + itemId] || null;
 export const dirtyFor = (game) => forGame(game).filter(r => r.dirty);
 
 export async function file(path) { return tx(['files'], 'readonly', f => req(f.get(path))); }
+// any file kept on the phone under its repo path (games made with New game keep all their files here; see newGame.js)
+export async function putFile(path, bytes, type) { return tx(['files'], 'readwrite', f => req(f.put({ path, bytes: bytes.buffer ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : bytes, type }))); }
+export async function removeFile(path) { return tx(['files'], 'readwrite', f => req(f.delete(path))); }
 // a URL for a picture: the phone's copy when there is one, else the file on the site
 export async function urlFor(game, path) {
   await load();

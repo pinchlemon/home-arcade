@@ -286,6 +286,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 applySettings();
 render();
 games.preload(() => { if (!app.overlay) render(); });
+games.listed.then(n => { if (n) { games.preload(() => { if (!app.overlay) render(); }); if (!app.overlay) render(); } });
 artStore.load().then(() => { if (!app.overlay) render(); });   // sprites drawn on this phone (their dots and thumbnails)
 checkVersion();
 requestAnimationFrame(frame);

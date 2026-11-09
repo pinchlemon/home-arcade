@@ -9,6 +9,7 @@ import { fmt } from './gameEditor.js';
 import { pushAll, markSeen } from './sync.js';
 import * as store from '../artStore.js';
 import * as custom from '../custom.js';
+import * as made from '../newGame.js';
 
 const BLUE = '#4d7cff';
 
@@ -58,7 +59,8 @@ export function openReview(app, g) {
           <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">Changes · ${esc(g.name)}</span><span class="sub">${game ? (n ? n + (n === 1 ? ' change' : ' changes') + ' not pushed' : 'Nothing to push') : error ? 'Could not load: ' + esc(error) : 'Loading…'}</span></span>
           ${iconBtn('edit', A(() => { app.close(); import('./gameEditor.js').then(m => m.openGameEditor(app, g)); }), { color: '#fff', label: 'Open in the Studio' })}
         </div>`;
-      const rows = items.map(it => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(it.label)}</span><span class="sub ell">${esc(it.where)} · was ${esc(it.from)} → now <span style="color:var(--acc)">${esc(it.to)}</span></span></span>
+      const fresh = made.isUnpushed(g.file) ? `<div class="grow"><span class="t" style="min-width:0"><span class="cap">New game</span><span class="sub ell">Made on this phone · not on GitHub yet</span></span></div>` : '';
+      const rows = fresh + items.map(it => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(it.label)}</span><span class="sub ell">${esc(it.where)} · was ${esc(it.from)} → now <span style="color:var(--acc)">${esc(it.to)}</span></span></span>
           ${iconBtn('undo', A(() => putBack([it.path])), { label: 'Put back ' + it.label })}</div>`).join('')
         + art.map(r => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(r.name)}</span><span class="sub ell">Art · ${r.item && r.isNew ? 'new sprite' : 'redrawn'}</span></span>
           ${iconBtn('undo', A(() => { if (confirm(r.isNew ? 'Delete the new sprite ' + r.name + '? It has not been pushed.' : 'Restore ' + r.name + ' to the GitHub version?')) store.discard(g.file, r.itemId).then(rer); }), { label: 'Put back ' + r.name })}</div>`).join('');

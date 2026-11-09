@@ -6,7 +6,9 @@
   const here = document.currentScript.src.replace(/boot\.js(\?.*)?$/, '');   // the engine folder
   const folder = location.pathname.replace(/\/(index\.html)?$/, '').split('/').pop();
   function phoneEdits() {
-    try { const e = JSON.parse(localStorage.getItem('ha.game.' + folder) || 'null'); return (e && e.overrides) || {}; } catch (err) { return {}; }
+    // games made with New game live in games/<folder>, and their edits are kept under that path
+    const key = /\/games\/[^/]+\/?(index\.html)?$/.test(location.pathname) ? 'games/' + folder : folder;
+    try { const e = JSON.parse(localStorage.getItem('ha.game.' + key) || 'null'); return (e && e.overrides) || {}; } catch (err) { return {}; }
   }
   function apply(game, overrides) {
     for (const path in overrides) {
