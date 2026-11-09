@@ -1042,9 +1042,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       const clipBtns = `${iconBtn('dup', A(() => copy()), { color: '#fff', label: 'Copy' })}${iconBtn(null, A(paste), { color: '#fff', label: 'Paste', rows: G.paste, disabled: !CLIP })}`;
       // Select: how to select (box, lasso, wand) and whether it replaces, adds or subtracts
       const selBar = `<div class="plate bar se-colors" role="toolbar" aria-label="Selection">
-        <div style="display:flex;gap:0">${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; rer(); }), { on: ed.shape === k, label, pressed: ed.shape === k, rows: G[SHAPE_ICON[k]] })).join('')}</div>
+        ${SHAPES.map(([k, label]) => iconBtn(null, A(() => { ed.shape = k; rer(); }), { on: ed.shape === k, label, pressed: ed.shape === k, rows: G[SHAPE_ICON[k]] })).join('')}
         <button class="vscreen se-mode" ${A(() => { ed.mode = (ed.mode + 1) % 3; rer(); })} aria-label="${MODES[ed.mode]} (tap to change)">${svgText(MODE_TEXT[ed.mode], PINK)}</button>
-        <span style="flex:1"></span>
         ${clipBtns}${more}
       </div>`;
       // Move: what to do with the selected pixels (or the whole layer)
@@ -1052,7 +1051,6 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ${iconBtn(null, A(flipH), { color: '#fff', label: 'Flip horizontally', rows: G.flipH })}
         ${iconBtn(null, A(flipV), { color: '#fff', label: 'Flip vertically', rows: G.flipV })}
         ${iconBtn('redo', A(() => turn(1)), { color: '#fff', label: 'Turn a quarter right' })}
-        <span style="flex:1"></span>
         ${clipBtns}${more}
       </div>`;
       const floatBar = F ? `<div class="plate bar se-colors" role="toolbar" aria-label="Floating pixels">
@@ -1060,7 +1058,6 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ${iconBtn(null, A(flipH), { color: '#fff', label: 'Flip horizontally', rows: G.flipH })}
         ${iconBtn(null, A(flipV), { color: '#fff', label: 'Flip vertically', rows: G.flipV })}
         ${iconBtn('redo', A(() => turn(1)), { color: '#fff', label: 'Turn a quarter right' })}
-        <span style="flex:1"></span>
         ${stepper(Math.round(F.s * 100) + '%', A(() => scaleBy(-1)), A(() => scaleBy(1)), 'size')}
       </div>` : '';
       const colors = F ? floatBar : ed.tool === 'select' ? selBar : ed.tool === 'move' ? moveBar : `<div class="plate bar se-colors">
