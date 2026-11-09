@@ -59,13 +59,15 @@ export function buttonId(host) {
   return norm(o.title || host.getAttribute('aria-label') || (svg && svg.dataset.icon) || host.textContent);
 }
 const norm = (t) => (t || '').trim().replace(/\d+/g, '#').slice(0, 40);   // numbers left out, so a count doesn't make it a different button
-const textKey = (host) => { const o = origOf(host); return o.title ? placeNow() + '|' + norm(o.title) : null; };
+// the section tabs at the bottom are their own place: renaming a Settings row on a screen leaves the Settings tab alone
+const placeOf = (host) => (host && host.closest && host.closest('.tabbar') ? 'Tabs' : placeNow());
+const textKey = (host) => { const o = origOf(host); return o.title ? placeOf(host) + '|' + norm(o.title) : null; };
 export const hasText = (host) => !!origOf(host).title;
 // the key for an icon on screen
 export function slotOf(svg) {
   const b = svg.closest(HOST);
   const label = b ? (b.getAttribute('aria-label') || origOf(b).title || '') : '';
-  return [placeNow(), svg.dataset.icon, norm(label)].join('|');
+  return [placeOf(b), svg.dataset.icon, norm(label)].join('|');
 }
 // the top panel repeats the selected row's name and description: it follows that row's text (data-of = the row's name)
 function mirror(root) {
