@@ -281,7 +281,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 .sprite-ed .screen.fit.se-view canvas{width:auto;height:auto;max-width:none;max-height:none;-webkit-touch-callout:none}
 .se-zoom{position:absolute;right:8px;bottom:8px;height:24px;padding:0 8px;border-radius:5px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.14);color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.06em}
 .plate.bar.se-tools{display:grid;gap:2px;padding:6px}
-.se-tools .seg{min-width:0;padding:0 6px 0 4px;gap:6px}
+.se-tools .se-tool{width:auto;min-width:0;justify-self:center}
 .se-colors{justify-content:flex-start;gap:6px}
 .se-mode{height:32px;min-width:52px;padding:0 8px;display:flex;align-items:center;justify-content:center}
 .se-cur{flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:6px}

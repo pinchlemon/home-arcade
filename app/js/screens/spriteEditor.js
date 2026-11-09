@@ -27,9 +27,10 @@ let CLIP = null;   // copied pixels { data, w, h, mask, x, y }, kept while the a
 
 const PINK = '#ff4fd8';
 const ZOOMS = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
-const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['shade', 'Shade'], ['picker', 'Picker'], ['select', 'Select'], ['move', 'Move'], ['pan', 'Hand']];
-const TOOL_HELP = { pencil: 'Pencil', eraser: 'Eraser', fill: 'Fill', shade: 'Shade: step pixels along the palette', picker: 'Pick a colour', select: 'Select', move: 'Move pixels', pan: 'Hand: move the view' };
-const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', shade: 'shade', picker: 'picker', select: 'boxSelect', move: 'movePixels', pan: 'pan' };
+const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['shade', 'Shade'], ['shape', 'Shape'], ['picker', 'Picker'], ['select', 'Select'], ['move', 'Move'], ['pan', 'Hand']];
+const TOOL_HELP = { pencil: 'Pencil', eraser: 'Eraser', fill: 'Fill', shade: 'Shade: step pixels along the palette', shape: 'Shapes: line, box, oval', picker: 'Pick a colour', select: 'Select', move: 'Move pixels', pan: 'Hand: move the view' };
+const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', shade: 'shade', shape: 'shapes', picker: 'picker', select: 'boxSelect', move: 'movePixels', pan: 'pan' };
+const SHAPE_KINDS = [['line', 'Line', 'shapeLine'], ['box', 'Box', 'shapeBox'], ['boxF', 'Filled box', 'shapeBoxF'], ['oval', 'Oval', 'shapeOval'], ['ovalF', 'Filled oval', 'shapeOvalF']];
 const SHAPE_ICON = { box: 'boxSelect', lasso: 'lasso', wand: 'wand' };
 const SHAPES = [['box', 'Box select'], ['lasso', 'Lasso select'], ['wand', 'Magic wand: select a colour']];
 const MODES = ['Replace the selection', 'Add to the selection', 'Take away from the selection'], MODE_TEXT = ['NEW', 'ADD', 'SUB'];
@@ -93,7 +94,7 @@ function parsePaletteText(t) {
 
 export function openSpriteEditor(app, g, item, opts = {}) {
   const ed = { spr: null, err: null, layer: 0, frame: 0, tool: 'pencil', after: 'pencil', color: [0, 0, 0, 255], zoom: 0, ox: 0, oy: 0,
-    onion: false, grid: true, shadeDir: -1, recolor: true, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0],
+    onion: false, grid: true, shadeDir: -1, recolor: true, shapeKind: 0, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0],
     sel: null, float: null, shape: 'box', mode: 0, contiguous: true, preview: null,
     cv: null, exScale: 4, exCols: 0, out: null, gameCols: opts.sheetCols || 0 };
   const nav = makeNav();
@@ -278,6 +279,27 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function line(x0, y0, x1, y1) {
     const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
     for (;;) { plot(x0, y0); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
+  }
+  // a shape from where the finger went down to where it is now, drawn over the cel as it was (so it can be redrawn as the finger moves)
+  function drawShape(x1, y1) {
+    const sh = stroke.shape, d = stroke.cel.data;
+    d.set(sh.base); stroke.done.fill(0);
+    const k = SHAPE_KINDS[ed.shapeKind][0], x0 = sh.x0, y0 = sh.y0;
+    if (k === 'line') { line(x0, y0, x1, y1); stroke.cel.v++; return; }
+    const ax = Math.min(x0, x1), bx = Math.max(x0, x1), ay = Math.min(y0, y1), by = Math.max(y0, y1);
+    if (k === 'box' || k === 'boxF') {
+      if (k === 'boxF') { for (let y = ay; y <= by; y++) for (let x = ax; x <= bx; x++) plot(x, y); }
+      else { line(ax, ay, bx, ay); line(bx, ay, bx, by); line(bx, by, ax, by); line(ax, by, ax, ay); }
+      stroke.cel.v++; return;
+    }
+    // an oval fitting the box: pixels whose centres are inside it; the outline is those with a side neighbour outside
+    const w = bx - ax + 1, h = by - ay + 1, cx = ax + w / 2, cy = ay + h / 2, rx = w / 2 - 0.2, ry = h / 2 - 0.2;   // a little inside the box, so corners stay round (3×3 is a plus)
+    const inside = (x, y) => x >= ax && x <= bx && y >= ay && y <= by && ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1.0001;
+    for (let y = ay; y <= by; y++) for (let x = ax; x <= bx; x++) {
+      if (!inside(x, y)) continue;
+      if (k === 'ovalF' || w < 3 || h < 3 || !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1)) plot(x, y);
+    }
+    stroke.cel.v++;
   }
   function fill(x, y) {
     const s = ed.spr; if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
@@ -525,6 +547,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     if (ed.float) settle();
     const why = blocked(ed.layer); if (why) { toast(why); return; }
     step(); stroke = { cel: editableCel(), done: new Uint8Array(ed.spr.w * ed.spr.h), last: [x, y] };
+    if (ed.tool === 'shape') { stroke.shape = { x0: x, y0: y, base: stroke.cel.data.slice() }; drawShape(x, y); draw(); return; }
     plot(x, y); draw();
   }
   function move(e) {
@@ -559,6 +582,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       }
       return;
     }
+    if (stroke && stroke.shape) { const [x, y] = cell(at(e)); if (x !== stroke.last[0] || y !== stroke.last[1]) { stroke.last = [x, y]; drawShape(x, y); draw(); } return; }
     if (stroke) { const [x, y] = cell(at(e)); if (x !== stroke.last[0] || y !== stroke.last[1]) { line(stroke.last[0], stroke.last[1], x, y); stroke.last = [x, y]; draw(); } }
   }
   function up(e) {
@@ -729,12 +753,12 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function setTag(i) { settle(); if (ed.playTag === i) ed.sheet = { kind: 'tag', i }; else { ed.playTag = i; const t = S().tags[i]; stop(); ed.frame = t.from; } rer(); }
   function setColor(c) {
     ed.color = c.slice(); if (ed.color.length < 4) ed.color.push(255);
-    if (ed.tool !== 'pencil' && ed.tool !== 'fill' && ed.tool !== 'shade') { ed.tool = 'pencil'; rer(); return; }
+    if (ed.tool !== 'pencil' && ed.tool !== 'fill' && ed.tool !== 'shade' && ed.tool !== 'shape') { ed.tool = 'pencil'; rer(); return; }
     if (ed.sheet && ed.sheet.kind === 'palette') { rer(); return; }
     // just the swatches: the chosen one gets its ring, the big one shows it
     const pal = ed.spr.palette;
     document.querySelectorAll('#se-pal .se-pc').forEach((el, i) => el.classList.toggle('sel', !!pal[i] && sameColor(pal[i], ed.color)));
-    const cur = document.querySelector('#se-cur .se-sw > span'); if (cur) cur.style.background = rgba(ed.color);
+    const cur = document.querySelector('#se-cur .se-sw > span'); if (cur) cur.style.background = rgba(ed.color); const cb = document.getElementById('se-cur'); if (cb) cb.setAttribute('aria-label', 'Colour ' + rgbHex(ed.color) + ', change it');
     const add = document.querySelector('[aria-label="Add this colour to the palette"]'); if (add) rer();
   }
   function setTool(t) { if (ed.float && t !== 'move' && t !== 'pan') settle(); if (t === 'picker' && ed.tool !== 'picker') ed.after = ed.tool === 'eraser' || ed.tool === 'pan' ? 'pencil' : ed.tool; ed.tool = t; rer(); }
@@ -1009,8 +1033,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       </div>`;
       if (!s) return `<div class="screen-tool sprite-ed" style="--acc:${PINK}"><h1 class="sr">Draw · ${esc(item.name)}</h1>${top}<div class="screen fit se-view"><span class="sub">${ed.err ? esc(ed.err) : 'Opening…'}</span></div></div>`;
       // the tools, like the Studio's tabs: the chosen one wide, with its name
-      const tools = `<div class="plate bar se-tools" role="tablist" aria-label="Tools" style="grid-template-columns:${TOOLS.map(([t]) => (ed.tool === t ? '2.6fr' : '1fr')).join(' ')}">
-        ${TOOLS.map(([t, label]) => { const on = ed.tool === t; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${TOOL_HELP[t]}" ${A(() => setTool(t))}>${well(28, svgRows(G[TOOL_ICON[t]], on ? PINK : '#e4e2dc'))}<span class="lbl"${on ? '' : ' hidden'}>${label}</span>${on ? '<span class="selring"></span>' : ''}</button>`; }).join('')}
+      const tools = `<div class="plate bar se-tools" role="tablist" aria-label="Tools" style="grid-template-columns:repeat(${TOOLS.length},1fr)">
+        ${TOOLS.map(([t, label]) => { const on = ed.tool === t; return `<button class="btn icon bare se-tool" role="tab" aria-selected="${on}" aria-label="${TOOL_HELP[t]}" ${A(() => setTool(t))}>${well(28, (on ? '<span class="ring"></span>' : '') + svgRows(G[TOOL_ICON[t]], on ? PINK : '#e4e2dc'))}<span class="lbl" hidden>${label}</span></button>`; }).join('')}
       </div>`;
       // under the tools: the palette, or (selecting and moving) the selection's own buttons, or (while pixels float) how to change them
       const F = ed.float;
@@ -1031,7 +1055,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ${stepper(Math.round(F.s * 100) + '%', A(() => scaleBy(-1)), A(() => scaleBy(1)), 'size')}
       </div>` : '';
       const colors = F ? floatBar : ed.tool === 'select' || ed.tool === 'move' ? selBar : `<div class="plate bar se-colors">
-        ${ed.tool === 'shade' ? `<button class="vscreen se-mode" ${A(() => { ed.shadeDir = -ed.shadeDir; rer(); })} aria-label="${ed.shadeDir < 0 ? 'Darker' : 'Lighter'} (tap to change)">${svgText(ed.shadeDir < 0 ? 'DARK' : 'LIGHT', PINK)}</button>` : ''}<button class="se-cur" id="se-cur" ${A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'color' ? null : { kind: 'color', i: palIdx(ed.color), old: ed.color.slice() }; rer(); })} aria-label="Colour ${rgbHex(ed.color)}, change it">${swatch(ed.color, 36)}</button>
+        ${ed.tool === 'shape' ? iconBtn(null, A(() => { ed.shapeKind = (ed.shapeKind + 1) % SHAPE_KINDS.length; rer(); }), { color: PINK, label: SHAPE_KINDS[ed.shapeKind][1] + ' (tap to change)', rows: G[SHAPE_KINDS[ed.shapeKind][2]] }) : ''}${ed.tool === 'shade' ? `<button class="vscreen se-mode" ${A(() => { ed.shadeDir = -ed.shadeDir; rer(); })} aria-label="${ed.shadeDir < 0 ? 'Darker' : 'Lighter'} (tap to change)">${svgText(ed.shadeDir < 0 ? 'DARK' : 'LIGHT', PINK)}</button>` : ''}<button class="se-cur" id="se-cur" ${A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'color' ? null : { kind: 'color', i: palIdx(ed.color), old: ed.color.slice() }; rer(); })} aria-label="Colour ${rgbHex(ed.color)}, change it">${swatch(ed.color, 36)}</button>
         <div class="se-pal" id="se-pal">${s.palette.map((c, i) => `<button class="se-pc${sameColor(c, ed.color) ? ' sel' : ''}" ${A(() => setColor(c))} aria-label="Palette colour ${i + 1}">${swatch(c, 24)}</button>`).join('')}</div>
         ${s.palette.some(c => sameColor(c, ed.color)) ? '' : iconBtn('plus', A(() => { step(); s.palette.push(ed.color.slice()); ed.sw = 1e6; changed(); rer(); }), { color: PINK, label: 'Add this colour to the palette' })}
         ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'palette' ? null : { kind: 'palette' }; rer(); }), { color: '#fff', label: 'Palette', rows: G.palette })}
