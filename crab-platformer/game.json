@@ -173,6 +173,34 @@
       "id": "beach",
       "name": "Beach",
       "kind": "waves"
+    },
+    {
+      "id": "level-mw2pyvad",
+      "name": "Level 1",
+      "kind": "level",
+      "width": 640,
+      "start": {
+        "x": 40
+      },
+      "exit": {
+        "x": 600
+      },
+      "checkpoints": [],
+      "things": [
+        {
+          "obj": "palm",
+          "x": 110
+        },
+        {
+          "obj": "castle",
+          "x": 300
+        },
+        {
+          "obj": "eye",
+          "x": 420,
+          "h": 50
+        }
+      ]
     }
   ],
   "level": {
