@@ -81,8 +81,8 @@ export default {
     const on = it && it.kind === 'music' && playing === it.id;
     const right = it ? `
       <span class="cap acc ell">${esc(g.name)}</span>
-      <span class="title clamp2">${esc(it.name)}</span>
-      <span class="sub clamp2" style="white-space:normal">${esc(f.name + ' · ' + it.help)}</span>
+      <span class="title clamp2" data-of="${esc(it.name)}" data-f="title">${esc(it.name)}</span>
+      <span class="sub clamp2" style="white-space:normal">${esc(f.name)}<span class="dsep" data-of="${esc(it.name)}" data-f="sub">${esc(it.help)}</span></span>
       <div class="actions">
         ${plateBtn(on ? 'pause' : 'play', on ? 'Stop' : 'Play', A(() => hear(app, g, it)))}
         ${plateBtn('right', 'Next', A(() => setSel(app, si + 1, true)))}
