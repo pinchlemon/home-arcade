@@ -27,9 +27,9 @@ let CLIP = null;   // copied pixels { data, w, h, mask, x, y }, kept while the a
 
 const PINK = '#ff4fd8';
 const ZOOMS = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
-const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['picker', 'Picker'], ['select', 'Select'], ['move', 'Move'], ['pan', 'Hand']];
-const TOOL_HELP = { pencil: 'Pencil', eraser: 'Eraser', fill: 'Fill', picker: 'Pick a colour', select: 'Select', move: 'Move pixels', pan: 'Hand: move the view' };
-const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', picker: 'picker', select: 'boxSelect', move: 'movePixels', pan: 'pan' };
+const TOOLS = [['pencil', 'Pencil'], ['eraser', 'Eraser'], ['fill', 'Fill'], ['shade', 'Shade'], ['picker', 'Picker'], ['select', 'Select'], ['move', 'Move'], ['pan', 'Hand']];
+const TOOL_HELP = { pencil: 'Pencil', eraser: 'Eraser', fill: 'Fill', shade: 'Shade: step pixels along the palette', picker: 'Pick a colour', select: 'Select', move: 'Move pixels', pan: 'Hand: move the view' };
+const TOOL_ICON = { pencil: 'pencil', eraser: 'eraser', fill: 'fill', shade: 'shade', picker: 'picker', select: 'boxSelect', move: 'movePixels', pan: 'pan' };
 const SHAPE_ICON = { box: 'boxSelect', lasso: 'lasso', wand: 'wand' };
 const SHAPES = [['box', 'Box select'], ['lasso', 'Lasso select'], ['wand', 'Magic wand: select a colour']];
 const MODES = ['Replace the selection', 'Add to the selection', 'Take away from the selection'], MODE_TEXT = ['NEW', 'ADD', 'SUB'];
@@ -52,9 +52,48 @@ function hsvToRgb(h, s, v) {
   return [f(5), f(3), f(1)];
 }
 
+// ---- palettes
+const hexList = (t) => t.trim().split(/\s+/).map(h => { const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255, 255]; });
+const PRESETS = [
+  ['PICO-8', hexList('000000 1D2B53 7E2553 008751 AB5236 5F574F C2C3C7 FFF1E8 FF004D FFA300 FFEC27 00E436 29ADFF 83769C FF77A8 FFCCAA')],
+  ['Sweetie 16', hexList('1A1C2C 5D275D B13E53 EF7D57 FFCD75 A7F070 38B764 257179 29366F 3B5DC9 41A6F6 73EFF7 F4F4F4 94B0C2 566C86 333C57')],
+  ['Game Boy', hexList('0F380F 306230 8BAC0F 9BBC0F')],
+  ['Hedron', hexList('000000 3A3A3F 8A8A90 E4E2DC FF5A1F 7DFF6A FF4FD8 4D7CFF FFD23F')]
+];
+const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+// the next colour along a ramp: the palette neighbour (left or right) of the same family that is darker (dir -1) or lighter (dir 1)
+function rampStep(pal, c, dir) {
+  const i = pal.findIndex(p => p[0] === c[0] && p[1] === c[1] && p[2] === c[2]);
+  if (i < 0) return null;
+  const [h, sat] = rgbToHsv(c), L = lum(c);
+  const kin = (p) => { const [h2, s2] = rgbToHsv(p); const dh = Math.min(Math.abs(h - h2), 360 - Math.abs(h - h2)); return dh <= 50 || sat < 0.15 || s2 < 0.15; };
+  for (const j of [i - 1, i + 1]) { const p = pal[j]; if (p && (p[3] === undefined || p[3] > 0) && kin(p) && (dir < 0 ? lum(p) < L : lum(p) > L)) return p; }
+  return null;
+}
+// five shades around a colour: darker ones turn cooler and richer, lighter ones warmer and paler (the usual pixel-art ramp)
+function makeRamp(c) {
+  const [h, s, v] = rgbToHsv(c), out = [];
+  const toward = (h0, t, deg) => { let d = ((t - h0 + 540) % 360) - 180; return (h0 + Math.sign(d) * Math.min(Math.abs(d), deg) + 360) % 360; };
+  for (let k = -2; k <= 2; k++) {
+    if (!k) { out.push([c[0], c[1], c[2], 255]); continue; }
+    const a = Math.abs(k), dark = k < 0, hh = s < 0.05 ? h : toward(h, dark ? 250 : 60, 12 * a);
+    const ss = Math.max(0, Math.min(1, s + (dark ? 0.1 : -0.14) * a)), vv = dark ? v * (1 - 0.24 * a) : Math.min(1, v + (1 - v) * 0.4 * a + 0.04 * a);
+    out.push([...hsvToRgb(hh, ss, vv), 255]);
+  }
+  return out;
+}
+// palette files: .hex (one colour per line), .gpl (GIMP), .pal (JASC), or a picture (its colours in reading order)
+function parsePaletteText(t) {
+  const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean), out = [];
+  if (/^JASC-PAL/i.test(lines[0] || '')) { for (const l of lines.slice(3)) { const m = l.match(/^(\d+)\s+(\d+)\s+(\d+)/); if (m) out.push([+m[1], +m[2], +m[3], 255]); } return out; }
+  if (/^GIMP Palette/i.test(lines[0] || '')) { for (const l of lines.slice(1)) { const m = l.match(/^(\d+)\s+(\d+)\s+(\d+)/); if (m) out.push([+m[1], +m[2], +m[3], 255]); } return out; }
+  for (const l of lines) { const m = l.match(/^#?([0-9a-f]{6})(?:[0-9a-f]{2})?$/i); if (m) out.push(hexList(m[1])[0]); }
+  return out;
+}
+
 export function openSpriteEditor(app, g, item, opts = {}) {
   const ed = { spr: null, err: null, layer: 0, frame: 0, tool: 'pencil', after: 'pencil', color: [0, 0, 0, 255], zoom: 0, ox: 0, oy: 0,
-    onion: false, grid: true, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0],
+    onion: false, grid: true, shadeDir: -1, recolor: true, playing: false, playTag: -1, sheet: null, hist: [], fut: [], saved: true, tl: [0, 0], sw: 0, hsv: [0, 0, 0],
     sel: null, float: null, shape: 'box', mode: 0, contiguous: true, preview: null,
     cv: null, exScale: 4, exCols: 0, out: null, gameCols: opts.sheetCols || 0 };
   const nav = makeNav();
@@ -224,7 +263,12 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     const i = y * s.w + x; if (stroke.done[i] || (ed.sel && !ed.sel.mask[i])) return; stroke.done[i] = 1;
     const d = stroke.cel.data, j = i * 4;
     if (ed.tool === 'eraser') { d[j] = d[j + 1] = d[j + 2] = d[j + 3] = 0; }
-    else {
+    else if (ed.tool === 'shade') {
+      if (!d[j + 3]) return;
+      const n = rampStep(ed.spr.palette, [d[j], d[j + 1], d[j + 2]], ed.shadeDir);
+      if (!n) return;
+      d[j] = n[0]; d[j + 1] = n[1]; d[j + 2] = n[2];
+    } else {
       const c = ed.color, sa = (c[3] === undefined ? 255 : c[3]) / 255, da = d[j + 3] / 255;
       if (sa >= 1 || !da) { d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = Math.round(sa * 255); }
       else { const oa = sa + da * (1 - sa); for (let k = 0; k < 3; k++) d[j + k] = Math.round((c[k] * sa + d[j + k] * da * (1 - sa)) / oa); d[j + 3] = Math.round(oa * 255); }
@@ -685,7 +729,8 @@ export function openSpriteEditor(app, g, item, opts = {}) {
   function setTag(i) { settle(); if (ed.playTag === i) ed.sheet = { kind: 'tag', i }; else { ed.playTag = i; const t = S().tags[i]; stop(); ed.frame = t.from; } rer(); }
   function setColor(c) {
     ed.color = c.slice(); if (ed.color.length < 4) ed.color.push(255);
-    if (ed.tool !== 'pencil' && ed.tool !== 'fill') { ed.tool = 'pencil'; rer(); return; }
+    if (ed.tool !== 'pencil' && ed.tool !== 'fill' && ed.tool !== 'shade') { ed.tool = 'pencil'; rer(); return; }
+    if (ed.sheet && ed.sheet.kind === 'palette') { rer(); return; }
     // just the swatches: the chosen one gets its ring, the big one shows it
     const pal = ed.spr.palette;
     document.querySelectorAll('#se-pal .se-pc').forEach((el, i) => el.classList.toggle('sel', !!pal[i] && sameColor(pal[i], ed.color)));
@@ -723,21 +768,116 @@ export function openSpriteEditor(app, g, item, opts = {}) {
     return h + '</div>';
   }
 
+  // ---------------------------------------------------------------- palette
+  const palIdx = (c) => ed.spr.palette.findIndex(p => sameColor(p, c));
+  function setPalette(list, msg) {
+    if (!list.length) { toast('No colours found'); return; }
+    step(); ed.spr.palette = list.slice(0, 256).map(c => c.slice()); ed.sw = 0; changed(); rer(); if (msg) toast(msg);
+  }
+  // every colour drawn in the sprite, in the order first seen
+  function usedColors() {
+    const seen = new Map();
+    for (const cel of ed.spr.cels.values()) { const d = cel.data; for (let j = 0; j < d.length; j += 4) if (d[j + 3]) { const k = d[j] << 24 | d[j + 1] << 16 | d[j + 2] << 8 | d[j + 3]; if (!seen.has(k)) seen.set(k, [d[j], d[j + 1], d[j + 2], d[j + 3]]); if (seen.size > 256) return [...seen.values()]; } }
+    return [...seen.values()];
+  }
+  const palOps = {
+    ramp() {
+      const r = makeRamp(ed.color), pal = ed.spr.palette.slice(), i = palIdx(ed.color);
+      const fresh = r.filter((c, k) => k === 2 || !pal.some(p => sameColor(p, c)));
+      if (i >= 0) pal.splice(i, 1, ...fresh); else pal.push(...fresh);
+      setPalette(pal, 'Added a ramp of ' + fresh.length);
+    },
+    sort() { setPalette(ed.spr.palette.slice().sort((a, b) => lum(a) - lum(b)), 'Sorted dark to light'); },
+    move(d) {
+      const pal = ed.spr.palette.slice(), i = palIdx(ed.color), j = i + d;
+      if (i < 0 || j < 0 || j >= pal.length) return;
+      [pal[i], pal[j]] = [pal[j], pal[i]]; setPalette(pal);
+    },
+    fromSprite() {
+      const pal = ed.spr.palette.slice(), add = usedColors().filter(c => !pal.some(p => sameColor(p, c)));
+      if (!add.length) { toast('Every colour is in the palette'); return; }
+      setPalette(pal.concat(add), 'Added ' + add.length + (add.length === 1 ? ' colour' : ' colours'));
+    },
+    unused() {
+      const used = usedColors(), pal = ed.spr.palette.filter(p => used.some(c => sameColor(c, p)));
+      const n = ed.spr.palette.length - pal.length;
+      if (!n) { toast('Every colour is used'); return; }
+      setPalette(pal, 'Removed ' + n + (n === 1 ? ' colour' : ' colours'));
+    },
+    async exportHex() {
+      const txt = ed.spr.palette.map(c => rgbHex(c).slice(1)).join('\n') + '\n';
+      await share(new File([txt], item.name.replace(/[^\w-]+/g, '_') + '-palette.hex', { type: 'text/plain' }));
+    },
+    async exportPng() {
+      const pal = ed.spr.palette, c = document.createElement('canvas'); c.width = Math.max(1, pal.length); c.height = 1;
+      const x = c.getContext('2d'), im = x.createImageData(c.width, 1);
+      pal.forEach((p, i) => im.data.set([p[0], p[1], p[2], p[3] === undefined ? 255 : p[3]], i * 4)); x.putImageData(im, 0, 0);
+      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+      await share(new File([blob], item.name.replace(/[^\w-]+/g, '_') + '-palette.png', { type: 'image/png' }));
+    },
+    async importFile(f) {
+      if (!f) return;
+      try {
+        let list;
+        if (/\.(aseprite|ase)$/i.test(f.name)) list = (await readAse(await f.arrayBuffer())).palette;
+        else if (/^image\//.test(f.type) || /\.(png|gif|jpe?g|webp)$/i.test(f.name)) {
+          const bmp = await createImageBitmap(f), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+          const x = c.getContext('2d'); x.drawImage(bmp, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data; list = [];
+          for (let j = 0; j < d.length && list.length <= 256; j += 4) if (d[j + 3] && !list.some(p => p[0] === d[j] && p[1] === d[j + 1] && p[2] === d[j + 2])) list.push([d[j], d[j + 1], d[j + 2], 255]);
+        } else list = parsePaletteText(await f.text());
+        setPalette(list, 'Loaded ' + list.length + ' colours from ' + f.name);
+      } catch (e) { toast('Could not read ' + f.name); }
+    }
+  };
+  // change a palette colour; with recolour on, every pixel of the old colour in the sprite changes with it
+  function changePaletteColor(i, old) {
+    const s = ed.spr, nw = ed.color.slice();
+    if (sameColor(old, nw)) { toast('The colour has not changed'); return; }
+    step(); s.palette[i] = nw;
+    let n = 0;
+    if (ed.recolor) for (const [k, cel] of s.cels) {
+      const d = cel.data; let copy = null;
+      for (let j = 0; j < d.length; j += 4) if (d[j + 3] && d[j] === old[0] && d[j + 1] === old[1] && d[j + 2] === old[2] && d[j + 3] === (old[3] === undefined ? 255 : old[3])) {
+        if (!copy) copy = d.slice();
+        copy[j] = nw[0]; copy[j + 1] = nw[1]; copy[j + 2] = nw[2]; copy[j + 3] = nw[3]; n++;
+      }
+      if (copy) s.cels.set(k, { data: copy, opacity: cel.opacity, v: (cel.v || 0) + 1 });
+    }
+    ed.sheet.old = nw.slice(); changed(); rer(); draw();
+    toast(ed.recolor ? (n ? 'Changed ' + n + (n === 1 ? ' pixel' : ' pixels') : 'Palette updated, no pixels used it') : 'Palette updated');
+  }
+
   function sheetHtml() {
     const sh = ed.sheet; if (!sh) return '';
     const s = ed.spr, close = iconBtn('check', A(() => { ed.sheet = null; rer(); }), { color: '#fff', label: 'Done' });
-    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(G.boxSelect, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
+    const head = (t, sub) => `<div class="ihead">${well(40, sh.kind === 'sel' ? svgRows(G.boxSelect, PINK) : icon(sh.kind === 'canvas' ? 'scene' : sh.kind === 'export' ? 'up' : sh.kind === 'color' || sh.kind === 'palette' ? 'paint' : sh.kind === 'tag' ? 'events' : sh.kind === 'frame' ? 'scene' : sh.kind === 'layer' ? 'tiles' : 'display', PINK))}<span class="t"><span class="title acc ell">${esc(t)}</span><span class="sub ell">${esc(sub)}</span></span>${close}</div>`;
     const btns = (list, three) => `<div class="se-btns${three ? ' se-btns3' : ''}">${list.map(([ic, label, fn, dis, rows]) => `<button class="btn bare" ${A(fn)}${dis ? ' disabled' : ''}>${well(28, rows ? svgRows(rows, '#e4e2dc') : icon(ic, '#e4e2dc'))}<span>${esc(label)}</span></button>`).join('')}</div>`;
     const field = (id, val, label) => `<label class="se-field"><span class="cap">${esc(label)}</span><input id="${id}" value="${esc(val)}" maxlength="40" autocomplete="off" spellcheck="false"></label>`;
     let body = '';
     if (sh.kind === 'color') {
-      body = head('Colour', rgbHex(ed.color).toUpperCase() + ' · ' + Math.round((ed.color[3] / 255) * 100) + '% solid') + `
+      body = head(sh.i >= 0 && s.palette[sh.i] ? 'Edit colour' : 'Colour', rgbHex(ed.color).toUpperCase() + ' · ' + Math.round((ed.color[3] / 255) * 100) + '% solid') + `
         <canvas id="se-sv" class="se-pick" style="height:120px"></canvas>
         <canvas id="se-hue" class="se-pick" style="height:24px"></canvas>
         <canvas id="se-alpha" class="se-pick" style="height:24px"></canvas>
         <div class="se-hexrow">${swatch(ed.color, 40)}<label class="se-field" style="flex:1"><span class="cap">Hex</span><input id="se-hex" value="${rgbHex(ed.color).slice(1).toUpperCase()}" maxlength="8" autocomplete="off" spellcheck="false"></label></div>
-        ${btns([['plus', 'Add to palette', () => { if (s.palette.some(c => sameColor(c, ed.color))) { toast('Already in the palette'); return; } step(); s.palette.push(ed.color.slice()); ed.sw = 1e6; changed(); rer(); }],
+        ${sh.i >= 0 && s.palette[sh.i] ? `<div class="grow"><span class="t"><span class="cap">Palette colour ${sh.i + 1}</span><span class="sub">${ed.recolor ? 'Pixels of this colour change too' : 'Only the palette changes'}</span></span>${toggle(ed.recolor, A(() => { ed.recolor = !ed.recolor; rer(); }), 'Recolour the sprite')}</div>` : ''}
+        ${btns([...(sh.i >= 0 && s.palette[sh.i] ? [['check', 'Change colour', () => changePaletteColor(sh.i, sh.old)]] : []), ['plus', 'Add to palette', () => { if (s.palette.some(c => sameColor(c, ed.color))) { toast('Already in the palette'); return; } step(); s.palette.push(ed.color.slice()); ed.sw = 1e6; changed(); rer(); }],
           ['trash', 'Remove', () => { const i = s.palette.findIndex(c => sameColor(c, ed.color)); if (i < 0) { toast('This colour is not in the palette'); return; } step(); s.palette.splice(i, 1); changed(); rer(); }]])}`;
+    } else if (sh.kind === 'palette') {
+      const i = palIdx(ed.color), n = s.palette.length;
+      body = head('Palette', n + (n === 1 ? ' colour' : ' colours') + (i >= 0 ? ' · colour ' + (i + 1) + ' chosen' : '')) + `
+        <div class="se-palgrid">${s.palette.map((c, k) => `<button class="se-pc${k === i ? ' sel' : ''}" ${A(() => { ed.color = c.slice(); if (ed.color.length < 4) ed.color.push(255); rer(); })} aria-label="Palette colour ${k + 1}">${swatch(c, 26)}</button>`).join('')}</div>
+        ${btns([['paint', 'Edit colour', () => { ed.sheet = { kind: 'color', i, old: ed.color.slice() }; rer(); }, i < 0], [null, 'Make ramp', palOps.ramp, false, G.shade],
+          ['left', 'Move left', () => palOps.move(-1), i <= 0], ['right', 'Move right', () => palOps.move(1), i < 0 || i >= n - 1],
+          ['down', 'Sort by light', palOps.sort, n < 2], ['plus', 'From sprite', palOps.fromSprite], ['trash', 'Remove unused', palOps.unused, !n], ['trash', 'Remove colour', () => { if (i < 0) return; step(); s.palette.splice(i, 1); changed(); rer(); }, i < 0]])}
+        <div class="se-note sub" style="margin-top:12px">Files</div>
+        <div class="se-btns">
+          <label class="btn bare se-file">${well(28, icon('down', '#e4e2dc'))}<span>Import</span><input type="file" id="se-palimp" accept=".hex,.gpl,.pal,.txt,.aseprite,.ase,image/png,image/gif"></label>
+          <button class="btn bare" ${A(palOps.exportHex)}${n ? '' : ' disabled'}>${well(28, icon('up', '#e4e2dc'))}<span>Export .hex</span></button>
+          <button class="btn bare" ${A(palOps.exportPng)}${n ? '' : ' disabled'}>${well(28, icon('up', '#e4e2dc'))}<span>Export .png</span></button>
+        </div>
+        <div class="se-note sub" style="margin-top:12px">Presets (replace the palette)</div>
+        <div class="se-btns">${PRESETS.map(([nm, list]) => `<button class="btn bare" ${A(() => setPalette(list, nm + ' palette'))}><span class="se-strip">${list.slice(0, 8).map(c => `<i style="background:${rgbHex(c)}"></i>`).join('')}</span><span>${esc(nm)}</span></button>`).join('')}</div>`;
     } else if (sh.kind === 'layer') {
       const L = s.layers[ed.layer];
       body = head(L.name, L.group ? 'Layer group (from desktop Aseprite)' : 'Layer ' + (ed.layer + 1) + ' of ' + s.layers.length) + field('se-lname', L.name, 'Name') + `
@@ -891,9 +1031,10 @@ export function openSpriteEditor(app, g, item, opts = {}) {
         ${stepper(Math.round(F.s * 100) + '%', A(() => scaleBy(-1)), A(() => scaleBy(1)), 'size')}
       </div>` : '';
       const colors = F ? floatBar : ed.tool === 'select' || ed.tool === 'move' ? selBar : `<div class="plate bar se-colors">
-        <button class="se-cur" id="se-cur" ${A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'color' ? null : { kind: 'color' }; rer(); })} aria-label="Colour ${rgbHex(ed.color)}, change it">${swatch(ed.color, 36)}</button>
+        ${ed.tool === 'shade' ? `<button class="vscreen se-mode" ${A(() => { ed.shadeDir = -ed.shadeDir; rer(); })} aria-label="${ed.shadeDir < 0 ? 'Darker' : 'Lighter'} (tap to change)">${svgText(ed.shadeDir < 0 ? 'DARK' : 'LIGHT', PINK)}</button>` : ''}<button class="se-cur" id="se-cur" ${A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'color' ? null : { kind: 'color', i: palIdx(ed.color), old: ed.color.slice() }; rer(); })} aria-label="Colour ${rgbHex(ed.color)}, change it">${swatch(ed.color, 36)}</button>
         <div class="se-pal" id="se-pal">${s.palette.map((c, i) => `<button class="se-pc${sameColor(c, ed.color) ? ' sel' : ''}" ${A(() => setColor(c))} aria-label="Palette colour ${i + 1}">${swatch(c, 24)}</button>`).join('')}</div>
         ${s.palette.some(c => sameColor(c, ed.color)) ? '' : iconBtn('plus', A(() => { step(); s.palette.push(ed.color.slice()); ed.sw = 1e6; changed(); rer(); }), { color: PINK, label: 'Add this colour to the palette' })}
+        ${iconBtn(null, A(() => { ed.sheet = ed.sheet && ed.sheet.kind === 'palette' ? null : { kind: 'palette' }; rer(); }), { color: '#fff', label: 'Palette', rows: G.palette })}
       </div>`;
       const tl = `<div class="plate se-tl">
         <div class="se-tlbar" data-pad="pager">
@@ -939,6 +1080,7 @@ export function openSpriteEditor(app, g, item, opts = {}) {
       if (nm) nm.addEventListener('change', () => { const v = nm.value.trim(); if (v && v !== S().layers[ed.layer].name) { step(); S().layers[ed.layer].name = v; changed(); rer(); } });
       if (tn) tn.addEventListener('change', () => { const t = S().tags[ed.sheet.i], v = tn.value.trim(); if (t && v && v !== t.name) { step(); t.name = v; changed(); rer(); } });
       if (ed.sheet && ed.sheet.kind === 'color') pickerMount(root);
+      const pimp = root.querySelector('#se-palimp'); if (pimp) pimp.addEventListener('change', () => { const f = pimp.files && pimp.files[0]; pimp.value = ''; palOps.importFile(f); });
       const imp = root.querySelector('#se-import'); if (imp) imp.addEventListener('change', () => { const f = imp.files && imp.files[0]; imp.value = ''; importFile(f); });
     },
     frame(t) {
