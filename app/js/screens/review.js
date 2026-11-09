@@ -8,6 +8,7 @@ import { makeNav, padFrame } from '../padnav.js';
 import { fmt } from './gameEditor.js';
 import { pushAll, markSeen } from './sync.js';
 import * as store from '../artStore.js';
+import * as custom from '../custom.js';
 
 const BLUE = '#4d7cff';
 
@@ -70,6 +71,52 @@ export function openReview(app, g) {
           ${bareBtn('up', n ? 'Push' : 'Pushed', A(() => { if (n) pushAll(app).then(() => rer()); }), n ? BLUE : undefined)}
         </div>
       </div>`;
+    },
+    frame() { if (input.pressed('b')) app.close(); else padFrame(document.getElementById('app'), nav, input); }
+  };
+  app.open(ov);
+}
+
+// App customizations: what differs from GitHub's app/custom.json, by kind; push them, save them as a file, load a file, or go back
+export function openCustomReview(app) {
+  markSeen({ file: '_custom' });
+  const nav = makeNav();
+  async function exportFile() {
+    const f = new File([custom.fileText()], 'hedron-customizations.json', { type: 'application/json' });
+    try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f] }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+  }
+  const ov = {
+    place: 'Review',
+    render() {
+      const list = custom.changes(), n = list.reduce((x, c) => x + c.n, 0);
+      const rows = list.map(c => `<div class="grow"><span class="t" style="min-width:0"><span class="cap">${esc(c.label)}</span><span class="sub ell">${c.n} ${c.n === 1 ? 'change' : 'changes'}</span></span></div>`).join('');
+      return `<div class="screen-tool" style="--acc:${BLUE}">
+        <h1 class="sr">App customizations</h1>
+        <div class="plate bar">
+          ${iconBtn('back', A(() => app.close()), { color: '#fff', label: 'Back to Sync' })}
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="title ell">App customizations</span><span class="sub">${n ? n + (n === 1 ? ' change' : ' changes') + ' to push' : 'Matches GitHub'}</span></span>
+        </div>
+        <div class="plate inspector">${rows || `<div class="center-note">${well(40, icon('check', BLUE))}<span class="sub">Nothing to push.</span></div>`}
+          <div class="se-btns" style="margin-top:12px">
+            <button class="btn bare" ${A(exportFile)}>${well(28, icon('up', '#e4e2dc'))}<span>Export</span></button>
+            <label class="btn bare se-file">${well(28, icon('down', '#e4e2dc'))}<span>Import</span><input type="file" id="cu-imp" accept=".json,application/json"></label>
+          </div>
+        </div>
+        <div class="plate bar">
+          ${bareBtn('trash', 'Discard', A(() => { if (n && confirm('Discard ' + n + (n === 1 ? ' change' : ' changes') + ' and go back to the customizations on GitHub?')) custom.discard(); }))}
+          ${bareBtn('up', n ? 'Push' : 'Pushed', A(() => { if (n) pushAll(app).then(() => { if (app.overlay === ov) app.render(); }); }), n ? BLUE : undefined)}
+        </div>
+      </div>`;
+    },
+    mount(root) {
+      const inp = root.querySelector('#cu-imp');
+      if (inp) inp.addEventListener('change', async () => {
+        const f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+        let o; try { o = JSON.parse(await f.text()); } catch (e) { app.toast('Not a customizations file'); return; }
+        if (!o || typeof o !== 'object' || !Object.keys(o).some(k => k in custom.KEYS)) { app.toast('Not a customizations file'); return; }
+        if (confirm('Replace this phone\'s customizations with ' + f.name + '?')) custom.replaceAll(o);
+      });
     },
     frame() { if (input.pressed('b')) app.close(); else padFrame(document.getElementById('app'), nav, input); }
   };

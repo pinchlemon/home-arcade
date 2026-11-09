@@ -1,3 +1,4 @@
+import './custom.js';   // customizations from GitHub, put in place before the icons below read them
 // Pixel art: bitmaps, the 3x5 font, Platonic solids, and helpers that draw them as SVG or onto a canvas.
 // One unit = one pixel. On screen a pixel is 2px and is drawn at 0.88 of its cell so neighbours keep a hairline gap.
 

@@ -24,6 +24,7 @@ A no-code game-dev and arcade web app, used on an iPhone 16 Pro (home-screen app
 - iOS quirks to remember: home-screen apps get less height than the screen (black band), so layout is centered by measurement; iOS Safari hides a controller from a page until a button is pressed (the app tells launched games via `sessionStorage` `ha.pad`); Low Power Mode caps pages at 30 fps.
 
 ## Testing
+The owner's app customizations (redrawn icons, button text, order) live in `app/custom.json` once she pushes them; a fresh test browser loads them, so screenshots match her phone.
 Serve locally with `python3 -m http.server 8765` from the repo root and drive it with Playwright (at 402x874 for portrait, 874x402 or 859x329-395 with side margins for landscape). Fake a controller with an init script that replaces `navigator.getGamepads`. The old test scripts were kept outside the repo and are not available in a fresh session; rewrite what you need.
 
 ## Not built yet (ideas the owner approved)
