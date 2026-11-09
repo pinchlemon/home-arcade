@@ -133,14 +133,20 @@ export function gameJson(name, template) {
   return {
     title: name, template,
     about: 'A game made with New game in Hedron. Distances are in game pixels, times in frames (60 a second). Tiles are 8×8; a scene map is one character per tile ("." is empty).',
-    load: ['engine/screen', 'engine/audio', 'engine/input', 'engine/tiles', 'engine/loop'],
+    load: ['engine/screen', 'engine/audio', 'engine/input', 'engine/tiles', 'engine/logic', 'engine/loop'],
     screen: { width: 160, height: 144, ground: 144, zooms: [[160, 144], [240, 216], [320, 288]] },
     colors: { sky: top ? '#2f4a2a' : '#1d2b53', ink: '#0b0b10', text: '#f4f1ea', hurt: '#ff4f5e' },
     player: { symbol: top ? 'skull' : 'crab', color: '#ff5a1f', scale: 1, walkMax: 1.4, walkAccel: 0.2, stopDecel: 0.3, gravity: 0.3, holdJumpGravity: 0.17, jumpSpeed: 4.1, maxFall: 3.6,
       coyoteFrames: 6, jumpBufferFrames: 7, speed: 1.1, lives: 3, hurtInvulnFrames: 90, hurtStunFrames: 12, knockback: 2, shoot: 1, shotSpeed: 3, shotCooldown: 14, stomp: 1 },
     camera: { lookAhead: top ? 0 : 12, lookEase: 0.1 },
     tiles: TILESETS[template], objects: OBJECTS[template],
-    scenes: [top ? topdownLevel() : platformerLevel()]
+    scenes: [top ? topdownLevel() : platformerLevel()],
+    // visual logic (the Studio's Logic tab): a first graph to change or delete
+    logic: [{ id: 'g1', name: 'Logic 1', scene: '', nodes: [
+      { id: 'n1', t: 'gone', x: 16, y: 16, p: { obj: 'coin' } },
+      { id: 'n2', t: 'say', x: 196, y: 16, p: { text: 'ALL COINS', v: 0, secs: 2 } },
+      { id: 'n3', t: 'sound', x: 196, y: 124, p: { snd: 'win' } }
+    ], wires: [['n1', 'o0', 'n2', 'in'], ['n2', 'o0', 'n3', 'in']] }]
   };
 }
 const slug = (s) => (s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'game').slice(0, 24);

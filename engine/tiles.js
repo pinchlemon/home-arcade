@@ -3,11 +3,13 @@
 // things placed on top in pixels, a start and an exit. Tiles can be solid, one-way (stand on them from above)
 // or hurt. Things are copies of objects, which mix behaviors from the engine's library (behaviors.json).
 // Loaded after engine/screen, engine/audio and engine/input, before engine/loop (which calls update and render).
+// The game's visual logic (engine/logic.js, loaded next) is told what happens through fire().
 const T = 8;
 const TG = window.GAME, TP = TG.player || {}, TOP = TG.template === 'topdown';
 const COL = Object.assign({ sky: '#1d1b24', ink: '#0b0b10', text: '#f4f1ea', hurt: '#ff4f5e' }, TG.colors || {});
 const INK = COL.ink, CREAM = COL.text, RED = COL.hurt;
 let musicOn = true;
+const fire = (what, it) => { if (window.LOGIC) window.LOGIC.fire(what, it); };
 function startMusic() {}   // tile games have no music yet (audio.js asks for it)
 const sfx = {
   jump: () => blip(300, 600, 0.12, 'square', 0.04),
@@ -24,6 +26,10 @@ const sfx = {
 keys.up = keys.down = false;
 Object.assign(KEYMAP, { ArrowDown: 'down', KeyS: 'down' });
 if (TOP) Object.assign(KEYMAP, { ArrowUp: 'up', KeyW: 'up', Space: 'a' });
+// every button that went down since the last frame, however briefly (the logic's Button pressed box reads it)
+const tapped = {};
+const setKeyWas = setKey;
+setKey = function (k, v) { if (v && !keys[k]) tapped[k] = true; setKeyWas(k, v); };
 function padAxis() {
   const g = gamepad; if (!g) return { up: false, down: false };
   const ay = g.axes[1] || 0, b = (i) => !!(g.buttons[i] && g.buttons[i].pressed);
@@ -74,14 +80,17 @@ function loadScene(i) {
   player = { ...pb, x: SC.start.x, y: SC.start.y, vx: 0, vy: 0, dir: 1, face: [1, 0], onGround: false, coyote: 0, buffer: 0, hp: TP.lives || 3, inv: 0, stun: 0, cool: 0, dead: 0, t: 0 };
   player.bw = Math.max(4, player.w - 2); player.bh = Math.max(4, player.h - 1);
   actors2 = []; shots2 = []; pellets = [];
-  for (const t of SC.things || []) {
-    const o = (TG.objects || {})[t.obj]; if (!o) continue;
-    const b = makeBody(o.symbol, o.scale || 1), a = { ...b, obj: o, x: t.x, y: t.y, hx: t.x, hy: t.y, vx: 0, vy: 0, dir: 1, t: 0, cool: 0, alive: true, hit: 0, b: {} };
-    for (const bh of o.behaviors || []) a.b[bh.type] = { ...behaviorDefaults2(bh.type), ...bh };
-    a.hp = a.b.health ? a.b.health.hp : 0;
-    actors2.push(a);
-  }
+  for (const t of SC.things || []) { const a = makeThing(t.obj, t.x, t.y); if (a) actors2.push(a); }
   camX = player.x - VW / 2; camY = player.y - VH / 2;
+  if (window.LOGIC) window.LOGIC.begin();
+}
+// a copy of an object, standing at x (its middle) and y (its feet)
+function makeThing(id, x, y) {
+  const o = (TG.objects || {})[id]; if (!o) return null;
+  const b = makeBody(o.symbol, o.scale || 1), a = { ...b, obj: o, oid: id, x, y, hx: x, hy: y, vx: 0, vy: 0, dir: 1, t: 0, cool: 0, alive: true, hit: 0, b: {} };
+  for (const bh of o.behaviors || []) a.b[bh.type] = { ...behaviorDefaults2(bh.type), ...bh };
+  a.hp = a.b.health ? a.b.health.hp : 0;
+  return a;
 }
 function behaviorDefaults2(type) { const d = {}, p = ((window.BEHAVIORS || {}).behaviors || {})[type]; for (const k in (p && p.params) || {}) d[k] = p.params[k].default; return d; }
 
@@ -126,12 +135,12 @@ const P2 = Object.assign({ walkMax: 1.4, walkAccel: 0.2, stopDecel: 0.3, gravity
   lives: 3, hurtInvulnFrames: 90, hurtStunFrames: 12, knockback: 2, speed: 1.2, shoot: true, shotSpeed: 3, shotCooldown: 14, stomp: true }, TP);
 function hurt(fromX) {
   const p = player; if (p.inv > 0 || p.dead) return;
-  p.hp--; p.inv = P2.hurtInvulnFrames; p.stun = P2.hurtStunFrames; sfx.hurt(); if (typeof rumble === 'function') rumble(120, 0.6, 0.3);
+  p.hp--; p.inv = P2.hurtInvulnFrames; p.stun = P2.hurtStunFrames; sfx.hurt(); fire('hurt'); if (typeof rumble === 'function') rumble(120, 0.6, 0.3);
   const d = Math.sign(p.x - fromX) || -p.dir;
-  if (TOP) { p.vx = d * P2.knockback; } else { p.vx = d * P2.knockback; p.vy = -P2.knockback; p.onGround = false; }
+  if (TOP) { p.vx = d * P2.knockback; p.vy = 0; } else { p.vx = d * P2.knockback; p.vy = -P2.knockback; p.onGround = false; }
   if (p.hp <= 0) die();
 }
-function die() { player.dead = 60; player.hp = 0; sfx.melt(); }
+function die() { if (player.dead) return; player.dead = 60; player.hp = 0; sfx.melt(); fire('dies'); }
 function updatePlayer() {
   const p = player, ax = padAxis();
   p.t++; if (p.inv > 0) p.inv--; if (p.cool > 0) p.cool--;
@@ -141,8 +150,8 @@ function updatePlayer() {
     let dx = (R ? 1 : 0) - (L ? 1 : 0), dy = (D ? 1 : 0) - (U ? 1 : 0);
     if (dx || dy) { p.face = [dx, dy]; if (dx) p.dir = dx; }
     const k = dx && dy ? Math.SQRT1_2 : 1;
-    if (p.stun > 0) { p.stun--; p.vx *= 0.85; } else { p.vx = dx * P2.speed * k; p.vy = dy * P2.speed * k; }
-    moveX(p, p.vx, p.bw, p.bh); moveY(p, p.stun > 0 ? 0 : p.vy, p.bw, p.bh);
+    if (p.stun > 0) { p.stun--; p.vx *= 0.85; p.vy *= 0.85; } else { p.vx = dx * P2.speed * k; p.vy = dy * P2.speed * k; }
+    moveX(p, p.vx, p.bw, p.bh); moveY(p, p.vy, p.bw, p.bh);
   } else {
     const dx = (R ? 1 : 0) - (L ? 1 : 0);
     if (p.stun > 0) p.stun--;
@@ -209,8 +218,11 @@ function updateThings() {
       shots2.push({ x: a.x, y: a.y - a.h / 2, vx: dx / d * B.shooter.speed, vy: dy / d * B.shooter.speed, life: 240 }); sfx.charge();
     }
     const ab = boxOf(a, a.w - 2, a.h - 1);
-    if (!p.dead && pb.x0 < ab.x1 && pb.x1 > ab.x0 && pb.y0 < ab.y1 && pb.y1 > ab.y0) {
-      if (B.collectible) { a.alive = false; score += B.collectible.score || 0; p.hp = Math.min(P2.lives, p.hp + (B.collectible.hearts || 0)); sfx.coin(); continue; }
+    const over = !p.dead && pb.x0 < ab.x1 && pb.x1 > ab.x0 && pb.y0 < ab.y1 && pb.y1 > ab.y0;
+    if (over && !a.touch) fire('touch', a);
+    a.touch = over;
+    if (over && a.alive) {
+      if (B.collectible) { a.alive = false; score += B.collectible.score || 0; p.hp = Math.min(P2.lives, p.hp + (B.collectible.hearts || 0)); sfx.coin(); fire('collect', a); continue; }
       const fromAbove = !TOP && p.vy > 0 && p.y - p.vy <= ab.y0 + 3;
       if (B.bouncer && fromAbove) { p.vy = -B.bouncer.strength; p.onGround = false; p.y = ab.y0; sfx.jump(); continue; }
       if (fromAbove && P2.stomp && B.health) { p.vy = -P2.jumpSpeed * 0.7; p.y = ab.y0; damage(a); continue; }
@@ -226,12 +238,13 @@ function updateThings() {
   }
   pellets = pellets.filter(s => s.life > 0);
 }
-function damage(a) { a.hp--; a.hit = 8; sfx.hit(); if (a.hp <= 0) { a.alive = false; score += 1; sfx.melt(); } }
+function damage(a) { a.hp--; a.hit = 8; sfx.hit(); if (a.hp <= 0) { a.alive = false; score += 1; sfx.melt(); fire('defeat', a); } }
 
 // ---------------------------------------------------------------- camera, update, drawing
 let camX = 0, camY = 0;
 function update() {
   if (banner) { if (--banner.t <= 0) { const f = banner.then; banner = null; if (f) f(); } return; }
+  if (window.LOGIC) window.LOGIC.tick();
   updatePlayer(); updateThings();
   const look = TOP ? 0 : player.dir * ((TG.camera || {}).lookAhead || 12), ease = (TG.camera || {}).lookEase || 0.1;
   const tx = player.x + look - VW / 2, ty = player.y - player.h / 2 - VH / 2;
@@ -250,7 +263,9 @@ function drawSym(o, color, flip) {
   for (let r = 0; r < rows.length; r++) for (let c = 0; c < W2; c++) if (on(r, c)) ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
 }
 const DIG = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001001001', 8: '111101111101111', 9: '111101111001111',
-  Y: '101101010010010', O: '111101101101111', U: '101101101101111', W: '101101111111101', I: '111010010010111', N: '110101101101101', C: '111100100100111', L: '100100100100111', E: '111100111100111', A: '010101111101101', R: '110101110101101', P: '111101111100100', S: '111100111001111', D: '110101101101110', ' ': '000000000000000' };
+  Y: '101101010010010', O: '111101101101111', U: '101101101101111', W: '101101111111101', I: '111010010010111', N: '110101101101101', C: '111100100100111', L: '100100100100111', E: '111100111100111', A: '010101111101101', R: '110101110101101', P: '111101111100100', S: '111100111001111', D: '110101101101110', ' ': '000000000000000',
+  B: '110101110101110', F: '111100110100100', G: '011100101101011', H: '101101111101101', J: '001001001101010', K: '101101110101101', M: '101111111101101', Q: '010101101110011', T: '111010010010010', V: '101101101101010', X: '101101010101101', Z: '111001010100111',
+  '!': '010010010000010', '?': '111001010000010', '.': '000000000000010', ',': '000000000010100', ':': '000010000010000', '-': '000000111000000', '+': '000010111010000', '/': '001001010100100', "'": '010010000000000' };
 function say(str, x, y, color) {
   for (const pass of [INK, color]) { let cx = x + (pass === INK ? 1 : 0); for (const ch of str) { const g = DIG[ch]; if (g) for (let i = 0; i < 15; i++) if (g[i] === '1') { ctx.fillStyle = pass; ctx.fillRect(cx + i % 3, y + (pass === INK ? 1 : 0) + Math.floor(i / 3), 1, 1); } cx += 4; } }
 }
@@ -271,6 +286,7 @@ function render() {
   for (let i = 0; i < P2.lives; i++) { ctx.fillStyle = INK; ctx.fillRect(3 + i * 7, 3, 6, 6); ctx.fillStyle = i < p.hp ? RED : '#3a3a42'; ctx.fillRect(4 + i * 7, 4, 4, 4); }
   say(String(score), VW - 4 - String(score).length * 4, 4, CREAM);
   if (banner) say(banner.text, Math.round(VW / 2 - banner.text.length * 2), Math.round(VH / 2 - 3), CREAM);
+  if (window.LOGIC) window.LOGIC.draw();
   if (paused) say('PAUSED', VW / 2 - 12, VH / 2 - 3, CREAM);
 }
 loadScene(sceneIndex);

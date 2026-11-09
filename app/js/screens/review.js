@@ -25,6 +25,11 @@ function describe(schema, base, path, now) {
   const was = games.getPath(base, path);
   if (path === 'scenes') return { label: 'Scenes and levels', where: 'Scene', from: many(count(was), 'scene'), to: many(count(now), 'scene') + (count(now) === count(was) ? ', edited' : '') };
   if (path === 'objects') return { label: 'Objects', where: 'Objects', from: many(count(was), 'object'), to: many(count(now), 'object') + (count(now) === count(was) ? ', edited' : '') };
+  if (path === 'tiles') return { label: 'Tiles', where: 'Scene', from: many(count(was), 'tile'), to: many(count(now), 'tile') + (count(now) === count(was) ? ', edited' : '') };
+  if (path === 'logic') {   // visual logic: counted in boxes over all its graphs
+    const boxes = (v) => { const n = (Array.isArray(v) ? v : []).reduce((k, g) => k + ((g && g.nodes) || []).length, 0); return n + (n === 1 ? ' box' : ' boxes'); };
+    return { label: 'Visual logic', where: 'Logic', from: boxes(was), to: boxes(now) + (boxes(now) === boxes(was) ? ', edited' : '') };
+  }
   const f = fieldFor(schema, path);
   if (f) return { label: f.label, where: f.where, from: fmt(f, was), to: fmt(f, now) };
   const show = (v) => (typeof v === 'object' ? 'edited' : String(v));

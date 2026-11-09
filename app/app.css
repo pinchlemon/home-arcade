@@ -442,3 +442,48 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
   .icon-ed.te>.te-low{grid-area:low!important;min-height:0;overflow-y:auto;scrollbar-width:none}
   .icon-ed.te .ts-cols{grid-template-columns:repeat(8,minmax(0,26px))}
 }
+
+/* Studio > Logic: the node graph (boxes are plates, flow dots are square and bone, number dots are round and blue) */
+.lg-view{position:relative;display:block!important;padding:0!important;overflow:hidden;touch-action:none;-webkit-touch-callout:none;background-image:radial-gradient(rgba(237,237,234,.1) 1px,transparent 1.2px);background-size:16px 16px}
+/* upright: the graph takes the spare height, and makes room for the list while a box is being added (sideways it keeps the whole left side) */
+@media not all and (orientation:landscape) and (max-height:520px){
+  .screen-tool .screen.fit.lg-view{flex:1 1 304px}
+  .screen-tool .screen.fit.lg-view.small{flex:0 1 170px;height:170px;min-height:120px}
+}
+.lg-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
+.lg-wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.lg-wires path{fill:none;stroke-linecap:round;stroke-width:2.5}
+.lg-wires .flow{stroke:#e4e2dc}
+.lg-wires .num{stroke:#4d7cff}
+.lg-wires .sel{stroke:var(--acc);stroke-width:4.5}
+.lg-wires .temp{stroke-dasharray:5 5}
+.lg-node{position:absolute;width:136px;border-radius:var(--r-btn);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015) 40%,rgba(0,0,0,.15)),var(--plate);border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.6);pointer-events:none}
+.lg-node.sel{border-color:var(--acc);box-shadow:0 0 0 1.5px var(--acc),0 4px 12px rgba(0,0,0,.6)}
+.lg-node.drag{z-index:2;opacity:.9}
+.lg-h{height:25px;line-height:24px;padding:0 12px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(0,0,0,.3);border-radius:5px 5px 0 0}
+.lg-h:only-of-type{border-radius:5px}
+.lg-r{height:20px;line-height:20px;padding:0 12px;font-size:10px;display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+.lg-r.out{justify-content:flex-end;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
+.lg-r .l{color:var(--dim);flex:none}
+.lg-r .v{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.lg-r .v.w{color:#8fa8ff}
+.lg-p{position:absolute;width:12px;height:12px;margin:-7px 0 0 -7px;background:#000;border:2px solid #4d7cff;border-radius:50%}
+.lg-p.flow{border-color:#e4e2dc;border-radius:2px}
+.lg-p.num.on{background:#4d7cff}
+.lg-p.flow.on{background:#e4e2dc}
+.lg-p.arm{box-shadow:0 0 0 3px var(--acc)}
+.lg-p.ok{animation:lg-ok 1s ease-in-out infinite}
+@keyframes lg-ok{0%,100%{box-shadow:0 0 0 2px rgba(255,255,255,.9)}50%{box-shadow:0 0 0 5px rgba(255,255,255,.25)}}
+.lg-empty{position:absolute;left:0;right:0;top:42%;text-align:center;white-space:normal;padding:0 34px;pointer-events:none}
+.lg-insp{flex:1 1 200px}
+.lg-groups{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:0 0 6px}
+.lg-groups .seg{height:32px;padding:0 2px;gap:0;font-size:10px;letter-spacing:.06em;border-radius:var(--r-btn);background:rgba(0,0,0,.35);color:var(--muted)}
+.lg-groups .seg.on{color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
+.lg-groups .seg:disabled{opacity:.3}
+.lg-list{display:flex;flex-direction:column}
+.lg-add{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:46px;padding:6px 2px;border-top:1px solid rgba(255,255,255,.06);text-align:left}
+.lg-add:first-child{border-top:0}
+.lg-add .sub{white-space:normal;font-size:11px;line-height:14px}
+.lg-add.pressed::after{content:'';position:absolute;inset:2px -8px;border-radius:var(--r-btn);border:1.5px solid var(--acc);pointer-events:none}
+.vscreen.lg-text{display:block;padding:0 8px;font-size:11px;line-height:26px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+

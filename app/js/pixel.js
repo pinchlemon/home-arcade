@@ -122,7 +122,12 @@ export const G = {
   shapeBox: ['1111111','1000001','1000001','1000001','1000001','1000001','1111111'],
   shapeBoxF: ['1111111','1111111','1111111','1111111','1111111','1111111','1111111'],
   shapeOval: ['0011100','0100010','1000001','1000001','1000001','0100010','0011100'],
-  shapeOvalF: ['0011100','0111110','1111111','1111111','1111111','0111110','0011100']
+  shapeOvalF: ['0011100','0111110','1111111','1111111','1111111','0111110','0011100'],
+  // the Logic tab: one icon per kind of box (event, flow, action, value)
+  nodeEvent: ['0000110','0001100','0011000','0111110','0001100','0011000','0110000'],
+  nodeFlow: ['0000111','0001000','1111000','0001000','0000111'],
+  nodeAction: ['0010000','0011000','1111100','1111110','1111100','0011000','0010000'],
+  nodeValue: ['0100100','1111110','0100100','0100100','1111110','0100100']
 };
 export const icon = (name, color = '#e4e2dc') => svgRows(G[name], color);
 
@@ -180,7 +185,7 @@ const USED_ON = Object.fromEntries(Object.entries({
   check: 'Sprite editor',
   code: 'Arcade,Studio',
   controller: 'Studio,Studio editor,Settings',
-  cut: 'Sprite editor',
+  cut: 'Sprite editor,Studio editor',
   display: 'Studio editor,Art,Sprite editor,Settings',
   dots: 'Sprite editor',
   down: 'Studio editor,New sprite,Sprite editor',
@@ -188,7 +193,11 @@ const USED_ON = Object.fromEntries(Object.entries({
   edit: 'Arcade,Studio,Art',
   erase: 'Studio editor,Sprite editor',
   eraser: 'Sprite editor',
-  events: 'Sprite editor',
+  events: 'Sprite editor,Studio editor',
+  nodeEvent: 'Studio editor',
+  nodeFlow: 'Studio editor',
+  nodeAction: 'Studio editor',
+  nodeValue: 'Studio editor',
   eye: 'Sprite editor',
   eyeOff: 'Sprite editor',
   fill: 'Sprite editor',
