@@ -31,6 +31,8 @@ function describe(schema, base, path, now) {
     const boxes = (v) => { const n = (Array.isArray(v) ? v : []).reduce((k, g) => k + ((g && g.nodes) || []).length, 0); return n + (n === 1 ? ' box' : ' boxes'); };
     return { label: 'Visual logic', where: 'Logic', from: boxes(was), to: boxes(now) + (boxes(now) === boxes(was) ? ', edited' : '') };
   }
+  if (path === 'lab.prototypes') return { label: 'Lab prototypes', where: 'Lab', from: many(count(was), 'prototype'), to: many(count(now), 'prototype') + (count(now) === count(was) ? ', edited' : '') };
+  if (path === 'lab.ideas') return { label: 'Lab ideas', where: 'Lab', from: many(count(was), 'idea'), to: many(count(now), 'idea') + (count(now) === count(was) ? ', edited' : '') };
   const f = fieldFor(schema, path);
   if (f) return { label: f.label, where: f.where, from: fmt(f, was), to: fmt(f, now) };
   const show = (v) => (typeof v === 'object' ? 'edited' : String(v));

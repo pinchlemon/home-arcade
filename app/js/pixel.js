@@ -103,6 +103,7 @@ export const G = {
   dots: ['0000000','0000000','1101011','1101011','0000000','0000000','0000000'],
   boxSelect: ['1101011','0000000','1000001','0000000','1000001','0000000','1101011'],
   lasso: ['0011100','0100010','1000001','1000001','0110010','0101100','0010000'],
+  flask: ['0111110','0010100','0010100','0100010','1000001','1111111','1111111'],
   wand: ['1010000','0100000','1010000','0001000','0000100','0000010','0000001'],
   merge: ['1111111','1000001','1111111','0001000','0101010','0011100','0001000'],
   paste: ['0011100','1111111','1000001','1011101','1000001','1011101','1111111'],
@@ -241,7 +242,8 @@ const USED_ON = Object.fromEntries(Object.entries({
   trash: 'Studio editor,Sprite editor',
   undo: 'Studio editor,Sprite editor',
   up: 'Studio editor,Sprite editor',
-  wand: 'Sprite editor'
+  wand: 'Sprite editor,Studio editor',
+  flask: 'Studio editor'
 }).map(([k, v]) => [k, v.split(',')]));
 let seen = null, whereNow = () => '', saveSeen = 0;
 export const iconPlace = (fn) => { whereNow = fn; };

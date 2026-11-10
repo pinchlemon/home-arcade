@@ -6,7 +6,7 @@ const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typ
 // features: add-ons in features/ that hook into the game (engine/features.js). With none on, nothing here changes how it plays.
 const FX=window.FEATURES||{emit(){},on(){}};
 // multipliers a feature can change (1 = normal)
-const MOD={speed:1,jump:1,gravity:1,time:1};
+const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1}; // demon: the demon's full size; knock 0: nobody gets knocked down
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -490,7 +490,7 @@ function dive(W){
   return true;
 }
 function knockDown(W,dx,dz,power){
-  if(W.downT>0||W.diveT>0)return;
+  if(W.downT>0||W.diveT>0||!MOD.knock)return;
   rumble(W,1,0.8,300);
   W.downT=DOWN_TIME;W.charging=false;W.crouchT=0;
   W.yaw=Math.atan2(-dx,-dz); // face the hit so he falls over backwards
@@ -678,12 +678,14 @@ if(matchMedia('(pointer:coarse)').matches)document.getElementById('hint').textCo
 
 // ---- controllers: the first is player 1, a second one takes over the red wizard as player 2
 const PAD_HINT='Stick move · R1 run · Cross jump · Circle crouch (tap while running to dive-roll) · Square catch / hold to throw · L1 tackle · Triangle change shape / duel special (or buddy mode / switch wizard when empty-handed) · Right stick team shape (duel) · D-pad up switch demon / 2v2 duel';
-const padPrev={};let padOn=false, padToP2=false;
+const padPrev={};let padOn=false, padToP2=false, padBlock=false;
 addEventListener('gamepadconnected',()=>{padOn=true;document.getElementById('hint').textContent=PAD_HINT;});
 addEventListener('keydown',e=>{if(e.code==='Digit2'&&!e.repeat){padToP2=!padToP2;popup(padToP2?'CONTROLLER → PLAYER 2':'CONTROLLER → PLAYER 1',player.pos,'#ffd36a');}});
 function padRead(gp,W){
   const b=i=>gp.buttons[i]?(gp.buttons[i].pressed||gp.buttons[i].value>0.3):false;
   const now=[b(0),b(5)||b(10),b(2)||b(7),b(3),b(9),b(1)||b(6),b(4),b(8),b(12)];
+  // the Lab (or another feature) can take the controller for a while: the game sees nothing pressed
+  if(padBlock){padPrev[gp.index]=now;W.ctl.castHeld=false;W.jumpHeld=false;return {x:0,y:0,run:false,crouch:false,rx:0,ry:0};}
   const prev=padPrev[gp.index]||[];
   const down=i=>now[i]&&!prev[i], up=i=>!now[i]&&prev[i];
   if(down(0)){W.jumpHeld=true;W.jumpQ=true;}
@@ -1379,7 +1381,7 @@ function updateDemon(dt){
     demon.spawnT-=dt;if(demon.spawnT<=0)spawnDemon();
     return;
   }
-  demon.scale=Math.min(1,demon.scale+dt*1.2);
+  demon.scale=Math.min(MOD.demon,demon.scale+dt*1.2);
   // whoever has the solid is the target; if it's loose, the closest wizard still standing
   let T;
   if(orb.state==='held')T=orb.holder;
@@ -1420,8 +1422,8 @@ function updateDemon(dt){
       if(od<1.35&&fw>0.3)swatOrb();
     }else{steer(2.4,Math.sin(time*2.4)*0.4);want=d>1.8?1:0.35;}
     if(demon.state==='walk')demon.sway=(demon.sway||0)*Math.exp(-7*dt);
-    if(!(demon.stunT>0)&&demon.mode!=='swat'&&d<3.6&&ahead>0.8&&demon.cd<=0&&T.downT<=0&&demon.scale>=1){demon.state='windup';demon.atkT=WINDUP;demon.kind='lunge';rumbleAll(0.25,0.15,WINDUP*1000,demon.pos,10);want=0;}
-    else if(!(demon.stunT>0)&&demon.mode==='hunt'&&d>4.5&&d<11&&ahead>0.85&&demon.cd<=0&&T.downT<=0&&demon.scale>=1&&Math.random()<dt*0.9){demon.state='windup';demon.atkT=WINDUP;demon.kind='spit';rumbleAll(0.2,0.1,WINDUP*1000,demon.pos,14);demon.spitAt=T;want=0;}
+    if(!(demon.stunT>0)&&demon.mode!=='swat'&&d<3.6&&ahead>0.8&&demon.cd<=0&&T.downT<=0&&demon.scale>=MOD.demon){demon.state='windup';demon.atkT=WINDUP;demon.kind='lunge';rumbleAll(0.25,0.15,WINDUP*1000,demon.pos,10);want=0;}
+    else if(!(demon.stunT>0)&&demon.mode==='hunt'&&d>4.5&&d<11&&ahead>0.85&&demon.cd<=0&&T.downT<=0&&demon.scale>=MOD.demon&&Math.random()<dt*0.9){demon.state='windup';demon.atkT=WINDUP;demon.kind='spit';rumbleAll(0.2,0.1,WINDUP*1000,demon.pos,14);demon.spitAt=T;want=0;}
   }else if(demon.state==='windup'){ // rears up high, sways, jaws wide, embers swirl into its mouth; then hangs, dead still
     const hang=demon.atkT<0.22;
     if(!hang)steer(1.4,0);demon.atkT-=dt;rearGoal=1.5;pinchGoal=1.2;
@@ -1920,6 +1922,7 @@ function frame(now){
   camera.position.copy(camBase);
   if(shake>0.002){camera.position.x+=(Math.random()-.5)*shake*2.5;camera.position.y+=(Math.random()-.5)*shake*2.5;shake*=Math.exp(-9*dt);}
   camera.lookAt(camLook);
+  FX.emit('camera',camera,camLook);
 
   // 1) world at low res  2) the solid at a finer res, with the wizards' depth so they still hide it  3) both stretched to the screen
   renderer.setRenderTarget(lowRT);renderer.setClearColor(0x000000,1);renderer.clear();
@@ -1945,7 +1948,8 @@ if(DUEL){if(WATCH)player.human=false;duelReset();duelScore();}
 FX.game={THREE,scene,camera,player,buddy,ALL,orb,demon,SOLIDS,MOD,keys,DUEL,PARTY,
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
-  shake(k){shake=Math.max(shake,k);}};
+  shake(k){shake=Math.max(shake,k);},
+  orbMesh:orbG,demonParts,get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();
 

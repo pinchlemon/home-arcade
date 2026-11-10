@@ -77,12 +77,13 @@ export function openGameEditor(app, g) {
   const set = (path, v) => { record(); games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
   // games with settings only (no scene in their studio.json, like Void Wizard): just the Settings tab
   const settingsOnly = () => !!ed.game && !ed.game.schema.scene;
-  const sceneLabel = () => { if (ed.tab === 'features' && hasFeatures()) { const fs = ed.game.schema.features, f = fs[Math.min(ed.fgroup || 0, fs.length - 1)]; return (f ? f.name : 'No features') + ' · Features'; }
+  const sceneLabel = () => { if (ed.tab === 'lab' && hasLab()) return (ed.labPage ? 'Ideas' : 'Prototypes') + ' · Lab';
+    if (ed.tab === 'features' && hasFeatures()) { const fs = ed.game.schema.features, f = fs[Math.min(ed.fgroup || 0, fs.length - 1)]; return (f ? f.name : 'No features') + ' · Features'; }
     if (settingsOnly()) { const gs = ed.game.schema.groups || [], gr = gs[Math.min(ed.group, gs.length - 1)]; return (gr ? gr.name : 'Settings') + ' · Settings'; } if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr ? gr.name : 'Logic') + ' · Logic'; } const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
   // Play starts the scene on screen (from Logic: the scene the graph runs in)
   function playScene() {
     if (!ed.game) return null;
-    if (settingsOnly() || ed.tab === 'features') return null;
+    if (settingsOnly() || ed.tab === 'features' || ed.tab === 'lab') return null;
     if (ed.tab === 'scene') return scene().id;
     if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); if (gr && gr.scene) return gr.scene; const lv = scenes().find(s => s.kind === 'level'); return lv && !tileGame() ? lv.id : null; }
     return null;
@@ -512,12 +513,67 @@ export function openGameEditor(app, g) {
       </div>
       <div class="plate inspector" style="margin-top:8px">${f.about ? `<div class="grow"><span class="t"><span class="sub" style="white-space:normal">${esc(f.about)}</span></span></div>` : ''}${field(on)}${(f.fields || []).map(field).join('')}${ask}</div>`;
   }
+  // ---------------------------------------------------------------- Lab: prototypes saved from the game's Lab, and ideas
+  // (game.json lab.prototypes and lab.ideas, edited on the phone like any setting). See engine/features.md.
+  const protos = () => { const l = val('lab.prototypes'); return Array.isArray(l) ? l : []; };
+  const ideas = () => { const l = val('lab.ideas'); return Array.isArray(l) ? l : []; };
+  const setProtos = (fn) => { const l = structuredClone(protos()); fn(l); set('lab.prototypes', l); };
+  const setIdeas = (fn) => { const l = structuredClone(ideas()); fn(l); set('lab.ideas', l); };
+  function playProto(p) { try { sessionStorage.setItem('ha.lab.play', p.id); } catch (e) {} games.launch(g); }
+  function askIdea(text) {
+    const req = `Hedron Lab idea for ${g.name} (repo pinchlemon/home-arcade, folder ${folder}).\n` +
+      `Read CLAUDE.md and engine/features.md (the Lab part), then build this as new Lab toys on the right shelf (or a new shelf), and open a PR:\n\n${text.trim()}\n\n` +
+      'Shelves it has now: ' + ((val('lab.shelves') || []).join(', ') || 'none') + '\n';
+    const copy = () => (navigator.clipboard ? navigator.clipboard.writeText(req) : Promise.reject()).then(() => app.toast('Copied: paste it to Claude')).catch(() => prompt('Copy this and paste it to Claude:', req));
+    if (navigator.share) navigator.share({ title: 'Lab idea for ' + g.name, text: req }).catch(e => { if (!e || e.name !== 'AbortError') copy(); });
+    else copy();
+  }
+  const summary = (p) => Object.values(p.labels || {}).join(' · ') || Object.keys(p.values || {}).length + ' knobs';
+  function labPanel() {
+    const page = ed.labPage ? 1 : 0, P = protos(), I = ideas();
+    const pager = `<div class="plate bar gap20" style="flex:none" data-pad="pager">
+        ${iconBtn('left', A(() => { ed.labPage = page ? 0 : 1; ed.labSel = null; rerender(); }), { color: '#fff', label: 'Previous page' })}
+        <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center"><span class="cap acc">${page ? 'Ideas' : 'Prototypes'}</span><span class="sub" style="font-size:11px">${page ? I.length + (I.length === 1 ? ' idea' : ' ideas') : P.length + ' saved'} · ${page + 1}/2</span></span>
+        ${iconBtn('right', A(() => { ed.labPage = page ? 0 : 1; ed.labSel = null; rerender(); }), { color: '#fff', label: 'Next page' })}
+      </div>`;
+    const rowOf = (cap, sub, btns, edited) => `<div class="grow"><span class="t"><span class="cap"${edited ? ` style="color:${GREEN}"` : ''}>${esc(cap)}</span><span class="sub clamp2">${esc(sub)}</span></span><span style="display:flex;gap:2px;flex:none">${btns}</span></div>`;
+    let body;
+    if (page === 1) {
+      body = rowOf('New idea', 'A mechanic or look to try. Claude can build it as Lab toys', bareBtn('plus', 'Add', A(() => { const t = prompt('Your idea:', ''); if (t && t.trim()) setIdeas(l => l.unshift({ id: 'i' + Date.now().toString(36), text: t.trim().slice(0, 600), made: Date.now() })); })))
+        + I.map((it, i) => rowOf('Idea ' + (I.length - i), it.text,
+          iconBtn('wand', A(() => askIdea(it.text)), { color: '#fff', label: 'Ask Claude to build it' }) +
+          iconBtn('rename', A(() => { const t = prompt('Your idea:', it.text); if (t !== null && t.trim()) setIdeas(l => { l[i].text = t.trim().slice(0, 600); }); }), { color: '#fff', label: 'Change idea' }) +
+          iconBtn('trash', A(() => { if (confirm('Delete this idea?')) setIdeas(l => l.splice(i, 1)); }), { color: '#fff', label: 'Delete idea' }))).join('');
+    } else if (!P.length) {
+      body = `<div class="grow"><span class="t"><span class="cap">Nothing saved yet</span><span class="sub" style="white-space:normal">Play ${esc(g.name)}, open the Lab (D-pad down, or the LAB button), turn knobs or roll the Dice, then Save. Saved mixes show up here.</span></span></div>`;
+    } else {
+      const k = P.findIndex(p => p.id === ed.labSel);
+      if (k >= 0) {   // one prototype: its name, note and knobs, and what you can do with it
+        const p = P[k];
+        body = rowOf('Name', p.name, iconBtn('rename', A(() => { const t = prompt('Prototype name', p.name); if (t && t.trim()) setProtos(l => { l[k].name = t.trim().slice(0, 40); }); }), { color: '#fff', label: 'Rename' }))
+          + rowOf('Note', p.note || 'Empty', iconBtn('rename', A(() => { const t = prompt('Note: what is it, what to try next', p.note || ''); if (t !== null) setProtos(l => { l[k].note = t.trim().slice(0, 300); }); }), { color: '#fff', label: 'Change note' }))
+          + `<div class="grow"><span class="t"><span class="cap">Knobs</span><span class="sub" style="white-space:normal">${esc(summary(p))}</span></span></div>`
+          + rowOf('Play it', 'Fine-tune it in the game Lab, then Save', bareBtn('play', 'Play', A(() => playProto(p))))
+          + rowOf('Copy', 'A copy to branch off', bareBtn('dup', 'Copy', A(() => setProtos(l => l.splice(k + 1, 0, { ...structuredClone(p), id: 'p' + Date.now().toString(36), name: (p.name + ' copy').slice(0, 40), made: Date.now() })))))
+          + rowOf('Delete', 'Undo brings it back', bareBtn('trash', 'Delete', A(() => { setProtos(l => l.splice(k, 1)); ed.labSel = null; rerender(); })))
+          + rowOf('All prototypes', P.length + ' saved', bareBtn('back', 'Back', A(() => { ed.labSel = null; rerender(); })));
+      } else {
+        body = P.map((p) => rowOf(p.name, p.note || summary(p),
+          iconBtn('play', A(() => playProto(p)), { color: '#fff', label: 'Play ' + p.name }) +
+          iconBtn('edit', A(() => { ed.labSel = p.id; rerender(); }), { color: '#fff', label: 'Open ' + p.name }))).join('');
+      }
+    }
+    return pager + `<div class="plate inspector" style="margin-top:8px">${body}</div>`;
+  }
   const BASE_TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
   const LOGIC_TABS = [BASE_TABS[0], BASE_TABS[1], ['logic', 'Logic', 'events'], BASE_TABS[2]];
   // games with features (engine/features.md) get a Features tab before Settings
   const FEATURE_TAB = ['features', 'Features', 'wand'];
   const hasFeatures = () => !!ed.game && Array.isArray(ed.game.schema.features);
-  const tabs = () => { const t = settingsOnly() ? [BASE_TABS[2]] : logicGame() ? LOGIC_TABS : BASE_TABS; return hasFeatures() ? [...t.slice(0, -1), FEATURE_TAB, t[t.length - 1]] : t; };
+  // games with a Lab (studio.json "lab") get a Lab tab before Features: saved prototypes and ideas
+  const LAB_TAB = ['lab', 'Lab', 'flask'];
+  const hasLab = () => !!ed.game && !!ed.game.schema.lab;
+  const tabs = () => { const t = settingsOnly() ? [BASE_TABS[2]] : logicGame() ? LOGIC_TABS : BASE_TABS; const extra = [...(hasLab() ? [LAB_TAB] : []), ...(hasFeatures() ? [FEATURE_TAB] : [])]; return [...t.slice(0, -1), ...extra, t[t.length - 1]]; };
   const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
   // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
   const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
@@ -530,7 +586,8 @@ export function openGameEditor(app, g) {
       let screen = '', panel = '';
       if (ed.tab === 'logic' && !logicGame()) ed.tab = 'scene';
       if (ed.tab === 'features' && !hasFeatures()) ed.tab = 'settings';
-      if (settingsOnly() && ed.tab !== 'features') ed.tab = 'settings';
+      if (ed.tab === 'lab' && !hasLab()) ed.tab = 'settings';
+      if (settingsOnly() && ed.tab !== 'features' && ed.tab !== 'lab') ed.tab = 'settings';
       if (ed.tab === 'logic') {
         ({ screen, panel } = logicGraph(tileCtx()));
       } else if (ed.tab === 'scene' && tileGame()) {
@@ -591,6 +648,8 @@ export function openGameEditor(app, g) {
           <div style="display:flex;gap:6px;align-items:center">${viewSwitch(false)}<span class="vsep"></span><span class="cap acc" style="padding-left:4px">Backdrop · ${schema.background.length} layers</span></div></div>${bgPanel()}`;
       } else if (ed.tab === 'features') {
         panel = featuresPanel(n);
+      } else if (ed.tab === 'lab') {
+        panel = labPanel();
       } else {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
         panel = `<div class="plate bar gap20" style="flex:none" data-pad="pager">
