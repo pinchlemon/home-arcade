@@ -1,5 +1,5 @@
 {
- "about": "How the Studio shows Void Wizard. It has settings only for now: no scene, objects or art editing. Each field points into game.json.",
+ "about": "How the Studio shows Void Wizard: settings groups, and features (add-ons in features/, each with an on/off switch and its own settings; see engine/features.md). No scene, objects or art editing yet. Each field points into game.json.",
  "groups": [
   {
    "id": "move",
@@ -802,6 +802,47 @@
      "min": 0,
      "max": 4000,
      "step": 50
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "trail",
+   "name": "Sparkle trail",
+   "about": "An example feature: while you run, sparks in the colour of the solid trail behind you.",
+   "fields": [
+    {
+     "path": "features.trail.rate",
+     "label": "Amount",
+     "help": "Sparks a second at full speed",
+     "min": 5,
+     "max": 200,
+     "step": 5
+    },
+    {
+     "path": "features.trail.size",
+     "label": "Size",
+     "help": "How big each spark is",
+     "min": 0.1,
+     "max": 2,
+     "step": 0.05
+    },
+    {
+     "path": "features.trail.life",
+     "label": "Life",
+     "help": "Seconds each spark lasts",
+     "min": 0.1,
+     "max": 2,
+     "step": 0.05
+    },
+    {
+     "path": "features.trail.rise",
+     "label": "Rise",
+     "help": "How fast sparks float up",
+     "min": 0,
+     "max": 4,
+     "step": 0.1
     }
    ]
   }

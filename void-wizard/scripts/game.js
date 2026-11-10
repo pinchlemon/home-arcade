@@ -3,6 +3,10 @@
 // Each has its old value here too, so the game plays the same if a number is missing.
 const CFG=window.GAME||{};
 const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typeof o!=='object'||!(k in o))return def;o=o[k];}return typeof o==='number'&&isFinite(o)?o:def;};
+// features: add-ons in features/ that hook into the game (engine/features.js). With none on, nothing here changes how it plays.
+const FX=window.FEATURES||{emit(){},on(){}};
+// multipliers a feature can change (1 = normal)
+const MOD={speed:1,jump:1,gravity:1,time:1};
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -139,7 +143,7 @@ function updateWizard(W,dt,inp){
     if(W.downT<=0){W.downT=0;W.grounded=true;W.y=0;W.jumpQ=true;W.landSquash=0.4;}}
   // movement
   let ix=inp.ix,iz=inp.iz;const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il;}
-  const maxSpd=(inp.run?WZ('run',8.5):WZ('walk',5.2))*(W.charging?WZ('chargeSlow',0.45):1)*(W.crouchK>0.5?WZ('crouchSlow',0.45):1)*(W.slowT>0?0.5:1), a=1-Math.exp(-(down?(W.grounded?(DOWN_TIME-W.downT<1?1.6:14):0.3):(W.grounded?WZ('groundGrip',12):WZ('airGrip',7)))*dt);
+  const maxSpd=(inp.run?WZ('run',8.5):WZ('walk',5.2))*MOD.speed*(W.charging?WZ('chargeSlow',0.45):1)*(W.crouchK>0.5?WZ('crouchSlow',0.45):1)*(W.slowT>0?0.5:1), a=1-Math.exp(-(down?(W.grounded?(DOWN_TIME-W.downT<1?1.6:14):0.3):(W.grounded?WZ('groundGrip',12):WZ('airGrip',7)))*dt);
   W.lungeCD=Math.max(0,W.lungeCD-dt);W.diveCD=Math.max(0,W.diveCD-dt);
   const diving=W.diveT>0;
   if(diving){
@@ -161,15 +165,15 @@ function updateWizard(W,dt,inp){
   // jumping
   if(W.jumpQ){W.jumpQ=false;
     if(W.grounded){if(W.crouchT<=0)W.crouchT=CROUCH;}
-    else if(W.airJumps>0){W.airJumps--;W.vy=DUEL?WZ('duelDoubleJump',12.6):WZ('doubleJump',10.4);W.hatS.v.y-=1.2;W.robeS.v.y-=2.2;rv.set(W.pos.x,Math.max(0,W.y-0.1),W.pos.z);spawnPuffs(9,2.6,rv);}
+    else if(W.airJumps>0){W.airJumps--;W.vy=(DUEL?WZ('duelDoubleJump',12.6):WZ('doubleJump',10.4))*MOD.jump;W.hatS.v.y-=1.2;W.robeS.v.y-=2.2;rv.set(W.pos.x,Math.max(0,W.y-0.1),W.pos.z);spawnPuffs(9,2.6,rv);FX.emit('jump',W,true);}
   }
   W.crouchAmt=0;
   if(W.crouchT>0){
     W.crouchT-=dt;W.crouchAmt=Math.sin(Math.min(1,1-W.crouchT/CROUCH)*Math.PI*0.5);
-    if(W.crouchT<=0){W.crouchT=0;W.crouchAmt=0;W.vy=DUEL?WZ('duelJump',14.4):WZ('jump',11.8);W.grounded=false;W.airJumps=1;W.hatS.v.y-=0.9;W.robeS.v.y-=1.5;spawnPuffs(7,1.6,W.pos);}
+    if(W.crouchT<=0){W.crouchT=0;W.crouchAmt=0;W.vy=(DUEL?WZ('duelJump',14.4):WZ('jump',11.8))*MOD.jump;W.grounded=false;W.airJumps=1;W.hatS.v.y-=0.9;W.robeS.v.y-=1.5;spawnPuffs(7,1.6,W.pos);FX.emit('jump',W,false);}
   }
-  if(!W.grounded){W.vy-=(down?30:diving?30:(WZ('gravity',38)+(W.vy>0&&!W.jumpHeld?WZ('shortHop',50):0)+(W.vy<0?WZ('fallExtra',16):0)))*dt;W.y+=W.vy*dt;
-    if(W.y<=0){W.y=0;W.airJumps=1;W.landT=time;W.hatS.v.y-=1.4;W.robeS.v.y-=1.6;spawnPuffs(10,2.4,W.pos);
+  if(!W.grounded){W.vy-=(down?30:diving?30:(WZ('gravity',38)+(W.vy>0&&!W.jumpHeld?WZ('shortHop',50):0)+(W.vy<0?WZ('fallExtra',16):0))*MOD.gravity)*dt;W.y+=W.vy*dt;
+    if(W.y<=0){W.y=0;W.airJumps=1;W.landT=time;FX.emit('land',W);W.hatS.v.y-=1.4;W.robeS.v.y-=1.6;spawnPuffs(10,2.4,W.pos);
       if(down&&W.vy<-3){W.vy=-W.vy*0.35;W.tiltV+=3;}else{W.landSquash=diving?0:Math.min(1,-W.vy/14);W.vy=0;W.grounded=true;}}}
   // tipping over: a springy fall onto his back, a bounce, then popping back upright
   const tiltGoal=down&&W.downT>0.35?1.5:0;
@@ -449,6 +453,7 @@ function grab(W,caught){
   rv.set(W.pos.x,0,W.pos.z);spawnPuffs(Math.round(8*big),1.8*big,rv,0.8);
   orb.flash=Math.max(orb.flash,3*big);
   if(W===buddy&&caught&&W.grounded)W.jumpQ=true; // a happy little hop
+  FX.emit('catch',W,caught);
 }
 function throwOrb(W,c,dirX,dirZ,vh,vy,exact){
   if(DUEL){orb.special=null;if(W.mad>0.35){const a=(Math.random()-.5)*(W.mad-0.35)*0.9,ca=Math.cos(a),sa=Math.sin(a),nx=dirX*ca-dirZ*sa;dirZ=dirX*sa+dirZ*ca;dirX=nx;}}
@@ -465,6 +470,7 @@ function throwOrb(W,c,dirX,dirZ,vh,vy,exact){
   for(let i=0;i<6+Math.round(c*10);i++){randDir(rv);rv.x+=dirX*1.5;rv.z+=dirZ*1.5;rv.multiplyScalar(1.5+Math.random()*2+c*2);spark(orb.p,rv,0.2+Math.random()*0.15,0.6+Math.random()*0.5,i%2?0xf4fffd:cur.col,4);}
   if(c>0.5){rv.set(W.pos.x,0,W.pos.z);spawnPuffs(4+Math.round(c*5),1+c*1.5,rv);}
   shake=Math.max(shake,0.04+c*0.12);
+  FX.emit('throw',W,c);
 }
 const DOWN_TIME=WZ('downTime',2.4);
 const DIVE_T=MV('diveTime',0.55);
@@ -480,6 +486,7 @@ function dive(W){
   W.hatS.v.y-=1;W.robeS.v.z-=2;
   rv.set(W.pos.x,0,W.pos.z);spawnPuffs(7,1.8,rv,0.8);
   if(W.ctl)W.ctl.catchT=Math.max(W.ctl.catchT,DIVE_T+0.05);
+  FX.emit('dive',W);
   return true;
 }
 function knockDown(W,dx,dz,power){
@@ -500,6 +507,7 @@ function knockDown(W,dx,dz,power){
   rv.set(W.pos.x,0,W.pos.z);spawnPuffs(10,2.6,rv,1.1);
   shake=Math.max(shake,0.16);
   knockLoose(W,dx,dz,power);
+  FX.emit('knockdown',W);
 }
 function knockLoose(W,dx,dz,power){
   if(orb.state==='held'&&orb.holder===W){ // the solid goes flying
@@ -533,6 +541,7 @@ function tackle(W){
   W.lungeSpd=Math.max(W.tacklePower,3)+MV('tackleBoost',6);W.lungeT=MV('tackleTime',0.24);W.lungeCD=MV('tackleCooldown',0.6);W.faceLock=0.3;
   W.robeS.v.z-=3;W.headV+=5;W.hatS.v.y-=0.8;
   rv.set(W.pos.x,0,W.pos.z);spawnPuffs(5,1.2,rv,0.7);
+  FX.emit('tackle',W);
 }
 function playerThrow(W){
   W=W||player;const c=W.charge;
@@ -919,7 +928,7 @@ function boomFx(p){fxSphere(p,0xffd36a,4.2,0.5);fxRing(p.x,p.z,0xff8a4a,5.5,0.55
 function demonParts(){const o=[];headCenter(lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.62*demon.scale});for(const S of demon.segs){segCenter(S,lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.5*S.w*demon.scale});}return o;}
 function hurtDemon(q,dmg,col){
   if(!demon.alive||demon.dying)return;
-  demon.hp-=dmg;demon.flash=1;
+  demon.hp-=dmg;FX.emit('demonHit',dmg);demon.flash=1;
   rv2.set(q.x,q.y,q.z);fxSphere(rv2,col,1.6,0.3);fxRing(q.x,q.z,col,2.6,0.4);fxBurst(rv2,col,22,4);
   if(demon.hp<=0)killDemon();
 }
@@ -1292,7 +1301,7 @@ function spawnDemon(){
 function killDemon(){
   if(demon.dying)return;
   if(PARTY)for(const W of ALL){W.mad=0;rv2.set(W.pos.x,W.y+0.9,W.pos.z);fxBurst(rv2,0xb07aff,26,3);fxRing(W.pos.x,W.pos.z,0xb07aff,2.5,0.7);fxPillar(W.pos.x,W.pos.z,0xb07aff,6,0.6,0.8);}
-  demon.dying=true;demon.dieT=0;rumbleAll(0.6,0.7,900);demon.dieNext=SEG_N-1;demon.kills++;scoreEl.textContent='DEMONS DOWN: '+demon.kills;
+  demon.dying=true;demon.dieT=0;rumbleAll(0.6,0.7,900);demon.dieNext=SEG_N-1;demon.kills++;FX.emit('demonDown');scoreEl.textContent='DEMONS DOWN: '+demon.kills;
   hpBar.visible=false;shake=Math.max(shake,0.25);
 }
 const DUST=[0x8a6ad0,0xd9d0e6,0x5a4690,0xffa040];
@@ -1591,7 +1600,7 @@ function orbVsDemon(){
   if(orb.oop)popup('ALLEY-OOP!',hcV,'#ffd36a');
   else if(head&&orb.res>=1)popup('HEAD ×'+mult.toFixed(1),hcV,'#'+cur.color.getHexString());
   else if(orb.res>=1)popup('×'+mult.toFixed(1),hcV,'#'+cur.color.getHexString());
-  demon.hp-=dmg;
+  demon.hp-=dmg;FX.emit('demonHit',dmg);
   // the solid pops up and out, away from the body and back toward the thrower, so they can run under it
   let ox=orb.p.x-hcV.x,oz=orb.p.z-hcV.z,ol=Math.hypot(ox,oz);if(ol<0.01){ox=-pushX;oz=-pushZ;ol=1;}
   rumble(orb.last,0.25+Math.min(0.65,dmg/70),0.5,90+Math.min(160,dmg*2));
@@ -1664,7 +1673,7 @@ let sparkAcc=0, wasFull=false;
 
 let last=performance.now();
 function frame(now){
-  const dt=Math.min((now-last)/1000,1/30);last=now;time+=dt;
+  const dt=Math.min((now-last)/1000,1/30)*MOD.time;last=now;time+=dt;
 
   const [gp,gp2]=readPads();
   // throw / catch input for every human-controlled wizard
@@ -1868,6 +1877,7 @@ function frame(now){
   if(orb.state==='ground'&&orb.glow>0)orbG.position.x+=(Math.random()-.5)*0.045*orb.glow;
   orbLight.position.copy(orb.p);
   updateMarkers(dt);
+  FX.emit('frame',dt);
   // landing marker under a flying orb
   { orbMark.position.set(orb.p.x,0.003,orb.p.z);
     const s=1/(1+orb.p.y*0.25), base=orb.state==='air'?0.45:0.3;
@@ -1931,6 +1941,11 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 if(DUEL){if(WATCH)player.human=false;duelReset();duelScore();}
+// what features can reach (see engine/features.md): the scene, the wizards, the solid, the demon, effects and multipliers
+FX.game={THREE,scene,camera,player,buddy,ALL,orb,demon,SOLIDS,MOD,keys,DUEL,PARTY,
+  get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
+  spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
+  shake(k){shake=Math.max(shake,k);}};
 requestAnimationFrame(frame);
 })();
 

@@ -41,6 +41,7 @@ export function fmt(f, v) {
   if (v == null) return '-';
   if (f.show === 'seconds') return (v / 60).toFixed(2) + ' S';
   if (f.show === 'percent') return Math.round(v * 100) + '%';
+  if (f.show === 'onoff') return v ? 'ON' : 'OFF';
   return Number(v).toFixed(decimals(f.step));
 }
 function nudge(f, v, dir) {
@@ -75,11 +76,12 @@ export function openGameEditor(app, g) {
   const set = (path, v) => { record(); games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
   // games with settings only (no scene in their studio.json, like Void Wizard): just the Settings tab
   const settingsOnly = () => !!ed.game && !ed.game.schema.scene;
-  const sceneLabel = () => { if (settingsOnly()) { const gs = ed.game.schema.groups || [], gr = gs[Math.min(ed.group, gs.length - 1)]; return (gr ? gr.name : 'Settings') + ' · Settings'; } if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr ? gr.name : 'Logic') + ' · Logic'; } const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
+  const sceneLabel = () => { if (ed.tab === 'features' && hasFeatures()) { const fs = ed.game.schema.features, f = fs[Math.min(ed.fgroup || 0, fs.length - 1)]; return (f ? f.name : 'No features') + ' · Features'; }
+    if (settingsOnly()) { const gs = ed.game.schema.groups || [], gr = gs[Math.min(ed.group, gs.length - 1)]; return (gr ? gr.name : 'Settings') + ' · Settings'; } if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr ? gr.name : 'Logic') + ' · Logic'; } const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
   // Play starts the scene on screen (from Logic: the scene the graph runs in)
   function playScene() {
     if (!ed.game) return null;
-    if (settingsOnly()) return null;
+    if (settingsOnly() || ed.tab === 'features') return null;
     if (ed.tab === 'scene') return scene().id;
     if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); if (gr && gr.scene) return gr.scene; const lv = scenes().find(s => s.kind === 'level'); return lv && !tileGame() ? lv.id : null; }
     return null;
@@ -100,7 +102,7 @@ export function openGameEditor(app, g) {
   function field(f) {
     const v = val(f.path), edited = f.path in edits().overrides;
     return `<div class="grow"><span class="t"><span class="cap" style="color:${edited ? GREEN : 'var(--text)'}">${esc(f.label)}</span><span class="sub">${esc(f.help)}</span></span>
-      ${stepper(fmt(f, v), A(() => set(f.path, nudge(f, v, -1))), A(() => set(f.path, nudge(f, v, 1))), f.label)}</div>`;
+      ${f.show === 'onoff' ? stepper(fmt(f, v), A(() => set(f.path, v ? 0 : 1)), A(() => set(f.path, v ? 0 : 1)), f.label) : stepper(fmt(f, v), A(() => set(f.path, nudge(f, v, -1))), A(() => set(f.path, nudge(f, v, 1))), f.label)}</div>`;
   }
 
   // ---------------------------------------------------------------- Scene: the whole scene as symbols
@@ -476,9 +478,39 @@ export function openGameEditor(app, g) {
   // ---------------------------------------------------------------- the screen
   // the Backdrop is a second view of the Scene tab (the switch is in the corner of the screen)
   // games on the tile engine also have Logic (visual logic as a node graph, logicGraph.js)
+  // ---------------------------------------------------------------- Features: add-ons with an on/off switch and their own settings
+  // (engine/features.md). Ask Claude writes a request for a new one, to paste into a Claude Code session.
+  function askClaude() {
+    const what = prompt('Describe the mechanic or idea to prototype in ' + g.name + ':', '');
+    if (!what || !what.trim()) return;
+    const D = data(), have = (ed.game.schema.features || []).map(f => '- ' + f.name + ' (' + ((games.getPath(D, 'features.' + f.id + '.on')) ? 'on' : 'off') + '): ' + (f.about || ''));
+    const text = `Hedron feature request for ${g.name} (repo pinchlemon/home-arcade, folder ${folder}).\n` +
+      `Read CLAUDE.md and engine/features.md, then make this a new feature with its own Studio controls, switched on, and open a PR:\n\n${what.trim()}\n\n` +
+      (have.length ? 'Features it has now:\n' + have.join('\n') + '\n' : 'It has no features yet.\n');
+    const copy = () => (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => app.toast('Copied: paste it to Claude')).catch(() => prompt('Copy this and paste it to Claude:', text));
+    if (navigator.share) navigator.share({ title: 'Feature for ' + g.name, text }).catch(e => { if (!e || e.name !== 'AbortError') copy(); });
+    else copy();
+  }
+  function featuresPanel(n) {
+    const fs = ed.game.schema.features || [], k = Math.min(ed.fgroup || 0, Math.max(0, fs.length - 1)), f = fs[k];
+    const ask = `<div class="grow"><span class="t"><span class="cap">New feature</span><span class="sub">Describe a mechanic; Claude builds it with its own controls</span></span>${bareBtn('wand', 'Ask Claude', A(askClaude))}</div>`;
+    if (!f) return `<div class="plate bar" style="flex:none"><span class="cap acc" style="padding-left:6px">Features</span></div>
+      <div class="plate inspector" style="margin-top:8px"><div class="grow"><span class="t"><span class="cap">No features yet</span><span class="sub">A feature is a mechanic or effect with an on/off switch and its own settings here.</span></span></div>${ask}</div>`;
+    const on = { path: 'features.' + f.id + '.on', label: 'On', help: 'Switch ' + f.name + ' on or off', min: 0, max: 1, step: 1, show: 'onoff' };
+    const isOn = !!val(on.path);
+    return `<div class="plate bar gap20" style="flex:none" data-pad="pager">
+        ${iconBtn('left', A(() => { ed.fgroup = (k + fs.length - 1) % fs.length; rerender(); }), { color: '#fff', label: 'Previous feature' })}
+        <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center"><span class="cap acc ell" style="max-width:100%">${esc(f.name)}</span><span class="sub" style="font-size:11px">${isOn ? 'On' : 'Off'} · ${k + 1}/${fs.length}</span></span>
+        ${iconBtn('right', A(() => { ed.fgroup = (k + 1) % fs.length; rerender(); }), { color: '#fff', label: 'Next feature' })}
+      </div>
+      <div class="plate inspector" style="margin-top:8px">${f.about ? `<div class="grow"><span class="t"><span class="sub" style="white-space:normal">${esc(f.about)}</span></span></div>` : ''}${field(on)}${(f.fields || []).map(field).join('')}${ask}</div>`;
+  }
   const BASE_TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
   const LOGIC_TABS = [BASE_TABS[0], BASE_TABS[1], ['logic', 'Logic', 'events'], BASE_TABS[2]];
-  const tabs = () => (settingsOnly() ? [BASE_TABS[2]] : logicGame() ? LOGIC_TABS : BASE_TABS);
+  // games with features (engine/features.md) get a Features tab before Settings
+  const FEATURE_TAB = ['features', 'Features', 'wand'];
+  const hasFeatures = () => !!ed.game && Array.isArray(ed.game.schema.features);
+  const tabs = () => { const t = settingsOnly() ? [BASE_TABS[2]] : logicGame() ? LOGIC_TABS : BASE_TABS; return hasFeatures() ? [...t.slice(0, -1), FEATURE_TAB, t[t.length - 1]] : t; };
   const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
   // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
   const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
@@ -490,7 +522,8 @@ export function openGameEditor(app, g) {
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
       if (ed.tab === 'logic' && !logicGame()) ed.tab = 'scene';
-      if (settingsOnly()) ed.tab = 'settings';
+      if (ed.tab === 'features' && !hasFeatures()) ed.tab = 'settings';
+      if (settingsOnly() && ed.tab !== 'features') ed.tab = 'settings';
       if (ed.tab === 'logic') {
         ({ screen, panel } = logicGraph(tileCtx()));
       } else if (ed.tab === 'scene' && tileGame()) {
@@ -549,6 +582,8 @@ export function openGameEditor(app, g) {
           <button class="btn bare" id="combine" aria-pressed="${!!ed.combined}" style="position:absolute;right:8px;bottom:6px" ${A(() => { ed.combined = !ed.combined; refreshBg(); })}>${well(28, svgRows(G.grid, BONE))}<span class="lbl">${ed.combined ? 'Spread' : 'Combine'}</span></button></div>`;
         panel = `<div class="plate bar" role="toolbar" aria-label="Backdrop">
           <div style="display:flex;gap:6px;align-items:center">${viewSwitch(false)}<span class="vsep"></span><span class="cap acc" style="padding-left:4px">Backdrop · ${schema.background.length} layers</span></div></div>${bgPanel()}`;
+      } else if (ed.tab === 'features') {
+        panel = featuresPanel(n);
       } else {
         const groups = schema.groups, k = Math.min(ed.group, groups.length - 1), gr = groups[k];
         panel = `<div class="plate bar gap20" style="flex:none" data-pad="pager">

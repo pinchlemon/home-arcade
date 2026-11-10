@@ -16,7 +16,8 @@ const BLUE = '#4d7cff';
 // what a setting is called in the Studio, found from its path in studio.json
 function fieldFor(schema, path) {
   const all = [...(schema.groups || []).flatMap(g => g.fields.map(f => ({ ...f, where: g.name }))),
-    ...(schema.background || []).flatMap(l => (l.fields || []).map(f => ({ ...f, where: 'Backdrop · ' + l.name })))];
+    ...(schema.background || []).flatMap(l => (l.fields || []).map(f => ({ ...f, where: 'Backdrop · ' + l.name }))),
+    ...(schema.features || []).flatMap(x => [{ path: 'features.' + x.id + '.on', label: 'On', show: 'onoff', where: 'Feature · ' + x.name }, ...(x.fields || []).map(f => ({ ...f, where: 'Feature · ' + x.name }))])];
   return all.find(f => f.path === path) || null;
 }
 const many = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
