@@ -10,7 +10,11 @@ feature('lab', ({ game, on }) => {
 
   // ---------------------------------------------------------------- toys and their values
   const decimals = (step) => (String(step).split('.')[1] || '').length;
-  const isDefault = (t) => values[t.id] === t.value;
+  // boosts: a rule's short change on top of a knob (LAB.boost). The panel and saved prototypes show the knob itself.
+  const boosts = {};
+  const eff = (id) => (boosts[id] ? boosts[id].v : values[id]);
+  const isDefault = (t) => eff(t.id) === t.value;
+  const run = (t, v) => { try { if (t.apply) t.apply(v); } catch (e) { console.error('Lab toy ' + t.id, e); } };
   function snap(t, v) {
     if (t.kind === 'onoff') return v ? 1 : 0;
     const n = Math.round((v - t.min) / t.step) * t.step + t.min;
@@ -20,11 +24,19 @@ feature('lab', ({ game, on }) => {
     const t = byId[id]; if (!t) return;
     const n = snap(t, v); if (n === values[id]) return;
     values[id] = n;
-    try { if (t.apply) t.apply(n); } catch (e) { console.error('Lab toy ' + id, e); }
+    if (!boosts[id]) run(t, n);
     if (!quiet) draw();
   }
-  const get = (id) => (id in values ? values[id] : undefined);
-  function setAll(vals) { for (const t of toys) set(t.id, vals && t.id in vals ? vals[t.id] : t.value, true); draw(); }
+  const get = (id) => (id in values ? eff(id) : undefined);
+  function boost(id, v, seconds) {
+    const t = byId[id]; if (!t) return;
+    const n = snap(t, v), had = boosts[id];
+    boosts[id] = { v: n, until: performance.now() / 1000 + seconds };
+    if (!had || had.v !== n) run(t, n);
+  }
+  function unboost(id) { if (!boosts[id]) return; delete boosts[id]; run(byId[id], values[id]); }
+  function setAll(vals) {
+    for (const id in boosts) unboost(id); for (const t of toys) set(t.id, vals && t.id in vals ? vals[t.id] : t.value, true); draw(); }
   const changed = () => { const o = {}; for (const t of toys) if (!isDefault(t)) o[t.id] = values[t.id]; return o; };
   const fmt = (t, v) => (t.fmt ? t.fmt(v) : t.kind === 'onoff' ? (v ? 'ON' : 'OFF') : v.toFixed(decimals(t.step)));
 
@@ -32,9 +44,9 @@ feature('lab', ({ game, on }) => {
   //   { id, label, help, min, max, step, value (the normal value), kind: 'onoff' for a switch,
   //     apply(v) when it changes, frame(dt, v, now) every frame while it isn't normal,
   //     camera(camera, lookAt, v, now) after the game places the camera, while it isn't normal,
-  //     dice: false to leave it out of Dice, fmt(v) to show the value its own way }
+  //     dice: false to leave it out of Dice, fmt(v) to show the value its own way, help(v) for help that follows the value }
   window.LAB = {
-    game, get, set,
+    game, get, set, boost, base: (id) => values[id],   // base: the knob itself, without a rule's boost
     shelf(id, name, make) {
       let list = [];
       try { list = make(game) || []; } catch (e) { console.error('Lab shelf ' + id, e); }
@@ -53,11 +65,12 @@ feature('lab', ({ game, on }) => {
   on('frame', (dt) => {
     const now = performance.now() / 1000;
     pollPad(now);
-    for (const t of toys) if (t.frame && !isDefault(t)) { try { t.frame(dt, values[t.id], now); } catch (e) { console.error('Lab toy ' + t.id, e); } }
+    for (const id in boosts) if (now >= boosts[id].until) unboost(id);
+    for (const t of toys) if (t.frame && !isDefault(t)) { try { t.frame(dt, eff(t.id), now); } catch (e) { console.error('Lab toy ' + t.id, e); } }
   });
   on('camera', (cam, look) => {
     const now = performance.now() / 1000;
-    for (const t of toys) if (t.camera && !isDefault(t)) { try { t.camera(cam, look, values[t.id], now); } catch (e) { console.error('Lab toy ' + t.id, e); } }
+    for (const t of toys) if (t.camera && !isDefault(t)) { try { t.camera(cam, look, eff(t.id), now); } catch (e) { console.error('Lab toy ' + t.id, e); } }
   });
 
   // ---------------------------------------------------------------- prototypes: kept as a phone edit of lab.prototypes
@@ -171,7 +184,7 @@ feature('lab', ({ game, on }) => {
           : `<button class="st" data-dec="${t.id}" aria-label="Less ${esc(t.label)}">-</button><span class="vl">${fmt(t, v)}</span><button class="st" data-inc="${t.id}" aria-label="More ${esc(t.label)}">+</button>`;
         const k = (x) => ((x - t.min) / (t.max - t.min) * 100).toFixed(1) + '%';
         const bar = t.kind === 'onoff' ? '' : `<span class="bar"><span style="width:${k(v)}"></span><em style="left:${k(t.value)}"></em></span>`;
-        return `<div class="lab-row${i === sel ? ' on' : ''}${moved ? ' moved' : ''}" data-i="${i}"><span class="lb"><b>${esc(t.label)}</b>${t.help ? `<i>${esc(t.help)}</i>` : ''}${bar}</span>${ctl}</div>`;
+        return `<div class="lab-row${i === sel ? ' on' : ''}${moved ? ' moved' : ''}" data-i="${i}"><span class="lb"><b>${esc(t.label)}</b>${t.help ? `<i>${esc(typeof t.help === 'function' ? t.help(v) : t.help)}</i>` : ''}${bar}</span>${ctl}</div>`;
       }).join('');
     }
     const fresh = performance.now() - sayT < 2500 ? sayText : (playing ? 'Playing ' + playing : '');
