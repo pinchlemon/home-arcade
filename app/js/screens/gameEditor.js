@@ -112,7 +112,7 @@ export function openGameEditor(app, g) {
   }
   // ---- objects: reusable templates. Levels place copies; changing an object changes every copy.
   const objects = () => data().objects || {};
-  const glyph = (name) => ART[name] || (ed.game.symbols || {})[name] || ART.beach;
+  const glyph = (name) => (Array.isArray(name) ? name : null) || ART[name] || (ed.game.symbols || {})[name] || ART.beach;
   const isActor = (o) => o && o.base === 'actor';
   // how an object is drawn and placed in the editor: built-ins borrow the game's item sizes, others come from their symbol
   function defFor(id) {
