@@ -17,7 +17,7 @@ function info(app, g) {
   const D = games.applyOverrides(x.data, games.getEdits(g.file).overrides), sc = D.scenes || [];
   const logic = Array.isArray(D.logic) ? D.logic : [];
   return { tiles: !!D.template, logic: !!D.template || (D.load || []).includes('engine/logic'), scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length,
-    scene: !!x.schema.scene, groupNames: (x.schema.groups || []).map(gr => gr.name.toLowerCase()), graphs: logic.length, boxes: logic.reduce((n, l) => n + ((l && l.nodes) || []).length, 0) };
+    scene: !!x.schema.scene, features: Array.isArray(x.schema.features) ? x.schema.features.length : -1, featuresOn: (x.schema.features || []).filter(f => (D.features || {})[f.id] && D.features[f.id].on).length, groupNames: (x.schema.groups || []).map(gr => gr.name.toLowerCase()), graphs: logic.length, boxes: logic.reduce((n, l) => n + ((l && l.nodes) || []).length, 0) };
 }
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
@@ -30,6 +30,8 @@ function parts(app, g, k) {
     { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' · behaviors' : '…', tag: 'Edit', go: edit('objects') }]),
     // games made with New game have visual logic (the Logic tab)
     ...(k && k.logic ? [{ id: 'logic', icon: 'events', name: 'Logic', meta: k.graphs ? plural(k.graphs, 'graph', 'graphs') + ' · ' + plural(k.boxes, 'box', 'boxes') : 'No boxes yet', tag: 'Edit', go: edit('logic') }] : []),
+    // games with features (engine/features.md): add-ons with an on/off switch and their own settings
+    ...(k && k.features >= 0 ? [{ id: 'features', icon: 'wand', name: 'Features', meta: k.features ? plural(k.features, 'feature', 'features') + ' · ' + k.featuresOn + ' on' : 'None yet · ask Claude for one', tag: 'Edit', go: edit('features') }] : []),
     { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · ' + k.groupNames.slice(0, 3).join(', ') : '…', tag: 'Edit', go: edit('settings') }
   ];
 }

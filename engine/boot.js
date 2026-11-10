@@ -29,9 +29,13 @@
       if (at >= 0 && !game.load.includes('engine/logic')) game.load.splice(at + 1, 0, 'engine/logic');
     }
     window.GAME = apply(game, phoneEdits());
-    for (const name of game.load) {
+    const srcs = game.load.map(name => (name.startsWith('engine/') ? here + name.slice(7) + '.js' : 'scripts/' + name + '.js'));
+    // features that are switched on (engine/features.js): features/<id>.js, after the game's own scripts
+    const F = game.features || {};
+    for (const id in F) if (F[id] && F[id].on) srcs.push('features/' + id + '.js');
+    for (const src of srcs) {
       const s = document.createElement('script');
-      s.src = name.startsWith('engine/') ? here + name.slice(7) + '.js' : 'scripts/' + name + '.js';
+      s.src = src;
       s.async = false;   // keep the listed order
       document.body.appendChild(s);
     }

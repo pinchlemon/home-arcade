@@ -2,6 +2,7 @@
  "title": "Void Wizard",
  "about": "Void Wizard's numbers, for the Studio. The game's code is scripts/game.js (three.js, 3D). Distances are in world units (a wizard is about 1.5 tall), speeds in units a second, times in seconds.",
  "load": [
+  "engine/features",
   "game"
  ],
  "wizard": {
@@ -124,5 +125,14 @@
  },
  "world": {
   "motes": 1100
+ },
+ "features": {
+  "trail": {
+   "on": 0,
+   "rate": 40,
+   "size": 0.5,
+   "life": 0.35,
+   "rise": 0.6
+  }
  }
 }
