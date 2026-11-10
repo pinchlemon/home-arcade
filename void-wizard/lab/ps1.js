@@ -57,7 +57,7 @@
   const FRAG = `uniform sampler2D tDiffuse; varying vec2 vUv;
     float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
     float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
-    void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float d = (bayer4(gl_FragCoord.xy / 2.0) - 0.5) / 31.0 * 2.0;
+    void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float d = (bayer4(gl_FragCoord.xy / 2.0) - 0.5) / 31.0 * 2.0 * smoothstep(0.0, 0.08, max(c.r, max(c.g, c.b)));   // no dots on the black
       gl_FragColor = vec4(floor(clamp(c + d, 0.0, 1.0) * 31.0 + 0.5) / 31.0, 1.0); }`;
   let quad = null;
   LAB.screen.add({ active: () => v('ps1.depth', 0) > 0, render(r, from, to) {
