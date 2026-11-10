@@ -160,6 +160,7 @@
       "demon",
       "spawn",
       "camera",
+      "look",
       "health"
     ],
     "prototypes": [],
@@ -175,11 +176,6 @@
         "made": 1794328466005
       },
       {
-        "id": "imwawsafd",
-        "text": "ability to pick up extra solids and throw them",
-        "made": 1794328374217
-      },
-      {
         "id": "imwawlsgu",
         "text": "Centipede shoots a flame beam (on/off and intensity slider and color and effects)",
         "made": 1794328071008
@@ -191,7 +187,8 @@
       "imwawoygk",
       "imwawslp8",
       "imwawohkw",
-      "imwawpnsu"
+      "imwawpnsu",
+      "imwawsafd"
     ]
   }
 }

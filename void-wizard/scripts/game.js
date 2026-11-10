@@ -678,7 +678,7 @@ if(matchMedia('(pointer:coarse)').matches)document.getElementById('hint').textCo
 
 // ---- controllers: the first is player 1, a second one takes over the red wizard as player 2
 const PAD_HINT='Stick move · R1 run · Cross jump · Circle crouch (tap while running to dive-roll) · Square catch / hold to throw · L1 tackle · Triangle change shape / duel special (or buddy mode / switch wizard when empty-handed) · Right stick team shape (duel) · D-pad up switch demon / 2v2 duel';
-const padPrev={};let padOn=false, padToP2=false, padBlock=false;
+const padPrev={};let padOn=false, padToP2=false, padBlock=false, post=null;
 addEventListener('gamepadconnected',()=>{padOn=true;document.getElementById('hint').textContent=PAD_HINT;});
 addEventListener('keydown',e=>{if(e.code==='Digit2'&&!e.repeat){padToP2=!padToP2;popup(padToP2?'CONTROLLER → PLAYER 2':'CONTROLLER → PLAYER 1',player.pos,'#ffd36a');}});
 function padRead(gp,W){
@@ -1930,8 +1930,11 @@ function frame(now){
   renderer.setRenderTarget(orbRT);renderer.setClearColor(0x000000,0);renderer.clear();
   camera.layers.set(0);scene.overrideMaterial=depthMat;renderer.render(scene,camera);scene.overrideMaterial=null;
   camera.layers.set(1);renderer.render(scene,camera);
-  renderer.setRenderTarget(null);renderer.setClearColor(0x000000,1);renderer.clear();
+  // a feature can take the finished picture and draw it to the screen its own way (post: {target(renderer), draw(renderer)})
+  const postRT=post?post.target(renderer):null;
+  renderer.setRenderTarget(postRT);renderer.setClearColor(0x000000,1);renderer.clear();
   renderer.render(blitScene,blitCam);renderer.render(orbBlit,blitCam);
+  if(postRT){post.draw(renderer);renderer.setRenderTarget(null);}
   // corner badge, sitting just above its name
   hudPop*=Math.exp(-6*dt);
   hudSpin.rotation.y+=dt*0.55;hudSpin.rotation.x=0.25+Math.sin(time*0.7)*0.12;
@@ -1949,7 +1952,7 @@ FX.game={THREE,scene,camera,player,buddy,ALL,orb,demon,SOLIDS,MOD,keys,DUEL,PART
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
-  orbMesh:orbG,demonParts,get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
+  orbMesh:orbG,demonParts,hurtDemon,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();
 
