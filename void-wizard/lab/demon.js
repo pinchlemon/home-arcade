@@ -54,7 +54,13 @@ LAB.shelf('demon', 'Demon', (game) => {
     for (const S of D.segs) for (const L of S.legs) for (const o of [L.femur, L.tibia, L.knee]) if (o) o.traverse(x => add(x.material));
     for (const m of all) {
       if (Array.isArray(m)) continue;
-      m.onBeforeCompile = (sh) => {
+      // other Lab patches (PS1) may be on the same material: run theirs too, and say which are on so three.js
+      // keeps a separate compiled copy for each mix
+      const before = m.onBeforeCompile;
+      m.userData.labKey = (m.userData.labKey || '') + '|dissolve';
+      m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
+      m.onBeforeCompile = (sh, r) => {
+        before.call(m, sh, r);
         sh.uniforms.uDis = dis; sh.uniforms.uDisCol = edgeCol;
         sh.vertexShader = 'varying vec3 vDis;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDis = position;');
         sh.fragmentShader = NOISE + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
