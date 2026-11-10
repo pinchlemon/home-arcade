@@ -20,15 +20,23 @@ const pxBtn=document.getElementById('pxBtn');const pxLabel=()=>PX?'PIXEL '+PX+'Ã
 // two-pass look: the world is drawn small and blown up with chunky pixels,
 // then the solid is drawn on top at full screen resolution
 renderer.autoClear=false;
-const lowRT=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
+let lowRT=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
 const blitScene=new THREE.Scene(), blitCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
-blitScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:lowRT.texture,depthTest:false,depthWrite:false})));
+const blitMat=new THREE.MeshBasicMaterial({map:lowRT.texture,depthTest:false,depthWrite:false});blitScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),blitMat));
 const depthMat=new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide});
 // the solid gets its own finer pixel grid, layered over the world
-const orbRT=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
+let orbRT=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
 const orbBlit=new THREE.Scene();
-orbBlit.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:orbRT.texture,depthTest:false,depthWrite:false,transparent:true,
-  blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor})));
+const orbBlitMat=new THREE.MeshBasicMaterial({map:orbRT.texture,depthTest:false,depthWrite:false,transparent:true,
+  blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor});orbBlit.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),orbBlitMat));
+// pixel off: the world and the solid are drawn with smoothed (anti-aliased) edges instead, made the first time it's needed
+const pixRT={low:lowRT,orb:orbRT};let smoothRT=null;
+function smoothTargets(){
+  if(smoothRT)return smoothRT;
+  const MS=renderer.capabilities.isWebGL2&&THREE.WebGLMultisampleRenderTarget;
+  const make=()=>{const o={minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter};if(!MS)return new THREE.WebGLRenderTarget(1,1,o);const t=new THREE.WebGLMultisampleRenderTarget(1,1,o);t.samples=4;return t;};
+  return smoothRT={low:make(),orb:make()};
+}
 function resize(){
   const w=innerWidth,h=innerHeight;
   // pixel off: everything at the screen's own sharpness, smoothed instead of blocky
@@ -36,6 +44,8 @@ function resize(){
   renderer.setPixelRatio(pr);
   renderer.setSize(w,h,false);
   canvas.style.imageRendering=PX?'':'auto';
+  const T2=PX?pixRT:smoothTargets();
+  if(lowRT!==T2.low){lowRT=T2.low;orbRT=T2.orb;blitMat.map=lowRT.texture;orbBlitMat.map=orbRT.texture;blitMat.needsUpdate=orbBlitMat.needsUpdate=true;}
   const WPX=PX||1/pr;
   lowRT.setSize(Math.max(1,Math.round(w/WPX)),Math.max(1,Math.round(h/WPX)));
   const OPX=PX?Math.min(PX,Math.max(1.8,PX*0.6)):1/pr;
