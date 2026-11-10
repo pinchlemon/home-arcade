@@ -133,6 +133,18 @@
    "size": 0.5,
    "life": 0.35,
    "rise": 0.6
+  },
+  "text": {
+   "on": 1,
+   "title": "VOID WIZARD",
+   "score": "DEMONS DOWN",
+   "link": "TRY THE PARTY RELAY",
+   "tip": "Standing throws lob where you face (hold longer to throw farther). Jump-throw for a fastball that bends onto the demon if you're facing it. Crouch-throw to bowl. Pass back and forth to build resonance. Catch a lob mid-jump and throw before you land for an alley-oop. Plug in a second controller to play the red wizard.",
+   "fire": "FIRE \u00b7 hits hard, wild bounces",
+   "earth": "EARTH \u00b7 heavy, stuns, can't be swatted",
+   "air": "AIR \u00b7 floaty, easy to catch",
+   "aether": "AETHER \u00b7 every catch counts twice",
+   "water": "WATER \u00b7 rolls far, slows it down"
   }
  }
 }

@@ -38,6 +38,7 @@ const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imu
 // numbers as the person sees them
 const decimals = (step) => (String(step).split('.')[1] || '').length;
 export function fmt(f, v) {
+  if (f.show === 'text') return v == null || v === '' ? 'EMPTY' : String(v);
   if (v == null) return '-';
   if (f.show === 'seconds') return (v / 60).toFixed(2) + ' S';
   if (f.show === 'percent') return Math.round(v * 100) + '%';
@@ -101,6 +102,12 @@ export function openGameEditor(app, g) {
   // one adjustable setting: its name and what it does, and a stepper
   function field(f) {
     const v = val(f.path), edited = f.path in edits().overrides;
+    // words: the row shows the text itself, and the pencil opens a box to type new words
+    if (f.show === 'text') {
+      const t = v == null ? '' : String(v);
+      return `<div class="grow"><span class="t"><span class="cap" style="color:${edited ? GREEN : 'var(--text)'}">${esc(f.label)}</span><span class="sub clamp2"${t ? '' : ' style="color:#6f6d69"'}>${t ? esc(t) : 'Empty'}</span></span>
+      ${iconBtn('rename', A(() => { const n = prompt(f.label + (f.help ? ' (' + f.help + ')' : ''), t); if (n !== null && n !== t) set(f.path, n.slice(0, f.max || 300)); }), { color: '#fff', label: 'Change ' + f.label })}</div>`;
+    }
     return `<div class="grow"><span class="t"><span class="cap" style="color:${edited ? GREEN : 'var(--text)'}">${esc(f.label)}</span><span class="sub">${esc(f.help)}</span></span>
       ${f.show === 'onoff' ? stepper(fmt(f, v), A(() => set(f.path, v ? 0 : 1)), A(() => set(f.path, v ? 0 : 1)), f.label) : stepper(fmt(f, v), A(() => set(f.path, nudge(f, v, -1))), A(() => set(f.path, nudge(f, v, 1))), f.label)}</div>`;
   }
