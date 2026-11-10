@@ -109,6 +109,10 @@ export default {
     const s = state(app);
     if (s.off) return notReady(app, s.g, 'sprites', 'Art');
     if (!s.F) return { right: `<span class="cap acc">Art</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">Loading…</span>`, body: `<div class="group">${emptyRow('sprites', 'Loading art…')}</div>` };
+    // a game with no art list and no objects (Void Wizard, which is 3D): nothing to draw here yet
+    if (!s.F.game.schema.art && !s.F.game.data.template && !Object.keys(s.F.data.objects || {}).length)
+      return { right: `<span class="cap acc">Art</span><span class="title clamp2">${esc(s.g.name)}</span><span class="sub">No art to edit yet</span>`,
+        body: `<div class="group">${emptyRow('sprites', esc(s.g.name) + ' is 3D, built in code. Its models can\'t be drawn here yet; its numbers are in the Studio.')}</div>` };
     const { g, F, fi, f, si, it } = s, size = it && it.kind === 'image' ? sizeOf(app, g, it) : null;
     const right = it ? `
       <span class="cap acc ell">${esc(g.name)}</span>

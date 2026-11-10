@@ -73,10 +73,13 @@ export function openGameEditor(app, g) {
     if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender();
   }
   const set = (path, v) => { record(); games.setValue(folder, path, v); if (ed.tab === 'background') { refreshBg(); refreshTitle(); } else rerender(); };
-  const sceneLabel = () => { if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr ? gr.name : 'Logic') + ' · Logic'; } const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
+  // games with settings only (no scene in their studio.json, like Void Wizard): just the Settings tab
+  const settingsOnly = () => !!ed.game && !ed.game.schema.scene;
+  const sceneLabel = () => { if (settingsOnly()) { const gs = ed.game.schema.groups || [], gr = gs[Math.min(ed.group, gs.length - 1)]; return (gr ? gr.name : 'Settings') + ' · Settings'; } if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr ? gr.name : 'Logic') + ' · Logic'; } const c = scene(); return (c.name || 'Scene') + ' · ' + (c.kind === 'level' || c.kind === 'tiles' ? 'Level' : 'Waves'); };
   // Play starts the scene on screen (from Logic: the scene the graph runs in)
   function playScene() {
     if (!ed.game) return null;
+    if (settingsOnly()) return null;
     if (ed.tab === 'scene') return scene().id;
     if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); if (gr && gr.scene) return gr.scene; const lv = scenes().find(s => s.kind === 'level'); return lv && !tileGame() ? lv.id : null; }
     return null;
@@ -475,7 +478,7 @@ export function openGameEditor(app, g) {
   // games on the tile engine also have Logic (visual logic as a node graph, logicGraph.js)
   const BASE_TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
   const LOGIC_TABS = [BASE_TABS[0], BASE_TABS[1], ['logic', 'Logic', 'events'], BASE_TABS[2]];
-  const tabs = () => (logicGame() ? LOGIC_TABS : BASE_TABS);
+  const tabs = () => (settingsOnly() ? [BASE_TABS[2]] : logicGame() ? LOGIC_TABS : BASE_TABS);
   const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
   // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
   const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
@@ -487,6 +490,7 @@ export function openGameEditor(app, g) {
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
       if (ed.tab === 'logic' && !logicGame()) ed.tab = 'scene';
+      if (settingsOnly()) ed.tab = 'settings';
       if (ed.tab === 'logic') {
         ({ screen, panel } = logicGraph(tileCtx()));
       } else if (ed.tab === 'scene' && tileGame()) {
@@ -558,9 +562,9 @@ export function openGameEditor(app, g) {
       return `<div class="screen-tool" style="--acc:${GREEN}">
         <h1 class="sr">Studio · ${esc(g.name)}</h1>
         ${topBar()}
-        <div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${tabs().map(([k2]) => (tabOf() === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
+        ${tabs().length > 1 ? `<div class="plate bar" role="tablist" style="display:grid;grid-template-columns:${tabs().map(([k2]) => (tabOf() === k2 ? '2.4fr' : '1fr')).join(' ')};gap:4px">
           ${tabs().map(([k2, l2, ic]) => { const on = tabOf() === k2; return `<button class="seg${on ? ' on' : ''}" role="tab" aria-selected="${on}" aria-label="${l2}" ${A(() => { ed.tab = k2; ed.fanned = false; app.ui.geTab = k2; app.saveUI(); rerender(); })}>${well(28, svgRows(G[ic], on ? GREEN : BONE))}<span class="lbl"${on ? '' : ' hidden'}>${l2}</span>${on ? '<span class="selring"></span>' : ''}</button>`; }).join('')}
-        </div>
+        </div>` : ''}
         ${screen}${panel}
       </div>`;
     },

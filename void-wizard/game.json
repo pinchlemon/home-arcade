@@ -1,0 +1,128 @@
+{
+ "title": "Void Wizard",
+ "about": "Void Wizard's numbers, for the Studio. The game's code is scripts/game.js (three.js, 3D). Distances are in world units (a wizard is about 1.5 tall), speeds in units a second, times in seconds.",
+ "load": [
+  "game"
+ ],
+ "wizard": {
+  "walk": 5.2,
+  "run": 8.5,
+  "groundGrip": 12,
+  "airGrip": 7,
+  "chargeSlow": 0.45,
+  "crouchSlow": 0.45,
+  "jump": 11.8,
+  "doubleJump": 10.4,
+  "duelJump": 14.4,
+  "duelDoubleJump": 12.6,
+  "gravity": 38,
+  "shortHop": 50,
+  "fallExtra": 16,
+  "jumpSquat": 0.09,
+  "downTime": 2.4,
+  "catchStand": 0.85,
+  "catchAir": 1.0,
+  "catchDive": 1.05,
+  "catchPick": 1.0
+ },
+ "moves": {
+  "diveTime": 0.55,
+  "diveCooldown": 0.75,
+  "diveMinSpeed": 2.2,
+  "diveBoost": 1.5,
+  "tackleTime": 0.24,
+  "tackleCooldown": 0.6,
+  "tackleBoost": 6
+ },
+ "throw": {
+  "chargeTime": 1.0,
+  "lobMax": 22,
+  "jumpSpeed": 16,
+  "jumpCharge": 8,
+  "bowlSpeed": 6,
+  "bowlCharge": 11
+ },
+ "solid": {
+  "gravity": 24
+ },
+ "solids": [
+  {
+   "grav": 1.05,
+   "hang": 0.95,
+   "range": 0.95,
+   "speed": 1.05,
+   "dmg": 1.6,
+   "catchMul": 0.88,
+   "rest": 0.5,
+   "fric": 0.6,
+   "roll": 1.0,
+   "name": "Tetrahedron (fire)"
+  },
+  {
+   "grav": 1.3,
+   "hang": 0.85,
+   "range": 0.65,
+   "speed": 0.85,
+   "dmg": 1.25,
+   "catchMul": 1.0,
+   "rest": 0.15,
+   "fric": 0.95,
+   "roll": 3.0,
+   "name": "Cube (earth)"
+  },
+  {
+   "grav": 0.7,
+   "hang": 1.25,
+   "range": 1.25,
+   "speed": 1.12,
+   "dmg": 0.7,
+   "catchMul": 1.18,
+   "rest": 0.38,
+   "fric": 0.55,
+   "roll": 1.0,
+   "name": "Octahedron (air)"
+  },
+  {
+   "grav": 0.9,
+   "hang": 1.05,
+   "range": 1.0,
+   "speed": 1.0,
+   "dmg": 1.0,
+   "catchMul": 1.0,
+   "rest": 0.38,
+   "fric": 0.45,
+   "roll": 0.8,
+   "name": "Dodecahedron (aether)"
+  },
+  {
+   "grav": 1.0,
+   "hang": 1.0,
+   "range": 1.0,
+   "speed": 1.0,
+   "dmg": 0.9,
+   "catchMul": 1.0,
+   "rest": 0.34,
+   "fric": 0.22,
+   "roll": 0.2,
+   "name": "Icosahedron (water)"
+  }
+ ],
+ "demon": {
+  "hp": 200,
+  "segments": 14,
+  "prowlSpeed": 3.8,
+  "huntSpeed": 4.3,
+  "windup": 1.05,
+  "respawn": 3,
+  "hitBase": 6,
+  "hitPerSpeed": 0.8
+ },
+ "camera": {
+  "fov": 28,
+  "height": 35,
+  "back": 42
+ },
+ "world": {
+  "motes": 1100
+ }
+}
