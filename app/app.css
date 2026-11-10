@@ -449,6 +449,7 @@ canvas.pix{display:block;image-rendering:pixelated;touch-action:none}
 @media not all and (orientation:landscape) and (max-height:520px){
   .screen-tool .screen.fit.lg-view{flex:1 1 304px}
   .screen-tool .screen.fit.lg-view.small{flex:0 1 170px;height:170px;min-height:120px}
+  .screen-tool .screen.fit.lg-view.mid{flex:0 1 230px;height:230px;min-height:150px}
 }
 .lg-world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
 .lg-wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}

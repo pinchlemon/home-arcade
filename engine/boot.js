@@ -22,8 +22,9 @@
   Promise.all([json('game.json'), json(here + 'behaviors.json').catch(() => ({ behaviors: {} })), json(here + 'symbols.json').catch(() => ({})), json(here + 'logic.json').catch(() => ({}))]).then(([game, behaviors, symbols, logic]) => {
     window.BEHAVIORS = behaviors; window.SYMBOLS = symbols; window.LOGIC_NODES = logic;
     // tile games (New game) run visual logic; games made before it existed get it too
+    // games with visual logic always have a list of graphs, so the phone's graphs have a place to go
+    if ((game.template || (game.load || []).includes('engine/logic')) && !Array.isArray(game.logic)) game.logic = [];
     if (game.template) {
-      if (!Array.isArray(game.logic)) game.logic = [];
       const at = game.load.indexOf('engine/tiles');
       if (at >= 0 && !game.load.includes('engine/logic')) game.load.splice(at + 1, 0, 'engine/logic');
     }

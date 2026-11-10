@@ -16,7 +16,7 @@ function info(app, g) {
   if (!x || x === 'loading') return null;
   const D = games.applyOverrides(x.data, games.getEdits(g.file).overrides), sc = D.scenes || [];
   const logic = Array.isArray(D.logic) ? D.logic : [];
-  return { tiles: !!D.template, scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length,
+  return { tiles: !!D.template, logic: !!D.template || (D.load || []).includes('engine/logic'), scenes: sc.length, levels: sc.filter(s => s.kind === 'level').length, objects: Object.keys(D.objects || {}).length, groups: (x.schema.groups || []).length,
     graphs: logic.length, boxes: logic.reduce((n, l) => n + ((l && l.nodes) || []).length, 0) };
 }
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
@@ -27,7 +27,7 @@ function parts(app, g, k) {
     { id: 'scene', icon: 'scene', name: 'Scenes', meta: k ? plural(k.scenes, 'scene', 'scenes') + (k.levels ? ' · ' + plural(k.levels, 'level', 'levels') : '') + (k.tiles ? ' · tiles' : ' · backdrop') : '…', tag: 'Edit', go: edit('scene') },
     { id: 'objects', icon: 'objects', name: 'Objects', meta: k ? plural(k.objects, 'object', 'objects') + ' · behaviors' : '…', tag: 'Edit', go: edit('objects') },
     // games made with New game have visual logic (the Logic tab)
-    ...(k && k.tiles ? [{ id: 'logic', icon: 'events', name: 'Logic', meta: k.graphs ? plural(k.graphs, 'graph', 'graphs') + ' · ' + plural(k.boxes, 'box', 'boxes') : 'No boxes yet', tag: 'Edit', go: edit('logic') }] : []),
+    ...(k && k.logic ? [{ id: 'logic', icon: 'events', name: 'Logic', meta: k.graphs ? plural(k.graphs, 'graph', 'graphs') + ' · ' + plural(k.boxes, 'box', 'boxes') : 'No boxes yet', tag: 'Edit', go: edit('logic') }] : []),
     { id: 'settings', icon: 'controller', name: 'Settings', meta: k ? plural(k.groups, 'group', 'groups') + ' · movement, jump, health' : '…', tag: 'Edit', go: edit('settings') }
   ];
 }

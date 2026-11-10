@@ -1,7 +1,7 @@
 // ---- eyes ----
 // levels: an eye placed in the Studio waits at its spot (h pixels above the sand) until the crab comes near
 function placeEye(p, c) {
-  eyes.push({ c, x: p.x, y: GROUND - p.h, vx: 0, hy: GROUND - p.h, homeX: p.x, homeY: GROUND - p.h,
+  eyes.push({ c, oid: p.obj, x: p.x, y: GROUND - p.h, vx: 0, hy: GROUND - p.h, homeX: p.x, homeY: GROUND - p.h,
     pref: (Math.random() < 0.5 ? -1 : 1) * rnd(34, Math.max(44, VW / 2 - 20)), hp: c.hp, st: 'float', t: 0, timer: rnd(...c.firstShotFrames),
     ax: 0, ay: 1, flash: 0, lx: 0, ly: 0, squint: 0, phase: rnd(0, 6), scale: 1, melt: 0, vy: 0, blink: 0, blinkIn: rnd(30, 160) });
 }
@@ -14,11 +14,11 @@ function spawnEye() {
 }
 function hurtCrab(srcX) {
   if (crab.invuln > 0 || crab.dead) return;
-  crab.hp--; crab.invuln = P.hurtInvulnFrames; crab.stun = P.hurtStunFrames; shake = 8;
+  crab.hp--; if (window.crabLogicFire) crabLogicFire('hurt'); crab.invuln = P.hurtInvulnFrames; crab.stun = P.hurtStunFrames; shake = 8;
   crab.vx = Math.sign(crab.x - srcX || 1) * P.knockback; crab.vy = -P.knockbackUp; crab.onGround = false;
   splash(crab.x, crab.y - 8, 5, RED);
   sfx.hurt(); rumble(260, 0.9, 0.6);
-  if (crab.hp <= 0) { crab.dead = true; overT = 0; sfx.over(); for (let i = 0; i < 14; i++) splash(crab.x, crab.y - 8, 1, i % 2 ? RED : YEL); }
+  if (crab.hp <= 0) { crab.dead = true; overT = 0; sfx.over(); for (let i = 0; i < 14; i++) splash(crab.x, crab.y - 8, 1, i % 2 ? RED : YEL); if (window.crabLogicFire) crabLogicFire('dies'); }
 }
 function beamLen(e) { return e.ay > 0.02 ? Math.min(600, (GROUND - e.y) / e.ay) : 600; }
 function segDist(px, py, x0, y0, dx, dy, len) {

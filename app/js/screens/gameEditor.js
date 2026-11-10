@@ -78,7 +78,7 @@ export function openGameEditor(app, g) {
   function playScene() {
     if (!ed.game) return null;
     if (ed.tab === 'scene') return scene().id;
-    if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); return (gr && gr.scene) || null; }
+    if (ed.tab === 'logic' && ed.lg) { const gr = graphsOf(data()).find(x => x.id === ed.lg.graph); if (gr && gr.scene) return gr.scene; const lv = scenes().find(s => s.kind === 'level'); return lv && !tileGame() ? lv.id : null; }
     return null;
   }
   function topBar() {
@@ -149,6 +149,8 @@ export function openGameEditor(app, g) {
   }
   // games on the tile engine (New game) have their own Scene tab (tileScene.js)
   const tileGame = () => ed.game && ed.game.data.template;
+  // visual logic: games made with New game, and Crab Platformer's levels (games whose engine has a logic host)
+  const logicGame = () => ed.game && (ed.game.data.template || (ed.game.data.load || []).includes('engine/logic'));
   const tileCtx = () => ({ app, ed, g, data, scenes, scene, changeScenes, objects, glyph, rerender, spec: ed.game.logic,
     changeLogic: (fn) => { const l = structuredClone(Array.isArray(data().logic) ? data().logic : []); fn(l); record(); games.setValue(folder, 'logic', l); },
     changeTiles: (fn) => { const t = structuredClone(data().tiles || {}); fn(t); record(); games.setValue(folder, 'tiles', t); },
@@ -473,7 +475,7 @@ export function openGameEditor(app, g) {
   // games on the tile engine also have Logic (visual logic as a node graph, logicGraph.js)
   const BASE_TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];
   const LOGIC_TABS = [BASE_TABS[0], BASE_TABS[1], ['logic', 'Logic', 'events'], BASE_TABS[2]];
-  const tabs = () => (tileGame() ? LOGIC_TABS : BASE_TABS);
+  const tabs = () => (logicGame() ? LOGIC_TABS : BASE_TABS);
   const tabOf = () => (ed.tab === 'background' ? 'scene' : ed.tab);
   // switch between the scene and its backdrop layers (a button at the start of the bar under the screen)
   const viewSwitch = (toBg) => iconBtn(toBg ? 'display' : 'scene', A(() => { ed.tab = toBg ? 'background' : 'scene'; ed.fanned = false; app.ui.geTab = ed.tab; app.saveUI(); rerender(); }), { label: toBg ? 'Backdrop' : 'Back to the scene', color: '#fff' });
@@ -484,7 +486,7 @@ export function openGameEditor(app, g) {
         <div class="center-note"><span class="sub">${ed.error ? 'Could not load the game settings: ' + esc(ed.error) : 'Loading…'}</span></div></div>`;
       const n = games.editCount(folder), schema = ed.game.schema;
       let screen = '', panel = '';
-      if (ed.tab === 'logic' && !tileGame()) ed.tab = 'scene';
+      if (ed.tab === 'logic' && !logicGame()) ed.tab = 'scene';
       if (ed.tab === 'logic') {
         ({ screen, panel } = logicGraph(tileCtx()));
       } else if (ed.tab === 'scene' && tileGame()) {
@@ -564,7 +566,7 @@ export function openGameEditor(app, g) {
     },
     mount(root) {
       if (!ed.game) return;
-      if (ed.tab === 'logic' && tileGame()) { view = null; mountLogicGraph(root, tileCtx()); return; }
+      if (ed.tab === 'logic' && logicGame()) { view = null; mountLogicGraph(root, tileCtx()); return; }
       if (ed.tab === 'scene' && tileGame()) { view = null; mountTileScene(root, tileCtx()); return; }
       if (ed.tab === 'scene') {
         view = root.querySelector('#scn');

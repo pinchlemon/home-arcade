@@ -7,7 +7,7 @@ function behaviorDefaults(type) { const d = {}, p = (BEH.behaviors[type] || {}).
 function makeActor(obj, t) {
   const sym = (window.SYMBOLS || {})[obj.symbol] || ['11111111', '11111111', '11111111', '11111111', '11111111', '11111111', '11111111', '11111111'];
   const s = obj.scale || 2, h = t.h || 0;
-  const a = { obj, sym, s, w: sym[0].length * s, h: sym.length * s, x: t.x, y: GROUND - h, hx: t.x, hy: GROUND - h, dir: 1, t: 0, cool: 0, alive: true, hit: 0, b: {} };
+  const a = { obj, oid: t.obj, sym, s, w: sym[0].length * s, h: sym.length * s, x: t.x, y: GROUND - h, hx: t.x, hy: GROUND - h, dir: 1, t: 0, cool: 0, alive: true, hit: 0, b: {} };
   for (const bh of obj.behaviors || []) a.b[bh.type] = { ...behaviorDefaults(bh.type), ...bh };
   a.hp = a.b.health ? a.b.health.hp : 0;
   return a;
@@ -57,11 +57,13 @@ function updateActors() {
       shots.push({ x: a.x, y: a.y - a.h / 2, vx: dx / d * sp, vy: dy / d * sp, life: 300 });
       if (sfx.charge) sfx.charge();
     }
-    const box = actorBox(a);
-    if (!crab.dead && overlap(cb, box)) {
+    const box = actorBox(a), over = !crab.dead && overlap(cb, box);
+    if (over && !a.touch && window.crabLogicFire) crabLogicFire('touch', a);
+    a.touch = over;
+    if (over) {
       if (B.collectible) {
         a.alive = false; kills += B.collectible.score; crab.hp = Math.min(LIFE, crab.hp + B.collectible.hearts);
-        splash(a.x, a.y - a.h / 2, 5, a.obj.color || CREAM); if (sfx.land) sfx.land(); continue;
+        splash(a.x, a.y - a.h / 2, 5, a.obj.color || CREAM); if (sfx.land) sfx.land(); if (window.crabLogicFire) crabLogicFire('collect', a); continue;
       }
       if (B.bouncer && crab.vy > 0 && crab.y - crab.vy <= box.y0 + 3) { crab.vy = -B.bouncer.strength; crab.onGround = false; crab.y = box.y0; if (sfx.jump) sfx.jump(); continue; }
       if (B.touchDamage) hurtCrab(a.x);
@@ -81,7 +83,7 @@ function juiceHitsActor(p) {
     const b = actorBox(a);
     if (p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1) {
       p.life = 0; a.hp--; a.hit = 6; splash(p.x, p.y, 2);
-      if (a.hp <= 0) { a.alive = false; kills++; splash(a.x, a.y - a.h / 2, 8, a.obj.color || RED); if (sfx.melt) sfx.melt(); }
+      if (a.hp <= 0) { a.alive = false; kills++; splash(a.x, a.y - a.h / 2, 8, a.obj.color || RED); if (sfx.melt) sfx.melt(); if (window.crabLogicFire) crabLogicFire('defeat', a); }
       return true;
     }
   }

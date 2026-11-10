@@ -9,6 +9,7 @@ function reset() {
     hp: LIFE, invuln: 0, stun: 0, squirt: null, dead: false };
   parts = []; eyes = []; kills = 0; spawnT = S.spawning.startDelay; shake = 0; over = false; overT = 0;
   eyesPlaced = false; cleared = false; clearT = 0; actorsPlaced = false; actors = []; shots = [];
+  if (LEVEL && window.LOGIC) LOGIC.begin();   // a level starting again starts its logic again
 }
 reset();
 

@@ -96,6 +96,7 @@ function render() {
   sprite(EYE_ICON, sx, 4);
   text(score, sx + 10, 5);
 
+  if (LEVEL && window.LOGIC) LOGIC.draw();   // Show text boxes
   if (paused) {
     const mid = VW >> 1, my = (VH >> 1) - 10;
     ctx.fillStyle = INK; ctx.fillRect(mid - 16, my - 4, 32, 13);

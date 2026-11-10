@@ -21,6 +21,8 @@
     "beach",
     "render",
     "engine/actors",
+    "logic-host",
+    "engine/logic",
     "engine/loop"
   ],
   "screen": {

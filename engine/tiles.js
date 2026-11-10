@@ -290,3 +290,46 @@ function render() {
   if (paused) say('PAUSED', VW / 2 - 12, VH / 2 - 3, CREAM);
 }
 loadScene(sceneIndex);
+
+// ---- what the visual logic (engine/logic.js) reaches in this game
+window.LOGIC_HOST = {
+  get player() { return player; },
+  T, get scenes() { return SCENES; }, tiles: TILES,
+  sceneIndex: () => sceneIndex, sceneId: () => SC.id,
+  start: () => ({ x: SC.start.x, y: SC.start.y }), exit: () => (SC.exit ? { x: SC.exit.x, y: SC.exit.y } : null),
+  score: (n) => (n === undefined ? score : (score = n)),
+  hp: () => player.hp, maxHp: () => P2.lives,
+  hearts(k) {
+    const p = player; if (p.dead) return;
+    p.hp = Math.max(0, Math.min(P2.lives, p.hp + k));
+    if (k < 0) { sfx.hurt(); p.inv = Math.max(p.inv, 30); if (p.hp <= 0) die(); }
+  },
+  things: (id) => actors2.filter(a => a.alive && (!id || a.oid === id)),
+  thingCount: () => actors2.filter(a => a.alive).length,
+  spawn(id, x, y) { if (actors2.length > 400) actors2 = actors2.filter(a => a.alive); const a = makeThing(id, x, y); if (a) actors2.push(a); },
+  kill(a) { a.alive = false; },
+  move(x, y) { const p = player; p.x = x; p.y = y; p.vx = p.vy = 0; },
+  push(vx, vy) { const p = player; p.vx = vx; p.vy = vy; p.onGround = false; if (TOP) p.stun = Math.max(p.stun, 10); },
+  setPlayer(what, how, v) {
+    const k = { speed: TOP ? 'speed' : 'walkMax', jump: 'jumpSpeed', gravity: 'gravity', shoot: 'shoot', cooldown: 'shotCooldown' }[what];
+    if (k) P2[k] = Math.max(0, (how === 'add' ? +P2[k] || 0 : 0) + v);
+  },
+  sound(name) { const f = sfx[name]; if (f) f(); },
+  go(i) { sceneIndex = i; loadScene(i); },
+  win() { if (!won && !player.dead) clearScene(); },
+  buttons() {
+    const ax = padAxis();
+    return { jump: !!held('jump'), a: !!held('a'), b: !!held('b'), left: !!held('left'), right: !!held('right'), up: !!(keys.up || ax.up), down: !!(keys.down || ax.down) };
+  },
+  tapped: (k) => !!tapped[k],
+  forgetTaps() { for (const k in tapped) tapped[k] = false; },
+  map: () => MAP,
+  // the kinds of tile the player is touching (standing on one counts)
+  touchedTiles() {
+    const b = boxOf(player), set = new Set();
+    for (let ty = Math.floor((b.y0 - 1) / T); ty <= Math.floor((b.y1 + 1) / T); ty++)
+      for (let tx = Math.floor((b.x0 - 1) / T); tx <= Math.floor((b.x1 + 1) / T); tx++) { const ch = ty >= 0 && ty < MH && tx >= 0 && tx < MW ? MAP[ty][tx] : null; if (ch) set.add(ch); }
+    return set;
+  },
+  say(text) { say(text, Math.round(VW / 2 - text.length * 2), 22, CREAM); }
+};
