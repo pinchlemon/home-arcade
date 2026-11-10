@@ -120,6 +120,7 @@
       const m = o.material; if (!o.isMesh || !m || !m.isMeshToonMaterial || o.userData.labToon) return;
       const l = new T.MeshLambertMaterial({ color: m.color, emissive: m.emissive, vertexColors: m.vertexColors, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite });
       if (done.has(m)) patch(l);
+      if ((m.userData.labKey || '').includes('dissolve') && LAB.patchDissolve) LAB.patchDissolve(l);   // keep the demon's dissolve
       o.userData.labToon = m; o.material = l; softPairs.push(o);
     });
     else { for (const o of softPairs) { const l = o.material; o.material = o.userData.labToon; delete o.userData.labToon; l.dispose(); } softPairs.length = 0; }

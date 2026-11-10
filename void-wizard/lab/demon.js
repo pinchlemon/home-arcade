@@ -46,34 +46,37 @@ LAB.shelf('demon', 'Demon', (game) => {
                  mix(mix(dHash(i + vec3(0,0,1)), dHash(i + vec3(1,0,1)), f.x), mix(dHash(i + vec3(0,1,1)), dHash(i + vec3(1,1,1)), f.x), f.y), f.z); }
     float dFbm(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * dNoise(p); p *= 2.03; a *= 0.5; } return v; }
   `;
-  function patch() {
-    if (patched) return; patched = true;
-    const seen = new Set(), all = [];
-    const add = (m) => { if (m && !seen.has(m)) { seen.add(m); all.push(m); } };
-    D.g.traverse(o => add(o.material));
-    for (const S of D.segs) for (const L of S.legs) for (const o of [L.femur, L.tibia, L.knee]) if (o) o.traverse(x => add(x.material));
-    for (const m of all) {
-      if (Array.isArray(m)) continue;
-      // other Lab patches (PS1) may be on the same material: run theirs too, and say which are on so three.js
-      // keeps a separate compiled copy for each mix
-      const before = m.onBeforeCompile;
-      m.userData.labKey = (m.userData.labKey || '') + '|dissolve';
-      m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
-      m.onBeforeCompile = (sh, r) => {
-        before.call(m, sh, r);
-        sh.uniforms.uDis = dis; sh.uniforms.uDisCol = edgeCol;
-        sh.vertexShader = 'varying vec3 vDis;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDis = position;');
-        sh.fragmentShader = NOISE + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-          float dN = clamp((dFbm(vDis * 6.0) - 0.22) / 0.56, 0.0, 1.0), dD = uDis * 1.08 - 0.08;
-          if (dN < dD) discard;
-          float dEdge = (1.0 - smoothstep(dD, dD + 0.08, dN)) * step(0.001, uDis);`);
-        if (sh.fragmentShader.includes('#include <emissivemap_fragment>'))
-          sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uDisCol * dEdge * 4.0;');
-        else sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, '  gl_FragColor.rgb += uDisCol * dEdge * 4.0;\n}');
-      };
-      m.needsUpdate = true;
-    }
+  const patchedMats = new WeakSet();
+  function patchOne(m) {
+    if (!m || Array.isArray(m) || !m.isMaterial || patchedMats.has(m)) return;
+    patchedMats.add(m);
+    // other Lab patches (PS1) may be on the same material: run theirs too, and say which are on so three.js
+    // keeps a separate compiled copy for each mix
+    const before = m.onBeforeCompile;
+    m.userData.labKey = (m.userData.labKey || '') + '|dissolve';
+    m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
+    m.onBeforeCompile = (sh, r) => {
+      before.call(m, sh, r);
+      sh.uniforms.uDis = dis; sh.uniforms.uDisCol = edgeCol;
+      sh.vertexShader = 'varying vec3 vDis;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDis = position;');
+      sh.fragmentShader = NOISE + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        float dN = clamp((dFbm(vDis * 6.0) - 0.22) / 0.56, 0.0, 1.0), dD = uDis * 1.08 - 0.08;
+        if (dN < dD) discard;
+        float dEdge = (1.0 - smoothstep(dD, dD + 0.08, dN)) * step(0.001, uDis);`);
+      if (sh.fragmentShader.includes('#include <emissivemap_fragment>'))
+        sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uDisCol * dEdge * 4.0;');
+      else sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, '  gl_FragColor.rgb += uDisCol * dEdge * 4.0;\n}');
+    };
+    m.needsUpdate = true;
   }
+  // every material the demon shows, and the toon ones PS1 soft shading may have swapped out (checked again each time)
+  function patch() {
+    patched = true;
+    const add = (o) => { if (o.material) patchOne(o.material); if (o.userData.labToon) patchOne(o.userData.labToon); };
+    D.g.traverse(add);
+    for (const S of D.segs) for (const L of S.legs) for (const o of [L.femur, L.tibia, L.knee]) if (o) o.traverse(add);
+  }
+  LAB.patchDissolve = (m) => { if (patched) patchOne(m); };   // for materials made later (PS1 soft shading)
   // the game hides the body piece by piece as it dies; while it dissolves it stays whole instead
   const parts = () => { const o = [D.g]; for (const S of D.segs) { o.push(S.g); for (const L of S.legs) o.push(L.femur, L.tibia, L.knee); } return o; };
   window.FEATURES.on('demonDown', () => { if (LAB.get('demon.dissolve')) { patch(); disT = performance.now() / 1000; } }, 'lab');
@@ -95,6 +98,8 @@ LAB.shelf('demon', 'Demon', (game) => {
     { id: 'aggression', label: 'Aggression', help: '0 never attacks, 3 relentless', min: 0, max: 3, step: 0.1, value: 1, frame: rage },
     { id: 'flash', label: 'White flash', help: 'The whole centipede flashes when hit', kind: 'onoff', value: 0, dice: true, frame: flash, apply: (v) => { if (!v) { flashT = 0; restore(); } } },
     { id: 'flashLen', label: 'Flash length', help: 'Seconds it flashes for', min: 0.05, max: 1.5, step: 0.05, value: 0.3 },
+    { id: 'health', label: 'Demon health', help: 'Times its normal health (Studio Settings sets the normal)', min: 0.1, max: 5, step: 0.1, value: 1, fmt: (x) => '×' + x,
+      apply: (x) => { const was = game.MOD.hp; game.MOD.hp = x; if (D.alive && !D.dying) D.hp *= x / was; } },
     { id: 'flashRate', label: 'Flash speed', help: 'Flashes a second', min: 2, max: 30, step: 1, value: 12 },
     { id: 'dissolve', label: 'Dissolve', help: 'A beaten demon burns away with a glowing edge', kind: 'onoff', value: 0, dice: true, apply: (x) => { if (x) patch(); } },
     { id: 'dissolveLen', label: 'Dissolve time', help: 'Seconds it takes to burn away', min: 0.5, max: 3, step: 0.1, value: 1.5, dice: false },
