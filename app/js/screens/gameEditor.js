@@ -40,6 +40,7 @@ const decimals = (step) => (String(step).split('.')[1] || '').length;
 export function fmt(f, v) {
   if (f.show === 'text') return v == null || v === '' ? 'EMPTY' : String(v);
   if (v == null) return '-';
+  if (f.zero && v === 0) return f.zero;   // a word for 0, such as OFF
   if (f.show === 'seconds') return (v / 60).toFixed(2) + ' S';
   if (f.show === 'percent') return Math.round(v * 100) + '%';
   if (f.show === 'onoff') return v ? 'ON' : 'OFF';
