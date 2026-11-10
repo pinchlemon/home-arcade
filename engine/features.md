@@ -42,7 +42,8 @@ Adding a feature means writing these three parts, adding the new file to `PRE` i
   - `spark(at, vel, life, size, color, drag, gravity)`, `sparkBurst(at, n, speed, size, drag, color)`, and `spawnPuffs(n, speed, at, size)`.
   - `popup(text, at, cssColor)` and `shake(amount)`.
   - `fxRing(x, z, color, radius, seconds)`, `fxPillar(...)`, `fxSphere(...)`, `fxBurst(...)` and `rumble(wizard, strong, weak, ms)`.
-- **Actions:** `knockDown(W, dx, dz, power)` and `pushBack(W, dx, dz, power)`.
+- **Actions:** `knockDown(W, dx, dz, power)`, `pushBack(W, dx, dz, power)` and `hurtDemon(at, damage, color)` (`at` is any `{x, y, z}`, such as one of `demonParts()`).
+- **Screen:** set `post` to `{ target(renderer), draw(renderer) }` and the finished picture (world and solid, not the HUD) is drawn into `target`'s render target, then `draw` puts it on the screen. `null` (normal) draws straight to the screen. The Look shelf uses it.
 - **Multipliers:** `MOD` holds `speed`, `jump`, `gravity`, `time`, `demon` (the demon's full size) and `knock` (0: nobody gets knocked down), all 1 normally. For example, `game.MOD.time = 0.5` is slow motion.
 - **Events** (`on(name, fn)`):
   - `frame(dt)`, every frame after the world moves and before it is drawn.
@@ -56,7 +57,7 @@ If a mechanic needs something that isn't listed here, add it to the `FX.game` ob
 
 The Lab is a feature (`features/lab.js`) that opens a toy box over the running game: D-pad down or the LAB button opens it, the D-pad picks and turns knobs, L1 and R1 change shelf, Triangle rolls the Dice, Square saves, Select undoes, Start (or IDEA) jots down an idea, Circle closes. A saved mix is a **prototype**, kept in `game.json` under `lab.prototypes` (a phone edit, pushed like any setting). The Studio's Lab tab lists them (play, rename, note, copy, delete) and holds **ideas** (`lab.ideas`), each with an Ask Claude button.
 
-Knobs are **toys**, kept on **shelves**: one file per shelf in `void-wizard/lab/<shelf>.js`, listed in order in `game.json` `lab.shelves` (and in `PRE` in `sw.js`). Now: time, world, throws (homing), bodies, demon (aggression, white flash), spawn, camera, health (health bars, centipede touch damage, knockdown damage; it hooks the `camera` event to place the bars, so it stays after the camera shelf). To add a toy, add it to the shelf it belongs on; for a new kind of toy, add a shelf file.
+Knobs are **toys**, kept on **shelves**: one file per shelf in `void-wizard/lab/<shelf>.js`, listed in order in `game.json` `lab.shelves` (and in `PRE` in `sw.js`). Now: time, world, throws (homing), bodies, demon (aggression, white flash), spawn (extra solids you can kick, pick up and throw), camera, look (one file, two shelves: Look and Colour, the screen shaders), health (health bars, centipede touch damage, knockdown damage; it hooks the `camera` event to place the bars, so it stays after the camera shelf). To add a toy, add it to the shelf it belongs on; for a new kind of toy, add a shelf file.
 ```js
 LAB.shelf('time', 'Time', (game) => [
   { id: 'speed', label: 'Game speed', help: 'Below 1 is slow motion', min: 0.1, max: 3, step: 0.1, value: 1,
