@@ -87,18 +87,17 @@
         const robe = new T.LatheGeometry(rp, 7), n = robe.attributes.position.count, col = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) col.set(band[bandOf(robe.attributes.position.array[i * 3 + 1])] || [1, 1, 1], i * 3);
         robe.setAttribute('color', new T.BufferAttribute(col, 3));
-        // hood: a coarse sphere with the same face opening cut out
-        // (a bit bigger, so its flat faces sit outside the round original and nothing inside can poke through)
-        const hp = W.hoodGeo.parameters, hood = new T.SphereGeometry(hp.radius / (Math.cos(Math.PI / 9) * Math.cos(Math.PI / 14)), 9, 7, 0, Math.PI * 2, 0, Math.PI);
-        { const pa = hood.attributes.position, idx = hood.index.array, keep = [], fd = new T.Vector3(0, 0.1, 1).normalize(), c = new T.Vector3(), t = new T.Vector3();
-          for (let i = 0; i < idx.length; i += 3) { c.set(0, 0, 0); for (let j = 0; j < 3; j++) c.add(t.fromBufferAttribute(pa, idx[i + j])); if (c.normalize().dot(fd) < Math.cos(0.78)) keep.push(idx[i], idx[i + 1], idx[i + 2]); }
-          hood.setIndex(keep); }
+        // hood: a coarse sphere built around the face opening, so the opening is one clean ring of edges that meets
+        // the rim (cutting holes in a coarse sphere left a jagged edge with the black inside showing through)
+        const hp = W.hoodGeo.parameters, fd = new T.Vector3(0, 0.1, 1).normalize();
+        const hood = new T.SphereGeometry(hp.radius * 1.04, 9, 6, 0, Math.PI * 2, 0.78, Math.PI - 0.78);
+        hood.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), fd)));
         for (const m of meshes) {
           const g = m.geometry, P = g.parameters || {};
           let lo = null;
           if (g === W.robeGeo) lo = robe;
           else if (g === W.hoodGeo) lo = hood;
-          else if (g.type === 'TorusGeometry') lo = new T.TorusGeometry(P.radius, P.tube, 4, 9);
+          else if (g.type === 'TorusGeometry') lo = new T.TorusGeometry(P.radius * 1.03, P.tube * 1.2, 4, 9);   // the hood's rim, over the opening's edge
           else if (g.type === 'CircleGeometry' && P.radius > 0.4 && P.radius < 0.5) lo = new T.CircleGeometry(P.radius * 0.87, 14);   // the robe's black floor, kept inside the 7-sided hem
           else if (g.type === 'SphereGeometry' && g !== W.hoodGeo && P.radius > 0.2 && P.radius < 0.35) lo = new T.SphereGeometry(P.radius * 0.9, 8, 6);   // the black face, kept well inside the hood
           if (lo) { hi.swaps.push([m, g]); m.geometry = lo; }
