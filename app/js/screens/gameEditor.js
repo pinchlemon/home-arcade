@@ -516,14 +516,15 @@ export function openGameEditor(app, g) {
   // ---------------------------------------------------------------- Lab: prototypes saved from the game's Lab, and ideas
   // (game.json lab.prototypes and lab.ideas, edited on the phone like any setting). See engine/features.md.
   const protos = () => { const l = val('lab.prototypes'); return Array.isArray(l) ? l : []; };
-  const ideas = () => { const l = val('lab.ideas'); return Array.isArray(l) ? l : []; };
+  // ideas Claude has built are listed in lab.done (game.json), so they drop off the list even where the phone kept its own copy
+  const ideas = () => { const l = val('lab.ideas'), done = new Set(val('lab.done') || []); return Array.isArray(l) ? l.filter(x => !done.has(x.id)) : []; };
   const setProtos = (fn) => { const l = structuredClone(protos()); fn(l); set('lab.prototypes', l); };
   const setIdeas = (fn) => { const l = structuredClone(ideas()); fn(l); set('lab.ideas', l); };
   function playProto(p) { try { sessionStorage.setItem('ha.lab.play', p.id); } catch (e) {} games.launch(g); }
-  function askIdea(text) {
+  function askIdea(text, id) {
     const req = `Hedron Lab idea for ${g.name} (repo pinchlemon/home-arcade, folder ${folder}).\n` +
       `Read CLAUDE.md and engine/features.md (the Lab part), then build this as new Lab toys on the right shelf (or a new shelf), and open a PR:\n\n${text.trim()}\n\n` +
-      'Shelves it has now: ' + ((val('lab.shelves') || []).join(', ') || 'none') + '\n';
+      'Shelves it has now: ' + ((val('lab.shelves') || []).join(', ') || 'none') + '\n' + (id ? 'Its id is ' + id + ': once built, remove it from lab.ideas and add the id to lab.done.\n' : '');
     const copy = () => (navigator.clipboard ? navigator.clipboard.writeText(req) : Promise.reject()).then(() => app.toast('Copied: paste it to Claude')).catch(() => prompt('Copy this and paste it to Claude:', req));
     if (navigator.share) navigator.share({ title: 'Lab idea for ' + g.name, text: req }).catch(e => { if (!e || e.name !== 'AbortError') copy(); });
     else copy();
@@ -541,7 +542,7 @@ export function openGameEditor(app, g) {
     if (page === 1) {
       body = rowOf('New idea', 'A mechanic or look to try. Claude can build it as Lab toys', bareBtn('plus', 'Add', A(() => { const t = prompt('Your idea:', ''); if (t && t.trim()) setIdeas(l => l.unshift({ id: 'i' + Date.now().toString(36), text: t.trim().slice(0, 600), made: Date.now() })); })))
         + I.map((it, i) => rowOf('Idea ' + (I.length - i), it.text,
-          iconBtn('wand', A(() => askIdea(it.text)), { color: '#fff', label: 'Ask Claude to build it' }) +
+          iconBtn('wand', A(() => askIdea(it.text, it.id)), { color: '#fff', label: 'Ask Claude to build it' }) +
           iconBtn('rename', A(() => { const t = prompt('Your idea:', it.text); if (t !== null && t.trim()) setIdeas(l => { l[i].text = t.trim().slice(0, 600); }); }), { color: '#fff', label: 'Change idea' }) +
           iconBtn('trash', A(() => { if (confirm('Delete this idea?')) setIdeas(l => l.splice(i, 1)); }), { color: '#fff', label: 'Delete idea' }))).join('');
     } else if (!P.length) {
