@@ -2,7 +2,7 @@
 
 A feature is a small add-on to a game: a mechanic, an effect or a rule. It lives in one file and comes with its own controls in the Studio, so the owner can switch it on and off and tune it by touch on her phone. Features are how mechanics get prototyped: Claude writes one, she plays it and tunes it, and then keeps it, changes it or switches it off.
 
-Void Wizard is the first game with features: Sparkle trail (off) and Custom text (on; changes the title, score label, tip, mode link and the line under each solid). The Studio's Features tab shows them, and its **Ask Claude** button writes a request that she pastes into a Claude Code session.
+Void Wizard is the first game with features: the Lab (on, see below), Sparkle trail (off) and Custom text (on; changes the title, score label, tip, mode link and the line under each solid). The Studio's Features tab shows them, and its **Ask Claude** button writes a request that she pastes into a Claude Code session.
 
 ## The three parts of a feature (example: `trail` in Void Wizard)
 
@@ -34,22 +34,40 @@ Adding a feature means writing these three parts, adding the new file to `PRE` i
 
 ## Void Wizard: what `game` has
 
-- **Things:** `THREE`, `scene`, `camera`, `player`, `buddy` and `ALL` (the wizards), `orb` (the Solid), `demon`, and `SOLIDS`.
+- **Things:** `THREE`, `scene`, `camera`, `player`, `buddy` and `ALL` (the wizards), `orb` (the Solid), `orbMesh` (the group that draws it), `demon`, `demonParts()` (the demon as spheres `{x, y, z, r}`), and `SOLIDS`.
   - `solid` is the current solid. Its `col` is the colour, and it also has `grav`, `hang`, `speed` and the rest.
-- **Time and input:** `time`, `keys` (a Set of the `KeyboardEvent.code` values held down), and `pad` (player 1's raw Gamepad, or null). `DUEL` and `PARTY` say which mode is running.
+- **Time and input:** `time`, `keys` (a Set of the `KeyboardEvent.code` values held down), and `pad` (player 1's raw Gamepad, or null). Set `blockPad = true` to take the controller away from the game (the Lab does while it is open). `DUEL` and `PARTY` say which mode is running.
 - **A wizard** has `pos`, `vel`, `y`, `vy`, `yaw`, `grounded`, `downT` (more than 0 while knocked down), `charging`, `charge` and `root` (its three.js group).
 - **Effects:**
   - `spark(at, vel, life, size, color, drag, gravity)`, `sparkBurst(at, n, speed, size, drag, color)`, and `spawnPuffs(n, speed, at, size)`.
   - `popup(text, at, cssColor)` and `shake(amount)`.
   - `fxRing(x, z, color, radius, seconds)`, `fxPillar(...)`, `fxSphere(...)`, `fxBurst(...)` and `rumble(wizard, strong, weak, ms)`.
 - **Actions:** `knockDown(W, dx, dz, power)` and `pushBack(W, dx, dz, power)`.
-- **Multipliers:** `MOD` holds `speed`, `jump`, `gravity` and `time`, all 1 normally. For example, `game.MOD.time = 0.5` is slow motion.
+- **Multipliers:** `MOD` holds `speed`, `jump`, `gravity`, `time`, `demon` (the demon's full size) and `knock` (0: nobody gets knocked down), all 1 normally. For example, `game.MOD.time = 0.5` is slow motion.
 - **Events** (`on(name, fn)`):
   - `frame(dt)`, every frame after the world moves and before it is drawn.
+  - `camera(camera, lookAt)`, after the game places the camera, so a feature can move or turn it.
   - `jump(W, inAir)`, `land(W)`, `throw(W, charge)`, `catch(W, caught)` (caught is false for a pick-up), `dive(W)`, `tackle(W)` and `knockdown(W)`.
   - `demonHit(damage)` and `demonDown()`.
 
 If a mechanic needs something that isn't listed here, add it to the `FX.game` object or a new `FX.emit(...)` at the end of `void-wizard/scripts/game.js`, and add it to this list. With every feature off, the game must stay identical frame for frame: an `emit` with no listeners does nothing, and the multipliers are exactly 1.
+
+## The Lab (Void Wizard)
+
+The Lab is a feature (`features/lab.js`) that opens a toy box over the running game: D-pad down or the LAB button opens it, the D-pad picks and turns knobs, L1 and R1 change shelf, Triangle rolls the Dice, Square saves, Select undoes, Circle closes. A saved mix is a **prototype**, kept in `game.json` under `lab.prototypes` (a phone edit, pushed like any setting). The Studio's Lab tab lists them (play, rename, note, copy, delete) and holds **ideas** (`lab.ideas`), each with an Ask Claude button.
+
+Knobs are **toys**, kept on **shelves**: one file per shelf in `void-wizard/lab/<shelf>.js`, listed in order in `game.json` `lab.shelves` (and in `PRE` in `sw.js`). Now: time, world, bodies, spawn, camera. To add a toy, add it to the shelf it belongs on; for a new kind of toy, add a shelf file.
+```js
+LAB.shelf('time', 'Time', (game) => [
+  { id: 'speed', label: 'Game speed', help: 'Below 1 is slow motion', min: 0.1, max: 3, step: 0.1, value: 1,
+    apply: (v) => { game.MOD.time = v; } }
+]);
+```
+- `value` is the normal value. At normal values a toy must change nothing.
+- `apply(v)` runs when the value changes; `frame(dt, v, now)` every frame and `camera(camera, lookAt, v, now)` after the camera is placed, both only while the value isn't normal (`now` is real seconds, so they work when time is frozen).
+- `kind: 'onoff'` makes a switch. `dice: false` keeps a toy out of the Dice (switches stay out unless `dice: true`). `fmt(v)` shows the value its own way.
+- `LAB.get('shelf.id')` reads another toy's value, so toys can work together (spawned solids follow World's solid gravity).
+- A prototype stores only the values that aren't normal, by `shelf.id`, so renaming a toy's id loses it in saved prototypes.
 
 ## Another game
 

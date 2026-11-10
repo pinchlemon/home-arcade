@@ -145,6 +145,20 @@
    "air": "AIR \u00b7 floaty, easy to catch",
    "aether": "AETHER \u00b7 every catch counts twice",
    "water": "WATER \u00b7 rolls far, slows it down"
+  },
+  "lab": {
+   "on": 1
   }
+ },
+ "lab": {
+  "shelves": [
+   "time",
+   "world",
+   "bodies",
+   "spawn",
+   "camera"
+  ],
+  "prototypes": [],
+  "ideas": []
  }
 }

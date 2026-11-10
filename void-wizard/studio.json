@@ -808,6 +808,12 @@
  ],
  "features": [
   {
+   "id": "lab",
+   "name": "Lab",
+   "about": "A toy box over the running game: open it with D-pad down or the LAB button, turn knobs, roll the Dice, and Save mixes you like. Saved ones are in the Studio's Lab tab.",
+   "fields": []
+  },
+  {
    "id": "trail",
    "name": "Sparkle trail",
    "about": "An example feature: while you run, sparks in the colour of the solid trail behind you.",
@@ -916,5 +922,6 @@
     }
    ]
   }
- ]
+ ],
+ "lab": {}
 }
