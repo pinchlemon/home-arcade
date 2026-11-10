@@ -170,6 +170,81 @@
     "prototypes": [],
     "ideas": [
       {
+        "id": "imwb1pzye",
+        "text": "be able to toggle text overlays, health bars, large solid on bottom left",
+        "made": 1794336665414
+      },
+      {
+        "id": "imwb1ny0f",
+        "text": "not sure dissolve is working properly",
+        "made": 1794336569583
+      },
+      {
+        "id": "imwb1nnc4",
+        "text": "need to be able to see full descriptions in each option",
+        "made": 1794336555748
+      },
+      {
+        "id": "imwb1m1gb",
+        "text": "be able to see idea list in-game",
+        "made": 1794336480731
+      },
+      {
+        "id": "imwb1l0k9",
+        "text": "ability to adjust centipede health",
+        "made": 1794336432923
+      },
+      {
+        "id": "imwayv16u",
+        "text": "add ability to set new defaults",
+        "made": 1794331861446
+      },
+      {
+        "id": "imwayumum",
+        "text": "add feature where you can rotate camera with right stick",
+        "made": 1794331842862
+      },
+      {
+        "id": "imwayuc8a",
+        "text": "don’t change camera when rolling dice",
+        "made": 1794331829098
+      },
+      {
+        "id": "imway2swx",
+        "text": "map size and minimap option",
+        "made": 1794330544353
+      },
+      {
+        "id": "imwaxzi9e",
+        "text": "ability to edit character models in like a character customization screen",
+        "made": 1794330390578
+      },
+      {
+        "id": "imwaxvxtv",
+        "text": "different settings (grassy plains with grass flowers lightly blowing in the wind, castle, reflective pool, fairy forest, etc.)",
+        "made": 1794330224131
+      },
+      {
+        "id": "imwaxu9a2",
+        "text": "color of solids",
+        "made": 1794330145658
+      },
+      {
+        "id": "imwaxtwdq",
+        "text": "color of centipede and other centipede features",
+        "made": 1794330128942
+      },
+      {
+        "id": "imwaxtkpg",
+        "text": "color of cloaks",
+        "made": 1794330113812
+      },
+      {
+        "id": "imwaxsqok",
+        "text": "sliders for buddy behavior (how much he avoids centipede, how accurate throws are, when he attacks centipede, etc.)",
+        "made": 1794330074901
+      },
+      {
         "id": "imwawv62c",
         "text": "basketball minigame",
         "made": 1794328508532
