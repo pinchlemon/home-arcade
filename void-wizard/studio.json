@@ -1,0 +1,809 @@
+{
+ "about": "How the Studio shows Void Wizard. It has settings only for now: no scene, objects or art editing. Each field points into game.json.",
+ "groups": [
+  {
+   "id": "move",
+   "name": "Movement",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "wizard.walk",
+     "label": "Walk speed",
+     "help": "Top speed when walking",
+     "min": 1,
+     "max": 12,
+     "step": 0.1
+    },
+    {
+     "path": "wizard.run",
+     "label": "Run speed",
+     "help": "Top speed when running",
+     "min": 1,
+     "max": 16,
+     "step": 0.1
+    },
+    {
+     "path": "wizard.groundGrip",
+     "label": "Grip",
+     "help": "How quickly he speeds up and stops on the ground",
+     "min": 1,
+     "max": 40,
+     "step": 0.5
+    },
+    {
+     "path": "wizard.airGrip",
+     "label": "Air control",
+     "help": "How much he can steer in the air",
+     "min": 0,
+     "max": 40,
+     "step": 0.5
+    },
+    {
+     "path": "wizard.chargeSlow",
+     "label": "Winding up",
+     "help": "Speed while winding up a throw (1 is full speed)",
+     "min": 0.1,
+     "max": 1,
+     "step": 0.05
+    },
+    {
+     "path": "wizard.crouchSlow",
+     "label": "Crouching",
+     "help": "Speed while crouched (1 is full speed)",
+     "min": 0.1,
+     "max": 1,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "jump",
+   "name": "Jump",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "wizard.jump",
+     "label": "Jump power",
+     "help": "How hard he jumps",
+     "min": 4,
+     "max": 30,
+     "step": 0.2
+    },
+    {
+     "path": "wizard.doubleJump",
+     "label": "Double jump",
+     "help": "The second jump in the air",
+     "min": 0,
+     "max": 30,
+     "step": 0.2
+    },
+    {
+     "path": "wizard.gravity",
+     "label": "Gravity",
+     "help": "How fast he falls back down",
+     "min": 8,
+     "max": 100,
+     "step": 1
+    },
+    {
+     "path": "wizard.shortHop",
+     "label": "Short hop",
+     "help": "Extra pull when jump is let go early (0 is always a full jump)",
+     "min": 0,
+     "max": 150,
+     "step": 2
+    },
+    {
+     "path": "wizard.fallExtra",
+     "label": "Fall speed",
+     "help": "Extra pull on the way down",
+     "min": 0,
+     "max": 80,
+     "step": 1
+    },
+    {
+     "path": "wizard.jumpSquat",
+     "label": "Jump squat",
+     "help": "Seconds he crouches before leaving the ground",
+     "min": 0,
+     "max": 0.3,
+     "step": 0.01
+    },
+    {
+     "path": "wizard.duelJump",
+     "label": "Duel jump",
+     "help": "Jump power in Duel and Party",
+     "min": 4,
+     "max": 30,
+     "step": 0.2
+    },
+    {
+     "path": "wizard.duelDoubleJump",
+     "label": "Duel double jump",
+     "help": "Double jump in Duel and Party",
+     "min": 0,
+     "max": 30,
+     "step": 0.2
+    }
+   ]
+  },
+  {
+   "id": "moves",
+   "name": "Dive and tackle",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "moves.diveTime",
+     "label": "Dive length",
+     "help": "Seconds a dive roll lasts",
+     "min": 0.2,
+     "max": 1.5,
+     "step": 0.05
+    },
+    {
+     "path": "moves.diveCooldown",
+     "label": "Dive rest",
+     "help": "Seconds before you can dive again",
+     "min": 0,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "moves.diveMinSpeed",
+     "label": "Dive start",
+     "help": "How fast you must be moving to dive",
+     "min": 0,
+     "max": 8,
+     "step": 0.1
+    },
+    {
+     "path": "moves.diveBoost",
+     "label": "Dive boost",
+     "help": "Extra speed a dive adds",
+     "min": 0,
+     "max": 8,
+     "step": 0.1
+    },
+    {
+     "path": "moves.tackleTime",
+     "label": "Tackle length",
+     "help": "Seconds a tackle lunge lasts",
+     "min": 0.05,
+     "max": 1,
+     "step": 0.02
+    },
+    {
+     "path": "moves.tackleCooldown",
+     "label": "Tackle rest",
+     "help": "Seconds before you can tackle again",
+     "min": 0,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "moves.tackleBoost",
+     "label": "Tackle boost",
+     "help": "Extra speed a tackle adds",
+     "min": 0,
+     "max": 20,
+     "step": 0.5
+    },
+    {
+     "path": "wizard.downTime",
+     "label": "Knocked down",
+     "help": "Seconds a wizard stays down when floored",
+     "min": 0.3,
+     "max": 6,
+     "step": 0.1
+    }
+   ]
+  },
+  {
+   "id": "catch",
+   "name": "Catching",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "wizard.catchStand",
+     "label": "Reach",
+     "help": "How close the solid must be to catch it standing",
+     "min": 0.3,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "wizard.catchAir",
+     "label": "Reach in the air",
+     "help": "Catching while jumping",
+     "min": 0.3,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "wizard.catchDive",
+     "label": "Diving reach",
+     "help": "Catching during a dive roll",
+     "min": 0.3,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "wizard.catchPick",
+     "label": "Pick up",
+     "help": "Picking it up off the floor",
+     "min": 0.3,
+     "max": 3,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "throw",
+   "name": "Throwing",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "throw.chargeTime",
+     "label": "Wind up",
+     "help": "Seconds to wind up a full-power throw",
+     "min": 0.2,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "throw.lobMax",
+     "label": "Lob distance",
+     "help": "The farthest a full lob goes",
+     "min": 5,
+     "max": 60,
+     "step": 1
+    },
+    {
+     "path": "throw.jumpSpeed",
+     "label": "Jump throw",
+     "help": "Speed of a jump throw (the fastball)",
+     "min": 4,
+     "max": 40,
+     "step": 0.5
+    },
+    {
+     "path": "throw.jumpCharge",
+     "label": "Jump throw wind up",
+     "help": "Extra speed a full wind up adds to it",
+     "min": 0,
+     "max": 30,
+     "step": 0.5
+    },
+    {
+     "path": "throw.bowlSpeed",
+     "label": "Bowl",
+     "help": "Speed of a crouched, rolling throw",
+     "min": 1,
+     "max": 30,
+     "step": 0.5
+    },
+    {
+     "path": "throw.bowlCharge",
+     "label": "Bowl wind up",
+     "help": "Extra speed a full wind up adds to it",
+     "min": 0,
+     "max": 30,
+     "step": 0.5
+    },
+    {
+     "path": "solid.gravity",
+     "label": "Solid gravity",
+     "help": "How fast every solid falls",
+     "min": 4,
+     "max": 80,
+     "step": 1
+    }
+   ]
+  },
+  {
+   "id": "solid0",
+   "name": "Tetrahedron",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "solids.0.grav",
+     "label": "Weight",
+     "help": "How fast it falls (1 is normal)",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.hang",
+     "label": "Hang time",
+     "help": "How long a lob stays in the air",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.range",
+     "label": "Range",
+     "help": "How far a lob goes",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.speed",
+     "label": "Speed",
+     "help": "How fast a jump throw flies",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.dmg",
+     "label": "Damage",
+     "help": "How much it hurts the demon",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.catchMul",
+     "label": "Catchable",
+     "help": "How easy it is to catch",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.rest",
+     "label": "Bounce",
+     "help": "How bouncy it is (0 dead, 1 superball)",
+     "min": 0,
+     "max": 1,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.fric",
+     "label": "Floor grip",
+     "help": "How much the floor slows it",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.0.roll",
+     "label": "Steady",
+     "help": "How hard it is to tip over (higher stays put)",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "solid1",
+   "name": "Cube",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "solids.1.grav",
+     "label": "Weight",
+     "help": "How fast it falls (1 is normal)",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.hang",
+     "label": "Hang time",
+     "help": "How long a lob stays in the air",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.range",
+     "label": "Range",
+     "help": "How far a lob goes",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.speed",
+     "label": "Speed",
+     "help": "How fast a jump throw flies",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.dmg",
+     "label": "Damage",
+     "help": "How much it hurts the demon",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.catchMul",
+     "label": "Catchable",
+     "help": "How easy it is to catch",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.rest",
+     "label": "Bounce",
+     "help": "How bouncy it is (0 dead, 1 superball)",
+     "min": 0,
+     "max": 1,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.fric",
+     "label": "Floor grip",
+     "help": "How much the floor slows it",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.1.roll",
+     "label": "Steady",
+     "help": "How hard it is to tip over (higher stays put)",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "solid2",
+   "name": "Octahedron",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "solids.2.grav",
+     "label": "Weight",
+     "help": "How fast it falls (1 is normal)",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.hang",
+     "label": "Hang time",
+     "help": "How long a lob stays in the air",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.range",
+     "label": "Range",
+     "help": "How far a lob goes",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.speed",
+     "label": "Speed",
+     "help": "How fast a jump throw flies",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.dmg",
+     "label": "Damage",
+     "help": "How much it hurts the demon",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.catchMul",
+     "label": "Catchable",
+     "help": "How easy it is to catch",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.rest",
+     "label": "Bounce",
+     "help": "How bouncy it is (0 dead, 1 superball)",
+     "min": 0,
+     "max": 1,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.fric",
+     "label": "Floor grip",
+     "help": "How much the floor slows it",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.2.roll",
+     "label": "Steady",
+     "help": "How hard it is to tip over (higher stays put)",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "solid3",
+   "name": "Dodecahedron",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "solids.3.grav",
+     "label": "Weight",
+     "help": "How fast it falls (1 is normal)",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.hang",
+     "label": "Hang time",
+     "help": "How long a lob stays in the air",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.range",
+     "label": "Range",
+     "help": "How far a lob goes",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.speed",
+     "label": "Speed",
+     "help": "How fast a jump throw flies",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.dmg",
+     "label": "Damage",
+     "help": "How much it hurts the demon",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.catchMul",
+     "label": "Catchable",
+     "help": "How easy it is to catch",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.rest",
+     "label": "Bounce",
+     "help": "How bouncy it is (0 dead, 1 superball)",
+     "min": 0,
+     "max": 1,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.fric",
+     "label": "Floor grip",
+     "help": "How much the floor slows it",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.3.roll",
+     "label": "Steady",
+     "help": "How hard it is to tip over (higher stays put)",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "solid4",
+   "name": "Icosahedron",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "solids.4.grav",
+     "label": "Weight",
+     "help": "How fast it falls (1 is normal)",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.hang",
+     "label": "Hang time",
+     "help": "How long a lob stays in the air",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.range",
+     "label": "Range",
+     "help": "How far a lob goes",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.speed",
+     "label": "Speed",
+     "help": "How fast a jump throw flies",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.dmg",
+     "label": "Damage",
+     "help": "How much it hurts the demon",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.catchMul",
+     "label": "Catchable",
+     "help": "How easy it is to catch",
+     "min": 0.1,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.rest",
+     "label": "Bounce",
+     "help": "How bouncy it is (0 dead, 1 superball)",
+     "min": 0,
+     "max": 1,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.fric",
+     "label": "Floor grip",
+     "help": "How much the floor slows it",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "solids.4.roll",
+     "label": "Steady",
+     "help": "How hard it is to tip over (higher stays put)",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "demon",
+   "name": "Demon",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "demon.hp",
+     "label": "Health",
+     "help": "How much damage it takes to beat",
+     "min": 20,
+     "max": 2000,
+     "step": 10
+    },
+    {
+     "path": "demon.segments",
+     "label": "Length",
+     "help": "Body segments (takes effect next game)",
+     "min": 3,
+     "max": 30,
+     "step": 1
+    },
+    {
+     "path": "demon.prowlSpeed",
+     "label": "Prowl speed",
+     "help": "Speed while circling you",
+     "min": 0,
+     "max": 12,
+     "step": 0.1
+    },
+    {
+     "path": "demon.huntSpeed",
+     "label": "Hunt speed",
+     "help": "Speed while going for the solid",
+     "min": 0,
+     "max": 12,
+     "step": 0.1
+    },
+    {
+     "path": "demon.windup",
+     "label": "Wind up",
+     "help": "Seconds of warning before it strikes or spits",
+     "min": 0.2,
+     "max": 3,
+     "step": 0.05
+    },
+    {
+     "path": "demon.respawn",
+     "label": "Comes back",
+     "help": "Seconds before a new demon appears",
+     "min": 0.5,
+     "max": 20,
+     "step": 0.5
+    },
+    {
+     "path": "demon.hitBase",
+     "label": "Hit damage",
+     "help": "Damage of every hit before speed and bonuses",
+     "min": 0,
+     "max": 30,
+     "step": 0.5
+    },
+    {
+     "path": "demon.hitPerSpeed",
+     "label": "Speed damage",
+     "help": "Extra damage for each unit of speed",
+     "min": 0,
+     "max": 4,
+     "step": 0.05
+    }
+   ]
+  },
+  {
+   "id": "view",
+   "name": "Camera and world",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "camera.fov",
+     "label": "Lens",
+     "help": "Field of view in degrees (lower looks flatter)",
+     "min": 10,
+     "max": 70,
+     "step": 1
+    },
+    {
+     "path": "camera.height",
+     "label": "Camera height",
+     "help": "How high the camera sits",
+     "min": 5,
+     "max": 80,
+     "step": 1
+    },
+    {
+     "path": "camera.back",
+     "label": "Camera distance",
+     "help": "How far back the camera sits",
+     "min": 5,
+     "max": 90,
+     "step": 1
+    },
+    {
+     "path": "world.motes",
+     "label": "Motes",
+     "help": "Floating specks in the void",
+     "min": 0,
+     "max": 4000,
+     "step": 50
+    }
+   ]
+  }
+ ]
+}
