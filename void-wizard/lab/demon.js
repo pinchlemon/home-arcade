@@ -62,10 +62,10 @@ LAB.shelf('demon', 'Demon', (game) => {
       sh.fragmentShader = NOISE + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
         float dN = clamp((dFbm(vDis * 6.0) - 0.22) / 0.56, 0.0, 1.0), dD = uDis * 1.08 - 0.08;
         if (dN < dD) discard;
-        float dEdge = (1.0 - smoothstep(dD, dD + 0.08, dN)) * step(0.001, uDis);`);
+        float dEdge = (1.0 - smoothstep(dD, dD + 0.14, dN)) * step(0.001, uDis);`);
       if (sh.fragmentShader.includes('#include <emissivemap_fragment>'))
-        sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uDisCol * dEdge * 4.0;');
-      else sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, '  gl_FragColor.rgb += uDisCol * dEdge * 4.0;\n}');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ndiffuseColor.rgb *= 1.0 - dEdge; totalEmissiveRadiance = mix(totalEmissiveRadiance, uDisCol * 1.3, dEdge);');
+      else sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, '  gl_FragColor.rgb = mix(gl_FragColor.rgb, uDisCol * 1.3, dEdge);\n}');
     };
     m.needsUpdate = true;
   }
@@ -91,6 +91,9 @@ LAB.shelf('demon', 'Demon', (game) => {
     dis.value = k;
     if (LAB.get('demon.dissolveCol')) edgeCol.value.copy(game.solid.color); else edgeCol.value.setRGB(1, 0.45, 0.1);
     for (const o of parts()) o.visible = true;
+    // the game flashes a dying demon white; while it dissolves that is held off so the burn edge shows
+    D.g.traverse(o => { const e = o.material && o.material.emissive; if (e && e.r === e.g && e.g === e.b) e.setRGB(0, 0, 0); });
+    for (const S of D.segs) S.mat.emissive.setRGB(0, 0, 0);
     if (D.segs[0] && D.segs[0].legs[0]) D.segs[0].legs[0].femur.parent.visible = true;
   }
   window.FEATURES.on('frame', dissolve, 'lab');
