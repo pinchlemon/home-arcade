@@ -66,7 +66,7 @@ const FOLDER_ICON = { player: 'sprites', props: 'objects', backdrop: 'display', 
 
 function thumb(g, it, size, color, app) {
   if (it.kind === 'symbol') return svgRows(it.rows, color || '#e4e2dc', 3);
-  if (it.kind === 'tile') return svgTile(it.tile, 24);
+  if (it.kind === 'tile') return svgTile(it.tile, 20); // corners stay inside the round well
   const s = size, cw = it.cell ? it.cell[0] : s && s[0], ch = it.cell ? it.cell[1] : s && s[1];
   if (!cw) return '';
   // small enough that its corners stay inside the round well (on the sprite background from Settings)
