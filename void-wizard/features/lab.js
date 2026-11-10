@@ -62,13 +62,21 @@ feature('lab', ({ game, on }) => {
 
   // ---------------------------------------------------------------- prototypes: kept as a phone edit of lab.prototypes
   const protos = () => (Array.isArray(data.prototypes) ? data.prototypes : []);
-  function keepProtos(list) {
-    data.prototypes = list;
+  // a phone edit, the same way the Studio keeps one (games.js setValue)
+  function keep(path, list) {
     try {
       const k = 'ha.game.' + folder, e = JSON.parse(localStorage.getItem(k) || 'null') || {};
-      e.overrides = e.overrides || {}; e.overrides['lab.prototypes'] = list; e.dirty = true; e.edited = Date.now();
-      localStorage.setItem(k, JSON.stringify(e));
-    } catch (err) { say('Could not save on this phone'); }
+      e.overrides = e.overrides || {}; e.overrides[path] = list; e.dirty = true; e.edited = Date.now();
+      localStorage.setItem(k, JSON.stringify(e)); return true;
+    } catch (err) { say('Could not save on this phone'); return false; }
+  }
+  function keepProtos(list) { data.prototypes = list; keep('lab.prototypes', list); }
+  // ideas: jotted down here, they show in the Studio's Lab tab (ones Claude has built are listed in lab.done)
+  function idea() {
+    const t = prompt('Your idea:', ''); if (!t || !t.trim()) return;
+    const done = new Set(data.done || []), list = (Array.isArray(data.ideas) ? data.ideas : []).filter(x => !done.has(x.id));
+    list.unshift({ id: 'i' + Date.now().toString(36), text: t.trim().slice(0, 600), made: Date.now() });
+    data.ideas = list; if (keep('lab.ideas', list)) say('Idea kept: it is in the Studio, under Lab');
   }
   let playing = null;   // the prototype loaded last
   function load(p) { push(); setAll(p.values || {}); playing = p.name; say('Playing ' + p.name); }
@@ -123,7 +131,7 @@ feature('lab', ({ game, on }) => {
   .lab-row .vl{min-width:42px;text-align:center;color:#ffd36a}
   .lab-row .sw{min-width:90px;height:24px;border:1px solid var(--line);color:#ffd36a}
   .lab-empty{padding:12px 10px;color:var(--dim);line-height:1.6}
-  .lab-act{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px 8px;border-top:1px solid var(--line)}
+  .lab-act{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px 8px;border-top:1px solid var(--line)}
   .lab-act button{height:26px;border:1px solid var(--line);color:#ffd36a}
   .lab-say{padding:0 8px 6px;min-height:12px;color:#7dff6a;font-size:8px}
   .lab-hint{padding:0 8px 7px;color:var(--dim);font-size:8px;line-height:1.5}
@@ -170,8 +178,8 @@ feature('lab', ({ game, on }) => {
     panel.innerHTML = `<div class="lab-top"><button data-sh="-1" aria-label="Previous shelf">&lt;</button><span class="nm">${esc(sh.name.toUpperCase())}<small>LAB · ${shelfAt + 1}/${shelves.length}</small></span><button data-sh="1" aria-label="Next shelf">&gt;</button><button data-close aria-label="Close the Lab">X</button></div>
       <div class="lab-rows">${rows}</div>
       <div class="lab-say">${esc(fresh)}</div>
-      <div class="lab-act"><button data-do="dice">DICE</button><button data-do="back">UNDO</button><button data-do="reset">RESET</button><button data-do="save">SAVE</button></div>
-      <div class="lab-hint">D-pad pick and turn · L1 R1 shelf · Cross switch / play · Triangle dice · Square save · Select undo · Circle close</div>`;
+      <div class="lab-act"><button data-do="dice">DICE</button><button data-do="back">UNDO</button><button data-do="reset">RESET</button><button data-do="save">SAVE</button><button data-do="idea">IDEA</button></div>
+      <div class="lab-hint">D-pad pick and turn · L1 R1 shelf · Cross switch / play · Triangle dice · Square save · Select undo · Start idea · Circle close</div>`;
     const on = panel.querySelector('.lab-row.on'); if (on) on.scrollIntoView({ block: 'nearest' });
   }
   panel.addEventListener('click', (e) => {
@@ -184,7 +192,7 @@ feature('lab', ({ game, on }) => {
     else if (d.inc) turn(byId[d.inc], 1);
     else if (d.flip) turn(byId[d.flip], 1);
     else if (d.load !== undefined) load(protos()[+d.load]);
-    else if (d.do) ({ dice, back, reset, save })[d.do]();
+    else if (d.do) ({ dice, back, reset, save, idea })[d.do]();
     draw();
   });
 
@@ -218,6 +226,7 @@ feature('lab', ({ game, on }) => {
         if (down(3)) dice();
         if (down(2)) save();
         if (down(8)) back();
+        if (down(9)) idea();
       }
     }
     for (let i = 0; i < 17; i++) prev[i] = b(i);

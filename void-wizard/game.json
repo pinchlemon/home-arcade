@@ -154,9 +154,12 @@
     "shelves": [
       "time",
       "world",
+      "throws",
       "bodies",
+      "demon",
       "spawn",
-      "camera"
+      "camera",
+      "health"
     ],
     "prototypes": [],
     "ideas": [
@@ -171,45 +174,23 @@
         "made": 1794328466005
       },
       {
-        "id": "imwawslp8",
-        "text": "homing throws",
-        "made": 1794328388828
-      },
-      {
         "id": "imwawsafd",
         "text": "ability to pick up extra solids and throw them",
         "made": 1794328374217
-      },
-      {
-        "id": "imwawpnsu",
-        "text": "wizards take damage upon collision with centipede (on/off)",
-        "made": 1794328251582
-      },
-      {
-        "id": "imwawoygk",
-        "text": "whole centipede flashes white when damaged (on/off and slider for duration and frequency of flash)",
-        "made": 1794328218740
-      },
-      {
-        "id": "imwawohkw",
-        "text": "health bar on/off and how much health is given to each player",
-        "made": 1794328196864
-      },
-      {
-        "id": "imwawo5qp",
-        "text": "slider for aggressiveness of centipede",
-        "made": 1794328181521
-      },
-      {
-        "id": "imwawngyb",
-        "text": "ability to add ideas to this list while in the game",
-        "made": 1794328149395
       },
       {
         "id": "imwawlsgu",
         "text": "Centipede shoots a flame beam (on/off and intensity slider and color and effects)",
         "made": 1794328071008
       }
+    ],
+    "done": [
+      "imwawngyb",
+      "imwawo5qp",
+      "imwawoygk",
+      "imwawslp8",
+      "imwawohkw",
+      "imwawpnsu"
     ]
   }
 }
