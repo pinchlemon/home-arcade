@@ -1968,7 +1968,7 @@ FX.game={THREE,scene,camera,player,buddy,ALL,orb,demon,SOLIDS,MOD,keys,DUEL,PART
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
-  orbMesh:orbG,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
+  orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();
 
