@@ -15,8 +15,8 @@ const scene=new THREE.Scene();
 // near/far hug the actual scene (the camera always sits ~50+ units away), which keeps depth precise on phone GPUs
 const camera=new THREE.PerspectiveCamera(cfg('camera.fov',28),1,12,260);
 
-const pxSteps=[1,2,3,4,6]; let pxIdx=(w=>pxSteps.reduce((b,x,i)=>Math.abs(x-w)<Math.abs(pxSteps[b]-w)?i:b,0))(cfg('world.pixel',2)); let PX=pxSteps[pxIdx]; // world.pixel: the starting pixel size (the PIXEL button cycles it)
-const pxBtn=document.getElementById('pxBtn');pxBtn.textContent='PIXEL '+PX+'×';
+const pxSteps=[0,1,2,3,4,6]; let pxIdx=(w=>pxSteps.reduce((b,x,i)=>Math.abs(x-w)<Math.abs(pxSteps[b]-w)?i:b,0))(cfg('world.pixel',2)); let PX=pxSteps[pxIdx]; // world.pixel: the starting pixel size, 0 for off (the PIXEL button cycles it)
+const pxBtn=document.getElementById('pxBtn');const pxLabel=()=>PX?'PIXEL '+PX+'×':'PIXEL OFF';pxBtn.textContent=pxLabel();
 // two-pass look: the world is drawn small and blown up with chunky pixels,
 // then the solid is drawn on top at full screen resolution
 renderer.autoClear=false;
@@ -31,15 +31,19 @@ orbBlit.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMater
   blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor})));
 function resize(){
   const w=innerWidth,h=innerHeight;
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+  // pixel off: everything at the screen's own sharpness, smoothed instead of blocky
+  const pr=PX?Math.min(devicePixelRatio||1,1.5):Math.min(devicePixelRatio||1,2);
+  renderer.setPixelRatio(pr);
   renderer.setSize(w,h,false);
-  lowRT.setSize(Math.max(1,Math.round(w/PX)),Math.max(1,Math.round(h/PX)));
-  const OPX=Math.min(PX,Math.max(1.8,PX*0.6));
+  canvas.style.imageRendering=PX?'':'auto';
+  const WPX=PX||1/pr;
+  lowRT.setSize(Math.max(1,Math.round(w/WPX)),Math.max(1,Math.round(h/WPX)));
+  const OPX=PX?Math.min(PX,Math.max(1.8,PX*0.6)):1/pr;
   orbRT.setSize(Math.max(1,Math.round(w/OPX)),Math.max(1,Math.round(h/OPX)));
   if(renderer.hudRT)renderer.hudRT.setSize(Math.max(1,Math.round(HUD_PX/OPX)),Math.max(1,Math.round(HUD_PX/OPX)));
   camera.aspect=w/h;camera.updateProjectionMatrix();
 }
-pxBtn.addEventListener('click',()=>{pxIdx=(pxIdx+1)%pxSteps.length;PX=pxSteps[pxIdx];pxBtn.textContent='PIXEL '+PX+'×';resize();});
+pxBtn.addEventListener('click',()=>{pxIdx=(pxIdx+1)%pxSteps.length;PX=pxSteps[pxIdx];pxBtn.textContent=pxLabel();resize();});
 addEventListener('resize',resize);resize();
 
 // ---- toon shading with 3 hard bands
