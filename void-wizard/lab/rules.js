@@ -63,7 +63,7 @@
     ['BLOOM', 'Everything bright glows', { 'glow.bloom': 1.8 }],
     ['TILT-SHIFT', 'The world looks like a tiny model', { 'glow.tilt': 2 }],
     ['TECHNI', 'Old film colours', { 'print.techni': 1 }],
-    ['PS1', 'Jittery old-console polygons and colours', { 'ps1.snap': 3, 'ps1.wobble': 0.5, 'ps1.depth': 1 }]
+    ['PS1', 'Jittery old-console polygons and colours', { 'ps1.snap': 1.5, 'ps1.wobble': 0.3, 'ps1.depth': 1, 'ps1.lowpoly': 1, 'ps1.gouraud': 1 }]
   ];
   const fire = (k, W) => {
     const then = THEN[LAB.get('rules.then' + k) || 0], sec = LAB.get('rules.for' + k) || 3;
