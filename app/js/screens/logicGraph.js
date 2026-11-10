@@ -47,9 +47,9 @@ const pv = (n, p) => { const v = (n.p || {})[p.k]; return v === undefined || v =
 // the choices of a setting, and how a value reads
 function optionsOf(c, p) {
   const D = c.data();
-  if (p.type === 'obj') return [...(p.it ? [['@it', 'That one']] : []), ...(p.any ? [['', 'Any thing']] : []), ...Object.entries(D.objects || {}).map(([id, o]) => [id, o.name])];
+  if (p.type === 'obj') return [...(p.it ? [['@it', 'That one']] : []), ...(p.any ? [['', 'Any thing']] : []), ...Object.entries(D.objects || {}).filter(([, o]) => D.template || o.base === 'actor' || o.base === 'eye').map(([id, o]) => [id, o.name])];
   if (p.type === 'tile') return [...(p.none ? [['', 'Nothing']] : []), ...Object.entries(D.tiles || {}).map(([ch, t]) => [ch, t.name])];
-  if (p.type === 'scene') return [['@next', 'Next'], ['@again', 'This one'], ...c.scenes().filter(s => s.kind === 'tiles').map(s => [s.id, s.name])];
+  if (p.type === 'scene') return [['@next', 'Next'], ['@again', 'This one'], ...c.scenes().filter(s => s.kind === 'tiles' || s.kind === 'level' || s.kind === 'waves').map(s => [s.id, s.name])];
   return p.options || [];
 }
 function label(c, p, v) {
@@ -136,7 +136,9 @@ export function logicGraph(c) {
     return `<div class="lg-node${S.sel === n.id ? ' sel' : ''}" data-n="${esc(n.id)}" style="left:${n.x}px;top:${n.y}px;height:${sh.h}px;--c:${gp.color}"><div class="lg-h">${esc(sp.name)}</div>${rows}${dots}</div>`;
   };
   const v0 = S.views[gr.id];
-  const screen = `<div class="screen fit gap20 lg-view${S.adding ? ' small' : ''}" id="lgv" role="application" aria-label="${esc(gr.name)}: ${nodes.length} boxes. Drag a box to move it, drag from a dot to another dot to join them.">
+  // the canvas makes room for the list of boxes, and for a box with many settings
+  const selSp = S.sel && byId[S.sel] ? spec.nodes[byId[S.sel].t] : null, roomy = selSp && (selSp.params || []).length >= 3;
+  const screen = `<div class="screen fit gap20 lg-view${S.adding ? ' small' : roomy ? ' mid' : ''}" id="lgv" role="application" aria-label="${esc(gr.name)}: ${nodes.length} boxes. Drag a box to move it, drag from a dot to another dot to join them.">
       <div class="lg-world" id="lgw"${v0 ? ` style="transform:translate(${v0.ox}px,${v0.oy}px) scale(${v0.z})"` : ''}>
         <svg class="lg-wires" id="lgs" width="1" height="1">${wiresSvg(gr, spec, S)}</svg>${nodes.map(nodeHtml).join('')}</div>
       ${nodes.length ? '' : '<span class="sub lg-empty">No boxes yet. Tap + BOX and start with an Event.</span>'}
@@ -148,7 +150,7 @@ export function logicGraph(c) {
     const sp = spec.nodes[t], arm = S.arm, id = uid('n'), p = {};
     for (const q of sp.params || []) {
       p[q.k] = q.default;
-      if (q.type === 'obj' && !q.any && !q.it) p[q.k] = Object.keys(D.objects || {})[0] || '';
+      if (q.type === 'obj' && !q.any && !q.it) p[q.k] = (optionsOf(c, q)[0] || [''])[0];
       if (q.type === 'tile' && !q.none) p[q.k] = Object.keys(D.tiles || {})[0] || '';
     }
     let at;
@@ -167,7 +169,7 @@ export function logicGraph(c) {
   }
   let body;
   if (S.adding) {
-    const arm = S.arm, kinds = Object.entries(spec.nodes).filter(([, sp]) => fitsKind(sp, arm));
+    const arm = S.arm, kinds = Object.entries(spec.nodes).filter(([, sp]) => fitsKind(sp, arm) && (!sp.only || D.template));
     const has = (gid) => kinds.some(([, sp]) => sp.group === gid);
     if (!has(S.group)) S.group = (spec.groups.find(x => has(x.id)) || { id: 'event' }).id;
     const gp = groupOf(S.group);
@@ -210,7 +212,7 @@ export function logicGraph(c) {
         ${iconBtn('dup', A(() => { const id = uid('n'), at = freeSpot(nodes, spec, n.x + 16, n.y + shape(sp).h + 20, shape(sp).h); change(g => { g.nodes.push({ ...structuredClone(n), id, x: at.x, y: at.y }); }); S.sel = id; S.reveal = id; done(); }), { label: 'Duplicate this box' })}
         ${iconBtn('trash', A(() => { S.sel = null; change(g => { g.nodes = g.nodes.filter(x => x.id !== n.id); g.wires = g.wires.filter(w => w[0] !== n.id && w[2] !== n.id); }); done(); }), { label: 'Delete this box' })}</div>${rows}`;
   } else {
-    const sc = [['', 'All scenes'], ...c.scenes().filter(s => s.kind === 'tiles').map(s => [s.id, s.name])], si = Math.max(0, sc.findIndex(s => s[0] === (gr.scene || '')));
+    const sc = [['', D.template ? 'All scenes' : 'All levels'], ...c.scenes().filter(s => s.kind === 'tiles' || s.kind === 'level').map(s => [s.id, s.name])], si = Math.max(0, sc.findIndex(s => s[0] === (gr.scene || '')));
     const runs = (d) => { change(g => { g.scene = sc[(si + d + sc.length) % sc.length][0]; }); done(); };
     body = `<div class="ihead">${well(40, svgRows(G.events, GREEN))}<span class="t"><span class="title acc ell">${esc(gr.name)}</span><span class="sub">${nodes.length} ${nodes.length === 1 ? 'box' : 'boxes'} · ${gr.wires.length} ${gr.wires.length === 1 ? 'wire' : 'wires'}</span></span>
         ${iconBtn('rename', A(() => { const t = prompt('Graph name', gr.name); if (t && t.trim()) { change(g => { g.name = t.trim().slice(0, 24); }); done(); } }), { label: 'Rename graph' })}
@@ -234,11 +236,11 @@ function join(g, a, b) {
   if (b.type === 'num') g.wires = g.wires.filter(w => !(w[2] === b.n && w[3] === b.port));
   if (!g.wires.some(w => w[0] === a.n && w[1] === a.port && w[2] === b.n && w[3] === b.port)) g.wires.push([a.n, a.port, b.n, b.port]);
 }
-// three joined boxes for a first look: collect a thing, get points, see a message
+// joined boxes for a first look: collect a thing (or defeat one), get points, see a message
 export function example(g, D) {
   const pick = Object.keys(D.objects || {}).find(id => ((D.objects[id].behaviors || []).some(b => b.type === 'collectible'))) || '';
   const a = uid('n'), b = a + 'b', k = a + 'c';
-  g.nodes.push({ id: a, t: 'collect', x: 16, y: 16, p: { obj: pick } }, { id: b, t: 'score', x: 196, y: 16, p: { n: 5 } }, { id: k, t: 'say', x: 196, y: 96, p: { text: 'SCORE #', v: 0, secs: 2 } }, { id: a + 'd', t: 'scoreV', x: 16, y: 116, p: {} });
+  g.nodes.push(pick || D.template ? { id: a, t: 'collect', x: 16, y: 16, p: { obj: pick } } : { id: a, t: 'defeat', x: 16, y: 16, p: { obj: '' } }, { id: b, t: 'score', x: 196, y: 16, p: { n: 5 } }, { id: k, t: 'say', x: 196, y: 96, p: { text: 'SCORE #', v: 0, secs: 2 } }, { id: a + 'd', t: 'scoreV', x: 16, y: 116, p: {} });
   g.wires.push([a, 'o0', b, 'in'], [b, 'o0', k, 'in'], [a + 'd', 'v', k, 'v']);
 }
 

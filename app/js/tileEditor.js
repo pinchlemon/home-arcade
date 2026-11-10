@@ -18,7 +18,14 @@ export function svgTile(t, size) {
   return `<svg viewBox="0 0 8 8" width="${size}" height="${size}" shape-rendering="crispEdges"><path d="${b}" fill="${shadeOf(t)}"/><path d="${a}" fill="${t.color || '#888'}"/></svg>`;
 }
 // the level editor's plan view draws each tile as one colour: its own plan symbol, or the shape of its game art
-export const planRows = (t) => (Array.isArray(t.plan) ? t.plan : (t.symbol || []).map(r => r.replace(/[12]/g, '1')));
+// the plan symbol: the tile's own, else its art's shape in one colour; a full block (ground, brick, wall...) is drawn as
+// Crab Platformer's ground symbol, an outlined square with dots, so a floor reads as blocks the way it does in Crab's editor
+const BLOCK = ['11111111', '10000001', '10100101', '10000001', '10010001', '10000101', '10000001', '11111111'];
+export const planRows = (t) => {
+  if (Array.isArray(t.plan)) return t.plan;
+  const rows = (t.symbol || []).map(r => r.replace(/[12]/g, '1'));
+  return rows.length === 8 && rows.every(r => r === '11111111') ? BLOCK : rows;
+};
 // plan colours are the app's own (the colours of the sections and of the objects' symbols)
 export const PLAN_COLORS = ['#7dff6a', '#ffd23f', '#ff5a1f', '#ff4f5e', '#ff4fd8', '#8b5cf6', '#4d7cff', '#e4e2dc'];
 const HUES = [[115, '#7dff6a'], [49, '#ffd23f'], [17, '#ff5a1f'], [355, '#ff4f5e'], [312, '#ff4fd8'], [262, '#8b5cf6'], [225, '#4d7cff']];

@@ -1,6 +1,7 @@
 function update() {
   t++;
   if (shake > 0) shake--;
+  if (LEVEL && window.LOGIC) LOGIC.tick();   // the level's visual logic (logic-host.js)
   if (crab.dead) {
     overT++;
     if (overT > 60 && (pressed.jump || pressed.a || pressed.b)) reset();
@@ -102,5 +103,6 @@ function spawnDust(x, y) {
 // levels: after the exit, the next scene in game.json; after the last one, back to the first
 function nextScene() {
   const i = SCENES.indexOf(SCENE), next = SCENES[i + 1] || SCENES[0];
+  if (window.LOGIC) LOGIC_HOST.carry(LOGIC.vars);
   location.replace(location.pathname + '?scene=' + encodeURIComponent(next.id));
 }

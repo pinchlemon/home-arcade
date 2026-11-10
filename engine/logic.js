@@ -1,11 +1,21 @@
-// Visual logic for tile games: runs the node graphs made in the Studio's Logic tab (game.json "logic").
+// Visual logic: runs the node graphs made in the Studio's Logic tab (game.json "logic").
 // A graph is boxes joined by wires. An Event box starts a chain; white wires carry the flow from box to box;
 // blue wires carry a number from a Value box into another box's setting. The boxes are listed in logic.json.
-// Loaded after engine/tiles (it uses the scene, the player and the things from there), before engine/loop.
+// The game it runs in is reached through window.LOGIC_HOST, which the game sets up before this file loads:
+// engine/tiles.js for games made with New game, crab-platformer/scripts/logic-host.js for Crab Platformer's levels.
+// The host tells the logic what happens with LOGIC.fire(what, thing), and calls LOGIC.begin() when a scene starts,
+// LOGIC.tick() once a frame before things move, and LOGIC.draw() over the picture.
+//
+// What a host has: player (an object with x, y, vx, vy; x is the middle, y the feet), T (tile size), scenes, sceneIndex(),
+// sceneId(), start(), exit(), score(n?) (read, or set), hp(), maxHp(), hearts(k) (add, minus hurts), things(id) (the live
+// things, each with oid, x, y), thingCount(), spawn(id, x, y), kill(thing), move(x, y), push(vx, vy), sound(name),
+// go(i) (to scene i), win(), buttons() (what is held) and tapped(k) (pressed since the last frame, then forgotten),
+// say(text) (draw it), carry(vars) (vars kept when the page changes scene), and for tile games: tiles (the kinds),
+// map (rows of characters), mapW, mapH, touchedTiles() (a Set), setPlayer(what, how, value).
 window.LOGIC = (function () {
-  const SPEC = (window.LOGIC_NODES || {}).nodes || {};
+  const H = window.LOGIC_HOST, SPEC = (window.LOGIC_NODES || {}).nodes || {};
   // each graph once: its boxes by id, where each flow output leads, and which Value box feeds each setting
-  const ALL = (Array.isArray(TG.logic) ? TG.logic : []).filter(g => g && Array.isArray(g.nodes)).map(g => {
+  const ALL = (Array.isArray(window.GAME && GAME.logic) ? GAME.logic : []).filter(g => g && Array.isArray(g.nodes)).map(g => {
     const byId = {}, outs = {}, ins = {};
     for (const n of g.nodes) if (n && SPEC[n.t]) byId[n.id] = n;
     for (const w of g.wires || []) {
@@ -14,7 +24,7 @@ window.LOGIC = (function () {
     }
     return { id: g.id, scene: g.scene || '', outs, ins, nodes: Object.values(byId) };
   });
-  const vars = {};                      // the game's own numbers, kept between scenes
+  const vars = Object.assign({}, H && H.carried ? H.carried() : {});   // the game's own numbers, kept between scenes
   let live = [], state = {}, waits = [], sigQ = [], frames = 0, budget = 0, busy = 0, fresh = false, before = {}, nextScene = null, note = null;
   const st = (G, n) => state[G.id + ':' + n.id] || (state[G.id + ':' + n.id] = {});
   // a setting: what the box says, else the list's default
@@ -27,17 +37,17 @@ window.LOGIC = (function () {
     const src = G.ins[n.id + ':' + k], v = src ? value(G, src, ctx, (depth || 0) + 1) : +P(n, k);
     return isFinite(v) ? v : 0;
   }
-  const thingsOf = (id) => actors2.filter(a => a.alive && (!id || a.oid === id));
+  const T = () => H.T || 8;
   function value(G, n, ctx, depth) {
     if (depth > 24) return 0;           // wires in a ring
     const N = (k) => num(G, n, k, ctx, depth);
     switch (n.t) {
       case 'var': return +vars[P(n, 'name')] || 0;
-      case 'scoreV': return score;
-      case 'heartsV': return player.hp;
-      case 'count': return thingsOf(P(n, 'obj')).length;
+      case 'scoreV': return H.score();
+      case 'heartsV': return H.hp();
+      case 'count': return H.things(P(n, 'obj')).length;
       case 'time': return frames / 60;
-      case 'playerV': { const w = P(n, 'what'), p = player; return w === 'y' ? p.y : w === 'tx' ? Math.floor(p.x / T) : w === 'ty' ? Math.floor((p.y - 1) / T) : w === 'vx' ? p.vx : w === 'vy' ? p.vy : p.x; }
+      case 'playerV': { const w = P(n, 'what'), p = H.player; return w === 'y' ? p.y : w === 'tx' ? Math.floor(p.x / T()) : w === 'ty' ? Math.floor((p.y - 1) / T()) : w === 'vx' ? p.vx : w === 'vy' ? p.vy : p.x; }
       case 'random': { const a = Math.ceil(Math.min(N('min'), N('max'))), b = Math.floor(Math.max(N('min'), N('max'))); return a + Math.floor(Math.random() * (b - a + 1)); }
       case 'math': {
         const a = N('a'), b = N('b');
@@ -49,16 +59,16 @@ window.LOGIC = (function () {
   // carry on from one of a box's flow outputs
   function go(G, n, out, ctx) { for (const t of G.outs[n.id + ':o' + out] || []) exec(G, t, ctx); }
   function place(at, ctx) {
-    const p = player, it = ctx.it;
+    const p = H.player, it = ctx.it;
     if (at === 'it' && it) return { x: it.x, y: it.y };
-    if (at === 'start') return { x: SC.start.x, y: SC.start.y };
-    if (at === 'exit' && SC.exit) return { x: SC.exit.x, y: SC.exit.y };
+    if (at === 'start') return H.start();
+    if (at === 'exit' && H.exit()) return H.exit();
     if (at === 'corner') return { x: 0, y: 0 };
     return { x: p.x, y: p.y };
   }
   function exec(G, n, ctx) {
     if (--budget < 0) return;           // a chain that never ends is cut off for this frame
-    const N = (k) => num(G, n, k, ctx), p = player;
+    const N = (k) => num(G, n, k, ctx);
     switch (n.t) {
       // ---- flow
       case 'if': {
@@ -71,45 +81,42 @@ window.LOGIC = (function () {
       case 'once': { const s = st(G, n); if (s.done) return; s.done = true; return go(G, n, 0, ctx); }
       case 'chance': return go(G, n, Math.random() * 100 < N('pct') ? 0 : 1, ctx);
       // ---- actions
-      case 'score': score = Math.max(0, Math.round(score + N('n'))); break;
-      case 'hearts': {
-        const k = Math.round(N('n')); if (p.dead) break;
-        p.hp = Math.max(0, Math.min(P2.lives, p.hp + k));
-        if (k < 0) { sfx.hurt(); p.inv = Math.max(p.inv, 30); if (p.hp <= 0) die(); }
-        break;
-      }
+      case 'score': H.score(Math.max(0, Math.round(H.score() + N('n')))); break;
+      case 'hearts': H.hearts(Math.round(N('n'))); break;
       case 'setVar': { const k = String(P(n, 'name')); vars[k] = (P(n, 'how') === 'set' ? 0 : +vars[k] || 0) + N('v'); break; }
       case 'spawn': {
         const at = place(P(n, 'at'), ctx);
-        if (actors2.filter(a => a.alive).length < 300) { const a = makeThing(P(n, 'obj'), at.x + N('x'), at.y + N('y')); if (a) actors2.push(a); }
+        if (H.thingCount() < 300) H.spawn(P(n, 'obj'), at.x + N('x'), at.y + N('y'));
         break;
       }
-      case 'remove': { const o = P(n, 'obj'); if (o === '@it') { if (ctx.it) ctx.it.alive = false; } else if (o) for (const a of thingsOf(o)) a.alive = false; break; }
+      case 'remove': { const o = P(n, 'obj'); if (o === '@it') { if (ctx.it) H.kill(ctx.it); } else if (o) for (const a of H.things(o)) H.kill(a); break; }
       case 'swapTiles': {
-        const a = P(n, 'from'), b = P(n, 'to'), to = TILES[b] ? b : null;
-        if (a && TILES[a]) for (const row of MAP) for (let x = 0; x < row.length; x++) if (row[x] === a) row[x] = to;
+        if (!H.map) break;
+        const a = P(n, 'from'), b = P(n, 'to'), to = H.tiles[b] ? b : null;
+        if (a && H.tiles[a]) for (const row of H.map()) for (let x = 0; x < row.length; x++) if (row[x] === a) row[x] = to;
         break;
       }
-      case 'setTile': { const tx = Math.round(N('tx')), ty = Math.round(N('ty')), ch = P(n, 'tile'); if (ty >= 0 && ty < MH && tx >= 0 && tx < MW) MAP[ty][tx] = TILES[ch] ? ch : null; break; }
-      case 'move': { const at = place(P(n, 'at'), ctx); p.x = at.x + N('x'); p.y = at.y + N('y'); p.vx = p.vy = 0; break; }
-      case 'push': p.vx = N('vx'); p.vy = N('vy'); p.onGround = false; if (TOP) p.stun = Math.max(p.stun, 10); break;
-      case 'setPlayer': {
-        const k = { speed: TOP ? 'speed' : 'walkMax', jump: 'jumpSpeed', gravity: 'gravity', shoot: 'shoot', cooldown: 'shotCooldown' }[P(n, 'what')];
-        if (k) P2[k] = Math.max(0, (P(n, 'how') === 'add' ? +P2[k] || 0 : 0) + N('v'));
+      case 'setTile': {
+        if (!H.map) break;
+        const tx = Math.round(N('tx')), ty = Math.round(N('ty')), ch = P(n, 'tile'), M = H.map();
+        if (ty >= 0 && ty < M.length && tx >= 0 && tx < M[ty].length) M[ty][tx] = H.tiles[ch] ? ch : null;
         break;
       }
+      case 'move': { const at = place(P(n, 'at'), ctx); H.move(at.x + N('x'), at.y + N('y')); break; }
+      case 'push': H.push(N('vx'), N('vy')); break;
+      case 'setPlayer': if (H.setPlayer) H.setPlayer(P(n, 'what'), P(n, 'how'), N('v')); break;
       case 'say': {
         const v = Math.round(N('v') * 100) / 100;
         note = { text: String(P(n, 'text')).replace(/#/g, String(v)).toUpperCase().slice(0, 38), t: Math.max(6, Math.round(N('secs') * 60)) };
         break;
       }
-      case 'sound': { const f = sfx[P(n, 'snd')]; if (f) f(); break; }
+      case 'sound': H.sound(P(n, 'snd')); break;
       case 'goScene': {
-        const s = P(n, 'scene'), i = s === '@next' ? (sceneIndex + 1) % SCENES.length : s === '@again' ? sceneIndex : SCENES.findIndex(x => x.id === s);
+        const s = P(n, 'scene'), i = s === '@next' ? (H.sceneIndex() + 1) % H.scenes.length : s === '@again' ? H.sceneIndex() : H.scenes.findIndex(x => x.id === s);
         if (i >= 0) nextScene = i;
         return;
       }
-      case 'win': if (!won && !p.dead) clearScene(); return;
+      case 'win': H.win(); return;
       case 'send': if (sigQ.length < 200) sigQ.push({ k: String(P(n, 'name')), it: ctx.it }); break;
       default: return;                   // an Event or Value box is not something to run
     }
@@ -132,51 +139,42 @@ window.LOGIC = (function () {
     sigQ.length = 0;
   }
   const fire = (type, it, key) => { if (live.length) top(() => dispatch(type, it, key)); };
-  function buttons() {
-    const ax = padAxis();
-    return { jump: !!held('jump'), a: !!held('a'), b: !!held('b'), left: !!held('left'), right: !!held('right'), up: !!(keys.up || ax.up), down: !!(keys.down || ax.down) };
-  }
-  // the kinds of tile the player is touching (standing on one counts)
-  function tilesTouched() {
-    const b = boxOf(player), set = new Set();
-    for (let ty = Math.floor((b.y0 - 1) / T); ty <= Math.floor((b.y1 + 1) / T); ty++)
-      for (let tx = Math.floor((b.x0 - 1) / T); tx <= Math.floor((b.x1 + 1) / T); tx++) { const ch = ty >= 0 && ty < MH && tx >= 0 && tx < MW ? MAP[ty][tx] : null; if (ch) set.add(ch); }
-    return set;
-  }
   return {
     vars, fire,
-    // a scene was loaded
+    // a scene was loaded (or started again)
     begin() {
-      live = ALL.filter(G => !G.scene || G.scene === SC.id);
-      state = {}; waits = []; sigQ = []; frames = 0; fresh = true; note = null; nextScene = null; before = buttons();
-      for (const k in tapped) tapped[k] = false;
+      const id = H.sceneId();
+      live = H.active === false ? [] : ALL.filter(G => !G.scene || G.scene === id);
+      state = {}; waits = []; sigQ = []; frames = 0; fresh = true; note = null; nextScene = null; before = H.buttons();
+      if (H.forgetTaps) H.forgetTaps();
     },
     // once a frame, before the player and the things move
     tick() {
-      if (nextScene !== null) { const i = nextScene; nextScene = null; sceneIndex = i; loadScene(i); }
+      if (nextScene !== null) { const i = nextScene; nextScene = null; if (H.carry) H.carry(vars); H.go(i); return; }
       budget = 3000;
       if (note && --note.t <= 0) note = null;
-      if (actors2.length > 400) actors2 = actors2.filter(a => a.alive);
       if (!live.length) return;
+      if (H.frame) H.frame();   // the host looks for touches it can only see from outside
       if (fresh) { fresh = false; fire('start'); }
       frames++;
       if (waits.length) {
         const due = []; waits = waits.filter(w => (--w.t > 0 ? true : (due.push(w), false)));
         for (const w of due) top(() => go(w.G, w.n, 0, w.ctx));
       }
-      const now = buttons();
-      for (const k in now) { if (tapped[k] || (now[k] && !before[k])) fire('press', null, k); tapped[k] = false; }
+      const now = H.buttons();
+      for (const k in now) if (H.tapped(k) || (now[k] && !before[k])) fire('press', null, k);
+      if (H.forgetTaps) H.forgetTaps();
       before = now;
       let touched = null;
       for (const G of live) for (const n of G.nodes) {
         if (n.t === 'always') top(() => go(G, n, 0, { it: null }));
         else if (n.t === 'timer') { const s = st(G, n); s.t = (s.t || 0) + 1; if (s.t >= Math.max(1, Math.round(+P(n, 'secs') * 60))) { s.t = 0; top(() => go(G, n, 0, { it: null })); } }
-        else if (n.t === 'gone') { const s = st(G, n), c = thingsOf(P(n, 'obj')).length; if (s.c > 0 && c === 0) top(() => go(G, n, 0, { it: null })); s.c = c; }
-        else if (n.t === 'tile') { const s = st(G, n); touched = touched || tilesTouched(); const on = touched.has(P(n, 'tile')); if (on && !s.on) top(() => go(G, n, 0, { it: null })); s.on = on; }
+        else if (n.t === 'gone') { const s = st(G, n), c = H.things(P(n, 'obj')).length; if (s.c > 0 && c === 0) top(() => go(G, n, 0, { it: null })); s.c = c; }
+        else if (n.t === 'tile' && H.touchedTiles) { const s = st(G, n); touched = touched || H.touchedTiles(); const on = touched.has(P(n, 'tile')); if (on && !s.on) top(() => go(G, n, 0, { it: null })); s.on = on; }
       }
     },
     // the Show text box, over the game
-    draw() { if (note) say(note.text, Math.round(VW / 2 - note.text.length * 2), 22, CREAM); }
+    draw() { if (note) H.say(note.text); }
   };
 })();
 LOGIC.begin();
