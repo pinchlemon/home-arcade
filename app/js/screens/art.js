@@ -11,6 +11,7 @@ import * as input from '../input.js';
 import { makeNav, padFrame } from '../padnav.js';
 import * as store from '../artStore.js';
 import { openSpriteEditor } from './spriteEditor.js';
+import { openSymbolEditor, playerRows } from '../symbolEditor.js';
 import { readAse } from '../ase.js';
 import { openTileEditor, svgTile, kindOf, TILE_KINDS, tileUses, freeTileChar } from '../tileEditor.js';
 
@@ -57,15 +58,18 @@ function folders(app, g) {
   }
   // games on the tile engine: their tiles (drawn with the tile editor)
   if (x.data.template && D.tiles) out.unshift({ id: 'tiles', name: 'Tiles', items: Object.keys(D.tiles).map(ch => ({ id: 'tile:' + ch, kind: 'tile', ch, tile: D.tiles[ch], name: D.tiles[ch].name, help: TILE_KINDS.find(k => k[0] === kindOf(D.tiles[ch]))[1] + ' · used ' + tileUses(D.scenes, ch) + ' times' })) });
+  // ...and the player, drawn with the symbol editor
+  if (x.data.template) out.splice(1, 0, { id: 'hero', name: 'Player', items: [{ id: 'hero:player', kind: 'player', name: 'Player', rows: playerRows(D, x.symbols), color: (D.player || {}).color || '#ff5a1f', help: (D.player || {}).shoot ? 'Walks, jumps and shoots' : 'Walks and jumps' }] });
   const used = {};
   for (const o of Object.values(objs)) if (o.symbol && x.symbols[o.symbol]) (used[o.symbol] = used[o.symbol] || []).push(o.name);
   out.push({ id: 'symbols', name: 'Symbols', items: Object.keys(x.symbols).map(k => ({ id: 'sym:' + k, kind: 'symbol', name: k[0].toUpperCase() + k.slice(1), rows: x.symbols[k], used: used[k] || [], help: used[k] ? 'Used by ' + used[k].join(', ') : 'Not used yet' })) });
   return { list: out, data: D, game: x };
 }
-const FOLDER_ICON = { player: 'sprites', props: 'objects', backdrop: 'display', symbols: 'grid', tiles: 'shapeBoxF' };
+const FOLDER_ICON = { player: 'sprites', props: 'objects', backdrop: 'display', symbols: 'grid', tiles: 'shapeBoxF', hero: 'sprites' };
 
 function thumb(g, it, size, color, app) {
   if (it.kind === 'symbol') return svgRows(it.rows, color || '#e4e2dc', 3);
+  if (it.kind === 'player') return svgRows(it.rows, it.color, Math.max(1, Math.floor(28 / Math.max(it.rows.length, it.rows[0].length))));
   if (it.kind === 'tile') return svgTile(it.tile, 20); // corners stay inside the round well
   const s = size, cw = it.cell ? it.cell[0] : s && s[0], ch = it.cell ? it.cell[1] : s && s[1];
   if (!cw) return '';
@@ -75,6 +79,7 @@ function thumb(g, it, size, color, app) {
 }
 const meta = (it, s, g) => {
   if (it.kind === 'symbol') return '8×8 symbol · ' + it.help;
+  if (it.kind === 'player') return it.rows[0].length + '×' + it.rows.length + ' player · ' + it.help;
   if (it.kind === 'tile') return '8×8 tile · ' + it.help;
   const r = g && store.record(g.file, it.id), mark = r && r.dirty ? (it.fresh ? ' · new · not pushed' : ' · not pushed') : '';
   return (it.cell ? it.cell[0] + '×' + it.cell[1] + ' · ' + it.frames + ' frames' : s ? s[0] + '×' + s[1] + ' px' : '…') + mark + ' · ' + it.help;
@@ -110,21 +115,21 @@ export default {
       <span class="title clamp2" data-of="${esc(it.name)}" data-f="title">${esc(it.name)}</span>
       <span class="sub clamp2" style="white-space:normal">${esc(f.name)}<span class="dsep" data-of="${esc(it.name)}" data-f="sub">${esc(meta(it, size, g))}</span></span>
       <div class="actions">
-        ${it.kind === 'tile' ? plateBtn('paint', 'Draw', A(() => drawTile(app, g, it, F))) : it.kind === 'symbol' ? plateBtn('select', 'View', A(() => openViewer(app, g, it, F))) : plateBtn('paint', 'Draw', A(() => openDraw(app, g, it, F)))}
-        ${it.kind === 'tile' ? plateBtn('scene', 'Levels', A(() => { app.ui.geTab = 'scene'; app.saveUI(); openGameEditor(app, g); })) : it.kind === 'symbol' ? plateBtn('edit', 'Objects', A(() => jump(app, g, it))) : plateBtn(it.cell ? 'play' : 'select', it.cell ? 'Animate' : 'View', A(() => openViewer(app, g, it, F)))}
+        ${it.kind === 'player' ? plateBtn('paint', 'Draw', A(() => drawPlayer(app, g, F))) : it.kind === 'tile' ? plateBtn('paint', 'Draw', A(() => drawTile(app, g, it, F))) : it.kind === 'symbol' ? plateBtn('select', 'View', A(() => openViewer(app, g, it, F))) : plateBtn('paint', 'Draw', A(() => openDraw(app, g, it, F)))}
+        ${it.kind === 'player' ? plateBtn('controller', 'Settings', A(() => { app.ui.geTab = 'settings'; app.saveUI(); openGameEditor(app, g); })) : it.kind === 'tile' ? plateBtn('scene', 'Levels', A(() => { app.ui.geTab = 'scene'; app.saveUI(); openGameEditor(app, g); })) : it.kind === 'symbol' ? plateBtn('edit', 'Objects', A(() => jump(app, g, it))) : plateBtn(it.cell ? 'play' : 'select', it.cell ? 'Animate' : 'View', A(() => openViewer(app, g, it, F)))}
       </div>` : `<span class="cap acc">${esc(g.name)}</span><span class="title clamp2">${esc(f.name)}</span><span class="sub">Empty folder</span>`;
     const per = rows(), pg = pageOf(f.items, Math.floor(si / per));
     const rowHtml = pg.slice.map((x, j) => {
       const i = pg.p * per + j, on = i === si, sz = x.kind === 'image' ? sizeOf(app, g, x) : null;
-      return row({ art: thumb(g, x, sz, on ? PINK : null, app), artOff: x.kind === 'symbol' ? thumb(g, x, sz) : null, name: x.name, meta: meta(x, sz, g), tag: on ? (x.kind === 'symbol' ? 'View' : 'Draw') : x.kind === 'symbol' ? 'Symbol' : x.kind === 'tile' ? 'Tile' : x.cell ? 'Sheet' : 'PNG', selected: on,
-        act: A(() => (!on ? setSel(app, i) : x.kind === 'tile' ? drawTile(app, g, x, F) : x.kind === 'symbol' ? openViewer(app, g, x, F) : openDraw(app, g, x, F))) });
+      return row({ art: thumb(g, x, sz, on ? PINK : null, app), artOff: x.kind === 'symbol' ? thumb(g, x, sz) : null, name: x.name, meta: meta(x, sz, g), tag: on ? (x.kind === 'symbol' ? 'View' : 'Draw') : x.kind === 'symbol' ? 'Symbol' : x.kind === 'tile' ? 'Tile' : x.kind === 'player' ? 'Player' : x.cell ? 'Sheet' : 'PNG', selected: on,
+        act: A(() => (!on ? setSel(app, i) : x.kind === 'player' ? drawPlayer(app, g, F) : x.kind === 'tile' ? drawTile(app, g, x, F) : x.kind === 'symbol' ? openViewer(app, g, x, F) : openDraw(app, g, x, F))) });
     }).join('');
     const body = `<div class="group">
       <div class="plate bar">
         <div role="tablist" aria-label="Folders" style="display:flex;align-items:center;gap:4px">
           ${F.list.map((x, k) => iconBtn(FOLDER_ICON[x.id] || 'folder', A(() => setFolder(app, k)), { on: k === fi, label: x.name, pressed: k === fi })).join('')}
         </div>
-        ${f.id === 'tiles' ? iconBtn('plus', A(() => newTile(app, g, F)), { color: '#fff', label: 'New tile' }) : f.id !== 'symbols' ? iconBtn('plus', A(() => openNew(app, g, f)), { color: '#fff', label: 'New sprite in ' + f.name }) : ''}
+        ${f.id === 'tiles' ? iconBtn('plus', A(() => newTile(app, g, F)), { color: '#fff', label: 'New tile' }) : f.id !== 'symbols' && f.id !== 'hero' ? iconBtn('plus', A(() => openNew(app, g, f)), { color: '#fff', label: 'New sprite in ' + f.name }) : ''}
         ${pager(pg.range, A(() => setSel(app, Math.max(0, pg.p - 1) * per)), A(() => setSel(app, Math.min(pg.pages - 1, pg.p + 1) * per)))}
       </div>
       ${rowHtml || emptyRow('folder', 'This folder is empty.')}
@@ -137,7 +142,7 @@ export default {
     else if (input.pressed('up')) setSel(app, s.si - 1);
     else if (input.pressed('right')) setFolder(app, s.fi + 1);
     else if (input.pressed('left')) setFolder(app, s.fi - 1);
-    else if (input.pressed('a') && s.it) (s.it.kind === 'tile' ? drawTile(app, s.g, s.it, s.F) : openViewer(app, s.g, s.it, s.F));
+    else if (input.pressed('a') && s.it) (s.it.kind === 'player' ? drawPlayer(app, s.g, s.F) : s.it.kind === 'tile' ? drawTile(app, s.g, s.it, s.F) : openViewer(app, s.g, s.it, s.F));
   }
 };
 
@@ -232,6 +237,7 @@ async function openDraw(app, g, it, F) {
 const SIZES = [8, 12, 16, 24, 32, 48, 64, 96, 128, 256];
 // tiles of a tile-engine game: drawn with the tile editor, saved in the game's edits
 function drawTile(app, g, it, F) { openTileEditor(app, g, it.ch, F.data, () => app.render()); }
+function drawPlayer(app, g, F) { openSymbolEditor(app, g, F.data, F.game.symbols, () => app.render()); }
 function newTile(app, g, F) {
   const ch = freeTileChar(F.data.tiles || {}); if (!ch) { app.toast('No room for more tiles'); return; }
   const all = structuredClone(F.data.tiles || {});
