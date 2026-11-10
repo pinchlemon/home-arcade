@@ -540,14 +540,15 @@ export function openGameEditor(app, g) {
       </div>`;
     const rowOf = (cap, sub, btns, edited) => `<div class="grow"><span class="t"><span class="cap"${edited ? ` style="color:${GREEN}"` : ''}>${esc(cap)}</span><span class="sub clamp2">${esc(sub)}</span></span><span style="display:flex;gap:2px;flex:none">${btns}</span></div>`;
     let body;
+    const st = val('lab.start') || {}, stOn = st.values && Object.keys(st.values).length;
+    const startRow = rowOf('Start mix', stOn ? summary(st) : 'The game starts plain. Set it in the game: Lab, Saved shelf, SET.',
+      stOn ? iconBtn('trash', A(() => set('lab.start', {})), { color: '#fff', label: 'Clear the start mix' }) : '', stOn);
     if (page === 1) {
       body = rowOf('New idea', 'A mechanic or look to try. Claude can build it as Lab toys', bareBtn('plus', 'Add', A(() => { const t = prompt('Your idea:', ''); if (t && t.trim()) setIdeas(l => l.unshift({ id: 'i' + Date.now().toString(36), text: t.trim().slice(0, 600), made: Date.now() })); })))
         + I.map((it, i) => rowOf('Idea ' + (I.length - i), it.text,
           iconBtn('wand', A(() => askIdea(it.text, it.id)), { color: '#fff', label: 'Ask Claude to build it' }) +
           iconBtn('rename', A(() => { const t = prompt('Your idea:', it.text); if (t !== null && t.trim()) setIdeas(l => { l[i].text = t.trim().slice(0, 600); }); }), { color: '#fff', label: 'Change idea' }) +
           iconBtn('trash', A(() => { if (confirm('Delete this idea?')) setIdeas(l => l.splice(i, 1)); }), { color: '#fff', label: 'Delete idea' }))).join('');
-    } else if (!P.length) {
-      body = `<div class="grow"><span class="t"><span class="cap">Nothing saved yet</span><span class="sub" style="white-space:normal">Play ${esc(g.name)}, open the Lab (D-pad down, or the LAB button), turn knobs or roll the Dice, then Save. Saved mixes show up here.</span></span></div>`;
     } else {
       const k = P.findIndex(p => p.id === ed.labSel);
       if (k >= 0) {   // one prototype: its name, note and knobs, and what you can do with it
@@ -560,11 +561,12 @@ export function openGameEditor(app, g) {
           + rowOf('Delete', 'Undo brings it back', bareBtn('trash', 'Delete', A(() => { setProtos(l => l.splice(k, 1)); ed.labSel = null; rerender(); })))
           + rowOf('All prototypes', P.length + ' saved', bareBtn('back', 'Back', A(() => { ed.labSel = null; rerender(); })));
       } else {
-        body = P.map((p) => rowOf(p.name, p.note || summary(p),
+        body = (P.length ? '' : `<div class="grow"><span class="t"><span class="cap">Nothing saved yet</span><span class="sub" style="white-space:normal">Play ${esc(g.name)}, open the Lab (D-pad down, or the LAB button), turn knobs or roll the Dice, then Save. Saved mixes show up here.</span></span></div>`) + P.map((p) => rowOf(p.name, p.note || summary(p),
           iconBtn('play', A(() => playProto(p)), { color: '#fff', label: 'Play ' + p.name }) +
           iconBtn('edit', A(() => { ed.labSel = p.id; rerender(); }), { color: '#fff', label: 'Open ' + p.name }))).join('');
       }
     }
+    if (page === 0 && ed.labSel == null) body = startRow + body;
     return pager + `<div class="plate inspector" style="margin-top:8px">${body}</div>`;
   }
   const BASE_TABS = [['scene', 'Scene', 'scene'], ['objects', 'Objects', 'objects'], ['settings', 'Settings', 'controller']];

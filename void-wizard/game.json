@@ -161,6 +161,7 @@
       "demon",
       "spawn",
       "camera",
+      "hud",
       "look",
       "effects",
       "ps1",
@@ -169,46 +170,6 @@
     ],
     "prototypes": [],
     "ideas": [
-      {
-        "id": "imwb1pzye",
-        "text": "be able to toggle text overlays, health bars, large solid on bottom left",
-        "made": 1794336665414
-      },
-      {
-        "id": "imwb1ny0f",
-        "text": "not sure dissolve is working properly",
-        "made": 1794336569583
-      },
-      {
-        "id": "imwb1nnc4",
-        "text": "need to be able to see full descriptions in each option",
-        "made": 1794336555748
-      },
-      {
-        "id": "imwb1m1gb",
-        "text": "be able to see idea list in-game",
-        "made": 1794336480731
-      },
-      {
-        "id": "imwb1l0k9",
-        "text": "ability to adjust centipede health",
-        "made": 1794336432923
-      },
-      {
-        "id": "imwayv16u",
-        "text": "add ability to set new defaults",
-        "made": 1794331861446
-      },
-      {
-        "id": "imwayumum",
-        "text": "add feature where you can rotate camera with right stick",
-        "made": 1794331842862
-      },
-      {
-        "id": "imwayuc8a",
-        "text": "don’t change camera when rolling dice",
-        "made": 1794331829098
-      },
       {
         "id": "imway2swx",
         "text": "map size and minimap option",
@@ -267,7 +228,16 @@
       "imwawslp8",
       "imwawohkw",
       "imwawpnsu",
-      "imwawsafd"
-    ]
+      "imwawsafd",
+      "imwb1pzye",
+      "imwb1ny0f",
+      "imwb1nnc4",
+      "imwb1m1gb",
+      "imwb1l0k9",
+      "imwayv16u",
+      "imwayumum",
+      "imwayuc8a"
+    ],
+    "start": {}
   }
 }

@@ -6,7 +6,7 @@ const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typ
 // features: add-ons in features/ that hook into the game (engine/features.js). With none on, nothing here changes how it plays.
 const FX=window.FEATURES||{emit(){},on(){}};
 // multipliers a feature can change (1 = normal)
-const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1}; // demon: the demon's full size; knock 0: nobody gets knocked down
+const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,turn:0}; // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -1304,7 +1304,7 @@ function spawnDemon(){
   const a=Math.random()*Math.PI*2, r=13+Math.random()*4;
   demon.pos.set(player.pos.x+Math.cos(a)*r,0,player.pos.z+Math.sin(a)*r);
   demon.yaw=Math.atan2(player.pos.x-demon.pos.x,player.pos.z-demon.pos.z);
-  demon.hp=DEMON_HP;demon.alive=true;demon.scale=0.05;demon.state='walk';demon.cd=1.4;demon.vel.set(0,0,0);
+  demon.hp=DEMON_HP*MOD.hp;demon.alive=true;demon.scale=0.05;demon.state='walk';demon.cd=1.4;demon.vel.set(0,0,0);
   trail.length=0;
   const fx=Math.sin(demon.yaw),fz=Math.cos(demon.yaw);
   for(let k=1;k<=80;k++)trail.push({x:demon.pos.x-fx*k*0.12,z:demon.pos.z-fz*k*0.12});
@@ -1523,9 +1523,9 @@ function updateDemon(dt){
       if(hd<r){const o=r-hd;W.pos.x+=hx/hd*o;W.pos.z+=hz/hd*o;}
     }
   }
-  hpBar.visible=demon.hp<DEMON_HP;
+  hpBar.visible=demon.hp<DEMON_HP*MOD.hp;
   hpBar.position.set(demon.pos.x,1.9*sc+Math.max(0,demon.rear)*1.2,demon.pos.z);hpBar.quaternion.copy(camera.quaternion);
-  hpFg.scale.x=Math.max(0.001,demon.hp/DEMON_HP);
+  hpFg.scale.x=Math.max(0.001,Math.min(1,demon.hp/(DEMON_HP*MOD.hp)));
 }
 // the solid hits some part of the centipede: every hit hurts it, the head most of all
 const RES_MULT=[0.25,0.6,1.2,2.0,3.0,4.2];
@@ -1717,6 +1717,7 @@ function frame(now){
              iz:(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-(keys.has('KeyW')||keys.has('ArrowUp')?1:0)+joy.y+(gp?gp.y:0),
              run:keys.has('ShiftLeft')||keys.has('ShiftRight')||(gp?gp.run:false),
              crouch:keys.has('KeyC')||keys.has('ControlLeft')||(gp?gp.crouch:false)};
+  if(MOD.turn){const c=Math.cos(MOD.turn),s=Math.sin(MOD.turn),x=pin.ix;pin.ix=x*c+pin.iz*s;pin.iz=-x*s+pin.iz*c;}
   player.faceTarget=null;
   if(DUEL){
     duelTick(dt,gp);
@@ -1893,6 +1894,7 @@ function frame(now){
   if(orb.state==='ground'&&orb.glow>0)orbG.position.x+=(Math.random()-.5)*0.045*orb.glow;
   orbLight.position.copy(orb.p);
   updateMarkers(dt);
+  if(!DUEL&&fxList.length)fxTick(dt); // flashes made outside the duel (by features) fade too
   FX.emit('frame',dt);
   // landing marker under a flying orb
   { orbMark.position.set(orb.p.x,0.003,orb.p.z);
@@ -1966,7 +1968,7 @@ FX.game={THREE,scene,camera,player,buddy,ALL,orb,demon,SOLIDS,MOD,keys,DUEL,PART
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
-  orbMesh:orbG,demonParts,hurtDemon,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
+  orbMesh:orbG,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();
 

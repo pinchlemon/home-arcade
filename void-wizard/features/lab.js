@@ -17,6 +17,7 @@ feature('lab', ({ game, on }) => {
   const run = (t, v) => { try { if (t.apply) t.apply(v); } catch (e) { console.error('Lab toy ' + t.id, e); } };
   function snap(t, v) {
     if (t.kind === 'onoff') return v ? 1 : 0;
+    if (v === t.value) return v;   // the normal value always stays itself, even off the step grid
     const n = Math.round((v - t.min) / t.step) * t.step + t.min;
     return +Math.min(t.max, Math.max(t.min, n)).toFixed(decimals(t.step) + 2);
   }
@@ -56,11 +57,11 @@ feature('lab', ({ game, on }) => {
         if (t.kind === 'onoff') { t.min = 0; t.max = 1; t.step = 1; }
         sh.toys.push(t); toys.push(t); byId[t.id] = t; values[t.id] = t.value;
       }
-      shelves.splice(shelves.length - 1, 0, sh);   // keep Saved last
+      shelves.splice(shelves.length - 2, 0, sh);   // keep Ideas and Saved last
       draw();
     }
   };
-  shelves.push({ id: 'saved', name: 'Saved', toys: [] });
+  shelves.push({ id: 'ideas', name: 'Ideas', toys: [] }, { id: 'saved', name: 'Saved', toys: [] });
 
   on('frame', (dt) => {
     const now = performance.now() / 1000;
@@ -91,6 +92,16 @@ feature('lab', ({ game, on }) => {
     list.unshift({ id: 'i' + Date.now().toString(36), text: t.trim().slice(0, 600), made: Date.now() });
     data.ideas = list; if (keep('lab.ideas', list)) say('Idea kept: it is in the Studio, under Lab');
   }
+  const ideasNow = () => { const done = new Set(data.done || []); return (Array.isArray(data.ideas) ? data.ideas : []).filter(x => !done.has(x.id)); };
+  // the start mix: knobs the game starts with (and Reset goes back to), kept as a phone edit of lab.start
+  const startVals = () => (data.start && data.start.values) || null;
+  function setStart() {
+    const vals = changed(), labels = {};
+    for (const id in vals) labels[id] = byId[id].shelf + ' · ' + byId[id].label + ' ' + fmt(byId[id], vals[id]);
+    data.start = Object.keys(vals).length ? { values: vals, labels, made: Date.now() } : {};
+    if (keep('lab.start', data.start)) say(Object.keys(vals).length ? 'The game now starts like this' : 'The game now starts plain');
+  }
+  function clearStart() { data.start = {}; if (keep('lab.start', {})) say('The game now starts plain'); }
   let playing = null;   // the prototype loaded last
   function load(p) { push(); setAll(p.values || {}); playing = p.name; say('Playing ' + p.name); }
   function save() {
@@ -115,7 +126,7 @@ feature('lab', ({ game, on }) => {
     draw(); say('Rolled ' + n + ' knob' + (n === 1 ? '' : 's'));
   }
   function back() { const v = undo.pop(); if (!v) { say('Nothing to undo'); return; } setAll(v); say('Undone'); }
-  function reset() { push(); setAll(null); playing = null; say('Back to normal'); }
+  function reset() { push(); const s = startVals(); setAll(s); playing = null; say(s ? 'Back to your start mix' : 'Back to normal'); }
 
   // ---------------------------------------------------------------- the panel
   const css = document.createElement('style');
@@ -136,7 +147,7 @@ feature('lab', ({ game, on }) => {
   .lab-row .lb{flex:1;min-width:0}
   .lab-row .lb b{display:block;font-weight:400;color:var(--ink)}
   .lab-row.moved .lb b{color:#7dff6a}
-  .lab-row .lb i{display:block;font-style:normal;color:var(--dim);font-size:8px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lab-row .lb i{display:block;font-style:normal;color:var(--dim);font-size:8px;margin-top:2px;line-height:1.35;white-space:normal}
   .lab-row .bar{display:block;height:3px;background:rgba(120,128,220,.2);margin-top:4px;position:relative}
   .lab-row .bar span{position:absolute;left:0;top:0;bottom:0;background:#ffd36a}
   .lab-row .bar em{position:absolute;top:-2px;width:1px;height:7px;background:var(--ink)}
@@ -165,7 +176,7 @@ feature('lab', ({ game, on }) => {
   }
   function say(t) { sayText = t; sayT = performance.now(); draw(); }
   const shelf = () => shelves[Math.min(shelfAt, shelves.length - 1)];
-  const rowsOf = (sh) => (sh.id === 'saved' ? protos() : sh.toys);
+  const rowsOf = (sh) => (sh.id === 'saved' ? [{ start: true }, ...protos()] : sh.id === 'ideas' ? [{ add: true }, ...ideasNow()] : sh.toys);
   function turn(t, dir) { set(t.id, t.kind === 'onoff' ? (values[t.id] ? 0 : 1) : values[t.id] + dir * t.step); }
 
   function draw() {
@@ -174,9 +185,15 @@ feature('lab', ({ game, on }) => {
     const sh = shelf(), list = rowsOf(sh); sel = Math.min(sel, Math.max(0, list.length - 1));
     const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     let rows;
+    const lit = (i) => (i === sel ? ' on' : '');
     if (sh.id === 'saved') {
-      rows = list.length ? list.map((p, i) => `<div class="lab-row${i === sel ? ' on' : ''}" data-i="${i}"><button class="lb" data-load="${i}" style="text-align:left"><b>${esc(p.name)}</b><i>${esc(p.note || Object.values(p.labels || {}).join(' · ') || '')}</i></button><button class="sw" data-load="${i}">PLAY</button></div>`).join('')
-        : '<div class="lab-empty">Nothing saved yet. Turn some knobs, then SAVE. Saved prototypes also show in the Studio, under Lab.</div>';
+      const st = startVals();
+      rows = `<div class="lab-row${lit(0)}" data-i="0"><span class="lb"><b>Start mix</b><i>${esc(st ? Object.values(data.start.labels || {}).join(' · ') : 'The game starts plain. SET makes it start with the knobs as they are now.')}</i></span><button class="st" style="width:40px" data-start="set">SET</button>${st ? '<button class="st" style="width:48px" data-start="clear">CLEAR</button>' : ''}</div>`
+        + (list.length > 1 ? list.slice(1).map((p, k) => { const i = k + 1; return `<div class="lab-row${lit(i)}" data-i="${i}"><button class="lb" data-load="${k}" style="text-align:left"><b>${esc(p.name)}</b><i>${esc(p.note || Object.values(p.labels || {}).join(' · ') || '')}</i></button><button class="sw" data-load="${k}">PLAY</button></div>`; }).join('')
+          : '<div class="lab-empty">Nothing saved yet. Turn some knobs, then SAVE. Saved prototypes also show in the Studio, under Lab.</div>');
+    } else if (sh.id === 'ideas') {
+      rows = `<div class="lab-row${lit(0)}" data-i="0"><span class="lb"><b>New idea</b><i>A mechanic or look to try. They also show in the Studio, under Lab.</i></span><button class="sw" data-do="idea">ADD</button></div>`
+        + list.slice(1).map((it, k) => `<div class="lab-row${lit(k + 1)}" data-i="${k + 1}"><span class="lb"><b>Idea ${list.length - 1 - k}</b><i style="color:var(--ink)">${esc(it.text)}</i></span></div>`).join('');
     } else {
       rows = list.map((t, i) => {
         const v = values[t.id], moved = v !== t.value;
@@ -208,6 +225,7 @@ feature('lab', ({ game, on }) => {
     else if (d.inc) turn(byId[d.inc], 1);
     else if (d.flip) turn(byId[d.flip], 1);
     else if (d.load !== undefined) load(protos()[+d.load]);
+    else if (d.start) (d.start === 'set' ? setStart : clearStart)();
     else if (d.do) ({ dice, back, reset, save, idea })[d.do]();
     draw();
   });
@@ -227,7 +245,7 @@ feature('lab', ({ game, on }) => {
       if (unblockWhenUp && ![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(b)) { game.blockPad = false; unblockWhenUp = false; }
       if (down(13)) toggle(true);
     } else {
-      const sh = shelf(), list = rowsOf(sh), t = sh.id === 'saved' ? null : list[sel];
+      const sh = shelf(), list = rowsOf(sh), t = sh.id === 'saved' || sh.id === 'ideas' ? null : list[sel];
       if (down(1)) toggle(false);
       else {
         if (rep(12) && list.length) { sel = (sel + list.length - 1) % list.length; draw(); }
@@ -236,7 +254,7 @@ feature('lab', ({ game, on }) => {
         // the left stick turns a knob too, faster the further you push
         const x = gp.axes[0] || 0;
         if (t && t.kind !== 'onoff' && Math.abs(x) > 0.4) { if (now >= stickT) { turn(t, Math.sign(x)); stickT = now + 0.16 - Math.min(0.13, (Math.abs(x) - 0.4) * 0.22); } } else stickT = 0;
-        if (down(0)) { if (sh.id === 'saved') { if (list[sel]) load(list[sel]); } else if (t) { if (t.kind === 'onoff') turn(t, 1); } }
+        if (down(0)) { if (sh.id === 'saved') { if (sel === 0) setStart(); else if (list[sel]) load(list[sel]); } else if (sh.id === 'ideas') { if (sel === 0) idea(); } else if (t) { if (t.kind === 'onoff') turn(t, 1); } }
         if (down(4)) { shelfAt = (shelfAt + shelves.length - 1) % shelves.length; sel = 0; draw(); }
         if (down(5)) { shelfAt = (shelfAt + 1) % shelves.length; sel = 0; draw(); }
         if (down(3)) dice();
@@ -255,6 +273,7 @@ feature('lab', ({ game, on }) => {
     let want = null; try { want = sessionStorage.getItem('ha.lab.play'); sessionStorage.removeItem('ha.lab.play'); } catch (e) {}
     const p = want && protos().find(x => x.id === want);
     if (p) { setAll(p.values || {}); playing = p.name; draw(); }
+    else if (startVals()) { setAll(startVals()); draw(); }   // your start mix
   };
   if (!left) ready();
   for (const n of names) {
