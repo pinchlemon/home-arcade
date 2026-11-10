@@ -802,6 +802,14 @@
      "min": 0,
      "max": 4000,
      "step": 50
+    },
+    {
+     "path": "world.pixel",
+     "label": "Pixel size",
+     "help": "How chunky the world looks at the start: 1, 2, 3, 4 or 6 (the PIXEL button still changes it while you play)",
+     "min": 1,
+     "max": 6,
+     "step": 1
     }
    ]
   }

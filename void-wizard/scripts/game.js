@@ -15,8 +15,8 @@ const scene=new THREE.Scene();
 // near/far hug the actual scene (the camera always sits ~50+ units away), which keeps depth precise on phone GPUs
 const camera=new THREE.PerspectiveCamera(cfg('camera.fov',28),1,12,260);
 
-const pxSteps=[1,2,3,4,6]; let pxIdx=1; let PX=pxSteps[pxIdx];
-const pxBtn=document.getElementById('pxBtn');
+const pxSteps=[1,2,3,4,6]; let pxIdx=(w=>pxSteps.reduce((b,x,i)=>Math.abs(x-w)<Math.abs(pxSteps[b]-w)?i:b,0))(cfg('world.pixel',2)); let PX=pxSteps[pxIdx]; // world.pixel: the starting pixel size (the PIXEL button cycles it)
+const pxBtn=document.getElementById('pxBtn');pxBtn.textContent='PIXEL '+PX+'×';
 // two-pass look: the world is drawn small and blown up with chunky pixels,
 // then the solid is drawn on top at full screen resolution
 renderer.autoClear=false;

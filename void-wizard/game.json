@@ -124,7 +124,8 @@
     "back": 42
   },
   "world": {
-    "motes": 1100
+    "motes": 1100,
+    "pixel": 1
   },
   "features": {
     "trail": {
