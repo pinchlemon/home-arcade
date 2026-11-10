@@ -56,7 +56,13 @@
       game.fxRing(W.pos.x, W.pos.z, game.solid.col, 6, 0.45); game.shake(0.15); }],
     ['SHAKE', 'The screen shakes (once)', null, (W) => { game.shake(0.35); game.rumble(W, 0.6, 0.6, 200); }],
     ['SWAP', 'You and your buddy swap places (once)', null, () => {
-      const a = game.player.pos.clone(); game.player.pos.copy(game.buddy.pos); game.buddy.pos.copy(a); game.spawnPuffs(8, 2, game.player.pos); game.spawnPuffs(8, 2, game.buddy.pos); }]
+      const a = game.player.pos.clone(); game.player.pos.copy(game.buddy.pos); game.buddy.pos.copy(a); game.spawnPuffs(8, 2, game.player.pos); game.spawnPuffs(8, 2, game.buddy.pos); }],
+    // new ones go at the end: saved prototypes remember a rule by its place in this list
+    ['IMPACT', 'An impact frame (once; look on the Moments shelf)', null, () => LAB.impact && LAB.impact()],
+    ['TRANSITION', 'Plays the Moments transition (once; pick one there)', null, () => LAB.transition && LAB.transition()],
+    ['BLOOM', 'Everything bright glows', { 'glow.bloom': 1.8 }],
+    ['TILT-SHIFT', 'The world looks like a tiny model', { 'glow.tilt': 2 }],
+    ['TECHNI', 'Old film colours', { 'print.techni': 1 }]
   ];
   const fire = (k, W) => {
     const then = THEN[LAB.get('rules.then' + k) || 0], sec = LAB.get('rules.for' + k) || 3;

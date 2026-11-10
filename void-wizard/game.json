@@ -161,6 +161,7 @@
       "spawn",
       "camera",
       "look",
+      "effects",
       "rules",
       "health"
     ],
