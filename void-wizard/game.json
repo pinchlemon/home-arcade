@@ -171,6 +171,16 @@
     "prototypes": [],
     "ideas": [
       {
+        "id": "imwb808xw",
+        "text": "be able to save sets",
+        "made": 1794347221317
+      },
+      {
+        "id": "imwb7cyqe",
+        "text": "dice only changes a few settings",
+        "made": 1794346134999
+      },
+      {
         "id": "imway2swx",
         "text": "map size and minimap option",
         "made": 1794330544353
@@ -238,6 +248,66 @@
       "imwayumum",
       "imwayuc8a"
     ],
-    "start": {}
+    "start": {
+      "values": {
+        "bodies.demon": 2,
+        "demon.flash": 1,
+        "demon.flashLen": 0.5,
+        "hud.text": 0,
+        "hud.bars": 0,
+        "hud.badge": 0,
+        "look.trails": 0.05,
+        "echo.spin": -0.5,
+        "colour.dither": 0.5,
+        "colour.ditherSize": 4,
+        "tone.outline": 0.05,
+        "screen.crt": 1.1,
+        "screen.grain": 0.2,
+        "screen.halftone": 0.05,
+        "glow.bloom": 0.4,
+        "glow.radius": 0.65,
+        "glow.threshold": 0.4,
+        "glow.tilt": 0.4,
+        "ps1.snap": 1,
+        "ps1.wobble": 0.1,
+        "ps1.lowpoly": 1,
+        "ps1.gouraud": 1,
+        "ps1.depth": 1,
+        "ps1.fog": 0.1,
+        "rules.when1": 9,
+        "rules.then1": 1,
+        "rules.for1": 0.5
+      },
+      "labels": {
+        "bodies.demon": "Bodies · Demon size 2.0",
+        "demon.flash": "Demon · White flash ON",
+        "demon.flashLen": "Demon · Flash length 0.50",
+        "hud.text": "Screen · Words OFF",
+        "hud.bars": "Screen · Health bars OFF",
+        "hud.badge": "Screen · Solid badge OFF",
+        "look.trails": "Echo · Trails 0.05",
+        "echo.spin": "Echo · Trail spin -0.50",
+        "colour.dither": "Colour · Dither 0.50",
+        "colour.ditherSize": "Colour · Dot size 4",
+        "tone.outline": "Tone · Outline 0.05",
+        "screen.crt": "Screen · Curve 1.1",
+        "screen.grain": "Screen · Grain 0.20",
+        "screen.halftone": "Screen · Halftone 0.05",
+        "glow.bloom": "Glow · Bloom 0.4",
+        "glow.radius": "Glow · Bloom size 0.65",
+        "glow.threshold": "Glow · Bloom from 0.40",
+        "glow.tilt": "Glow · Tilt-shift 0.4",
+        "ps1.snap": "PS1 · Snap 1",
+        "ps1.wobble": "PS1 · Wobble 0.1",
+        "ps1.lowpoly": "PS1 · Low poly ON",
+        "ps1.gouraud": "PS1 · Soft shading ON",
+        "ps1.depth": "PS1 · Colour depth 15-BIT",
+        "ps1.fog": "PS1 · Fog 0.10",
+        "rules.when1": "Rules 1 and 2 · Rule 1: when DEMON HIT",
+        "rules.then1": "Rules 1 and 2 · Rule 1: then SLOW-MO",
+        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S"
+      },
+      "made": 1794350251938
+    }
   }
 }
