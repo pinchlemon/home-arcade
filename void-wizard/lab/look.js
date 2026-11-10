@@ -55,7 +55,7 @@
       // ---- Colour
       if (hue != 0.0) col = clamp(hueShift(col, hue), 0.0, 1.0);
       if (tint > 0.0) col = mix(col, clamp(tintCol * lum(col) * 1.8, 0.0, 1.0), tint);
-      float d = (bayer4(gl_FragCoord.xy / ditherSize) - 0.5) * dither;
+      float d = (bayer4(gl_FragCoord.xy / ditherSize) - 0.5) * dither * smoothstep(0.0, 0.08, max(col.r, max(col.g, col.b)));   // no dots on the black
       if (pal > 0.5) { float l = clamp(lum(col) * 3.0 + d * 1.5, 0.0, 3.0); col = l < 0.5 ? pal0 : l < 1.5 ? pal1 : l < 2.5 ? pal2 : pal3; }
       else if (levels >= 2.0) col = floor(col * (levels - 1.0) + 0.5 + d) / (levels - 1.0);
       if (invert > 0.5) col = 1.0 - col;

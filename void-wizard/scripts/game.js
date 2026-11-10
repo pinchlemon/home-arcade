@@ -32,7 +32,7 @@ orbBlit.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMater
 function resize(){
   const w=innerWidth,h=innerHeight;
   // pixel off: everything at the screen's own sharpness, smoothed instead of blocky
-  const pr=PX?Math.min(devicePixelRatio||1,1.5):Math.min(devicePixelRatio||1,2);
+  const pr=PX?Math.min(devicePixelRatio||1,1.5):cfg('world.sharp',0)?(devicePixelRatio||1):Math.min(devicePixelRatio||1,2);   // world.sharp: every screen pixel when off
   renderer.setPixelRatio(pr);
   renderer.setSize(w,h,false);
   canvas.style.imageRendering=PX?'':'auto';

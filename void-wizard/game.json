@@ -125,7 +125,8 @@
   },
   "world": {
     "motes": 1100,
-    "pixel": 1
+    "pixel": 0,
+    "sharp": 0
   },
   "features": {
     "trail": {
