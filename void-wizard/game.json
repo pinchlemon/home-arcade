@@ -1,164 +1,215 @@
 {
- "title": "Void Wizard",
- "about": "Void Wizard's numbers, for the Studio. The game's code is scripts/game.js (three.js, 3D). Distances are in world units (a wizard is about 1.5 tall), speeds in units a second, times in seconds.",
- "load": [
-  "engine/features",
-  "game"
- ],
- "wizard": {
-  "walk": 5.2,
-  "run": 8.5,
-  "groundGrip": 12,
-  "airGrip": 7,
-  "chargeSlow": 0.45,
-  "crouchSlow": 0.45,
-  "jump": 11.8,
-  "doubleJump": 10.4,
-  "duelJump": 14.4,
-  "duelDoubleJump": 12.6,
-  "gravity": 38,
-  "shortHop": 50,
-  "fallExtra": 16,
-  "jumpSquat": 0.09,
-  "downTime": 2.4,
-  "catchStand": 0.85,
-  "catchAir": 1.0,
-  "catchDive": 1.05,
-  "catchPick": 1.0
- },
- "moves": {
-  "diveTime": 0.55,
-  "diveCooldown": 0.75,
-  "diveMinSpeed": 2.2,
-  "diveBoost": 1.5,
-  "tackleTime": 0.24,
-  "tackleCooldown": 0.6,
-  "tackleBoost": 6
- },
- "throw": {
-  "chargeTime": 1.0,
-  "lobMax": 22,
-  "jumpSpeed": 16,
-  "jumpCharge": 8,
-  "bowlSpeed": 6,
-  "bowlCharge": 11
- },
- "solid": {
-  "gravity": 24
- },
- "solids": [
-  {
-   "grav": 1.05,
-   "hang": 0.95,
-   "range": 0.95,
-   "speed": 1.05,
-   "dmg": 1.6,
-   "catchMul": 0.88,
-   "rest": 0.5,
-   "fric": 0.6,
-   "roll": 1.0,
-   "name": "Tetrahedron (fire)"
+  "title": "Void Wizard",
+  "about": "Void Wizard's numbers, for the Studio. The game's code is scripts/game.js (three.js, 3D). Distances are in world units (a wizard is about 1.5 tall), speeds in units a second, times in seconds.",
+  "load": [
+    "engine/features",
+    "game"
+  ],
+  "wizard": {
+    "walk": 5.2,
+    "run": 8.5,
+    "groundGrip": 12,
+    "airGrip": 7,
+    "chargeSlow": 0.45,
+    "crouchSlow": 0.45,
+    "jump": 11.8,
+    "doubleJump": 10.4,
+    "duelJump": 14.4,
+    "duelDoubleJump": 12.6,
+    "gravity": 38,
+    "shortHop": 50,
+    "fallExtra": 16,
+    "jumpSquat": 0.09,
+    "downTime": 2.4,
+    "catchStand": 0.85,
+    "catchAir": 1,
+    "catchDive": 1.05,
+    "catchPick": 1
   },
-  {
-   "grav": 1.3,
-   "hang": 0.85,
-   "range": 0.65,
-   "speed": 0.85,
-   "dmg": 1.25,
-   "catchMul": 1.0,
-   "rest": 0.15,
-   "fric": 0.95,
-   "roll": 3.0,
-   "name": "Cube (earth)"
+  "moves": {
+    "diveTime": 0.55,
+    "diveCooldown": 0.75,
+    "diveMinSpeed": 2.2,
+    "diveBoost": 1.5,
+    "tackleTime": 0.24,
+    "tackleCooldown": 0.6,
+    "tackleBoost": 6
   },
-  {
-   "grav": 0.7,
-   "hang": 1.25,
-   "range": 1.25,
-   "speed": 1.12,
-   "dmg": 0.7,
-   "catchMul": 1.18,
-   "rest": 0.38,
-   "fric": 0.55,
-   "roll": 1.0,
-   "name": "Octahedron (air)"
+  "throw": {
+    "chargeTime": 1,
+    "lobMax": 22,
+    "jumpSpeed": 16,
+    "jumpCharge": 8,
+    "bowlSpeed": 6,
+    "bowlCharge": 11
   },
-  {
-   "grav": 0.9,
-   "hang": 1.05,
-   "range": 1.0,
-   "speed": 1.0,
-   "dmg": 1.0,
-   "catchMul": 1.0,
-   "rest": 0.38,
-   "fric": 0.45,
-   "roll": 0.8,
-   "name": "Dodecahedron (aether)"
+  "solid": {
+    "gravity": 24
   },
-  {
-   "grav": 1.0,
-   "hang": 1.0,
-   "range": 1.0,
-   "speed": 1.0,
-   "dmg": 0.9,
-   "catchMul": 1.0,
-   "rest": 0.34,
-   "fric": 0.22,
-   "roll": 0.2,
-   "name": "Icosahedron (water)"
-  }
- ],
- "demon": {
-  "hp": 200,
-  "segments": 14,
-  "prowlSpeed": 3.8,
-  "huntSpeed": 4.3,
-  "windup": 1.05,
-  "respawn": 3,
-  "hitBase": 6,
-  "hitPerSpeed": 0.8
- },
- "camera": {
-  "fov": 28,
-  "height": 35,
-  "back": 42
- },
- "world": {
-  "motes": 1100
- },
- "features": {
-  "trail": {
-   "on": 0,
-   "rate": 40,
-   "size": 0.5,
-   "life": 0.35,
-   "rise": 0.6
+  "solids": [
+    {
+      "grav": 1.05,
+      "hang": 0.95,
+      "range": 0.95,
+      "speed": 1.05,
+      "dmg": 1.6,
+      "catchMul": 0.88,
+      "rest": 0.5,
+      "fric": 0.6,
+      "roll": 1,
+      "name": "Tetrahedron (fire)"
+    },
+    {
+      "grav": 1.3,
+      "hang": 0.85,
+      "range": 0.65,
+      "speed": 0.85,
+      "dmg": 1.25,
+      "catchMul": 1,
+      "rest": 0.15,
+      "fric": 0.95,
+      "roll": 3,
+      "name": "Cube (earth)"
+    },
+    {
+      "grav": 0.7,
+      "hang": 1.25,
+      "range": 1.25,
+      "speed": 1.12,
+      "dmg": 0.7,
+      "catchMul": 1.18,
+      "rest": 0.38,
+      "fric": 0.55,
+      "roll": 1,
+      "name": "Octahedron (air)"
+    },
+    {
+      "grav": 0.9,
+      "hang": 1.05,
+      "range": 1,
+      "speed": 1,
+      "dmg": 1,
+      "catchMul": 1,
+      "rest": 0.38,
+      "fric": 0.45,
+      "roll": 0.8,
+      "name": "Dodecahedron (aether)"
+    },
+    {
+      "grav": 1,
+      "hang": 1,
+      "range": 1,
+      "speed": 1,
+      "dmg": 0.9,
+      "catchMul": 1,
+      "rest": 0.34,
+      "fric": 0.22,
+      "roll": 0.2,
+      "name": "Icosahedron (water)"
+    }
+  ],
+  "demon": {
+    "hp": 200,
+    "segments": 14,
+    "prowlSpeed": 3.8,
+    "huntSpeed": 4.3,
+    "windup": 1.05,
+    "respawn": 3,
+    "hitBase": 6,
+    "hitPerSpeed": 0.8
   },
-  "text": {
-   "on": 1,
-   "title": "VOID WIZARD",
-   "score": "DEMONS DOWN",
-   "link": "TRY THE PARTY RELAY",
-   "tip": "Standing throws lob where you face (hold longer to throw farther). Jump-throw for a fastball that bends onto the demon if you're facing it. Crouch-throw to bowl. Pass back and forth to build resonance. Catch a lob mid-jump and throw before you land for an alley-oop. Plug in a second controller to play the red wizard.",
-   "fire": "FIRE \u00b7 hits hard, wild bounces",
-   "earth": "EARTH \u00b7 heavy, stuns, can't be swatted",
-   "air": "AIR \u00b7 floaty, easy to catch",
-   "aether": "AETHER \u00b7 every catch counts twice",
-   "water": "WATER \u00b7 rolls far, slows it down"
+  "camera": {
+    "fov": 28,
+    "height": 35,
+    "back": 42
+  },
+  "world": {
+    "motes": 1100
+  },
+  "features": {
+    "trail": {
+      "on": 0,
+      "rate": 40,
+      "size": 0.5,
+      "life": 0.35,
+      "rise": 0.6
+    },
+    "text": {
+      "on": 1,
+      "title": "VOID WIZARD",
+      "score": "DEMONS DOWN",
+      "link": "TRY THE PARTY RELAY",
+      "tip": "",
+      "fire": "FIRE · hits hard, wild bounces",
+      "earth": "EARTH · heavy, stuns, can't be swatted",
+      "air": "AIR · floaty, easy to catch",
+      "aether": "AETHER · every catch counts twice",
+      "water": "WATER · rolls far, slows it down"
+    },
+    "lab": {
+      "on": 1
+    }
   },
   "lab": {
-   "on": 1
+    "shelves": [
+      "time",
+      "world",
+      "bodies",
+      "spawn",
+      "camera"
+    ],
+    "prototypes": [],
+    "ideas": [
+      {
+        "id": "imwawv62c",
+        "text": "basketball minigame",
+        "made": 1794328508532
+      },
+      {
+        "id": "imwawu991",
+        "text": "ability to catch centipede inside of solid and redeploy to be on your team (only for dodecahedron)",
+        "made": 1794328466005
+      },
+      {
+        "id": "imwawslp8",
+        "text": "homing throws",
+        "made": 1794328388828
+      },
+      {
+        "id": "imwawsafd",
+        "text": "ability to pick up extra solids and throw them",
+        "made": 1794328374217
+      },
+      {
+        "id": "imwawpnsu",
+        "text": "wizards take damage upon collision with centipede (on/off)",
+        "made": 1794328251582
+      },
+      {
+        "id": "imwawoygk",
+        "text": "whole centipede flashes white when damaged (on/off and slider for duration and frequency of flash)",
+        "made": 1794328218740
+      },
+      {
+        "id": "imwawohkw",
+        "text": "health bar on/off and how much health is given to each player",
+        "made": 1794328196864
+      },
+      {
+        "id": "imwawo5qp",
+        "text": "slider for aggressiveness of centipede",
+        "made": 1794328181521
+      },
+      {
+        "id": "imwawngyb",
+        "text": "ability to add ideas to this list while in the game",
+        "made": 1794328149395
+      },
+      {
+        "id": "imwawlsgu",
+        "text": "Centipede shoots a flame beam (on/off and intensity slider and color and effects)",
+        "made": 1794328071008
+      }
+    ]
   }
- },
- "lab": {
-  "shelves": [
-   "time",
-   "world",
-   "bodies",
-   "spawn",
-   "camera"
-  ],
-  "prototypes": [],
-  "ideas": []
- }
 }

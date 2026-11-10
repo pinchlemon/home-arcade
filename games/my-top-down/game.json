@@ -1,0 +1,309 @@
+{
+ "title": "My top-down",
+ "template": "topdown",
+ "about": "A game made with New game in Hedron. Distances are in game pixels, times in frames (60 a second). Tiles are 8×8; a scene map is one character per tile (\".\" is empty).",
+ "load": [
+  "engine/screen",
+  "engine/audio",
+  "engine/input",
+  "engine/tiles",
+  "engine/logic",
+  "engine/loop"
+ ],
+ "screen": {
+  "width": 160,
+  "height": 144,
+  "ground": 144,
+  "zooms": [
+   [
+    160,
+    144
+   ],
+   [
+    240,
+    216
+   ],
+   [
+    320,
+    288
+   ]
+  ]
+ },
+ "colors": {
+  "sky": "#2f4a2a",
+  "ink": "#0b0b10",
+  "text": "#f4f1ea",
+  "hurt": "#ff4f5e"
+ },
+ "player": {
+  "symbol": "skull",
+  "color": "#ff5a1f",
+  "scale": 1,
+  "walkMax": 1.4,
+  "walkAccel": 0.2,
+  "stopDecel": 0.3,
+  "gravity": 0.3,
+  "holdJumpGravity": 0.17,
+  "jumpSpeed": 4.1,
+  "maxFall": 3.6,
+  "coyoteFrames": 6,
+  "jumpBufferFrames": 7,
+  "speed": 1.1,
+  "lives": 3,
+  "hurtInvulnFrames": 90,
+  "hurtStunFrames": 12,
+  "knockback": 2,
+  "shoot": 1,
+  "shotSpeed": 3,
+  "shotCooldown": 14,
+  "stomp": 1
+ },
+ "camera": {
+  "lookAhead": 0,
+  "lookEase": 0.1
+ },
+ "tiles": {
+  "W": {
+   "name": "Wall",
+   "color": "#8b8794",
+   "solid": true,
+   "symbol": [
+    "11111112",
+    "11111112",
+    "11111112",
+    "22222222",
+    "11121111",
+    "11121111",
+    "11121111",
+    "22222222"
+   ]
+  },
+  "T": {
+   "name": "Tree",
+   "color": "#3a9a5c",
+   "shade": "#1f5a36",
+   "solid": true,
+   "symbol": [
+    "00111100",
+    "01111210",
+    "11112111",
+    "11211121",
+    "12111211",
+    "02222220",
+    "00022000",
+    "00022000"
+   ]
+  },
+  "~": {
+   "name": "Water",
+   "color": "#2f6f8f",
+   "shade": "#4a9ac0",
+   "solid": true,
+   "symbol": [
+    "11111111",
+    "11122111",
+    "12211221",
+    "11111111",
+    "11111111",
+    "11221111",
+    "22112211",
+    "11111111"
+   ]
+  },
+  "\"": {
+   "name": "Grass",
+   "color": "#4e8a3a",
+   "symbol": [
+    "00000000",
+    "01000100",
+    "01001100",
+    "00000000",
+    "00000000",
+    "00100010",
+    "01100010",
+    "00000000"
+   ]
+  },
+  ":": {
+   "name": "Path",
+   "color": "#a08a5c",
+   "symbol": [
+    "11111111",
+    "11121111",
+    "11111111",
+    "12111111",
+    "11111121",
+    "11111111",
+    "11211111",
+    "11111111"
+   ]
+  },
+  "^": {
+   "name": "Spikes",
+   "color": "#d6d2dc",
+   "hurt": true,
+   "symbol": [
+    "00000000",
+    "01000100",
+    "11101110",
+    "00000000",
+    "00100010",
+    "01110111",
+    "00000000",
+    "00000000"
+   ]
+  }
+ },
+ "objects": {
+  "coin": {
+   "name": "Coin",
+   "base": "actor",
+   "symbol": "coin",
+   "color": "#ffd23f",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "collectible",
+     "score": 1,
+     "hearts": 0
+    }
+   ]
+  },
+  "heart": {
+   "name": "Heart",
+   "base": "actor",
+   "symbol": "heart",
+   "color": "#ff4f5e",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "collectible",
+     "score": 0,
+     "hearts": 1
+    }
+   ]
+  },
+  "blob": {
+   "name": "Blob",
+   "base": "actor",
+   "symbol": "blob",
+   "color": "#ff4fd8",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "patrol",
+     "speed": 0.4,
+     "range": 32
+    },
+    {
+     "type": "touchDamage"
+    },
+    {
+     "type": "health",
+     "hp": 2
+    }
+   ]
+  },
+  "skull": {
+   "name": "Skull",
+   "base": "actor",
+   "symbol": "skull",
+   "color": "#d6d2dc",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "shooter",
+     "range": 80,
+     "every": 100,
+     "speed": 1.2
+    },
+    {
+     "type": "touchDamage"
+    },
+    {
+     "type": "health",
+     "hp": 3
+    }
+   ]
+  },
+  "bat": {
+   "name": "Bat",
+   "base": "actor",
+   "symbol": "bat",
+   "color": "#8b5cf6",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "chase",
+     "range": 60,
+     "speed": 0.5,
+     "fly": true
+    },
+    {
+     "type": "touchDamage"
+    },
+    {
+     "type": "health",
+     "hp": 1
+    }
+   ]
+  },
+  "rock": {
+   "name": "Rock",
+   "base": "actor",
+   "symbol": "block",
+   "color": "#8b8794",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "solid"
+    }
+   ]
+  }
+ },
+ "scenes": [
+  {
+   "id": "level-1",
+   "name": "Level 1",
+   "kind": "tiles",
+   "w": 32,
+   "h": 24,
+   "map": [
+    "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "W..............................W",
+    "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
+   ],
+   "start": {
+    "x": 24,
+    "y": 24
+   },
+   "exit": {
+    "x": 232,
+    "y": 176
+   },
+   "things": []
+  }
+ ],
+ "logic": []
+}

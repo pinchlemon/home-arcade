@@ -1,0 +1,138 @@
+<!doctype html><html><head><!-- Page for a game made with "New game" in Hedron (games/<folder>/index.html); the app fills in the TITLE, PAD, TIP and LEGEND parts. --><link rel="manifest" href="../../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Arcade">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><script>(function(){var x0=null,y0=0;
+addEventListener('touchstart',function(e){var t=e.touches[0];x0=(e.touches.length===1&&t.clientX<18)?t.clientX:null;y0=t.clientY;},{passive:true,capture:true});
+addEventListener('touchend',function(e){if(x0===null)return;var t=e.changedTouches[0];if(t.clientX-x0>90&&Math.abs(t.clientY-y0)<80)location.href='../../';x0=null;},{passive:true,capture:true});
+})();</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('../../sw.js').catch(function(){});});</script>
+</head><body>
+<title>My platformer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one centered column — window-framed game screen, then touch pad, then a key legend. Single deliberate dusk-beach look in both themes. */
+:root {
+  --bg: #2b1d28;          /* dusk plum */
+  --frame: #f3e6e2;       /* window chrome, like the original */
+  --frame-ink: #3a2a33;
+  --ink: #f6e4dc;
+  --muted: #b89aa6;
+  --accent: #e7b44c;      
+  --btn: #45303e;
+  --btn-hi: #5a3f51;
+  --display: "Silkscreen", "Courier New", monospace;
+  --body: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px;
+  box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  -webkit-user-select: none; user-select: none;
+}
+.window { max-width: 100%; flex-shrink: 0; background: var(--frame); border-radius: 6px; overflow: hidden; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+.titlebar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; color: var(--frame-ink); font-size: 12px; }
+.titlebar i { width: 12px; height: 12px; background: #c8304a; border: 2px solid var(--frame-ink); border-radius: 2px; box-sizing: border-box; }
+.titlebar span { flex: 1 1 0; width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.titlebar b { font-weight: 400; letter-spacing: 6px; opacity: .7; flex: none; }
+canvas { display: block; width: 480px; height: 432px; max-width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; background: #a8dccc; touch-action: none; }
+canvas:focus { outline: none; }
+canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.pad { width: min(100%, 520px); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pad .grp { display: flex; gap: 10px; }
+.pad button {
+  font-family: var(--display); font-size: 15px; color: var(--ink);
+  background: var(--btn); border: 0; border-bottom: 4px solid #1c121a; border-radius: 10px;
+  width: 56px; height: 56px; touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pad button.round { border-radius: 50%; width: 60px; height: 60px; background: #a8404a; }
+.pad button.round.b { background: var(--accent); color: #2b1d28; }
+.pad button.on { transform: translateY(3px); border-bottom-width: 1px; background: var(--btn-hi); }
+.pad button:focus-visible { outline: 2px solid var(--accent); }
+.zoom { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.zoom button { font-family: var(--display); font-size: 12px; color: var(--ink); background: var(--btn); border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.zoom button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.zoom button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.padstat { margin: 0; font-family: var(--display); font-size: 12px; color: var(--bg); background: var(--accent); padding: 4px 10px; border-radius: 999px; }
+.tip { margin: 0; max-width: 46ch; text-align: center; font-size: 12.5px; color: var(--ink); text-wrap: balance; }
+.legend { width: min(100%, 520px); display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; font-size: 12.5px; color: var(--muted); }
+.legend .ps { flex-basis: 100%; text-align: center; }
+.legend kbd { font-family: var(--display); font-size: 11px; color: var(--ink); background: var(--btn); padding: 2px 6px; border-radius: 4px; letter-spacing: .04em; }
+@media (hover: hover) and (pointer: fine) { .pad { display: none; } }
+/* Phones and tablets: the keyboard keys don't apply, only the controller line does */
+@media (pointer: coarse) { .legend > span:not(.ps) { display: none; } }
+/* Held sideways: a handheld. Arrows on the left, A/B on the right, the screen as big as fits, nothing scrolls. */
+@media (pointer: coarse) and (orientation: landscape) {
+  html, body { overflow: hidden; overscroll-behavior: none; }
+  body {
+    display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: 1fr auto auto 1fr;
+    grid-template-areas: ". win ." "left win right" "zoom win stat" ". win .";
+    align-items: center; justify-items: center; column-gap: 20px; row-gap: 14px;
+    padding-block: 8px; height: 100%;
+  }
+  .window { grid-area: win; }
+  .pad { display: contents; }
+  .pad .grp:first-child { grid-area: left; display: grid; grid-template-columns: 56px 56px; gap: 10px; }
+  .pad .grp:first-child #bu { grid-column: 1 / 3; justify-self: center; order: -1; }
+  .pad .grp:last-child { grid-area: right; align-items: flex-end; }
+  .zoom { grid-area: zoom; }
+  .zoom > span { display: none; }
+  .padstat { grid-area: stat; }
+  .tip, .legend { display: none; }
+}
+/* Controller connected: console mode. Just the game screen, as big as the display allows at its own aspect ratio, black bars around it. */
+html:has(body.console) { background: #000; padding: 0; overflow: hidden; }
+body.console {
+  display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; overscroll-behavior: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: #000; cursor: none;
+}
+body.console .titlebar, body.console .zoom, body.console .padstat, body.console .pad, body.console .tip, body.console .legend { display: none !important; }
+body.console .window { background: none; border-radius: 0; box-shadow: none; }
+body.console canvas { max-width: none; outline: none !important; }
+</style>
+
+<div class="window">
+  <div class="titlebar"><i></i><span>My platformer</span><b>–□×</b></div>
+  <canvas id="game" width="160" height="144" tabindex="0" aria-label="My platformer game screen"></canvas>
+</div>
+
+<div class="zoom" role="group" aria-label="Camera zoom">
+  <span>Zoom out</span>
+  <button id="z1" data-z="0" aria-pressed="true">1×</button>
+  <button id="z2" data-z="1" aria-pressed="false">1.5×</button>
+  <button id="z3" data-z="2" aria-pressed="false">2×</button>
+</div>
+
+<p id="pad-status" class="padstat" role="status" hidden>Controller connected</p>
+
+<div class="pad" aria-label="Touch controls">
+  <div class="grp">
+    <button data-k="left" aria-label="Move left">◀</button>
+    <button data-k="jump" aria-label="Jump">▲</button>
+    <button data-k="right" aria-label="Move right">▶</button>
+  </div>
+  <div class="grp">
+    <button class="round b" data-k="b" aria-label="Shoot back">B</button>
+    <button class="round" data-k="a" aria-label="Shoot">A</button>
+  </div>
+</div>
+
+<p class="tip">Reach the green flag. Jump on enemies or shoot them.</p>
+
+<div class="legend">
+<span><kbd>← →</kbd> move</span><span><kbd>↑</kbd> / <kbd>Space</kbd> jump</span><span><kbd>Z</kbd> (A) shoot</span><span><kbd>X</kbd> (B) shoot back</span><span><kbd>P</kbd> pause</span>
+</div>
+
+<script src="../../engine/boot.js"></script>
+
+</body></html>

@@ -1,4 +1,15 @@
 {
  "about": "Games made with New game in Hedron and pushed from the phone. The app lists these next to the code games.",
- "games": []
+ "games": [
+  {
+   "file": "games/my-platformer",
+   "name": "My platformer",
+   "template": "platformer"
+  },
+  {
+   "file": "games/my-top-down",
+   "name": "My top-down",
+   "template": "topdown"
+  }
+ ]
 }

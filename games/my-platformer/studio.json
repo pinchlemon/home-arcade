@@ -1,0 +1,197 @@
+{
+ "about": "What the Studio shows for this game (made with New game on the tile engine).",
+ "template": "platformer",
+ "groups": [
+  {
+   "id": "movement",
+   "name": "Movement",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "player.walkMax",
+     "label": "Top speed",
+     "help": "How fast the player moves",
+     "min": 0.5,
+     "max": 4,
+     "step": 0.05
+    },
+    {
+     "path": "player.walkAccel",
+     "label": "Speed up",
+     "help": "How quickly the player reaches top speed",
+     "min": 0.02,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.stopDecel",
+     "label": "Slow down",
+     "help": "How quickly the player stops",
+     "min": 0.02,
+     "max": 1,
+     "step": 0.01
+    }
+   ]
+  },
+  {
+   "id": "jump",
+   "name": "Jump",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "player.jumpSpeed",
+     "label": "Jump power",
+     "help": "How hard the player jumps",
+     "min": 1,
+     "max": 8,
+     "step": 0.1
+    },
+    {
+     "path": "player.gravity",
+     "label": "Gravity",
+     "help": "How fast the player falls",
+     "min": 0.05,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.holdJumpGravity",
+     "label": "Held jump",
+     "help": "Gravity while jump is held (lower floats longer)",
+     "min": 0.05,
+     "max": 1,
+     "step": 0.01
+    },
+    {
+     "path": "player.maxFall",
+     "label": "Fall speed",
+     "help": "Fastest fall",
+     "min": 1,
+     "max": 8,
+     "step": 0.1
+    },
+    {
+     "path": "player.coyoteFrames",
+     "label": "Late jump",
+     "help": "Frames a jump still works after a ledge",
+     "min": 0,
+     "max": 20,
+     "step": 1
+    },
+    {
+     "path": "player.jumpBufferFrames",
+     "label": "Early jump",
+     "help": "Frames a jump press is remembered before landing",
+     "min": 0,
+     "max": 20,
+     "step": 1
+    }
+   ]
+  },
+  {
+   "id": "health",
+   "name": "Health",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "player.lives",
+     "label": "Hearts",
+     "help": "Hits the player can take",
+     "min": 1,
+     "max": 9,
+     "step": 1
+    },
+    {
+     "path": "player.hurtInvulnFrames",
+     "label": "Safe time",
+     "help": "Frames of safety after a hit",
+     "min": 0,
+     "max": 240,
+     "step": 5
+    },
+    {
+     "path": "player.knockback",
+     "label": "Knockback",
+     "help": "How far a hit pushes the player",
+     "min": 0,
+     "max": 5,
+     "step": 0.1
+    }
+   ]
+  },
+  {
+   "id": "attack",
+   "name": "Attack",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "player.shoot",
+     "label": "Shooting",
+     "help": "A shoots (B shoots backward in a platformer)",
+     "min": 0,
+     "max": 1,
+     "step": 1,
+     "show": "onoff"
+    },
+    {
+     "path": "player.shotSpeed",
+     "label": "Shot speed",
+     "help": "How fast shots fly",
+     "min": 1,
+     "max": 8,
+     "step": 0.5
+    },
+    {
+     "path": "player.shotCooldown",
+     "label": "Fire rate",
+     "help": "Frames between shots",
+     "min": 2,
+     "max": 60,
+     "step": 1
+    },
+    {
+     "path": "player.stomp",
+     "label": "Stomp",
+     "help": "Jumping on an enemy hurts it",
+     "min": 0,
+     "max": 1,
+     "step": 1,
+     "show": "onoff"
+    }
+   ]
+  },
+  {
+   "id": "camera",
+   "name": "Camera",
+   "scope": "game",
+   "fields": [
+    {
+     "path": "camera.lookAhead",
+     "label": "Look ahead",
+     "help": "How far the camera looks the way the player faces",
+     "min": 0,
+     "max": 48,
+     "step": 2
+    },
+    {
+     "path": "camera.lookEase",
+     "label": "Follow",
+     "help": "How quickly the camera catches up",
+     "min": 0.02,
+     "max": 0.5,
+     "step": 0.01
+    }
+   ]
+  }
+ ],
+ "scene": {
+  "kind": "tiles",
+  "name": "Level",
+  "levelItems": []
+ },
+ "background": [],
+ "art": {
+  "folders": []
+ },
+ "sound": {}
+}

@@ -1,0 +1,310 @@
+{
+ "title": "My platformer",
+ "template": "platformer",
+ "about": "A game made with New game in Hedron. Distances are in game pixels, times in frames (60 a second). Tiles are 8×8; a scene map is one character per tile (\".\" is empty).",
+ "load": [
+  "engine/screen",
+  "engine/audio",
+  "engine/input",
+  "engine/tiles",
+  "engine/logic",
+  "engine/loop"
+ ],
+ "screen": {
+  "width": 160,
+  "height": 144,
+  "ground": 144,
+  "zooms": [
+   [
+    160,
+    144
+   ],
+   [
+    240,
+    216
+   ],
+   [
+    320,
+    288
+   ]
+  ]
+ },
+ "colors": {
+  "sky": "#1d2b53",
+  "ink": "#0b0b10",
+  "text": "#f4f1ea",
+  "hurt": "#ff4f5e"
+ },
+ "player": {
+  "symbol": "crab",
+  "color": "#ff5a1f",
+  "scale": 1,
+  "walkMax": 1.4,
+  "walkAccel": 0.2,
+  "stopDecel": 0.3,
+  "gravity": 0.3,
+  "holdJumpGravity": 0.17,
+  "jumpSpeed": 4.1,
+  "maxFall": 3.6,
+  "coyoteFrames": 6,
+  "jumpBufferFrames": 7,
+  "speed": 1.1,
+  "lives": 3,
+  "hurtInvulnFrames": 90,
+  "hurtStunFrames": 12,
+  "knockback": 2,
+  "shoot": 1,
+  "shotSpeed": 3,
+  "shotCooldown": 14,
+  "stomp": 1
+ },
+ "camera": {
+  "lookAhead": 12,
+  "lookEase": 0.1
+ },
+ "tiles": {
+  "#": {
+   "name": "Ground",
+   "color": "#7a9a4a",
+   "shade": "#5a4632",
+   "solid": true,
+   "symbol": [
+    "11111111",
+    "12111211",
+    "22222222",
+    "22122222",
+    "22222212",
+    "22222222",
+    "21222222",
+    "22222122"
+   ]
+  },
+  "B": {
+   "name": "Brick",
+   "color": "#b0563c",
+   "solid": true,
+   "symbol": [
+    "11111112",
+    "11111112",
+    "11111112",
+    "22222222",
+    "11121111",
+    "11121111",
+    "11121111",
+    "22222222"
+   ]
+  },
+  "S": {
+   "name": "Stone",
+   "color": "#8b8794",
+   "solid": true,
+   "symbol": [
+    "11111112",
+    "12211112",
+    "12111112",
+    "11111112",
+    "11111222",
+    "11112212",
+    "11111112",
+    "22222222"
+   ]
+  },
+  "=": {
+   "name": "Platform",
+   "color": "#d6a35a",
+   "oneWay": true,
+   "symbol": [
+    "11111111",
+    "21122112",
+    "02000020",
+    "00000000",
+    "00000000",
+    "00000000",
+    "00000000",
+    "00000000"
+   ]
+  },
+  "^": {
+   "name": "Spikes",
+   "color": "#d6d2dc",
+   "hurt": true,
+   "symbol": [
+    "00000000",
+    "00000000",
+    "00100010",
+    "00100010",
+    "01110111",
+    "01110111",
+    "11111111",
+    "22222222"
+   ]
+  },
+  "\"": {
+   "name": "Grass",
+   "color": "#8fd25a",
+   "symbol": [
+    "00000000",
+    "00000000",
+    "00000000",
+    "00000000",
+    "00010000",
+    "01010010",
+    "01011010",
+    "11011011"
+   ]
+  }
+ },
+ "objects": {
+  "coin": {
+   "name": "Coin",
+   "base": "actor",
+   "symbol": "coin",
+   "color": "#ffd23f",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "collectible",
+     "score": 1,
+     "hearts": 0
+    },
+    {
+     "type": "hover",
+     "bob": 1,
+     "bobSpeed": 0.08
+    }
+   ]
+  },
+  "heart": {
+   "name": "Heart",
+   "base": "actor",
+   "symbol": "heart",
+   "color": "#ff4f5e",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "collectible",
+     "score": 0,
+     "hearts": 1
+    },
+    {
+     "type": "hover",
+     "bob": 1,
+     "bobSpeed": 0.06
+    }
+   ]
+  },
+  "blob": {
+   "name": "Blob",
+   "base": "actor",
+   "symbol": "blob",
+   "color": "#ff4fd8",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "patrol",
+     "speed": 0.4,
+     "range": 40
+    },
+    {
+     "type": "touchDamage"
+    },
+    {
+     "type": "health",
+     "hp": 1
+    }
+   ]
+  },
+  "bat": {
+   "name": "Bat",
+   "base": "actor",
+   "symbol": "bat",
+   "color": "#8b5cf6",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "chase",
+     "range": 70,
+     "speed": 0.6,
+     "fly": true
+    },
+    {
+     "type": "touchDamage"
+    },
+    {
+     "type": "health",
+     "hp": 2
+    }
+   ]
+  },
+  "spring": {
+   "name": "Spring",
+   "base": "actor",
+   "symbol": "spring",
+   "color": "#7dff6a",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "bouncer",
+     "strength": 6
+    }
+   ]
+  },
+  "lift": {
+   "name": "Lift",
+   "base": "actor",
+   "symbol": "block",
+   "color": "#d6a35a",
+   "scale": 1,
+   "behaviors": [
+    {
+     "type": "solid"
+    },
+    {
+     "type": "mover",
+     "dx": 32,
+     "dy": 0,
+     "period": 180
+    }
+   ]
+  }
+ },
+ "scenes": [
+  {
+   "id": "level-1",
+   "name": "Level 1",
+   "kind": "tiles",
+   "w": 40,
+   "h": 18,
+   "map": [
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "########################################",
+    "########################################"
+   ],
+   "start": {
+    "x": 16,
+    "y": 128
+   },
+   "exit": {
+    "x": 304,
+    "y": 128
+   },
+   "things": []
+  }
+ ],
+ "logic": []
+}
