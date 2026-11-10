@@ -74,7 +74,7 @@ LAB.shelf('demon', 'Demon', (game) => {
     patched = true;
     const add = (o) => { if (o.material) patchOne(o.material); if (o.userData.labToon) patchOne(o.userData.labToon); };
     D.g.traverse(add);
-    for (const S of D.segs) for (const L of S.legs) for (const o of [L.femur, L.tibia, L.knee]) if (o) o.traverse(add);
+    for (const S of D.segs) { S.g.traverse(add); for (const L of S.legs) for (const o of [L.femur, L.tibia, L.knee]) if (o) o.traverse(add); }
   }
   LAB.patchDissolve = (m) => { if (patched) patchOne(m); };   // for materials made later (PS1 soft shading)
   // the game hides the body piece by piece as it dies; while it dissolves it stays whole instead
