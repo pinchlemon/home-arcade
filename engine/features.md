@@ -57,7 +57,7 @@ If a mechanic needs something that isn't listed here, add it to the `FX.game` ob
 
 The Lab is a feature (`features/lab.js`) that opens a toy box over the running game: D-pad down or the LAB button opens it, the D-pad picks and turns knobs, L1 and R1 change shelf, Triangle rolls the Dice, Square saves, Select undoes, Start (or IDEA) jots down an idea, Circle closes. A saved mix is a **prototype**, kept in `game.json` under `lab.prototypes` (a phone edit, pushed like any setting). The Studio's Lab tab lists them (play, rename, note, copy, delete) and holds **ideas** (`lab.ideas`), each with an Ask Claude button.
 
-Knobs are **toys**, kept on **shelves**: one file per shelf in `void-wizard/lab/<shelf>.js`, listed in order in `game.json` `lab.shelves` (and in `PRE` in `sw.js`). Now: time, world, throws (homing), bodies, demon (aggression, white flash), spawn (extra solids you can kick, pick up and throw), camera, look (one file, two shelves: Look and Colour, the screen shaders), health (health bars, centipede touch damage, knockdown damage; it hooks the `camera` event to place the bars, so it stays after the camera shelf). To add a toy, add it to the shelf it belongs on; for a new kind of toy, add a shelf file.
+Knobs are **toys**, kept on **shelves**: one file per shelf in `void-wizard/lab/<shelf>.js`, listed in order in `game.json` `lab.shelves` (and in `PRE` in `sw.js`). Now: time, world, throws (homing), bodies, demon (aggression, white flash), spawn (extra solids you can kick, pick up and throw), camera, look (one file, the screen shaders on five shelves: Look, Echo, Colour, Tone, Screen; its top comment says how to add one), health (health bars, centipede touch damage, knockdown damage; it hooks the `camera` event to place the bars, so it stays after the camera shelf). To add a toy, add it to the shelf it belongs on; for a new kind of toy, add a shelf file.
 ```js
 LAB.shelf('time', 'Time', (game) => [
   { id: 'speed', label: 'Game speed', help: 'Below 1 is slow motion', min: 0.1, max: 3, step: 0.1, value: 1,
@@ -68,7 +68,7 @@ LAB.shelf('time', 'Time', (game) => [
 - `apply(v)` runs when the value changes; `frame(dt, v, now)` every frame and `camera(camera, lookAt, v, now)` after the camera is placed, both only while the value isn't normal (`now` is real seconds, so they work when time is frozen).
 - `kind: 'onoff'` makes a switch. `dice: false` keeps a toy out of the Dice (switches stay out unless `dice: true`). `fmt(v)` shows the value its own way.
 - `LAB.get('shelf.id')` reads another toy's value, so toys can work together (spawned solids follow World's solid gravity).
-- A prototype stores only the values that aren't normal, by `shelf.id`, so renaming a toy's id loses it in saved prototypes.
+- A prototype stores only the values that aren't normal, by `shelf.id`, so renaming a toy's id loses it in saved prototypes. To move a toy to another shelf without losing it, give it its full old id (`id: 'look.trails'` on the Echo shelf).
 
 **Ideas Claude has built**: remove them from `lab.ideas` in `game.json` and add their ids to `lab.done`. Her phone keeps its own copy of the list until she next changes it, so `lab.done` is what hides them in the Studio and in the game.
 

@@ -93,11 +93,18 @@ function sizeApp() {
   } else { root.style.bottom = ''; root.style.height = ''; }
 }
 function viewH() { return parseFloat(root.style.height) || innerHeight; }
+let lastOverlay = null;
 function render() {
   sizeApp();
   resetActions();
   if (app.overlay) {
+    // a redraw after a change keeps a long list where it was (only when it is still the same list)
+    const sig = (e) => (e.querySelector('.cap') || {}).textContent || '';   // same first row: same list
+    const kept = app.overlay === lastOverlay ? [...root.querySelectorAll('.inspector')].map(e => [e.scrollTop, sig(e)]) : [];
+    lastOverlay = app.overlay;
     root.innerHTML = app.overlay.render(app);
+    const restore = () => root.querySelectorAll('.inspector').forEach((e, i) => { if (kept[i] && kept[i][0] && kept[i][1] === sig(e)) e.scrollTop = kept[i][0]; });
+    restore(); if (kept.length) requestAnimationFrame(restore);   // again once the layout has settled
     if (app.overlay && app.overlay.mount) app.overlay.mount(root, app);
     return;
   }
