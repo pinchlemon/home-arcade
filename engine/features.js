@@ -20,7 +20,8 @@
   // features/<id>.js calls feature('<id>', ({ game, set, on }) => { ... })
   window.feature = function (id, make) {
     const s = settings[id]; if (!s || !s.on) return;
-    const set = (key, fallback) => (typeof s[key] === 'number' && isFinite(s[key]) ? s[key] : fallback);
+    const set = (key, fallback) => (typeof fallback === 'string' ? (typeof s[key] === 'string' ? s[key] : fallback)
+      : typeof s[key] === 'number' && isFinite(s[key]) ? s[key] : fallback);   // words for words, numbers for numbers
     try { make({ game: FX.game, set, on: (name, fn) => FX.on(name, fn, id), id }); FX.running.push(id); } catch (e) { report(e, id); }
   };
 })();
