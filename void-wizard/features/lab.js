@@ -40,7 +40,7 @@ feature('lab', ({ game, on }) => {
       try { list = make(game) || []; } catch (e) { console.error('Lab shelf ' + id, e); }
       const sh = { id, name, toys: [] };
       for (const raw of list) {
-        const t = { kind: 'num', step: 1, min: 0, max: 1, value: 0, ...raw, id: id + '.' + raw.id, shelf: name };
+        const t = { kind: 'num', step: 1, min: 0, max: 1, value: 0, ...raw, id: raw.id.includes('.') ? raw.id : id + '.' + raw.id, shelf: name };   // an id with a dot keeps its old name after moving shelf
         if (t.kind === 'onoff') { t.min = 0; t.max = 1; t.step = 1; }
         sh.toys.push(t); toys.push(t); byId[t.id] = t; values[t.id] = t.value;
       }
@@ -175,11 +175,14 @@ feature('lab', ({ game, on }) => {
       }).join('');
     }
     const fresh = performance.now() - sayT < 2500 ? sayText : (playing ? 'Playing ' + playing : '');
+    const oldRows = panel.querySelector('.lab-rows'), keepTop = oldRows && panel.dataset.shelf === sh.id ? oldRows.scrollTop : 0;
+    panel.dataset.shelf = sh.id;
     panel.innerHTML = `<div class="lab-top"><button data-sh="-1" aria-label="Previous shelf">&lt;</button><span class="nm">${esc(sh.name.toUpperCase())}<small>LAB · ${shelfAt + 1}/${shelves.length}</small></span><button data-sh="1" aria-label="Next shelf">&gt;</button><button data-close aria-label="Close the Lab">X</button></div>
       <div class="lab-rows">${rows}</div>
       <div class="lab-say">${esc(fresh)}</div>
       <div class="lab-act"><button data-do="dice">DICE</button><button data-do="back">UNDO</button><button data-do="reset">RESET</button><button data-do="save">SAVE</button><button data-do="idea">IDEA</button></div>
       <div class="lab-hint">D-pad pick and turn · L1 R1 shelf · Cross switch / play · Triangle dice · Square save · Select undo · Start idea · Circle close</div>`;
+    panel.querySelector('.lab-rows').scrollTop = keepTop;   // a change further down keeps the list where it was
     const on = panel.querySelector('.lab-row.on'); if (on) on.scrollIntoView({ block: 'nearest' });
   }
   panel.addEventListener('click', (e) => {
