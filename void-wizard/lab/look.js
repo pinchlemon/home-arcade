@@ -84,7 +84,7 @@
   let made = null, w = 0, h = 0, fresh = true, pulse = 0, lastNow = 0;
   const size = new T.Vector2();
   function make() {   // made on first use (three.js ids use Math.random)
-    const rt = () => new T.WebGLRenderTarget(1, 1, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+    const rt = () => new T.WebGLRenderTarget(1, 1, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, depthBuffer: false });   // flat pictures: no depth, so effects drawn over each other never hide one another
     const u = { tScene: { value: null }, tPrev: { value: null }, res: { value: new T.Vector2() }, time: { value: 0 }, tintCol: { value: new T.Color() } };
     for (let i = 0; i < 4; i++) u['pal' + i] = { value: new T.Color() };
     for (const k of NAMES) u[k] = { value: 0 };
@@ -92,7 +92,7 @@
     const copy = new T.MeshBasicMaterial({ depthTest: false, depthWrite: false });
     const geo = new T.PlaneGeometry(2, 2), fx = new T.Scene(), out = new T.Scene();
     fx.add(new T.Mesh(geo, mat)); out.add(new T.Mesh(geo, copy));
-    made = { scene: rt(), a: rt(), b: rt(), mat, copy, fx, out, cam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+    made = { scene: rt(), a: rt(), b: rt(), p: rt(), q: rt(), mat, copy, fx, out, cam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
   }
   const v = (id, normal) => LAB.get(id) ?? normal;
   // the hit pulse: a flash of colour split and light whenever the demon is hit or a wizard goes down
@@ -103,7 +103,7 @@
     target(r) {
       if (!made) make();
       r.getDrawingBufferSize(size);
-      if (size.x !== w || size.y !== h) { w = size.x; h = size.y; for (const k of ['scene', 'a', 'b']) made[k].setSize(w, h); fresh = true; }
+      if (size.x !== w || size.y !== h) { w = size.x; h = size.y; for (const k of ['scene', 'a', 'b', 'p', 'q']) made[k].setSize(w, h); for (const s of stages) if (s.size) s.size(w, h); fresh = true; }
       return made.scene;
     },
     draw(r) {
@@ -126,15 +126,27 @@
       set('pal', pi);
       if (P) { if (P[1]) P[1].forEach((c, i) => u['pal' + i].value.setHex(c));
         else { const c = game.solid.color; u.pal0.value.setHex(0x000000); u.pal1.value.copy(c).multiplyScalar(0.35); u.pal2.value.copy(c); u.pal3.value.setHex(0xffffff); } }
-      r.setRenderTarget(m.b); r.render(m.fx, m.cam);
-      m.copy.map = m.b.texture; r.setRenderTarget(null); r.render(m.out, m.cam);
-      const t = m.a; m.a = m.b; m.b = t;   // this picture is the trail for the next one
+      // this file's own shader (only while one of its knobs is on), then any other stages, then the screen
+      let src = m.scene;
+      const ran = mine();
+      if (ran) { r.setRenderTarget(m.b); r.render(m.fx, m.cam); src = m.b; }
+      for (const s of stages) {
+        if (!s.active()) continue;
+        const dst = src === m.p ? m.q : m.p;
+        if (s.render(r, src, dst, now)) src = dst;   // a stage that draws into dst says so; one that draws over src in place doesn't
+      }
+      m.copy.map = src.texture; r.setRenderTarget(null); r.render(m.out, m.cam);
+      if (ran) { const t = m.a; m.a = m.b; m.b = t; }   // this picture is the trail for the next one
     }
   };
   // the shader runs only while some knob on these shelves isn't normal
   const knobs = [];
+  // other files add stages after this shader: LAB.screen.add({ active(), render(renderer, fromRT, toRT, now) -> true if it drew into toRT, size(w, h) })
+  const stages = [];
+  const mine = () => knobs.some(([id, normal]) => (LAB.get(id) ?? normal) !== normal && !id.endsWith('Speed') && !id.endsWith('Size')) || pulse > 0.001;
+  LAB.screen = { add(s) { stages.push(s); if (made && w) s.size && s.size(w, h); }, sync: () => sync(), get size() { return { w, h }; } };
   function sync() {
-    const any = knobs.some(([id, normal]) => (LAB.get(id) ?? normal) !== normal && !id.endsWith('Speed') && !id.endsWith('Size'));
+    const any = mine() || stages.some(s => s.active());
     if (any && game.post !== post) fresh = true;
     game.post = any ? post : null;
   }
