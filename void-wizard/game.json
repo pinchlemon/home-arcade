@@ -162,6 +162,7 @@
       "spawn",
       "camera",
       "hud",
+      "colours",
       "look",
       "effects",
       "ps1",
@@ -194,21 +195,6 @@
         "id": "imwaxvxtv",
         "text": "different settings (grassy plains with grass flowers lightly blowing in the wind, castle, reflective pool, fairy forest, etc.)",
         "made": 1794330224131
-      },
-      {
-        "id": "imwaxu9a2",
-        "text": "color of solids",
-        "made": 1794330145658
-      },
-      {
-        "id": "imwaxtwdq",
-        "text": "color of centipede and other centipede features",
-        "made": 1794330128942
-      },
-      {
-        "id": "imwaxtkpg",
-        "text": "color of cloaks",
-        "made": 1794330113812
       },
       {
         "id": "imwaxsqok",
@@ -246,7 +232,10 @@
       "imwb1l0k9",
       "imwayv16u",
       "imwayumum",
-      "imwayuc8a"
+      "imwayuc8a",
+      "imwaxu9a2",
+      "imwaxtwdq",
+      "imwaxtkpg"
     ],
     "start": {
       "values": {
