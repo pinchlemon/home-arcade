@@ -1483,7 +1483,7 @@ function updateDemon(dt){
     }
     if(Math.random()<0.25){for(const S of demon.segs.slice(0,4)){rv.set(S.pos.x,0,S.pos.z);spawnPuffs(1,0.8,rv,0.5);break;}}
     if(demon.atkT<=0&&demon.kind==='spit'){
-      spitVenom(demon.spitAt||T);rumbleAll(0.3,0.5,120,demon.pos,14);demon.state='recover';demon.atkT=0.6;demon.rearV-=6;
+      if(!(spitHook&&spitHook(demon.spitAt||T)))spitVenom(demon.spitAt||T);rumbleAll(0.3,0.5,120,demon.pos,14);demon.state='recover';demon.atkT=0.6;demon.rearV-=6;
     }else if(demon.atkT<=0){
       demon.state='strike';demon.atkT=0.28;demon.vel.x=Math.sin(demon.yaw)*15;demon.vel.z=Math.cos(demon.yaw)*15;demon.struck=new Set();demon.slammed=false;shake=Math.max(shake,0.16);
       headCenter(lO);for(let i=0;i<30;i++){randDir(rv).multiplyScalar(4);spark(lO,rv,0.3,0.6,i%2?0xff3a1a:0xffd36a,4);}
@@ -1571,7 +1571,7 @@ for(let i=0;i<9;i++){
   const puddle=glowDisc(0xff4a1a,1.1,0);
   venoms.push({g,v:new THREE.Vector3(),alive:false,acc:0,puddle});
 }
-let venomNext=0;
+let venomNext=0,spitHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
 const vLook=new THREE.Vector3();
 function spitVenom(T){
   headCenter(lO);lO.y+=0.05;
@@ -1601,6 +1601,7 @@ function splashVenom(V){
     rv.set(Math.cos(a)*sp+V.v.x/l*1.5,0.8+Math.random()*2.2,Math.sin(a)*sp+V.v.z/l*1.5);
     spark(rv2,rv,0.3+Math.random()*0.3,0.22+Math.random()*0.3,Math.random()<0.7?0xff5a1a:0xffc890,0.8,16);}
   V.puddle.position.set(p.x,0.003,p.z);V.puddle.material.opacity=0.7;V.puddle.scale.setScalar(0.6);
+  FX.emit('venomSplash',V);
 }
 function updateVenom(dt){
   for(const V of venoms){
@@ -1613,7 +1614,7 @@ function updateVenom(dt){
     for(const W of ALL){
       if(W.downT>0||W.diveT>0)continue;
       const hx=W.pos.x-V.g.position.x,hz=W.pos.z-V.g.position.z,hd=Math.hypot(hx,hz);
-      if(hd<0.7&&Math.abs(V.g.position.y-(W.y+0.5))<0.8){const l=Math.hypot(V.v.x,V.v.z)||1;knockDown(W,V.v.x/l,V.v.z/l,7);splashVenom(V);break;}
+      if(hd<0.7*(V.r||1)&&Math.abs(V.g.position.y-(W.y+0.5))<0.8*(V.r||1)){const l=Math.hypot(V.v.x,V.v.z)||1;knockDown(W,V.v.x/l,V.v.z/l,7);splashVenom(V);break;}
     }
     if(V.alive&&V.g.position.y<=0.06)splashVenom(V);
   }
@@ -2009,7 +2010,7 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   shake(k){shake=Math.max(shake,k);},
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
-  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;}};
+  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;}};
 requestAnimationFrame(frame);
 })();
 

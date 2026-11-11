@@ -10,7 +10,13 @@ LAB.shelf('health', 'Health', (game) => {
   document.head.appendChild(css);
   const bars = new Map();
   const maxOf = (W) => (W === game.player ? LAB.get('health.you') : LAB.get('health.buddy')) ?? 5;
-  const colOf = (W) => '#' + new T.Color(W.discBase || 0xffffff).getHexString();
+  // the wizard's colour, or his recoloured cloak (lifted toward white if it's too dark to see on the void)
+  const tmp = new T.Color(), HSL = {};
+  const colOf = (W) => {
+    tmp.setHex(W.labCloak || W.discBase || 0xffffff);
+    if (W.labCloak) { tmp.getHSL(HSL); if (HSL.l < 0.55) tmp.setHSL(HSL.h, HSL.s, 0.55); }
+    return '#' + tmp.getHexString();
+  };
   function bar(W) {
     let b = bars.get(W);
     if (!b) { b = document.createElement('div'); b.className = 'lab-hp'; document.body.appendChild(b); bars.set(W, b); b.dataset.k = ''; }
@@ -60,9 +66,11 @@ LAB.shelf('health', 'Health', (game) => {
       if (b.dataset.k !== k) { b.dataset.k = k; b.innerHTML = Array.from({ length: m }, (_, i) => `<i${i < hp ? '' : ' class="off"'}></i>`).join(''); b.classList.toggle('hurt', W.labHurt > 0); }
       b.style.color = colOf(W);
       at.set(W.pos.x, W.y + 1.9 * (W.root.scale.y || 1), W.pos.z).project(cam);
-      const hide = at.z > 1 || !W.root.visible;
+      // a curved or bulged screen moves the wizard on screen; the bar goes where he is drawn
+      const [sx, sy] = LAB.onScreen ? LAB.onScreen((at.x + 1) / 2, (at.y + 1) / 2) : [(at.x + 1) / 2, (at.y + 1) / 2];
+      const hide = at.z > 1 || !W.root.visible || sx < 0 || sx > 1 || sy < 0 || sy > 1;
       b.style.display = hide ? 'none' : 'flex';
-      if (!hide) b.style.transform = `translate(${((at.x + 1) / 2 * W2).toFixed(1)}px,${((1 - at.y) / 2 * H2 - 4).toFixed(1)}px) translate(-50%,-100%)`;
+      if (!hide) b.style.transform = `translate(${(sx * W2).toFixed(1)}px,${((1 - sy) * H2 - 4).toFixed(1)}px) translate(-50%,-100%)`;
     }
   }
   function off() { for (const b of bars.values()) b.style.display = 'none'; for (const W of game.ALL) { W.labDown = false; W.labHp = W.labMax = undefined; } }

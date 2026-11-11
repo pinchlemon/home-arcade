@@ -160,6 +160,7 @@
       "party",
       "bodies",
       "demon",
+      "attacks",
       "spawn",
       "camera",
       "hud",
@@ -174,21 +175,6 @@
     ],
     "prototypes": [],
     "ideas": [
-      {
-        "id": "imwbdy0lh",
-        "text": "fix bug where buddy health bar does not appear near him",
-        "made": 1794357194887
-      },
-      {
-        "id": "imwb808xw",
-        "text": "be able to save sets and choose from them in-game (separate from prototypes)",
-        "made": 1794347221317
-      },
-      {
-        "id": "imwb7cyqe",
-        "text": "dice only changes a few settings",
-        "made": 1794346134999
-      },
       {
         "id": "imway2swx",
         "text": "map size and minimap option",
@@ -213,11 +199,6 @@
         "id": "imwawu991",
         "text": "ability to catch centipede inside of solid and redeploy to be on your team (only for dodecahedron)",
         "made": 1794328466005
-      },
-      {
-        "id": "imwawlsgu",
-        "text": "Centipede shoots a flame beam (on/off and intensity slider and color and effects)",
-        "made": 1794328071008
       }
     ],
     "done": [
@@ -241,7 +222,9 @@
       "imwaxtkpg",
       "imwb808xw",
       "imwb7cyqe",
-      "imwaxsqok"
+      "imwaxsqok",
+      "imwbdy0lh",
+      "imwawlsgu"
     ],
     "start": {
       "values": {

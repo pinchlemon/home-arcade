@@ -43,6 +43,7 @@ LAB.shelf('colours', 'Colours', (game) => {
       paintRobe(W.robeGeo, W.robeBase, trim, cloak);
       if (W.labHi) paintRobe(W.labHi.robe, W.labHi.robeBase, trim, cloak);   // PS1 low poly keeps the full robe aside
       for (const m of W.hoodM) m.color.copy(cloak);
+      W.labCloak = LAB.get('colours.' + W.labKey + 'Cloak') ? cloak.getHex() : 0;   // the Health shelf's bar takes this colour
     };
   }
   // trim height: the robe is rebuilt from the game's outline with two extra rows, so the trim ends in a crisp line
