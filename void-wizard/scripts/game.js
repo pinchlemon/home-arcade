@@ -722,11 +722,11 @@ if(matchMedia('(pointer:coarse)').matches)document.getElementById('hint').textCo
 
 // ---- controllers: the first is player 1, a second one takes over the red wizard as player 2
 const PAD_HINT='Stick move · R1 run · Cross jump · Circle crouch (tap while running to dive-roll) · Square catch / hold to throw · L1 tackle · Triangle change shape / duel special (or buddy mode / switch wizard when empty-handed) · Right stick team shape (duel) · D-pad up switch demon / 2v2 duel';
-const padPrev={};let padOn=false, padToP2=false, padBlock=false, post=null;
+const padPrev={};let padOn=false, padToP2=false, padBlock=false, post=null, padSkip=null;
 addEventListener('gamepadconnected',()=>{padOn=true;document.getElementById('hint').textContent=PAD_HINT;});
 addEventListener('keydown',e=>{if(e.code==='Digit2'&&!e.repeat){padToP2=!padToP2;popup(padToP2?'CONTROLLER → PLAYER 2':'CONTROLLER → PLAYER 1',player.pos,'#ffd36a');}});
 function padRead(gp,W){
-  const b=i=>gp.buttons[i]?(gp.buttons[i].pressed||gp.buttons[i].value>0.3):false;
+  const b=i=>!(padSkip&&padSkip.has(i))&&(gp.buttons[i]?(gp.buttons[i].pressed||gp.buttons[i].value>0.3):false); // padSkip: buttons a feature has taken over
   const now=[b(0),b(5)||b(10),b(2)||b(7),b(3),b(9),b(1)||b(6),b(4),b(8),b(12)];
   // the Lab (or another feature) can take the controller for a while: the game sees nothing pressed
   if(padBlock){padPrev[gp.index]=now;W.ctl.castHeld=false;W.jumpHeld=false;return {x:0,y:0,run:false,crouch:false,rx:0,ry:0};}
@@ -2009,7 +2009,7 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   shake(k){shake=Math.max(shake,k);},
   swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
-  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
+  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;}};
 requestAnimationFrame(frame);
 })();
 
