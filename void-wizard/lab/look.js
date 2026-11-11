@@ -99,6 +99,23 @@
   const kick = (k) => { if (v('echo.pulse', 0)) pulse = Math.min(1, pulse + k * v('echo.pulse', 0)); };
   window.FEATURES.on('demonHit', () => kick(0.6), 'lab');
   window.FEATURES.on('knockdown', () => kick(0.8), 'lab');
+  // where a point of the 3D picture ends up on screen once Curve, Bulge and Swirl have bent it (both 0..1,
+  // y up), for things drawn over the game such as the Health shelf's bars. The shader goes the other way
+  // (screen to picture), so this steps back from it a few times.
+  function bend(x, y) {
+    const crt = v('screen.crt', 0), bulge = v('look.bulge', 0), swirl = v('look.swirl', 0), a = innerWidth / innerHeight;
+    if (crt > 0) { const cx = x * 2 - 1, cy = y * 2 - 1, k = 1 + crt * 0.12 * (cx * cx + cy * cy); x = cx * k * 0.5 + 0.5; y = cy * k * 0.5 + 0.5; }
+    let px = (x - 0.5) * a, py = y - 0.5, r = Math.hypot(px, py);
+    if (bulge) { const k = 1 + bulge * 0.6 * (r * r - 0.25); px *= k; py *= k; }
+    if (swirl) { const k = Math.max(0, 1 - r / 0.7), t = swirl * 2.5 * k * k, c = Math.cos(t), s = Math.sin(t); [px, py] = [c * px - s * py, s * px + c * py]; }
+    return [px / a + 0.5, py + 0.5];
+  }
+  LAB.onScreen = (x, y) => {
+    if (!v('screen.crt', 0) && !v('look.bulge', 0) && !v('look.swirl', 0)) return [x, y];
+    let u = x, w2 = y;
+    for (let i = 0; i < 12; i++) { const [fx, fy] = bend(u, w2); u += (x - fx) * 0.8; w2 += (y - fy) * 0.8; }
+    return [u, w2];
+  };
   const post = {
     target(r) {
       if (!made) make();

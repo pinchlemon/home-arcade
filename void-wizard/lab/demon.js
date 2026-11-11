@@ -79,7 +79,77 @@ LAB.shelf('demon', 'Demon', (game) => {
   LAB.patchDissolve = (m) => { if (patched) patchOne(m); };   // for materials made later (PS1 soft shading)
   // the game hides the body piece by piece as it dies; while it dissolves it stays whole instead
   const parts = () => { const o = [D.g]; for (const S of D.segs) { o.push(S.g); for (const L of S.legs) o.push(L.femur, L.tibia, L.knee); } return o; };
-  window.FEATURES.on('demonDown', () => { if (LAB.get('demon.dissolve')) { patch(); disT = performance.now() / 1000; } }, 'lab');
+  window.FEATURES.on('demonDown', () => { if (LAB.get('demon.dissolve') && !LAB.get('demon.absorb')) { patch(); disT = performance.now() / 1000; } }, 'lab');
+
+  // absorb: a beaten centipede is pulled into the Solid piece by piece, tail first, each piece spiralling in and
+  // shrinking, glowing in the Solid's colour; when the head goes in, the Solid flares. (Takes over from Dissolve.)
+  const V = () => new game.THREE.Vector3();
+  const tgt = V(), st = V(), sv = V(), glow = new game.THREE.Color();
+  let ab = null;
+  window.FEATURES.on('demonDown', () => { if (LAB.get('demon.absorb')) startAbsorb(); }, 'lab');
+  function startAbsorb() {
+    const n = D.segs.length, pieces = [], mats = new Map();
+    const keep = (o) => o.traverse(c => { const m = c.material; if (m && m.emissive && !mats.has(m)) mats.set(m, m.emissive.clone()); });
+    D.segs.forEach((S, i) => {
+      const delay = (n - 1 - i) * 0.07;
+      pieces.push({ o: S.g, p0: S.g.position.clone(), s0: S.g.scale.clone(), delay });
+      for (const L of S.legs) for (const o of [L.femur, L.tibia, L.knee]) if (o) pieces.push({ o, p0: o.position.clone(), s0: o.scale.clone(), delay: delay + 0.03, leg: true });
+      keep(S.g);
+    });
+    pieces.push({ o: D.g, p0: D.g.position.clone(), s0: D.g.scale.clone(), delay: n * 0.07 + 0.1, head: true });
+    keep(D.g);
+    ab = { t: 0, pieces, mats, legs: D.segs[0] && D.segs[0].legs[0] ? D.segs[0].legs[0].femur.parent : null };
+  }
+  function endAbsorb(flare) {
+    for (const P of ab.pieces) { P.o.position.copy(P.p0); P.o.scale.copy(P.s0); if (flare) P.o.visible = false; }
+    for (const [m, e] of ab.mats) m.emissive.copy(e);
+    if (flare && ab.legs) ab.legs.visible = false;
+    ab = null;
+  }
+  function absorb(dt) {
+    if (!ab) return;
+    if (D.alive && !D.dying) { endAbsorb(false); return; }   // a new demon already came
+    ab.t += dt;
+    const F = LAB.get('demon.absorbLen') ?? 0.8, hex = game.solid.color.getHex();
+    game.orbMesh.getWorldPosition(tgt);
+    // everything still out there glows brighter in the Solid's colour as its turn comes
+    glow.copy(game.solid.color).multiplyScalar(Math.min(1, 0.3 + ab.t * 0.8));
+    for (const m of ab.mats.keys()) m.emissive.copy(glow);
+    let left = 0, legsOut = false;
+    for (const P of ab.pieces) {
+      const u = (ab.t - P.delay) / F;
+      if (u >= 1) {
+        if (!P.in) { P.in = true; P.o.visible = false; if (!P.leg) { game.sparkBurst(tgt, P.head ? 30 : 6, P.head ? 5 : 2.5, 0.6, 3, hex); game.orb.flash = Math.max(game.orb.flash || 0, P.head ? 6 : 1.5); } }
+        continue;
+      }
+      left++; P.o.visible = true; if (P.leg) legsOut = true;
+      if (u <= 0) {   // waiting its turn: it shudders
+        const j = 0.05 * Math.min(1, ab.t * 3);
+        P.o.position.set(P.p0.x + (Math.random() - 0.5) * j, P.p0.y + (Math.random() - 0.5) * j, P.p0.z + (Math.random() - 0.5) * j);
+        continue;
+      }
+      const e = u * u, arc = Math.sin(u * Math.PI), a = u * 7 + P.delay * 9;
+      st.lerpVectors(P.p0, tgt, e);
+      st.x += Math.cos(a) * 0.7 * arc; st.z += Math.sin(a) * 0.7 * arc; st.y += arc * 0.9;
+      P.o.position.copy(st);
+      P.o.scale.copy(P.s0).multiplyScalar(Math.max(0.02, 1 - e * 0.97));
+      P.o.rotation.y += dt * 10 * u;
+      if (!P.leg && Math.random() < dt * 40) { sv.subVectors(tgt, st).multiplyScalar(2.5); game.spark(st, sv, 0.35, 0.5, hex, 1); }
+    }
+    if (ab.legs) ab.legs.visible = legsOut;
+    // a swirl of light pulled in around the Solid the whole time
+    if (Math.random() < dt * 60) {
+      const a = Math.random() * Math.PI * 2, r = 1.6 + Math.random() * 1.2;
+      st.set(tgt.x + Math.cos(a) * r, tgt.y + (Math.random() - 0.3) * 1.2, tgt.z + Math.sin(a) * r);
+      sv.subVectors(tgt, st).multiplyScalar(2.6); sv.x += Math.sin(a) * 2; sv.z -= Math.cos(a) * 2;
+      game.spark(st, sv, 0.38, 0.45, Math.random() < 0.3 ? 0xffffff : hex, 0.5);
+    }
+    if (!left) {
+      game.fxBurst(tgt, hex, 70, 6); game.fxRing(tgt.x, tgt.z, hex, 4, 0.55); game.fxRing(tgt.x, tgt.z, 0xffffff, 2.4, 0.4, 0.06);
+      game.shake(0.3); endAbsorb(true);
+    }
+  }
+  window.FEATURES.on('frame', absorb, 'lab');
   function dissolve() {
     if (disT < 0) return;
     const k = (performance.now() / 1000 - disT) / (LAB.get('demon.dissolveLen') ?? 1.5);
@@ -106,6 +176,8 @@ LAB.shelf('demon', 'Demon', (game) => {
     { id: 'flashRate', label: 'Flash speed', help: 'Flashes a second', min: 2, max: 30, step: 1, value: 12 },
     { id: 'dissolve', label: 'Dissolve', help: 'A beaten demon burns away with a glowing edge', kind: 'onoff', value: 0, dice: true, apply: (x) => { if (x) patch(); } },
     { id: 'dissolveLen', label: 'Dissolve time', help: 'Seconds it takes to burn away', min: 0.5, max: 3, step: 0.1, value: 1.5, dice: false },
-    { id: 'dissolveCol', label: 'Burn colour', help: "Orange, or the solid's colour", kind: 'onoff', value: 0, fmt: (x) => (x ? 'SOLID' : 'ORANGE') }
+    { id: 'dissolveCol', label: 'Burn colour', help: "Orange, or the solid's colour", kind: 'onoff', value: 0, fmt: (x) => (x ? 'SOLID' : 'ORANGE') },
+    { id: 'absorb', label: 'Absorbed', help: 'A beaten demon is sucked into the Solid, tail first', kind: 'onoff', value: 0, dice: true },
+    { id: 'absorbLen', label: 'Absorb speed', help: 'Seconds each piece takes to fly in', min: 0.3, max: 2, step: 0.1, value: 0.8, dice: false }
   ];
 });
