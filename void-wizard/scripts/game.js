@@ -6,7 +6,7 @@ const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typ
 // features: add-ons in features/ that hook into the game (engine/features.js). With none on, nothing here changes how it plays.
 const FX=window.FEATURES||{emit(){},on(){}};
 // multipliers a feature can change (1 = normal)
-const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,turn:0}; // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
+const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,turn:0,passCone:2,passSpeed:1,autoCatch:0}; // passCone: a standing throw goes to a teammate within this (cosine of the angle; 2 is off); passSpeed: those passes fly this much faster; autoCatch: you catch without pressing // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -262,7 +262,7 @@ function updateWizard(W,dt,inp){
 }
 
 // ?duel = 5v5: blue (you) against red, one Quintessence. Each side: a summoner and four wizards in zones.
-const PARTY=/[?&]party\b/.test(location.search); // ?party: you and three AI wizards against the demon, relaying the Solid
+const PARTY=false; // the old ?party mode was removed: its ideas live on the Lab's Party shelf (its code below is left for now and never runs)
 const DUEL=PARTY||/[?&]duel\b/.test(location.search), WATCH=DUEL&&/[?&]ai\b/.test(location.search); // ?duel&ai: AI plays both sides
 const CAP_RES=3, ARENA_R=PARTY?200:24, TEAM_COL=[0x6a8cff,0xff6050];
 // roles: home spot (x, distance from the centre toward your own end) and element (index into SOLIDS: 0 fire, 1 earth, 2 air, 3 aether, 4 water)
@@ -586,14 +586,32 @@ function playerThrow(W){
   if(DUEL&&!PARTY){let m=null,ms=-9;for(const o of ALL){if(o===W||o.team!==W.team||o.capT>0)continue;const mx=o.pos.x-W.pos.x,mz=o.pos.z-W.pos.z,md=Math.hypot(mx,mz)||1,dot=(mx*dx+mz*dz)/md;
     if(dot>0.8&&md<28&&dot-md*0.01>ms){ms=dot-md*0.01;m=o;}}
     if(m){lobTo(W,c,m.pos.x+m.vel.x*0.4,m.pos.z+m.vel.z*0.4);return;}}
+  // the Lab's pass help: a standing throw goes to the teammate you're facing, leading them
+  if(!DUEL&&MOD.passCone<1){const m=passTarget(W,dx,dz);if(m){
+    const d0=hdist(m.pos,orb.p),T=(0.6+d0*0.036)*cur.hang/MOD.passSpeed;
+    lobTo(W,c,m.pos.x+m.vel.x*T,m.pos.z+m.vel.z*T,MOD.passSpeed);FX.emit('pass',W,m);return;}}
   // standing: a lob straight where you're facing, farther the longer you wound up. No aim help.
   const dist=3+c*(LOB_MAX*cur.range-3);lobTo(W,c,W.pos.x+dx*dist,W.pos.z+dz*dist);
 }
 const LOB_MAX=TH('lobMax',22); // the farthest anyone can lob it
-function lobTo(W,c,tx,tz){
+function lobTo(W,c,tx,tz,quick){
   const dx=tx-orb.p.x,dz=tz-orb.p.z,d=Math.max(0.5,Math.hypot(dx,dz));
-  const T=(0.6+d*0.036)*cur.hang, g=G*cur.grav, h=0.6-orb.p.y;
+  const T=(0.6+d*0.036)*cur.hang/(quick||1), g=G*cur.grav, h=0.6-orb.p.y;
   throwOrb(W,c,dx/d,dz/d,d/T,(h+0.5*g*T*T)/T,true);
+}
+// the teammate a pass goes to: roughly where you face, nearer ones first
+function passTarget(W,dx,dz){let m=null,ms=-9;
+  for(const o of ALL){if(o===W||o.downT>0||o.capT>0)continue;const mx=o.pos.x-W.pos.x,mz=o.pos.z-W.pos.z,md=Math.hypot(mx,mz)||1,dot=(mx*dx+mz*dz)/md;
+    if(dot>MOD.passCone&&md<LOB_MAX*cur.range+4&&dot-md*0.01>ms){ms=dot-md*0.01;m=o;}}
+  return m;}
+// the Lab's Party shelf: you take over another wizard (the old one gets the buddy's brain)
+function swapTo(W){
+  if(DUEL||W===player||buddy.human||!W)return false;
+  const old=player;player=W;buddy=old;
+  const c=old.ctl;old.ctl=W.ctl;W.ctl=c;old.human=false;W.human=true;
+  old.charging=false;W.charging=false;W.faceTarget=null;old.jumpHeld=false;
+  bud.holdT=0;bud.shoot=false;bud.closing=false;bud.spot.copy(old.pos);bud.wTarget=null;
+  FX.emit('swap',W,old);return true;
 }
 function buddyShoot(){
   const W=buddy,c=W.charge;
@@ -1844,7 +1862,7 @@ function frame(now){
         const sp=Math.hypot(orb.v.x,orb.v.z)||1;knockDown(W,orb.v.x/sp,orb.v.z/sp,9);
         orb.v.set(-orb.v.x*0.25,4,-orb.v.z*0.25);randDir(orb.w).multiplyScalar(12);break;
       }
-      if(me&&C.catchT<=0&&!PARTY)continue; // in the party, catching is automatic
+      if(me&&C.catchT<=0&&!MOD.autoCatch)continue; // the Lab can make catching automatic
       const d=hdist(orb.p,W.pos), dy=orb.p.y-(W.y+0.55);
       const dv=W.diveT>0;
       const up=me&&!W.grounded&&!dv;
@@ -1964,11 +1982,12 @@ function frame(now){
 }
 if(DUEL){if(WATCH)player.human=false;duelReset();duelScore();}
 // what features can reach (see engine/features.md): the scene, the wizards, the solid, the demon, effects and multipliers
-FX.game={THREE,scene,camera,player,buddy,ALL,orb,demon,SOLIDS,MOD,keys,DUEL,PARTY,
+FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){return buddy;},ALL, // player and buddy: the blue and red wizards; you and mate: whoever you control now, and the other one
+ orb,demon,SOLIDS,MOD,keys,DUEL,PARTY,
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
-  orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
+  swapTo,passTarget,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();
 

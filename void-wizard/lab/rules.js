@@ -18,9 +18,9 @@
     ['DEMON HIT', 'When the demon is hit', 'demonHit', () => true],
     ['DEMON DOWN', 'When a demon is beaten', 'demonDown', () => true],
     ['EVERY 3S', 'Every three seconds', 'every'],
-    ['HOLDING', 'While you hold the solid', null, () => game.orb.state === 'held' && game.orb.holder === game.player],
-    ['IN AIR', 'While you are in the air', null, () => !game.player.grounded],
-    ['RUNNING', 'While you run fast', null, () => Math.hypot(game.player.vel.x, game.player.vel.z) > 6.5]
+    ['HOLDING', 'While you hold the solid', null, () => game.orb.state === 'held' && game.orb.holder === game.you],
+    ['IN AIR', 'While you are in the air', null, () => !game.you.grounded],
+    ['RUNNING', 'While you run fast', null, () => Math.hypot(game.you.vel.x, game.you.vel.z) > 6.5]
   ];
   const near = (W, r) => game.ALL.filter(o => o !== W && Math.hypot(o.pos.x - W.pos.x, o.pos.z - W.pos.z) < r);
   const THEN = [
@@ -67,7 +67,7 @@
   ];
   const fire = (k, W) => {
     const then = THEN[LAB.get('rules.then' + k) || 0], sec = LAB.get('rules.for' + k) || 3;
-    if (then[3]) { then[3](W || game.player); return; }
+    if (then[3]) { then[3](W || game.you); return; }
     for (const id in then[2]) { const x = then[2][id]; LAB.boost(id, typeof x === 'function' ? x() : x, sec); }
   };
   const whenOf = (k) => WHEN[LAB.get('rules.when' + k) || 0];
