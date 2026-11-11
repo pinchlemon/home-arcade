@@ -82,7 +82,7 @@
         const hi = { robe: W.robeGeo, robeBase: W.robeBase, hood: W.hoodGeo, hoodBase: W.hoodBase, swaps: [] };
         // robe: the same outline, 7 sides instead of 28, coloured by height as the game does
         const rp = W.robeGeo.parameters.points, rc = W.robeGeo.attributes.color.array, rb = W.robeBase;
-        const bandOf = (y) => (y < 0.005 ? 0 : y < 0.05 ? 1 : 2), band = [];
+        const tY = W.labTrimY || 0.05, bandOf = (y) => (y < 0.005 ? 0 : y < tY ? 1 : 2), band = [];   // Colours may make the trim taller
         for (let i = 0; i < rb.length / 3 && !(band[0] && band[1] && band[2]); i++) { const b = bandOf(rb[i * 3 + 1]); if (!band[b]) band[b] = [rc[i * 3], rc[i * 3 + 1], rc[i * 3 + 2]]; }
         const robe = new T.LatheGeometry(rp, 7), n = robe.attributes.position.count, col = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) col.set(band[bandOf(robe.attributes.position.array[i * 3 + 1])] || [1, 1, 1], i * 3);
@@ -130,6 +130,7 @@
       l.color.copy(t.color); l.emissive.copy(t.emissive); l.opacity = t.opacity; l.visible = t.visible; }
   }
 
+  LAB.lowPoly = lowPoly;   // Colours rebuilds low poly when it changes the robe
   LAB.shelf('ps1', 'PS1', () => [
     { id: 'snap', label: 'Snap', help: '1 is the real PS1 grid; more is coarser and blockier', min: 0, max: 6, step: 0.25, value: 0, fmt: (x) => (x ? String(x) : 'OFF'),
       apply: (x) => { if (x > 0) scan(); } },

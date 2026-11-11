@@ -5,13 +5,18 @@ LAB.shelf('colours', 'Colours', (game) => {
   const PAL = [
     ['RED', 0xff3b30], ['ORANGE', 0xff8a1f], ['GOLD', 0xe8b64a], ['YELLOW', 0xffe14a], ['LIME', 0xa6e36a], ['GREEN', 0x2fb85a],
     ['TEAL', 0x2fb8a0], ['CYAN', 0x6ff2e0], ['SKY', 0x5ab4ff], ['BLUE', 0x3d4fc4], ['INDIGO', 0x3a2f9c], ['PURPLE', 0x8a4ad0],
-    ['PINK', 0xff7ac8], ['ROSE', 0xc43d5a], ['BROWN', 0x7a4a2a], ['WHITE', 0xf0f0f0], ['GREY', 0x808890], ['BLACK', 0x151518]
+    ['PINK', 0xff7ac8], ['ROSE', 0xc43d5a], ['BROWN', 0x7a4a2a], ['WHITE', 0xf0f0f0], ['GREY', 0x808890], ['BLACK', 0x151518],
+    // added later: new colours go on the end, because saved prototypes remember a colour by its place
+    ['CHARCOAL', 0x3c3f47], ['SLATE', 0x5a6478], ['SILVER', 0xc4cad4], ['CREAM', 0xf3e6c4], ['PEACH', 0xffb08a], ['CORAL', 0xff6f5a],
+    ['CRIMSON', 0x9c1c2a], ['MAROON', 0x5e1a24], ['AMBER', 0xffb02a], ['OLIVE', 0x7a8a2a], ['MINT', 0x9cf2c0], ['FOREST', 0x1f6e3a],
+    ['NAVY', 0x1e2a6e], ['LAVENDER', 0xb9a2f0], ['MAGENTA', 0xe03cc8], ['PLUM', 0x5a2a5e], ['TAN', 0xc8a47a], ['NEON', 0x7dff6a]
   ];
   const name = (x) => (x ? PAL[x - 1][0] : 'ORIGINAL');
   const pick = (x, orig) => (x ? PAL[x - 1][1] : orig);
 
   // ---- wizards: the robe is coloured per corner (black bottom edge, trim band, cloak), the hood and its lip by material
-  const band = (y) => (y < 0.005 ? 0 : y < 0.05 ? 1 : 2);
+  let trimY = 0.05;   // corners below this are trim (the game's own robe has one row there)
+  const band = (y) => (y < 0.005 ? 0 : y < trimY ? 1 : 2);
   function robeCols(W) {   // the colours the game gave it, read once
     const c = W.robeGeo.attributes.color.array, b = W.robeBase, out = [];
     for (let i = 0; i < b.length / 3 && !(out[1] && out[2]); i++) { const k = band(b[i * 3 + 1]); if (!out[k]) out[k] = new T.Color(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]); }
@@ -38,6 +43,34 @@ LAB.shelf('colours', 'Colours', (game) => {
     };
   }
   game.player.labKey = 'you'; game.buddy.labKey = 'buddy';
+  // trim height: the robe is rebuilt from the game's outline with two extra rows, so the trim ends in a crisp line
+  // at the chosen height. PS1 low poly is rebuilt around it (it reads W.labTrimY for where the trim ends).
+  const TRIM = [0.04, 0.08, 0.12, 0.16, 0.2, 0.28];
+  for (const W of [game.player, game.buddy]) { W.robeGeo0 = W.robeGeo; W.robeBase0 = W.robeBase; }
+  function robeAt(W, h) {
+    const P = W.robeGeo0.parameters.points, out = [], top = h + 0.015;
+    const xAt = (y) => { for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1]; if (y <= a.y && y >= b.y) return a.x + (b.x - a.x) * (a.y - y) / (a.y - b.y); } return P[P.length - 1].x; };
+    for (const p of P) if (p.y > top + 0.005) out.push(p.clone());
+    out.push(new T.Vector2(xAt(top), top), new T.Vector2(xAt(h), h));
+    for (const p of P) if (p.y < h - 0.005) out.push(p.clone());
+    const g = new T.LatheGeometry(out, W.robeGeo0.parameters.segments);
+    g.setAttribute('color', new T.BufferAttribute(new Float32Array(g.attributes.position.count * 3), 3));
+    return g;
+  }
+  function trimHeight(x) {
+    const lp = !!game.player.labHi && LAB.lowPoly;
+    if (lp) LAB.lowPoly(false);
+    trimY = x ? TRIM[x] + 0.008 : 0.05;
+    for (const W of [game.player, game.buddy]) {
+      const old = W.robeGeo, g = x ? robeAt(W, TRIM[x]) : W.robeGeo0;
+      W.body.traverse(o => { if (o.geometry === old) o.geometry = g; });
+      if (old !== W.robeGeo0) old.dispose();
+      W.robeGeo = g; W.robeBase = x ? Float32Array.from(g.attributes.position.array) : W.robeBase0;
+      W.labTrimY = x ? trimY : 0;
+      wizard(W)();
+    }
+    if (lp) LAB.lowPoly(true);
+  }
 
   // ---- solids: the thrown one, its badge in the corner, its light and ground glow, and its name
   const solid0 = game.SOLIDS.map(S => S.col);
@@ -70,6 +103,8 @@ LAB.shelf('colours', 'Colours', (game) => {
   return [
     row('youCloak', 'Your cloak', 'The blue wizard', wizard(game.player)),
     row('youTrim', 'Your trim', 'The band at the bottom of your cloak', wizard(game.player)),
+    { id: 'trimH', label: 'Trim height', help: 'How tall the band at the bottom of both cloaks is', min: 0, max: TRIM.length - 1, step: 1, value: 0, dice: false,
+      fmt: (x) => (x ? (TRIM[x] / 0.04) + '×' : 'NORMAL'), apply: trimHeight },
     row('buddyCloak', "Buddy's cloak", 'The red wizard', wizard(game.buddy)),
     row('buddyTrim', "Buddy's trim", 'The band at the bottom of his cloak', wizard(game.buddy)),
     row('solid0', 'Tetrahedron', 'Fire', solid(0)),
