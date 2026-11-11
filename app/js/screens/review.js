@@ -33,6 +33,7 @@ function describe(schema, base, path, now) {
   }
   if (path === 'lab.prototypes') return { label: 'Lab prototypes', where: 'Lab', from: many(count(was), 'prototype'), to: many(count(now), 'prototype') + (count(now) === count(was) ? ', edited' : '') };
   if (path === 'lab.start') { const n = (v) => Object.keys((v && v.values) || {}).length; return { label: 'Lab start mix', where: 'Lab', from: n(was) ? many(n(was), 'knob') : 'plain', to: n(now) ? many(n(now), 'knob') : 'plain' }; }
+  if (path === 'lab.presets') return { label: 'Lab presets', where: 'Lab', from: many(count(was), 'preset'), to: many(count(now), 'preset') + (count(now) === count(was) ? ', edited' : '') };
   if (path === 'lab.ideas') return { label: 'Lab ideas', where: 'Lab', from: many(count(was), 'idea'), to: many(count(now), 'idea') + (count(now) === count(was) ? ', edited' : '') };
   const f = fieldFor(schema, path);
   if (f) return { label: f.label, where: f.where, from: fmt(f, was), to: fmt(f, now) };

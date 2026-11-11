@@ -177,16 +177,6 @@
         "made": 1794357194887
       },
       {
-        "id": "imwb808xw",
-        "text": "be able to save sets and choose from them in-game (separate from prototypes)",
-        "made": 1794347221317
-      },
-      {
-        "id": "imwb7cyqe",
-        "text": "dice only changes a few settings",
-        "made": 1794346134999
-      },
-      {
         "id": "imway2swx",
         "text": "map size and minimap option",
         "made": 1794330544353
@@ -240,7 +230,9 @@
       "imwayuc8a",
       "imwaxu9a2",
       "imwaxtwdq",
-      "imwaxtkpg"
+      "imwaxtkpg",
+      "imwb808xw",
+      "imwb7cyqe"
     ],
     "start": {
       "values": {
@@ -330,6 +322,7 @@
         "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S"
       },
       "made": 1794356977080
-    }
+    },
+    "presets": []
   }
 }
