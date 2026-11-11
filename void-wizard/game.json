@@ -203,11 +203,6 @@
         "made": 1794330224131
       },
       {
-        "id": "imwaxsqok",
-        "text": "sliders for buddy behavior (how much he avoids centipede, how accurate throws are, when he attacks centipede, etc.)",
-        "made": 1794330074901
-      },
-      {
         "id": "imwawv62c",
         "text": "basketball minigame",
         "made": 1794328508532
@@ -243,7 +238,8 @@
       "imwaxtwdq",
       "imwaxtkpg",
       "imwb808xw",
-      "imwb7cyqe"
+      "imwb7cyqe",
+      "imwaxsqok"
     ],
     "start": {
       "values": {

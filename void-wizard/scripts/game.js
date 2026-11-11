@@ -157,7 +157,7 @@ function updateWizard(W,dt,inp){
     if(W.downT<=0){W.downT=0;W.grounded=true;W.y=0;W.jumpQ=true;W.landSquash=0.4;}}
   // movement
   let ix=inp.ix,iz=inp.iz;const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il;}
-  const maxSpd=(inp.run?WZ('run',8.5):WZ('walk',5.2))*MOD.speed*(W.charging?WZ('chargeSlow',0.45):1)*(W.crouchK>0.5?WZ('crouchSlow',0.45):1)*(W.slowT>0?0.5:1), a=1-Math.exp(-(down?(W.grounded?(DOWN_TIME-W.downT<1?1.6:14):0.3):(W.grounded?WZ('groundGrip',12):WZ('airGrip',7)))*dt);
+  const maxSpd=(inp.run?WZ('run',8.5):WZ('walk',5.2))*MOD.speed*(W.stSpeed||1)*(W.charging?WZ('chargeSlow',0.45):1)*(W.crouchK>0.5?WZ('crouchSlow',0.45):1)*(W.slowT>0?0.5:1), a=1-Math.exp(-(down?(W.grounded?(DOWN_TIME-W.downT<1?1.6:14):0.3):(W.grounded?WZ('groundGrip',12):WZ('airGrip',7)))*dt);
   W.lungeCD=Math.max(0,W.lungeCD-dt);W.diveCD=Math.max(0,W.diveCD-dt);
   const diving=W.diveT>0;
   if(diving){
@@ -179,12 +179,12 @@ function updateWizard(W,dt,inp){
   // jumping
   if(W.jumpQ){W.jumpQ=false;
     if(W.grounded){if(W.crouchT<=0)W.crouchT=CROUCH;}
-    else if(W.airJumps>0){W.airJumps--;W.vy=(DUEL?WZ('duelDoubleJump',12.6):WZ('doubleJump',10.4))*MOD.jump;W.hatS.v.y-=1.2;W.robeS.v.y-=2.2;rv.set(W.pos.x,Math.max(0,W.y-0.1),W.pos.z);spawnPuffs(9,2.6,rv);FX.emit('jump',W,true);}
+    else if(W.airJumps>0){W.airJumps--;W.vy=(DUEL?WZ('duelDoubleJump',12.6):WZ('doubleJump',10.4))*MOD.jump*(W.stJump||1);W.hatS.v.y-=1.2;W.robeS.v.y-=2.2;rv.set(W.pos.x,Math.max(0,W.y-0.1),W.pos.z);spawnPuffs(9,2.6,rv);FX.emit('jump',W,true);}
   }
   W.crouchAmt=0;
   if(W.crouchT>0){
     W.crouchT-=dt;W.crouchAmt=Math.sin(Math.min(1,1-W.crouchT/CROUCH)*Math.PI*0.5);
-    if(W.crouchT<=0){W.crouchT=0;W.crouchAmt=0;W.vy=(DUEL?WZ('duelJump',14.4):WZ('jump',11.8))*MOD.jump;W.grounded=false;W.airJumps=1;W.hatS.v.y-=0.9;W.robeS.v.y-=1.5;spawnPuffs(7,1.6,W.pos);FX.emit('jump',W,false);}
+    if(W.crouchT<=0){W.crouchT=0;W.crouchAmt=0;W.vy=(DUEL?WZ('duelJump',14.4):WZ('jump',11.8))*MOD.jump*(W.stJump||1);W.grounded=false;W.airJumps=1;W.hatS.v.y-=0.9;W.robeS.v.y-=1.5;spawnPuffs(7,1.6,W.pos);FX.emit('jump',W,false);}
   }
   if(!W.grounded){W.vy-=(down?30:diving?30:(WZ('gravity',38)+(W.vy>0&&!W.jumpHeld?WZ('shortHop',50):0)+(W.vy<0?WZ('fallExtra',16):0))*MOD.gravity)*dt;W.y+=W.vy*dt;
     if(W.y<=0){W.y=0;W.airJumps=1;W.landT=time;FX.emit('land',W);W.hatS.v.y-=1.4;W.robeS.v.y-=1.6;spawnPuffs(10,2.4,W.pos);
@@ -505,6 +505,7 @@ function dive(W){
 }
 function knockDown(W,dx,dz,power){
   if(W.downT>0||W.diveT>0||!MOD.knock)return;
+  power/=(W.stStrength||1); // strong wizards don't fly as far
   rumble(W,1,0.8,300);
   W.downT=DOWN_TIME;W.charging=false;W.crouchT=0;
   W.yaw=Math.atan2(-dx,-dz); // face the hit so he falls over backwards
@@ -565,7 +566,7 @@ function playerThrow(W){
   if(airborne){
     // jump throw: a hard, flat fastball. If any part of the demon is within about 30 degrees of where
     // you're facing, it bends onto that part (leading it as it moves); otherwise it flies straight.
-    const fv=(TH('jumpSpeed',16)+c*TH('jumpCharge',8))*cur.speed;let fy;const gg=G*cur.grav;
+    const fv=(TH('jumpSpeed',16)+c*TH('jumpCharge',8))*cur.speed*(W.stThrow||1);let fy;const gg=G*cur.grav;
     const tgt=PARTY?(demon.alive&&!demon.dying?demonPartAlong(W,dx,dz,0.52):null):DUEL?duelAimAlong(W,dx,dz,0.52):demon.alive&&!demon.dying?demonPartAlong(W,dx,dz,0.52):null;
     if(tgt){
       let px=tgt.pos.x,pz=tgt.pos.z;
@@ -591,7 +592,7 @@ function playerThrow(W){
     const d0=hdist(m.pos,orb.p),T=(0.6+d0*0.036)*cur.hang/MOD.passSpeed;
     lobTo(W,c,m.pos.x+m.vel.x*T,m.pos.z+m.vel.z*T,MOD.passSpeed);FX.emit('pass',W,m);return;}}
   // standing: a lob straight where you're facing, farther the longer you wound up. No aim help.
-  const dist=3+c*(LOB_MAX*cur.range-3);lobTo(W,c,W.pos.x+dx*dist,W.pos.z+dz*dist);
+  const dist=3+c*(LOB_MAX*cur.range*(W.stThrow||1)-3);lobTo(W,c,W.pos.x+dx*dist,W.pos.z+dz*dist);
 }
 const LOB_MAX=TH('lobMax',22); // the farthest anyone can lob it
 function lobTo(W,c,tx,tz,quick){
@@ -628,7 +629,7 @@ function buddyShoot(W){
   W=W||buddy;const c=W.charge;
   const t=demonAim(W).pos;
   const dx=t.x-orb.p.x,dz=t.z-orb.p.z,d=Math.max(0.5,Math.hypot(dx,dz));
-  const fv=(13+c*6)*cur.speed,T=d/fv;throwOrb(W,c,dx/d,dz/d,fv,(t.y-orb.p.y+0.5*G*cur.grav*T*T)/T,true);orb.fast=true;
+  const fv=(13+c*6)*cur.speed*(W.stThrow||1),T=d/fv;throwOrb(W,c,dx/d,dz/d,fv,(t.y-orb.p.y+0.5*G*cur.grav*T*T)/T,true);orb.fast=true;
 }
 function buddyThrow(){
   const W=buddy, c=W.charge;
@@ -1632,7 +1633,7 @@ function orbVsDemon(){
   const relay=PARTY&&orb.res>=1&&orb.chain?orb.chain.size:1;
   const mult=RES_MULT[orb.res]*(orb.fast?1.3:1)*(orb.oop?1.6:1)*(head?1.5:1)*(1+0.5*(relay-1))*(orb.special==='fire'?1.8:orb.special==='aether'?2:1);
   if(relay>=3){demon.stunT=Math.max(demon.stunT||0,1.2);for(let i=0;i<30;i++){randDir(rv).multiplyScalar(3+Math.random()*3);spark(orb.p,rv,0.5,0.7,ELEM_COL[i%5],2.5);}}
-  const dmg=(DM('hitBase',6)+sp*DM('hitPerSpeed',0.8))*mult*cur.dmg;
+  const dmg=(DM('hitBase',6)+sp*DM('hitPerSpeed',0.8))*mult*cur.dmg*(orb.last&&orb.last.stStrength||1); // stStrength: the Lab's Strength stat
   const hs=Math.hypot(orb.v.x,orb.v.z)||1, pushX=orb.v.x/hs, pushZ=orb.v.z/hs;
   const n=Math.min(40,8+Math.round(dmg*0.5));
   for(let i=0;i<n;i++){randDir(rv);rv.x+=pushX;rv.z+=pushZ;rv.multiplyScalar(2+Math.random()*(2+dmg*0.05));spark(hcV,rv,0.3+Math.random()*0.25,0.5+Math.random()*0.6,i%3===0?0xffffff:i%3===1?cur.col:0x8a5aff,3);}
@@ -1883,8 +1884,8 @@ function frame(now){
       const d=hdist(orb.p,W.pos), dy=orb.p.y-(W.y+0.55);
       const dv=W.diveT>0;
       const up=me&&!W.grounded&&!dv;
-      if(orb.state==='air'&&!(dv&&orb.touched)&&d<(me?(dv?(CATCH_R.dive*cur.catchMul):up?(CATCH_R.air*cur.catchMul):(CATCH_R.stand*cur.catchMul)):(DUEL&&orb.last&&orb.last.team!==W.team?0.5:0.8))&&Math.abs(dy)<(me?(dv?(CATCH_R.diveY*cur.catchMul):up?(CATCH_R.airY*cur.catchMul):(CATCH_R.standY*cur.catchMul)):0.85)){grab(W,true);if(me)C.catchT=0;if(dv)popup('DIVING CATCH',orb.p,'#9fe0ff');break;}
-      if(orb.state==='ground'&&d<(me?(CATCH_R.pick*cur.catchMul):0.85)&&W.y<0.8){grab(W,false);if(me)C.catchT=0;break;}
+      if(orb.state==='air'&&!(dv&&orb.touched)&&d<(W.stCatch||1)*(me?(dv?(CATCH_R.dive*cur.catchMul):up?(CATCH_R.air*cur.catchMul):(CATCH_R.stand*cur.catchMul)):(DUEL&&orb.last&&orb.last.team!==W.team?0.5:0.8))&&Math.abs(dy)<(W.stCatch||1)*(me?(dv?(CATCH_R.diveY*cur.catchMul):up?(CATCH_R.airY*cur.catchMul):(CATCH_R.standY*cur.catchMul)):0.85)){grab(W,true);if(me)C.catchT=0;if(dv)popup('DIVING CATCH',orb.p,'#9fe0ff');break;}
+      if(orb.state==='ground'&&d<(W.stCatch||1)*(me?(CATCH_R.pick*cur.catchMul):0.85)&&W.y<0.8){grab(W,false);if(me)C.catchT=0;break;}
     }
   }
   if(morphT>=0){
