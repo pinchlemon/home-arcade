@@ -22,7 +22,7 @@ feature('lab', ({ game, on }) => {
     ['demon', 'Demon', [['How it acts', 'bodies.demon demon.aggression demon.health'], ['Hurting you', 'health.contact health.contactDmg'],
       ['When hit', 'demon.flash demon.flashLen demon.flashRate'], ['When beaten', 'demon.dissolve demon.dissolveLen demon.dissolveCol']]],
     ['rules', 'Rules', [1, 2, 3, 4].map(n => ['Rule ' + n, `rules.when${n} rules.then${n} rules.for${n}`])],
-    ['colours', 'Colours', [['Wizards', 'colours.youCloak colours.youTrim colours.buddyCloak colours.buddyTrim colours.trimH'],
+    ['colours', 'Colours', [['Wizards', 'colours.youCloak colours.youTrim colours.buddyCloak colours.buddyTrim colours.greenCloak colours.greenTrim colours.purpleCloak colours.purpleTrim colours.goldCloak colours.goldTrim colours.trimH'],
       ['Solids', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
       ['Centipede', 'colours.shell colours.rim colours.bone colours.legs colours.spots colours.eyes']]],
     ['camera', 'Camera', [['Camera', 'camera.stick camera.stickSpeed camera.orbit camera.zoom camera.fov camera.tilt camera.spin'], ['On screen', 'hud.text hud.bars hud.badge']]],

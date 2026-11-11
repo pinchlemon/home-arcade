@@ -17,9 +17,9 @@ LAB.shelf('colours', 'Colours', (game) => {
   // ---- wizards: the robe is coloured per corner (black bottom edge, trim band, cloak), the hood and its lip by material
   let trimY = 0.05;   // corners below this are trim (the game's own robe has one row there)
   const band = (y) => (y < 0.005 ? 0 : y < trimY ? 1 : 2);
-  function robeCols(W) {   // the colours the game gave it, read once
-    const c = W.robeGeo.attributes.color.array, b = W.robeBase, out = [];
-    for (let i = 0; i < b.length / 3 && !(out[1] && out[2]); i++) { const k = band(b[i * 3 + 1]); if (!out[k]) out[k] = new T.Color(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]); }
+  function robeCols(W) {   // the colours the game gave it, read once from its own robe (one trim row, below 0.05)
+    const c = W.robeGeo.attributes.color.array, b = W.robeBase, out = [], band0 = (y) => (y < 0.005 ? 0 : y < 0.05 ? 1 : 2);
+    for (let i = 0; i < b.length / 3 && !(out[1] && out[2]); i++) { const k = band0(b[i * 3 + 1]); if (!out[k]) out[k] = new T.Color(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]); }
     return out;
   }
   function hoodMats(W) {
@@ -27,7 +27,10 @@ LAB.shelf('colours', 'Colours', (game) => {
     W.neck.traverse(o => { const m = o.userData.labToon || o.material; if (m && m.isMeshToonMaterial && m.color.getHex() === robe.getHex()) out.push(m); });
     return out;
   }
-  for (const W of [game.player, game.buddy]) { W.robe0 = robeCols(W); W.hoodM = hoodMats(W); }
+  // every wizard Colours looks after: blue and red, and the Party shelf's extra wizards once they are made
+  const wiz = [];
+  function prep(W, key) { W.robe0 = robeCols(W); W.hoodM = hoodMats(W); W.labKey = key; W.robeGeo0 = W.robeGeo; W.robeBase0 = W.robeBase; wiz.push(W); }
+  prep(game.player, 'you'); prep(game.buddy, 'buddy');
   function paintRobe(geo, base, trim, cloak) {
     const c = geo.attributes.color; if (!c) return;
     for (let i = 0; i < base.length / 3; i++) { const k = band(base[i * 3 + 1]); if (k === 1) trim.toArray(c.array, i * 3); else if (k === 2) cloak.toArray(c.array, i * 3); }
@@ -42,11 +45,9 @@ LAB.shelf('colours', 'Colours', (game) => {
       for (const m of W.hoodM) m.color.copy(cloak);
     };
   }
-  game.player.labKey = 'you'; game.buddy.labKey = 'buddy';
   // trim height: the robe is rebuilt from the game's outline with two extra rows, so the trim ends in a crisp line
   // at the chosen height. PS1 low poly is rebuilt around it (it reads W.labTrimY for where the trim ends).
   const TRIM = [0.04, 0.08, 0.12, 0.16, 0.2, 0.28];
-  for (const W of [game.player, game.buddy]) { W.robeGeo0 = W.robeGeo; W.robeBase0 = W.robeBase; }
   function robeAt(W, h) {
     const P = W.robeGeo0.parameters.points, out = [], top = h + 0.015;
     const xAt = (y) => { for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1]; if (y <= a.y && y >= b.y) return a.x + (b.x - a.x) * (a.y - y) / (a.y - b.y); } return P[P.length - 1].x; };
@@ -61,16 +62,20 @@ LAB.shelf('colours', 'Colours', (game) => {
     const lp = !!game.player.labHi && LAB.lowPoly;
     if (lp) LAB.lowPoly(false);
     trimY = x ? TRIM[x] + 0.008 : 0.05;
-    for (const W of [game.player, game.buddy]) {
-      const old = W.robeGeo, g = x ? robeAt(W, TRIM[x]) : W.robeGeo0;
-      W.body.traverse(o => { if (o.geometry === old) o.geometry = g; });
-      if (old !== W.robeGeo0) old.dispose();
-      W.robeGeo = g; W.robeBase = x ? Float32Array.from(g.attributes.position.array) : W.robeBase0;
-      W.labTrimY = x ? trimY : 0;
-      wizard(W)();
-    }
+    for (const W of wiz) trimOf(W, x);
     if (lp) LAB.lowPoly(true);
   }
+  function trimOf(W, x) {
+    const old = W.robeGeo, g = x ? robeAt(W, TRIM[x]) : W.robeGeo0;
+    W.body.traverse(o => { if (o.geometry === old) o.geometry = g; });
+    if (old !== W.robeGeo0) old.dispose();
+    W.robeGeo = g; W.robeBase = x ? Float32Array.from(g.attributes.position.array) : W.robeBase0;
+    W.labTrimY = x ? trimY : 0;
+    wizard(W)();
+  }
+  // the Party shelf calls this when it makes an extra wizard (before PS1 looks are put on it)
+  LAB.paintWizard = (W, key) => { prep(W, key); const h = LAB.get('colours.trimH') ?? 0; if (h) trimOf(W, h); else wizard(W)(); };
+  const extra = (key) => () => { const W = wiz.find(w => w.labKey === key); if (W) wizard(W)(); };
 
   // ---- solids: the thrown one, its badge in the corner, its light and ground glow, and its name
   const solid0 = game.SOLIDS.map(S => S.col);
@@ -103,10 +108,12 @@ LAB.shelf('colours', 'Colours', (game) => {
   return [
     row('youCloak', 'Your cloak', 'The blue wizard', wizard(game.player)),
     row('youTrim', 'Your trim', 'The band at the bottom of your cloak', wizard(game.player)),
-    { id: 'trimH', label: 'Trim height', help: 'How tall the band at the bottom of both cloaks is', min: 0, max: TRIM.length - 1, step: 1, value: 0, dice: false,
+    { id: 'trimH', label: 'Trim height', help: 'How tall the band at the bottom of every cloak is', min: 0, max: TRIM.length - 1, step: 1, value: 0, dice: false,
       fmt: (x) => (x ? (TRIM[x] / 0.04) + '×' : 'NORMAL'), apply: trimHeight },
     row('buddyCloak', "Buddy's cloak", 'The red wizard', wizard(game.buddy)),
     row('buddyTrim', "Buddy's trim", 'The band at the bottom of his cloak', wizard(game.buddy)),
+    // new knobs go at the end of the list (the panel's LAYOUT puts them with the wizards)
+
     row('solid0', 'Tetrahedron', 'Fire', solid(0)),
     row('solid1', 'Cube', 'Earth', solid(1)),
     row('solid2', 'Octahedron', 'Air', solid(2)),
@@ -117,6 +124,9 @@ LAB.shelf('colours', 'Colours', (game) => {
     row('bone', 'Centipede bone', 'Its face, antlers and jaw hooks', demonPart('bone')),
     row('legs', 'Centipede legs', 'Legs, antennae and tail', demonPart('legs')),
     row('spots', 'Centipede spots', 'The dots along its sides', demonPart('spots')),
-    row('eyes', 'Centipede eyes', 'Its glowing pupils', (x) => D.eyeMat.color.set(pick(x, eye0)))
+    row('eyes', 'Centipede eyes', 'Its glowing pupils', (x) => D.eyeMat.color.set(pick(x, eye0))),
+    ...[['green', 'Green'], ['purple', 'Purple'], ['gold', 'Gold']].flatMap(([k, n]) => [
+      row(k + 'Cloak', n + ' cloak', 'The ' + n.toLowerCase() + ' wizard (Party shelf, Extra wizards)', extra(k)),
+      row(k + 'Trim', n + ' trim', 'The band at the bottom of the ' + n.toLowerCase() + " wizard's cloak", extra(k))])
   ];
 });
