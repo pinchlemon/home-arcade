@@ -5,8 +5,11 @@ LAB.shelf('party', 'Party', (game) => {
   const T = game.THREE, MOD = game.MOD;
   const CONES = [2, 0.8, 0.5, -1.01];   // off, about 37°, 60°, anywhere (still the one you face most)
   // switching: 1 when you pass, 2 also whenever a teammate gets the Solid
-  window.FEATURES.on('pass', (W, to) => { if ((LAB.get('party.switch') ?? 0) >= 1 && W && W.human) game.swapTo(to); }, 'lab');
-  window.FEATURES.on('catch', (W) => { if ((LAB.get('party.switch') ?? 0) >= 2 && W && !W.human) game.swapTo(W); }, 'lab');
+  // switching: 1 when you pass, 2 both (when you pass, and whenever a teammate gets the Solid), 3 only when a teammate gets it
+  // (the options are in this order because saved mixes remember a choice by its place)
+  const sw = () => LAB.get('party.switch') ?? 0;
+  window.FEATURES.on('pass', (W, to) => { if ((sw() === 1 || sw() === 2) && W && W.human) game.swapTo(to); }, 'lab');
+  window.FEATURES.on('catch', (W) => { if (sw() >= 2 && W && !W.human) game.swapTo(W); }, 'lab');
   // a ring over the wizard you control, while control can move between wizards
   // (made on first use: three.js gives every new object an id from Math.random, so making it early would change the demon's moves)
   let mark = null, pop = 0;
@@ -153,8 +156,9 @@ LAB.shelf('party', 'Party', (game) => {
     { id: 'passSpeed', label: 'Pass speed', help: 'Helped passes fly flatter and faster', min: 0.5, max: 2.5, step: 0.1, value: 1, apply: (x) => { MOD.passSpeed = x; } },
     { id: 'magnet', label: 'Pass magnet', help: 'Passes bend toward whoever they are for, so they arrive', min: 0, max: 1, step: 0.1, value: 0, dice: false, frame: magnet },
     { id: 'autoCatch', label: 'Auto catch', help: 'You catch the Solid without pressing anything', kind: 'onoff', value: 0, dice: false, apply: (x) => { MOD.autoCatch = x; } },
-    { id: 'switch', label: 'Switch to', help: (x) => ['You always play the same wizard', 'You take over whoever you pass to', 'You always play whoever has the Solid'][x],
-      min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'WHO YOU PASS TO', 'WHOEVER HAS IT'][x],
+    { id: 'switch', label: 'Switch to', help: (x) => ['You always play the same wizard', 'You take over whoever you pass to, as soon as you pass (needs Pass help)',
+      'Both: you take over whoever you pass to, and whoever gets the Solid', 'You take over a teammate only once they have the Solid'][x],
+      min: 0, max: 3, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'WHO YOU PASS TO', 'BOTH', 'WHOEVER HAS IT'][x],
       apply: (x) => { if (!x && mark) mark.visible = false; }, frame: marker },
     { id: 'wizards', label: 'Extra wizards', help: 'Green, purple and gold join your team', min: 0, max: 3, step: 1, value: 0, dice: false, apply: crew },
     { id: 'team', label: 'Team brain', help: 'Your buddy plays like the extra wizards: spreads out, gets open, passes to whoever is free (always on with extra wizards)', kind: 'onoff', value: 0, dice: false, apply: sync },
