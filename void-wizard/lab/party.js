@@ -46,12 +46,15 @@ LAB.shelf('party', 'Party', (game) => {
   function crew(n) {
     const you = game.you;
     while (extras.length < n) { const c = WIZ[extras.length], W = game.makeWizard(c[0], c[1], c[2]); W.discBase = c[2]; W.root.visible = false; W.disc.visible = false; extras.push(W); stat(W, WHO[extras.length + 1][0]); }
+    let joined = false;
     extras.forEach((W, i) => {
       if (i < n && !game.ALL.includes(W)) {
         const a = Math.random() * Math.PI * 2; W.pos.set(you.pos.x + Math.cos(a) * 4, 0, you.pos.z + Math.sin(a) * 4); W.vel.set(0, 0, 0); W.downT = 0;
-        game.joinCrew(W); game.spawnPuffs(10, 2, W.pos);
+        if (!W.labPainted) { W.labPainted = true; if (LAB.paintWizard) LAB.paintWizard(W, ['green', 'purple', 'gold'][i]); }   // its colours from the Colours shelf
+        game.joinCrew(W); game.spawnPuffs(10, 2, W.pos); joined = true;
       } else if (i >= n) game.leaveCrew(W);
     });
+    if (joined && LAB.ps1Refresh) LAB.ps1Refresh();   // and whatever PS1 looks are on
     sync();
   }
   // stats: each wizard's own speed, jump, catching reach, throwing power and strength (the game reads W.stSpeed and the rest)
@@ -134,17 +137,23 @@ LAB.shelf('party', 'Party', (game) => {
         const others = game.ALL.filter(w => w !== you && !(o.state === 'held' && o.holder === w));
         const i = Math.max(0, others.indexOf(W)), n = others.length;
         let cx = anchor.x, cz = anchor.z, base;
-        if (live) {
+        if (!live) {   // no demon: follow you like the buddy does, walking up only once you've got away, and keep apart
+          const d = hd(W.pos, you.pos);
+          if (d > S * 1.3 || (ai.closing && d > S * 0.75)) { ai.closing = true; target = you.pos; arrive = S * 0.7; run = d > S * 2; }
+          else ai.closing = false;
+          for (const w of game.ALL) { if (w === W) continue; const dx = W.pos.x - w.pos.x, dz = W.pos.z - w.pos.z, dd = Math.hypot(dx, dz); if (dd < 2.2 && dd > 0.01) { target = away.set(W.pos.x + dx / dd * 1.5, 0, W.pos.z + dz / dd * 1.5); arrive = 0.2; run = false; break; } }
+          W.faceTarget = you.pos;
+        } else {
           const tx = D.pos.x - anchor.x, tz = D.pos.z - anchor.z, td = Math.hypot(tx, tz) || 1, R = get('shotRange', 16);
           base = Math.atan2(tz, tx);
           const up = Math.max(0, td - R * 0.75) * 0.6; cx += tx / td * up; cz += tz / td * up;
-        } else base = Math.atan2(W.pos.z - anchor.z, W.pos.x - anchor.x);
-        // left and right of the line to the demon, alternating, the later ones a little further back
-        const side = i % 2 ? -1 : 1, row = Math.floor(i / 2), ang = base + side * (Math.PI / 2 + row * 0.55);
-        slot.set(cx + Math.cos(ang) * S, 0, cz + Math.sin(ang) * S);
-        if (live) { const sd = game.demonNearest(slot); if (sd.d < K + 2) { const ax = slot.x - sd.x, az = slot.z - sd.z, ad = Math.hypot(ax, az) || 1; slot.x += ax / ad * (K + 2 - sd.d); slot.z += az / ad * (K + 2 - sd.d); } }
-        if (hd(W.pos, slot) > 1.2) { target = slot; arrive = 0.8; run = hd(W.pos, slot) > 5; }
-        W.faceTarget = o.p;
+          // left and right of the line to the demon, alternating, the later ones a little further back
+          const side = i % 2 ? -1 : 1, row = Math.floor(i / 2), ang = base + side * (Math.PI / 2 + row * 0.55);
+          slot.set(cx + Math.cos(ang) * S, 0, cz + Math.sin(ang) * S);
+          const sd = game.demonNearest(slot); if (sd.d < K + 2) { const ax = slot.x - sd.x, az = slot.z - sd.z, ad = Math.hypot(ax, az) || 1; slot.x += ax / ad * (K + 2 - sd.d); slot.z += az / ad * (K + 2 - sd.d); }
+          if (hd(W.pos, slot) > 1.2) { target = slot; arrive = 0.8; run = hd(W.pos, slot) > 5; }
+          W.faceTarget = o.p;
+        }
       }
     }
     // keep out of the demon's reach, unless going for the Solid

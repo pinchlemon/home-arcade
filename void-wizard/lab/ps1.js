@@ -131,6 +131,12 @@
   }
 
   LAB.lowPoly = lowPoly;   // Colours rebuilds low poly when it changes the robe
+  // wizards made later (the Party shelf's extra wizards) get whatever PS1 looks are on
+  LAB.ps1Refresh = () => {
+    if (v('ps1.lowpoly', 0)) lowPoly(true);
+    if (v('ps1.snap', 0) || v('ps1.wobble', 0)) scan();
+    if (v('ps1.gouraud', 0)) soften(true);
+  };
   LAB.shelf('ps1', 'PS1', () => [
     { id: 'snap', label: 'Snap', help: '1 is the real PS1 grid; more is coarser and blockier', min: 0, max: 6, step: 0.25, value: 0, fmt: (x) => (x ? String(x) : 'OFF'),
       apply: (x) => { if (x > 0) scan(); } },
