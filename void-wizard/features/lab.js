@@ -34,7 +34,8 @@ feature('lab', ({ game, on }) => {
       ['Glow', 'glow.bloom glow.radius glow.threshold glow.tilt glow.focus glow.glitch'],
       ['Print', 'print.techni print.bleach print.dots print.halftone print.radius print.shape']]],
     ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown']]],
-    ['ps1', 'PS1', [['Models', 'ps1.snap ps1.wobble ps1.lowpoly ps1.gouraud'], ['Picture', 'ps1.depth ps1.fog']]]
+    ['ps1', 'PS1', [['Models', 'ps1.snap ps1.wobble ps1.lowpoly ps1.gouraud'], ['Picture', 'ps1.depth ps1.fog']]],
+    ['ps2', 'PS2', [['Console', 'ps2.res ps2.c16 ps2.bloom ps2.wash ps2.rays ps2.blur'], ['TV', 'ps2.inter ps2.comp']]]
   ];
 
   // ---------------------------------------------------------------- toys and their values
