@@ -13,7 +13,8 @@ feature('lab', ({ game, on }) => {
   // to another shelf is only a change here.
   const LAYOUT = [
     ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
-    ['party', 'Party', [['Passing', 'party.aim party.passSpeed party.autoCatch'], ['Control', 'party.switch']]],
+    ['party', 'Party', [['Team', 'party.wizards party.team'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch'],
+      ['Teammate brains', 'party.spacing party.keepAway party.shoot party.shotRange party.accuracy party.think party.toYou']]],
     ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe']]],
     ['solids', 'Solids', [['Flight', 'bodies.solid world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'],
       ['Extra solids', 'spawn.count spawn.size spawn.bounce spawn.kick spawn.pickup spawn.power spawn.damage']]],

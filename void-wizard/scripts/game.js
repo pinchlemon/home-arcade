@@ -599,6 +599,17 @@ function lobTo(W,c,tx,tz,quick){
   const T=(0.6+d*0.036)*cur.hang/(quick||1), g=G*cur.grav, h=0.6-orb.p.y;
   throwOrb(W,c,dx/d,dz/d,d/T,(h+0.5*g*T*T)/T,true);
 }
+// more wizards (the Lab's Party shelf): join the team, or leave it. brain(W, dt) drives every wizard you don't
+// control when the Lab sets one (null: the buddy keeps his own brain and nobody else moves)
+let brain=null;
+function joinCrew(W){if(DUEL||ALL.includes(W))return;W.ctl=W.ctl||mkCtl();W.human=false;ALL.push(W);W.root.visible=true;W.disc.visible=true;}
+function leaveCrew(W){
+  if(DUEL||ALL.length<=2||!ALL.includes(W))return;
+  if(W===player)swapTo(buddy);
+  if(W===buddy)buddy=ALL.find(o=>o!==W&&o!==player);
+  if(orb.state==='held'&&orb.holder===W){orb.state='ground';orb.holder=null;orb.p.set(W.pos.x,0.4,W.pos.z);orb.v.set(0,0,0);orb.last=null;}
+  ALL.splice(ALL.indexOf(W),1);W.root.visible=false;W.disc.visible=false;W.charging=false;
+}
 // the teammate a pass goes to: roughly where you face, nearer ones first
 function passTarget(W,dx,dz){let m=null,ms=-9;
   for(const o of ALL){if(o===W||o.downT>0||o.capT>0)continue;const mx=o.pos.x-W.pos.x,mz=o.pos.z-W.pos.z,md=Math.hypot(mx,mz)||1,dot=(mx*dx+mz*dz)/md;
@@ -606,15 +617,15 @@ function passTarget(W,dx,dz){let m=null,ms=-9;
   return m;}
 // the Lab's Party shelf: you take over another wizard (the old one gets the buddy's brain)
 function swapTo(W){
-  if(DUEL||W===player||buddy.human||!W)return false;
-  const old=player;player=W;buddy=old;
+  if(DUEL||W===player||buddy.human||!W||!ALL.includes(W))return false;
+  const old=player;player=W;if(buddy===W)buddy=old; // with more wizards, the one you leave joins the others
   const c=old.ctl;old.ctl=W.ctl;W.ctl=c;old.human=false;W.human=true;
   old.charging=false;W.charging=false;W.faceTarget=null;old.jumpHeld=false;
   bud.holdT=0;bud.shoot=false;bud.closing=false;bud.spot.copy(old.pos);bud.wTarget=null;
   FX.emit('swap',W,old);return true;
 }
-function buddyShoot(){
-  const W=buddy,c=W.charge;
+function buddyShoot(W){
+  W=W||buddy;const c=W.charge;
   const t=demonAim(W).pos;
   const dx=t.x-orb.p.x,dz=t.z-orb.p.z,d=Math.max(0.5,Math.hypot(dx,dz));
   const fv=(13+c*6)*cur.speed,T=d/fv;throwOrb(W,c,dx/d,dz/d,fv,(t.y-orb.p.y+0.5*G*cur.grav*T*T)/T,true);orb.fast=true;
@@ -1393,7 +1404,7 @@ function stepLegs(S,sc,dt,moveX,moveZ){
 // a sideways flick of the head that sends the solid flying off across the floor
 function swatOrb(){
   // flings it away from the wizards, off to one side of its head
-  const cxp=PARTY?crewX():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.x+buddy.pos.x)/2:player.pos.x, czp=PARTY?crewZ():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.z+buddy.pos.z)/2:player.pos.z;
+  const cxp=PARTY||ALL.length>2?crewX():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.x+buddy.pos.x)/2:player.pos.x, czp=PARTY||ALL.length>2?crewZ():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.z+buddy.pos.z)/2:player.pos.z;
   const side=Math.random()<0.5?-1:1, a=Math.atan2(orb.p.x-cxp,orb.p.z-czp)+side*(0.2+Math.random()*0.35);
   orb.state='air';orb.holder=null;orb.last=null;orb.touched=false;orb.fast=false;orb.bowl=false;orb.oop=false;
   orb.v.set(Math.sin(a)*19,10,Math.cos(a)*19);randDir(orb.w).multiplyScalar(16);
@@ -1417,9 +1428,9 @@ function updateDemon(dt){
   // whoever has the solid is the target; if it's loose, the closest wizard still standing
   let T;
   if(orb.state==='held')T=orb.holder;
-  else if(PARTY){T=ALL.reduce((b,w)=>hdist(demon.pos,w.pos)<hdist(demon.pos,b.pos)?w:b,ALL[0]);}
+  else if(PARTY||ALL.length>2){T=ALL.reduce((b,w)=>hdist(demon.pos,w.pos)<hdist(demon.pos,b.pos)?w:b,ALL[0]);}
   else T=hdist(demon.pos,player.pos)<hdist(demon.pos,buddy.pos)?player:buddy;
-  if(T.downT>0){const o=PARTY?ALL.find(w=>w.downT<=0):(T===player?buddy:player);if(o&&o.downT<=0)T=o;}
+  if(T.downT>0){const o=PARTY||ALL.length>2?ALL.find(w=>w.downT<=0):(T===player?buddy:player);if(o&&o.downT<=0)T=o;}
   const dx=T.pos.x-demon.pos.x,dz=T.pos.z-demon.pos.z,d=Math.hypot(dx,dz)||0.001;
   // steer with a limited turning speed, so it sweeps around in wide curves instead of coiling up
   const steerTo=(gx,gz,maxRate,wig)=>{const ty=Math.atan2(gx-demon.pos.x,gz-demon.pos.z)+wig;let dd=ty-demon.yaw;dd=Math.atan2(Math.sin(dd),Math.cos(dd));demon.yaw+=clamp(dd*3,-maxRate,maxRate)*dt;};
@@ -1427,8 +1438,8 @@ function updateDemon(dt){
   // prowl: circle around the wizards, weaving; hunt: go for whoever has the solid
   if(demon.mode===undefined){demon.mode='prowl';demon.modeT=3;demon.orbitA=0;demon.orbitDir=1;}
   demon.modeT-=dt;
-  const cX=PARTY?crewX():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.x+buddy.pos.x)/2:player.pos.x;
-  const cZ=PARTY?crewZ():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.z+buddy.pos.z)/2:player.pos.z;
+  const cX=PARTY||ALL.length>2?crewX():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.x+buddy.pos.x)/2:player.pos.x;
+  const cZ=PARTY||ALL.length>2?crewZ():buddy.human||hdist(player.pos,buddy.pos)<14?(player.pos.z+buddy.pos.z)/2:player.pos.z;
   if(demon.state==='walk'&&demon.modeT<=0){
     if(demon.mode==='prowl'){demon.mode='hunt';demon.modeT=4+Math.random()*2;}
     else{demon.mode='prowl';demon.modeT=2.5+Math.random()*2.5;demon.orbitA=Math.atan2(demon.pos.z-cZ,demon.pos.x-cX);demon.orbitDir=Math.random()<0.5?-1:1;}
@@ -1743,7 +1754,8 @@ function frame(now){
     for(const W of ALL)if(W!==player&&W.capT<=0)updateWizard(W,dt,duelAI(W,dt));
   }else{
     updateWizard(player,dt,pin);
-    updateWizard(buddy,dt,buddy.human?(gp2?{ix:gp2.x,iz:gp2.y,run:gp2.run,crouch:gp2.crouch}:{ix:0,iz:0,run:false}):buddyInput(dt));
+    updateWizard(buddy,dt,buddy.human?(gp2?{ix:gp2.x,iz:gp2.y,run:gp2.run,crouch:gp2.crouch}:{ix:0,iz:0,run:false}):brain?brain(buddy,dt):buddyInput(dt));
+    if(ALL.length>2)for(const W of ALL)if(W!==player&&W!==buddy)updateWizard(W,dt,brain?brain(W,dt):{ix:0,iz:0,run:false});
   }
   if(DUEL){
     for(const W of ALL){
@@ -1777,6 +1789,11 @@ function frame(now){
   }else{
     const dx=buddy.pos.x-player.pos.x,dz=buddy.pos.z-player.pos.z,d=Math.hypot(dx,dz)||0.001;
     if(d<0.85&&Math.abs(player.y-buddy.y)<0.9){const o=(0.85-d)*0.5,nx=dx/d,nz=dz/d;player.pos.x-=nx*o;player.pos.z-=nz*o;buddy.pos.x+=nx*o;buddy.pos.z+=nz*o;}
+    if(ALL.length>2)for(let i=0;i<ALL.length;i++)for(let j=i+1;j<ALL.length;j++){ // the Lab's extra wizards: keep everyone from standing inside each other
+      const P=ALL[i],B=ALL[j];if((P===player||P===buddy)&&(B===player||B===buddy))continue;
+      const ex=B.pos.x-P.pos.x,ez=B.pos.z-P.pos.z,ed=Math.hypot(ex,ez)||0.001;
+      if(ed<0.85&&Math.abs(P.y-B.y)<0.9){const o=(0.85-ed)*0.5,nx=ex/ed,nz=ez/ed;P.pos.x-=nx*o;P.pos.z-=nz*o;B.pos.x+=nx*o;B.pos.z+=nz*o;}
+    }
     for(const [A,B] of [[player,buddy],[buddy,player]]){
       const ex=B.pos.x-A.pos.x,ez=B.pos.z-A.pos.z,ed=Math.hypot(ex,ez)||0.001,nx=ex/ed,nz=ez/ed,above=A.y-B.y;
       // landing on their head
@@ -1987,7 +2004,8 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
-  swapTo,passTarget,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
+  swapTo,passTarget,makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
+  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();
 
