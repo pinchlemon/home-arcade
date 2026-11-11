@@ -26,7 +26,7 @@ LAB.shelf('party', 'Party', (game) => {
   const extras = [];   // made the first time they're asked for (making them uses Math.random), then kept
   function crew(n) {
     const you = game.you;
-    while (extras.length < n) { const c = WIZ[extras.length], W = game.makeWizard(c[0], c[1], c[2]); W.discBase = c[2]; W.root.visible = false; W.disc.visible = false; extras.push(W); }
+    while (extras.length < n) { const c = WIZ[extras.length], W = game.makeWizard(c[0], c[1], c[2]); W.discBase = c[2]; W.root.visible = false; W.disc.visible = false; extras.push(W); stat(W, WHO[extras.length + 1][0]); }
     extras.forEach((W, i) => {
       if (i < n && !game.ALL.includes(W)) {
         const a = Math.random() * Math.PI * 2; W.pos.set(you.pos.x + Math.cos(a) * 4, 0, you.pos.z + Math.sin(a) * 4); W.vel.set(0, 0, 0); W.downT = 0;
@@ -35,6 +35,12 @@ LAB.shelf('party', 'Party', (game) => {
     });
     sync();
   }
+  // stats: each wizard's own speed, jump, catching reach, throwing power and strength (the game reads W.stSpeed and the rest)
+  const STATS = [['speed', 'Speed', 'stSpeed', 'How fast they run'], ['jump', 'Jump', 'stJump', 'How high they jump'], ['catch', 'Catching', 'stCatch', 'How far they can reach for a catch'],
+    ['throw', 'Throwing', 'stThrow', 'How fast their shots fly and how far they can lob'], ['strength', 'Strength', 'stStrength', 'Damage their hits do to the demon, and how hard they are to knock flying']];
+  const WHO = [['blue', 'Blue', () => game.player], ['red', 'Red', () => game.buddy], ['green', 'Green', () => extras[0]], ['purple', 'Purple', () => extras[1]], ['gold', 'Gold', () => extras[2]]];
+  const put = (W, f, x) => { W[f] = f === 'stJump' ? Math.sqrt(x) : x; };   // jump: x times as high, so the take-off speed grows by its square root
+  const stat = (W, k) => { if (!W) return; for (const [id, , f] of STATS) { const v = LAB.get('stats.' + k + '.' + id); if (v !== undefined) put(W, f, v); } };
   const sync = () => { game.brain = extras.some(W => game.ALL.includes(W)) || get('team', 0) ? think : null; };
   const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const spot = new T.Vector3(), slot = new T.Vector3(), away = new T.Vector3();
@@ -158,6 +164,8 @@ LAB.shelf('party', 'Party', (game) => {
     { id: 'shotRange', label: 'Shot range', help: 'How near the demon has to be before they shoot', min: 6, max: 28, step: 1, value: 16 },
     { id: 'accuracy', label: 'Accuracy', help: 'How true their passes and shots fly', min: 0, max: 1, step: 0.05, value: 0.7 },
     { id: 'think', label: 'Think time', help: 'Seconds they hold the Solid before throwing', min: 0.1, max: 2.5, step: 0.1, value: 0.6 },
-    { id: 'toYou', label: 'Pass to you', help: 'How much they prefer passing to the wizard you control', min: 0, max: 1, step: 0.1, value: 0.7 }
+    { id: 'toYou', label: 'Pass to you', help: 'How much they prefer passing to the wizard you control', min: 0, max: 1, step: 0.1, value: 0.7 },
+    ...WHO.flatMap(([k, name, W]) => STATS.map(([id, label, f, help]) => ({ id: 'stats.' + k + '.' + id, label, help: name + ' wizard: ' + help.toLowerCase(),
+      min: 0.5, max: 2, step: 0.1, value: 1, fmt: (x) => '×' + x.toFixed(1), apply: (x) => { const w = W(); if (w) put(w, f, x); } })))
   ];
 });
