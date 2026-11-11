@@ -8,7 +8,7 @@ LAB.shelf('spawn', 'Spawn', (game) => {
   const tmp = new T.Vector3();
   function add() {
     if (!edges) edges = game.SOLIDS.map(S => new T.EdgesGeometry(S.geo));
-    const k = Math.random() * game.SOLIDS.length | 0, S = game.SOLIDS[k], p = game.player.pos;
+    const k = Math.random() * game.SOLIDS.length | 0, S = game.SOLIDS[k], p = game.you.pos;
     const m = new T.LineSegments(edges[k], new T.LineBasicMaterial({ color: S.col }));
     const b = { m, col: S.col, r: S.circ * 0.75, p: new T.Vector3(p.x + (Math.random() - 0.5) * 14, 8 + Math.random() * 10, p.z + (Math.random() - 0.5) * 14),
       v: new T.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2), w: new T.Vector3(Math.random() * 4, Math.random() * 4, Math.random() * 4) };
@@ -80,7 +80,7 @@ LAB.shelf('spawn', 'Spawn', (game) => {
       b.m.position.copy(b.p); b.m.scale.setScalar(sz);
       b.m.rotation.x += b.w.x * dt; b.m.rotation.y += b.w.y * dt; b.m.rotation.z += b.w.z * dt;
       // too far away: drop back in near you
-      if (Math.hypot(b.p.x - game.player.pos.x, b.p.z - game.player.pos.z) > 70) { b.p.set(game.player.pos.x + (Math.random() - 0.5) * 10, 14, game.player.pos.z + (Math.random() - 0.5) * 10); b.v.set(0, 0, 0); }
+      if (Math.hypot(b.p.x - game.you.pos.x, b.p.z - game.you.pos.z) > 70) { b.p.set(game.you.pos.x + (Math.random() - 0.5) * 10, 14, game.you.pos.z + (Math.random() - 0.5) * 10); b.v.set(0, 0, 0); }
     }
     // and each other
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {

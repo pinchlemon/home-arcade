@@ -54,7 +54,7 @@
   function setFog(k) {
     if (!k) { game.scene.fog = null; return; }
     fog = fog || new T.Fog(0x000000, 40, 90);
-    const d = game.camera.position.distanceTo(game.player.root.position) || 55;   // about how far the camera sits from you
+    const d = game.camera.position.distanceTo(game.you.root.position) || 55;   // about how far the camera sits from you
     fog.near = d * (1.25 - k * 0.3); fog.far = d * (2.4 - k * 0.9);   // at the most, you are just inside it
     game.scene.fog = fog;
   }
