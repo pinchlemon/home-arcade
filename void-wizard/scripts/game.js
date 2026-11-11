@@ -796,7 +796,8 @@ function setMode(m){
   const label=m==='follow'?'FOLLOW':m==='stay'?'STAY':'WANDER';
   modeEl.textContent='BUDDY: '+label;budBtn.textContent=label;bud.label=label;
 }
-function cycleMode(){if(DUEL){if(!(orb.state==='held'&&orb.holder===player))switchNearest();return;}setMode(MODES[(MODES.indexOf(bud.mode)+1)%MODES.length]);}
+let changeHook=null; // the Lab's Party shelf: Triangle (F, the buddy button) picks another wizard instead, when this returns true
+function cycleMode(){if(DUEL){if(!(orb.state==='held'&&orb.holder===player))switchNearest();return;}if(changeHook&&changeHook())return;setMode(MODES[(MODES.indexOf(bud.mode)+1)%MODES.length]);}
 addEventListener('keydown',e=>{if(e.code==='KeyF'&&!e.repeat)cycleMode();});
 document.getElementById('dvBtn').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();dive(player);});
 document.getElementById('tklBtn').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();tackle();});
@@ -1717,7 +1718,7 @@ camera.position.copy(camBase);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let sparkAcc=0, wasFull=false;
 
-let last=performance.now();
+let last=performance.now(), lastPin=null;
 function frame(now){
   const dt=Math.min((now-last)/1000,1/30)*MOD.time;last=now;time+=dt;
 
@@ -1748,6 +1749,7 @@ function frame(now){
              run:keys.has('ShiftLeft')||keys.has('ShiftRight')||(gp?gp.run:false),
              crouch:keys.has('KeyC')||keys.has('ControlLeft')||(gp?gp.crouch:false)};
   if(MOD.turn){const c=Math.cos(MOD.turn),s=Math.sin(MOD.turn),x=pin.ix;pin.ix=x*c+pin.iz*s;pin.iz=-x*s+pin.iz*c;}
+  lastPin=pin;
   player.faceTarget=null;
   if(DUEL){
     duelTick(dt,gp);
@@ -2005,7 +2007,8 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
-  swapTo,passTarget,makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
+  swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
+  makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
   lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;}};
 requestAnimationFrame(frame);
 })();

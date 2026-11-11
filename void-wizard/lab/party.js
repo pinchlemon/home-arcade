@@ -23,6 +23,22 @@ LAB.shelf('party', 'Party', (game) => {
     mark.visible = !!v; mark.position.set(W.pos.x, W.y + 1.75 * W.root.scale.y + Math.sin(performance.now() / 300) * 0.05, W.pos.z);
     mark.scale.setScalar(1 + pop * 1.2);
   }
+  // ---- change player (Triangle, F or the buddy button, while you don't hold the Solid): the teammate the left stick
+  // points at, or with the stick let go, the teammate nearest the Solid
+  function changePlayer() {
+    if (!LAB.get('party.pick')) return false;
+    const o = game.orb, you = game.you;
+    if (o.state === 'held' && o.holder === you) return false;
+    const st = game.stick, sm = Math.hypot(st.x, st.z), mates = game.ALL.filter(W => W !== you && W.downT <= 0);
+    if (!mates.length) return true;
+    let best = null, bs = -1e9;
+    if (sm > 0.3) for (const W of mates) { const dx = W.pos.x - you.pos.x, dz = W.pos.z - you.pos.z, d = Math.hypot(dx, dz) || 1, dot = (dx * st.x + dz * st.z) / (d * sm), sc = dot * 10 - d * 0.05; if (sc > bs) { bs = sc; best = W; } }
+    else { game.solidSpot(spot); for (const W of mates) { const sc = -hd(W.pos, spot); if (sc > bs) { bs = sc; best = W; } } }
+    game.swapTo(best);
+    return true;
+  }
+  game.changeHook = changePlayer;
+
   // ---- more wizards, and the brain that runs every wizard you don't control (game.brain)
   const get = (id, n) => LAB.get('party.' + id) ?? n;
   const WIZ = [[0x2fb85a, 0xe8b64a, 0x40ff80], [0x8a4ad0, 0x6ff2e0, 0xb07aff], [0xe8a33a, 0x3d4fc4, 0xffd23f]];   // green, purple, gold: robe, trim, glow
@@ -160,6 +176,8 @@ LAB.shelf('party', 'Party', (game) => {
       'Both: you take over whoever you pass to, and whoever gets the Solid', 'You take over a teammate only once they have the Solid'][x],
       min: 0, max: 3, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'WHO YOU PASS TO', 'BOTH', 'WHOEVER HAS IT'][x],
       apply: (x) => { if (!x && mark) mark.visible = false; }, frame: marker },
+    { id: 'pick', label: 'Change player', help: 'Triangle (when you are not holding the Solid) takes over the teammate your stick points at, or with the stick let go, the one nearest the Solid. Off: Triangle sets the buddy to follow, stay or wander',
+      kind: 'onoff', value: 0, dice: false, frame: (dt) => { if (!LAB.get('party.switch')) marker(dt, 1); }, apply: (x) => { if (!x && mark && !LAB.get('party.switch')) mark.visible = false; } },
     { id: 'wizards', label: 'Extra wizards', help: 'Green, purple and gold join your team', min: 0, max: 3, step: 1, value: 0, dice: false, apply: crew },
     { id: 'team', label: 'Team brain', help: 'Your buddy plays like the extra wizards: spreads out, gets open, passes to whoever is free (always on with extra wizards)', kind: 'onoff', value: 0, dice: false, apply: sync },
     { id: 'spacing', label: 'Spacing', help: 'How far apart teammates spread', min: 4, max: 18, step: 1, value: 9 },
