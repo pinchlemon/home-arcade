@@ -9,6 +9,6 @@ LAB.shelf('hud', 'Screen', (game) => {
     { id: 'text', label: 'Words', help: 'Title, score, buddy mode, controls, tips and the mode link', kind: 'onoff', value: 1, dice: false, apply: flag('lab-notext') },
     { id: 'bars', label: 'Health bars', help: "The demon's bar, and the wizards' bars from the Health shelf", kind: 'onoff', value: 1, dice: false,
       apply: flag('lab-nohp'), frame: () => { game.hpBar.visible = false; } },
-    { id: 'badge', label: 'Solid badge', help: 'The big spinning solid and its name in the corner', kind: 'onoff', value: 1, dice: false, apply: flag('lab-nobadge') }
+    { id: 'badge', label: 'Solid badge', help: 'The big spinning solid and its name in the corner', kind: 'onoff', value: 1, dice: false, apply: (v) => { flag('lab-nobadge')(v); game.hudOff = !v; } }   // hidden, it isn't drawn either
   ];
 });

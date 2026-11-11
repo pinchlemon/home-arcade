@@ -248,7 +248,7 @@ feature('lab', ({ game, on }) => {
     }
     if (more.toys.length) out.push(more);
     out.push({ id: 'saved', name: 'Saved', kind: 'saved' }, { id: 'ideas', name: 'Ideas', kind: 'ideas' });
-    const lab = { id: 'lab', name: 'Lab settings', kind: 'toys', toys: toys.filter(t => t.setting && !placed.has(t.id)), heads: { 0: 'Dice', 2: 'Lab' } };
+    const lab = { id: 'lab', name: 'Lab settings', kind: 'toys', toys: toys.filter(t => t.setting && !placed.has(t.id)), heads: { 0: 'Dice', 2: 'Lab', 3: 'Speed' } };
     if (lab.toys.length) out.push(lab);
     shelves = out;
   }
@@ -527,6 +527,21 @@ feature('lab', ({ game, on }) => {
     for (let i = 0; i < 17; i++) prev[i] = b(i);
   }
 
+  // ---------------------------------------------------------------- speed readout: frames a second, counted over half a second
+  let fpsEl = null, fpsN = 0, fpsT = 0, fpsWorst = 0, fpsLast = 0;
+  function showFps(x) {
+    if (!x) { if (fpsEl) fpsEl.style.display = 'none'; return; }
+    if (!fpsEl) { fpsEl = document.createElement('div'); fpsEl.style.cssText = 'position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:30;font:700 11px/1 Saira,system-ui,sans-serif;letter-spacing:.06em;color:#ffd23f;background:rgba(0,0,0,.6);padding:4px 8px;border-radius:6px;pointer-events:none'; document.body.appendChild(fpsEl); }
+    fpsEl.style.display = ''; fpsEl.textContent = '… FPS'; fpsN = 0; fpsT = 0; fpsWorst = 0; fpsLast = 0;
+  }
+  on('frame', () => {
+    if (!fpsEl || fpsEl.style.display === 'none') return;
+    const now = performance.now();
+    if (fpsLast) { const d = now - fpsLast; fpsN++; fpsT += d; fpsWorst = Math.max(fpsWorst, d); }
+    fpsLast = now;
+    if (fpsT >= 500) { fpsEl.textContent = Math.round(fpsN * 1000 / fpsT) + ' FPS · SLOWEST ' + Math.round(fpsWorst) + ' MS'; fpsN = 0; fpsT = 0; fpsWorst = 0; }
+  });
+
   // ---------------------------------------------------------------- the shelves, then a prototype the Studio asked to play
   const names = Array.isArray(data.shelves) ? data.shelves : [];
   let left = names.length;
@@ -534,7 +549,10 @@ feature('lab', ({ game, on }) => {
     LAB.shelf('dice', 'Lab settings', () => [
       { id: 'count', label: 'Knobs per roll', help: 'How many knobs one press of Dice turns. ALL is the old way: about half of them', min: 1, max: DICE_ALL, step: 1, value: 3, dice: false, setting: true, fmt: (x) => (x >= DICE_ALL ? 'ALL' : String(x)) },
       { id: 'from', label: 'Roll from', help: 'Every shelf, or only the shelf you are on', kind: 'onoff', value: 0, dice: false, setting: true, fmt: (x) => (x ? 'THIS SHELF' : 'ALL SHELVES') },
-      { id: 'lab.pause', label: 'Pause while open', help: 'The game holds still while the Lab is open', kind: 'onoff', value: 1, dice: false, setting: true, apply: syncPause }
+      { id: 'lab.pause', label: 'Pause while open', help: 'The game holds still while the Lab is open', kind: 'onoff', value: 1, dice: false, setting: true, apply: syncPause },
+      { id: 'lab.sharp', label: 'Sharpness', help: 'Fewer pixels runs faster: every screen effect costs less. 100% is normal', min: 0.5, max: 1, step: 0.05, value: 1, dice: false, setting: true,
+        fmt: (x) => Math.round(x * 100) + '%', apply: (x) => { game.resScale = x; } },
+      { id: 'lab.fps', label: 'Show speed', help: 'Frames a second in the top corner (60 is smooth; 30 in Low Power Mode)', kind: 'onoff', value: 0, dice: false, setting: true, apply: showFps }
     ]);
     build(); shelfAt = Math.min(shelfAt, shelves.length - 1);
     for (const t of toys) if (t.setting && values[t.id] !== t.value) run(t, values[t.id]);   // settings remembered on this phone take effect

@@ -37,10 +37,11 @@ function smoothTargets(){
   const make=()=>{const o={minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter};if(!MS)return new THREE.WebGLRenderTarget(1,1,o);const t=new THREE.WebGLMultisampleRenderTarget(1,1,o);t.samples=4;return t;};
   return smoothRT={low:make(),orb:make()};
 }
+let resScale=1, hudOff=false;   // hudOff: the badge is hidden, so it isn't drawn
 function resize(){
   const w=innerWidth,h=innerHeight;
   // pixel off: everything at the screen's own sharpness, smoothed instead of blocky
-  const pr=PX?Math.min(devicePixelRatio||1,1.5):cfg('world.sharp',0)?(devicePixelRatio||1):Math.min(devicePixelRatio||1,2);   // world.sharp: every screen pixel when off
+  const pr=(PX?Math.min(devicePixelRatio||1,1.5):cfg('world.sharp',0)?(devicePixelRatio||1):Math.min(devicePixelRatio||1,2))*resScale;   // world.sharp: every screen pixel when off; resScale: a feature can draw fewer pixels
   renderer.setPixelRatio(pr);
   renderer.setSize(w,h,false);
   canvas.style.imageRendering=PX?'':'auto';
@@ -1994,10 +1995,12 @@ function frame(now){
   hudPop*=Math.exp(-6*dt);
   hudSpin.rotation.y+=dt*0.55;hudSpin.rotation.x=0.25+Math.sin(time*0.7)*0.12;
   const hs=1+hudPop*0.35*Math.sin(hudPop*Math.PI);hudSpin.scale.setScalar(hs);
+  if(!hudOff){
   renderer.setRenderTarget(hudRT);renderer.setClearColor(0x000000,0);renderer.clear();renderer.render(hudScene,hudCam);
   renderer.setRenderTarget(null);
   const nr=solidName.getBoundingClientRect();
   renderer.setViewport(nr.left,innerHeight-nr.top+2,HUD_PX,HUD_PX);renderer.render(hudBlit,blitCam);
+  }
   renderer.setViewport(0,0,innerWidth,innerHeight);renderer.setClearColor(0x000000,1);
   requestAnimationFrame(frame);
 }
@@ -2010,7 +2013,7 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   shake(k){shake=Math.max(shake,k);},
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
-  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;}};
+  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;}};
 requestAnimationFrame(frame);
 })();
 
