@@ -39,6 +39,21 @@ LAB.shelf('party', 'Party', (game) => {
   }
   game.changeHook = changePlayer;
 
+  // ---- team orders: the D-pad while playing (1 to 4 on a keyboard), when Team orders is on
+  let order = null;
+  const ORDERS = { up: ['spread', 'SPREAD OUT'], down: ['regroup', 'REGROUP'], left: ['attack', 'ATTACK!'], right: ['hold', 'HOLD BACK'] };
+  function give(dir) {
+    const [o, say] = ORDERS[dir];
+    order = order === o ? null : o;   // the same order again cancels it
+    game.popup(order ? say : 'AS YOU WERE', game.you.pos, '#ffd23f', true); game.rumble(game.you, 0.1, 0.4, 60);
+    if (order && !game.brain) game.popup('TURN ON TEAM BRAIN', game.mate.pos, '#8f8d88', true);
+  }
+  function orders(x) {
+    LAB.dpad = x ? give : null;
+    game.padSkip = x ? new Set([8, 12]) : null;   // the game's own uses of Select (rumble test) and D-pad up (the duel link)
+    if (!x) order = null;
+  }
+
   // ---- more wizards, and the brain that runs every wizard you don't control (game.brain)
   const get = (id, n) => LAB.get('party.' + id) ?? n;
   const WIZ = [[0x2fb85a, 0xe8b64a, 0x40ff80], [0x8a4ad0, 0x6ff2e0, 0xb07aff], [0xe8a33a, 0x3d4fc4, 0xffd23f]];   // green, purple, gold: robe, trim, glow
@@ -75,7 +90,7 @@ LAB.shelf('party', 'Party', (game) => {
     for (const c of game.ALL) {
       if (c === W || c.downT > 0) continue;
       const d = hd(c.pos, W.pos); if (d > reach || d < 2.5) continue;
-      let sc = (live ? Math.min(game.demonNearest(c.pos).d, 12) : 12) - d * 0.15 + (c === game.you ? get('toYou', 0.7) * 8 : 0);
+      let sc = (live ? Math.min(game.demonNearest(c.pos).d, 12) : 12) - d * 0.15 + (c === game.you ? get('toYou', 0.7) * (order === 'regroup' ? 16 : 8) : 0);
       if (live) {   // the demon close to the line between them: a risky pass
         const ux = (c.pos.x - W.pos.x) / d, uz = (c.pos.z - W.pos.z) / d, px = D.pos.x - W.pos.x, pz = D.pos.z - W.pos.z, t = Math.max(0, Math.min(d, px * ux + pz * uz));
         if (Math.hypot(px - ux * t, pz - uz * t) < 2) sc -= 8;
@@ -101,7 +116,9 @@ LAB.shelf('party', 'Party', (game) => {
     const ai = W.labAI || (W.labAI = { hold: 0, decided: false, shoot: false, goal: 0.5, to: null });
     const inp = { ix: 0, iz: 0, run: false };
     if (W.downT > 0) { ai.hold = 0; ai.decided = false; return inp; }
-    const K = get('keepAway', 4), S = get('spacing', 9), dn = live ? game.demonNearest(W.pos) : null;
+    // team orders bend the sliders: spread out, regroup on you, attack (close in, shoot more), hold back
+    const K = get('keepAway', 4) * (order === 'attack' ? 0.6 : order === 'hold' ? 1.5 : 1),
+      S = order === 'spread' ? get('spacing', 9) * 1.7 : order === 'regroup' ? Math.max(2.5, get('spacing', 9) * 0.4) : get('spacing', 9), dn = live ? game.demonNearest(W.pos) : null;
     let target = null, arrive = 0.3, run = true, fetching = false;
     W.faceTarget = null;
     if (o.state === 'held' && o.holder === W) {
@@ -109,7 +126,8 @@ LAB.shelf('party', 'Party', (game) => {
       const threat = dn && dn.d < K;
       if (!ai.decided && (ai.hold > get('think', 0.6) || (threat && ai.hold > 0.15))) {
         ai.decided = true; ai.to = null;
-        const dd = dn ? dn.d : 99, R = get('shotRange', 16), sh = get('shoot', 0.5);
+        const dd = dn ? dn.d : 99, R = get('shotRange', 16) * (order === 'attack' ? 1.2 : 1), sh0 = get('shoot', 0.5);
+        const sh = order === 'attack' ? Math.min(1, sh0 + 0.35) : order === 'hold' ? sh0 * 0.4 : order === 'regroup' ? sh0 * 0.5 : sh0;
         ai.shoot = live && dd < R && (Math.random() < sh || (o.res >= 3 && Math.random() < sh + 0.35));
         if (!ai.shoot) { ai.to = bestMate(W); if (!ai.to && live && dd < R * 1.3) ai.shoot = true; }
         ai.goal = ai.shoot ? 0.6 + Math.random() * 0.4 : 0.2 + Math.random() * 0.3;
@@ -133,7 +151,7 @@ LAB.shelf('party', 'Party', (game) => {
       else {
         // get open: spread out to the sides of whoever has it (or you), so the team fans out around the demon,
         // and move up when the demon is out of shooting range
-        const anchor = o.state === 'held' ? o.holder.pos : you.pos;
+        const anchor = o.state === 'held' && order !== 'regroup' ? o.holder.pos : you.pos;
         const others = game.ALL.filter(w => w !== you && !(o.state === 'held' && o.holder === w));
         const i = Math.max(0, others.indexOf(W)), n = others.length;
         let cx = anchor.x, cz = anchor.z, base;
@@ -146,7 +164,7 @@ LAB.shelf('party', 'Party', (game) => {
         } else {
           const tx = D.pos.x - anchor.x, tz = D.pos.z - anchor.z, td = Math.hypot(tx, tz) || 1, R = get('shotRange', 16);
           base = Math.atan2(tz, tx);
-          const up = Math.max(0, td - R * 0.75) * 0.6; cx += tx / td * up; cz += tz / td * up;
+          const up = order === 'attack' ? Math.max(0, td - R * 0.45) * 0.8 : order === 'hold' ? -4 : order === 'regroup' ? 0 : Math.max(0, td - R * 0.75) * 0.6; cx += tx / td * up; cz += tz / td * up;
           // left and right of the line to the demon, alternating, the later ones a little further back
           const side = i % 2 ? -1 : 1, row = Math.floor(i / 2), ang = base + side * (Math.PI / 2 + row * 0.55);
           slot.set(cx + Math.cos(ang) * S, 0, cz + Math.sin(ang) * S);
@@ -187,6 +205,8 @@ LAB.shelf('party', 'Party', (game) => {
       apply: (x) => { if (!x && mark) mark.visible = false; }, frame: marker },
     { id: 'pick', label: 'Change player', help: 'Triangle (when you are not holding the Solid) takes over the teammate your stick points at, or with the stick let go, the one nearest the Solid. Off: Triangle sets the buddy to follow, stay or wander',
       kind: 'onoff', value: 0, dice: false, frame: (dt) => { if (!LAB.get('party.switch')) marker(dt, 1); }, apply: (x) => { if (!x && mark && !LAB.get('party.switch')) mark.visible = false; } },
+    { id: 'orders', label: 'Team orders', help: 'D-pad while playing: up spread out, down regroup, left attack, right hold back (again: as you were). Select opens the Lab, Select + left or right flips presets',
+      kind: 'onoff', value: 0, dice: false, setting: true, apply: orders },   // a setting: presets and Reset leave it alone
     { id: 'wizards', label: 'Extra wizards', help: 'Green, purple and gold join your team', min: 0, max: 3, step: 1, value: 0, dice: false, apply: crew },
     { id: 'team', label: 'Team brain', help: 'Your buddy plays like the extra wizards: spreads out, gets open, passes to whoever is free (always on with extra wizards)', kind: 'onoff', value: 0, dice: false, apply: sync },
     { id: 'spacing', label: 'Spacing', help: 'How far apart teammates spread', min: 4, max: 18, step: 1, value: 9 },

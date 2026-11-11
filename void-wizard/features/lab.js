@@ -13,7 +13,7 @@ feature('lab', ({ game, on }) => {
   // to another shelf is only a change here.
   const LAYOUT = [
     ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
-    ['party', 'Party', [['Team', 'party.wizards party.team'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
+    ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.shoot party.shotRange party.accuracy party.think party.toYou']]],
     ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
       ...['Blue', 'Red', 'Green', 'Purple', 'Gold'].map(n => [n + ' wizard', ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + n.toLowerCase() + '.' + s).join(' ')])]],
@@ -228,7 +228,7 @@ feature('lab', ({ game, on }) => {
     for (const [id, name, groups] of LAYOUT) {
       const sh = { id, name, kind: 'toys', toys: [], heads: {} };
       for (const [head, ids] of groups) {
-        const list = ids.split(' ').map(x => byId[x]).filter(t => t && !t.setting && !placed.has(t.id));
+        const list = ids.split(' ').map(x => byId[x]).filter(t => t && !placed.has(t.id));   // a setting can sit on a shelf too
         if (!list.length) continue;
         sh.heads[sh.toys.length] = head;
         for (const t of list) { placed.add(t.id); t.shelf = name; sh.toys.push(t); }
@@ -244,7 +244,7 @@ feature('lab', ({ game, on }) => {
     }
     if (more.toys.length) out.push(more);
     out.push({ id: 'saved', name: 'Saved', kind: 'saved' }, { id: 'ideas', name: 'Ideas', kind: 'ideas' });
-    const lab = { id: 'lab', name: 'Lab settings', kind: 'toys', toys: toys.filter(t => t.setting), heads: { 0: 'Dice', 2: 'Lab' } };
+    const lab = { id: 'lab', name: 'Lab settings', kind: 'toys', toys: toys.filter(t => t.setting && !placed.has(t.id)), heads: { 0: 'Dice', 2: 'Lab' } };
     if (lab.toys.length) out.push(lab);
     shelves = out;
   }
@@ -452,10 +452,11 @@ feature('lab', ({ game, on }) => {
 
   // ---------------------------------------------------------------- controller
   const prev = [], heldT = [], downAt = [];
-  let stickT = 0, gridByHold = false;
+  let stickT = 0, gridByHold = false, selUsed = false;
   addEventListener('keydown', (e) => {   // a keyboard on the desktop
     if (e.repeat) return;
     if (e.code === 'KeyL') toggle(); else if (e.code === 'BracketLeft') stepPreset(-1); else if (e.code === 'BracketRight') stepPreset(1);
+    else if (LAB.dpad && !open && /^Digit[1-4]$/.test(e.code)) LAB.dpad(['up', 'down', 'left', 'right'][+e.code[5] - 1]);   // team orders on 1 to 4
   });
   function pollPad(now) {
     const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(g => g && g.connected);
@@ -468,9 +469,16 @@ feature('lab', ({ game, on }) => {
     for (const i of [4, 5]) if (down(i)) downAt[i] = now;
     if (!open) {
       if (unblockWhenUp && ![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(b)) { game.blockPad = false; unblockWhenUp = false; }
-      if (down(13)) toggle(true);
-      if (down(14)) stepPreset(-1);
-      if (down(15)) stepPreset(1);
+      if (LAB.dpad) {   // the D-pad gives orders (the Party shelf's Team orders): Select opens the Lab, Select + left/right flips presets
+        if (down(8)) selUsed = false;
+        if (b(8)) { if (down(14)) { stepPreset(-1); selUsed = true; } if (down(15)) { stepPreset(1); selUsed = true; } }
+        else for (const [i, d] of [[12, 'up'], [13, 'down'], [14, 'left'], [15, 'right']]) if (down(i)) LAB.dpad(d);
+        if (up(8) && !selUsed) toggle(true);
+      } else {
+        if (down(13)) toggle(true);
+        if (down(14)) stepPreset(-1);
+        if (down(15)) stepPreset(1);
+      }
     } else if (grid) {   // every shelf: the D-pad moves, Cross (or letting go of the held shoulder) goes there
       const n = shelves.length, cols = 2;
       if (rep(12)) { gridAt = (gridAt - cols + n) % n; draw(); }
@@ -525,6 +533,7 @@ feature('lab', ({ game, on }) => {
       { id: 'lab.pause', label: 'Pause while open', help: 'The game holds still while the Lab is open', kind: 'onoff', value: 1, dice: false, setting: true, apply: syncPause }
     ]);
     build(); shelfAt = Math.min(shelfAt, shelves.length - 1);
+    for (const t of toys) if (t.setting && values[t.id] !== t.value) run(t, values[t.id]);   // settings remembered on this phone take effect
     let want = null; try { want = sessionStorage.getItem('ha.lab.play'); sessionStorage.removeItem('ha.lab.play'); } catch (e) {}
     const p = want && protos().find(x => x.id === want);
     if (p) { setAll(p.values || {}); playing = p.name; }
