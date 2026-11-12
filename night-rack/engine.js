@@ -762,13 +762,57 @@ class Limit extends DSP { // drive + high-frequency exciter + look-ahead brick-w
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit };
+// ---------------------------------------------------------------- KEYS: play from MIDI, a computer keyboard or the touch keys
+// 8-voice electric-piano (2-op FM with a decaying bell index + tremolo) mixed over an audio thru, plus mono CV outs (last-note priority)
+class Keys extends DSP {
+  static IN = ['inL', 'inR']; static OUT = ['voct', 'gate', 'vel', 'mod', 'L', 'R'];
+  constructor(e) { super(e); this.V = Array.from({ length: 8 }, () => ({ n: -1, on: false, a: 0, ph: 0, mph: 0, ix: 0, vel: 0, age: 0 })); this.stack = []; this.cv = 0; this.vl = 0; this.md = 0; this.gap = 0; this.sus = false; this.tp = 0; }
+  note(n, v) {
+    if (v > 0) {
+      this.stack = this.stack.filter(x => x !== n); this.stack.push(n); this.cv = (n - 60) / 12; this.vl = v / 127 * 10; if (this.stack.length > 1) this.gap = 48;
+      let vo = this.V.find(x => x.n === n) || this.V.find(x => x.a < 0.001) || this.V.reduce((a, b) => (a.age > b.age ? a : b));
+      vo.n = n; vo.on = true; vo.vel = v / 127; vo.ix = 1; vo.age = 0; if (vo.a < 0.001) { vo.ph = 0; vo.mph = 0; }
+      this.flash('act', 1);
+    } else {
+      this.stack = this.stack.filter(x => x !== n); if (this.stack.length) this.cv = (this.stack[this.stack.length - 1] - 60) / 12;
+      for (const vo of this.V) if (vo.n === n) vo.on = false;
+    }
+  }
+  cc(c, v) { if (c === 1) this.md = v / 127 * 10; else if (c === 64) this.sus = v >= 64; else if (c === 123) { this.stack = []; for (const vo of this.V) vo.on = false; } }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, O = this.out, oct = (P.oct | 0) * 12;
+    const tone = P.tone ?? 0.4, dec = 0.4 + (P.decay ?? 0.45) * 5, trem = P.trem ?? 0.3, lvl = (P.level ?? 0.7) * 3;
+    const kD = Math.exp(-1 / (dec * sr)), kR = Math.exp(-1 / (0.18 * sr)), kI = Math.exp(-1 / (0.35 * sr)), kA = 1 - Math.exp(-1 / (0.002 * sr));
+    const fr = this.V.map(v => 440 * Math.pow(2, (v.n + oct - 69) / 12) / sr), held = this.stack.length > 0;
+    let act = 0;
+    for (let i = 0; i < n; i++) {
+      this.tp += 4.5 / sr; if (this.tp > 1) this.tp -= 1; const pan = Math.sin(TAU * this.tp) * trem;
+      let l = 0, r = 0;
+      for (let k = 0; k < 8; k++) { const v = this.V[k]; if (v.n < 0) continue;
+        if (v.age < 0.004 * sr && v.on) v.a += (1 - v.a) * kA; else v.a *= (v.on || this.sus) ? kD : kR; v.age++;
+        if (v.a < 1e-4 && !v.on) continue;
+        v.ix *= kI; v.mph += fr[k]; if (v.mph > 1) v.mph -= 1; const I = (0.4 + tone * 3.2) * (0.35 + 0.65 * v.vel) * (0.25 + 0.75 * v.ix);
+        v.ph += fr[k]; if (v.ph > 1) v.ph -= 1;
+        const x = (Math.sin(TAU * v.ph + I * Math.sin(TAU * v.mph)) + 0.12 * tone * v.ix * Math.sin(TAU * v.mph * 14)) * v.a * (0.4 + 0.6 * v.vel);
+        l += x; r += x; act++; }
+      l *= lvl * (1 + pan); r *= lvl * (1 - pan);
+      O.L[i] = IL[i] + l; O.R[i] = IR[i] + r;
+      O.voct[i] = this.cv + (P.oct | 0); O.vel[i] = this.vl; O.mod[i] = this.md;
+      O.gate[i] = held && this.gap <= 0 ? 10 : 0; if (this.gap > 0) this.gap--;
+    }
+    if (act) this.L.act = Math.max(this.L.act || 0, 0.5);
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
   handle(m) {
     if (m.t === 'add') { const C = DSPS[m.type]; if (!C) return; const d = new C(this); d.id = m.id; Object.assign(d.p, m.p || {}); d.onParam(); this.mods.set(m.id, d); this.dirty = true; }
     else if (m.t === 'param') { const d = this.mods.get(m.id); if (d) { d.p[m.k] = m.v; d.onParam(m.k, m.v); } }
+    else if (m.t === 'note') { const d = this.mods.get(m.id); if (d && d.note) d.note(m.n, m.v); }
+    else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
     else if (m.t === 'con') { this.cables.set(m.c, m); this.dirty = true; }
     else if (m.t === 'dis') { this.cables.delete(m.c); this.dirty = true; }
   }
