@@ -40,7 +40,10 @@ button.on{color:#021018;background:var(--acc);border-color:var(--acc)}
 #toast{bottom:22px;left:50%;transform:translateX(-50%);font-size:13px;padding:9px 14px;border-radius:8px;background:rgba(36,10,22,.88);border:1px solid rgba(255,90,120,.45);opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
 #toast.ok{background:rgba(6,26,40,.9);border-color:rgba(79,216,255,.45)}
 #patches{top:58px;right:14px;width:290px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-#patches.hide,#rand.hide{display:none}
+#patches.hide,#rand.hide,#kits.hide{display:none}
+#kits{top:58px;right:14px;width:300px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#kits .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#kits .chips{display:flex;flex-wrap:wrap;gap:5px}#kits .chips button{padding:5px 9px;font-size:11px}#kits .chips button.cur{background:#2a7bff;color:#fff}#kits .muted{color:var(--dim);line-height:1.4;font-size:11px}
+#kits .slot{display:flex;align-items:center;gap:6px;margin:5px 0}#kits .slot b{width:46px;font-size:10px;letter-spacing:.1em;color:#b8c8ea}#kits .slot span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8eef8}#kits .slot button,#kits .row button{padding:5px 8px;font-size:11px}#kits .row{display:flex;gap:6px;margin-top:6px}#kits input{flex:1;min-width:0;background:rgba(0,0,0,.35);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;font-size:12px}
 #rand{top:58px;right:14px;width:270px;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #rand .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#rand .sec:first-child{margin-top:0}#rand .chips{display:flex;flex-wrap:wrap;gap:5px}#rand .chips button{padding:5px 9px;font-size:11px;letter-spacing:.04em}#rand .muted{color:var(--dim);line-height:1.4}#rand button:disabled{opacity:.35;cursor:default}
 #patches .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#patches .sec:first-child{margin-top:0}
@@ -113,7 +116,7 @@ body.cam #cambar{display:flex}
   #kb .keys{height:84px}
   body.menuopen #bar{flex-direction:column;align-items:stretch;width:160px}
   #brand p{display:none}#brand{top:12px;left:12px}#brand h1{font-size:12px}
-  #patches,#rand,#scene{top:auto;bottom:10px;right:10px;left:10px;width:auto;max-height:60vh;overflow:auto}
+  #patches,#rand,#scene,#kits{top:auto;bottom:10px;right:10px;left:10px;width:auto;max-height:60vh;overflow:auto}
   #help{left:10px;right:10px;bottom:10px;max-width:none;max-height:55vh;overflow:auto}
   #padhint{left:10px;right:10px;max-width:none}
   #guide{left:10px;bottom:10px}
@@ -136,6 +139,7 @@ body.cam #cambar{display:flex}
   <button id="bRand" title="Random patch (R)">RANDOM</button>
   <button id="bKeys" title="Play notes (K)">KEYS</button>
   <button id="bCam" title="Free camera (C)">CAMERA</button>
+  <button id="bKits">KITS</button>
   <button id="bScene">SCENE</button>
   <button id="bGuide">GUIDE</button>
   <button id="bHelp">HELP</button>
@@ -160,6 +164,14 @@ body.cam #cambar{display:flex}
   <div class="muted" style="margin-top:6px">Turns the knobs on patched modules. Shuffle goes anywhere sensible; nudge makes small moves.</div>
   <div class="sec">UNDO</div>
   <div class="chips"><button id="rUndo" disabled>UNDO (Z)</button></div>
+</div>
+<div id="kits" class="hud hide">
+  <div class="sec">DRUM KITS (SAMPLER)</div><div class="chips" id="kList"></div>
+  <div class="sec" id="kNow">SOUNDS</div><div id="kSlots"></div>
+  <div class="row" id="kOwn"><input id="kName" maxlength="24" placeholder="Kit name"><button id="kRen">RENAME</button><button id="kDel">DELETE</button></div>
+  <div class="muted" style="margin-top:8px">LOAD swaps one sound for a file from your phone (WAV, MP3, M4A). Changing a built-in kit saves it as a new MY KIT. Kits are kept on this device.</div>
+  <div class="muted" style="margin-top:8px">909 by Rob Roy Recordings (1995) · 808 by Michael Fischer (1994) · 707 by Francois Dion · Sample Pi (CC0). Free sets, shared unmodified.</div>
+  <input type="file" id="kFile" accept="audio/*,.wav,.mp3,.m4a,.aif,.aiff,.ogg" hidden>
 </div>
 <div id="scene" class="hud hide">
   <div class="sec">LIGHT PRESETS</div><div class="chips" id="presets"></div>
@@ -482,10 +494,27 @@ DEFS.keys = lay('KEYS', 10, 'silver',
   [[kn('oct', 'OCTAVE', 'S', { min: -2, max: 2, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v }), kn('tone', 'TONE', 'M', { def: 0.4, fmt: fPct }), kn('decay', 'DECAY', 'S', { def: 0.45, fmt: v => fS(0.4 + v * 5) })],
    [kn('trem', 'TREMOLO', 'S', { def: 0.3, fmt: fPct }), ld('act', 'cyan'), kn('level', 'LEVEL', 'S', { def: 0.7, fmt: fPct })]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('voct', 'V/OCT'), jo('gate', 'GATE'), jo('vel', 'VEL'), jo('mod', 'MOD')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+const KIT_SLOTS = ['KICK', 'CLAP', 'SNARE', 'HAT', 'OPEN', 'PERC'], SK = ['k', 'c', 's', 'h', 'o', 'p'];
+const KITS = [
+  ['909 HOUSE', ['tr909/BT3A0D7.WAV', 'tr909/HANDCLP1.WAV', 'tr909/ST3T3S7.WAV', 'tr909/HHCD2.WAV', 'tr909/HHOD4.WAV', 'tr909/RIM127.WAV']],
+  ['909 TIGHT', ['tr909/BT7A0D3.WAV', 'tr909/HANDCLP2.WAV', 'tr909/ST7T7SA.WAV', 'tr909/HHCD0.WAV', 'tr909/HHOD2.WAV', 'tr909/RIM63.WAV']],
+  ['808 CLASSIC', ['tr808/BD5050.WAV', 'tr808/CP.WAV', 'tr808/SD5050.WAV', 'tr808/CH.WAV', 'tr808/OH25.WAV', 'tr808/RS.WAV']],
+  ['808 DEEP', ['tr808/BD2575.WAV', 'tr808/CP.WAV', 'tr808/SD2525.WAV', 'tr808/CH.WAV', 'tr808/OH10.WAV', 'tr808/CL.WAV']],
+  ['707 GARAGE', ['tr707/BassDrum1.wav', 'tr707/HandClap.wav', 'tr707/Snare1.wav', 'tr707/HhC.wav', 'tr707/HhO.wav', 'tr707/Tamb.wav']],
+  ['CLUB', ['samplepi/bd_haus.m4a', 'samplepi/perc_snap.m4a', 'samplepi/sn_dolf.m4a', 'samplepi/drum_cymbal_closed.m4a', 'samplepi/drum_cymbal_open.m4a', 'samplepi/elec_tick.m4a']],
+  ['DUSTY', ['samplepi/bd_klub.m4a', 'samplepi/perc_snap2.m4a', 'samplepi/elec_lo_snare.m4a', 'samplepi/drum_cymbal_pedal.m4a', 'samplepi/drum_cymbal_closed.m4a', 'samplepi/elec_wood.m4a']]];
+const NKIT = 16, USERKITS = {}; // user kits live at positions KITS.length .. NKIT-1
+const kitName = i => i < KITS.length ? KITS[i][0] : (USERKITS[i] ? USERKITS[i].name : 'MY KIT ' + (i - KITS.length + 1) + ' (empty)');
+DEFS.sampler = lay('SAMPLER', 20, 'black',
+  [[sc(1.5)],
+   SK.map((k, i) => kn(k + 'Tune', KIT_SLOTS[i], 'T', { min: -12, max: 12, def: 0, fmt: v => (v > 0 ? '+' : '') + v.toFixed(1) + ' st' })),
+   SK.map((k, i) => kn(k + 'Dec', 'DECAY', 'T', { def: i === 4 ? 0.6 : 1, fmt: v => v >= 0.99 ? 'FULL' : fS(0.015 + v * v * 1.6) })),
+   [kn('kit', 'KIT', 'S', { min: 0, max: NKIT - 1, step: 1, def: 0, fmt: v => kitName(v) }), ...SK.map((k, i) => kn(k + 'Lvl', 'LEVEL', 'T', { def: [0.9, 0.7, 0.6, 0.45, 0.4, 0.45][i], fmt: fPct }))]],
+  [SK.map((k, i) => ji('t' + k, 'TRIG', 'trig')), [...SK.map(k => jo(k, 'OUT')), jo('mix', 'MIX')]]);
 DEFS.blank16 = { title: '', hp: 16, theme: 'navy', knobs: [], jacks: [], logo: true };
 DEFS.blank20 = { title: '', hp: 20, theme: 'navy', knobs: [], jacks: [], logo: true };
 if (LAYOUT_ISSUES.length) console.warn('layout2:', LAYOUT_ISSUES.join(' | '));
-const ROWM = [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['keys', 'keys'], ['blank7', 'blank6'], ['blank8', 'blank20']];
+const ROWM = [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['keys', 'keys'], ['blank7', 'blank6'], ['sampler', 'sampler']];
 const ROWD = [['trig', 'trigseq'], ['drums', 'drums'], ['mix6', 'mix6'], ['duck', 'duck'], ['blank5', 'blank8c']];
 
 const ROWT = [['macro', 'macro'], ['texture', 'texture'], ['folder', 'folder'], ['lpg', 'lpg'], ['turing', 'turing'], ['atten', 'atten'], ['blank3', 'blank8'], ['blank4b', 'blank6b']];
@@ -642,6 +671,20 @@ class TrigSeqM extends Mod {
 }
 class DrumsM extends Mod { visual() { const L = this.T; for (const p of ['k', 'c', 'h', 'o']) this.leds['l' + p].vu(L[p] || 0); } }
 class Mix6M extends Mod { visual() { const L = this.T; this.leds.vuL.vu(clamp((L.vuL || 0) * 1.5, 0, 1)); this.leds.vuR.vu(clamp((L.vuR || 0) * 1.5, 0, 1)); } }
+class SamplerM extends Mod {
+  constructor(id, type) { super(id, type); this.fl = [0, 0, 0, 0, 0, 0]; this.names = []; }
+  knobChanged(id, v) { super.knobChanged(id, v); if (id === 'kit') { loadKit(this); if (window.renderKits) renderKits(); } }
+  visual() { const L = this.T; let ch = false; for (let i = 0; i < 6; i++) { const v = Math.max(L['s' + i] || 0, this.fl[i] * 0.85); if (Math.abs(v - this.fl[i]) > 0.02) ch = true; this.fl[i] = v; } if (ch) this.screenDirty = true; }
+  drawScreen() {
+    const s = this.scr, g = s.g, W = s.cw, H = s.ch; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#57e8ff'; g.font = '700 22px "Space Grotesk", sans-serif'; g.textBaseline = 'top'; g.textAlign = 'left'; g.fillText(kitName(this.v('kit')), 10, 7);
+    g.textAlign = 'right'; g.fillStyle = '#3d86ff'; g.font = '600 13px "Space Grotesk", sans-serif'; g.fillText(KIT_LOADING.has(this) ? 'LOADING…' : 'KIT ' + (this.v('kit') + 1), W - 10, 11);
+    const cw = (W - 20) / 6, cols = ['#ff3b5c', '#ffa62e', '#ffcf3a', '#35e0ff', '#3a6bff', '#9a5bff'];
+    const bh = Math.max(6, H - 62); for (let i = 0; i < 6; i++) { const x = 10 + i * cw, f = this.fl[i]; g.fillStyle = '#0d1a33'; g.fillRect(x + 2, 36, cw - 6, bh); g.fillStyle = cols[i]; g.globalAlpha = 0.25 + 0.75 * f; g.fillRect(x + 2, 36 + bh * (1 - f), cw - 6, bh * f); g.globalAlpha = 1;
+      g.fillStyle = '#b8c8ea'; g.textAlign = 'center'; g.font = '600 11px "Space Grotesk", sans-serif'; g.fillText(KIT_SLOTS[i], x + cw / 2 - 1, 36 + bh + 6); }
+    s.tex.needsUpdate = true;
+  }
+}
 class KeysM extends Mod { visual() { this.leds.act.set(clamp(this.T.act || 0, 0, 1)); } }
 class GlueM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 1.4, 0, 1)); } }
 class WideM extends Mod { visual() { this.leds.led.set(0.25 + 0.5 * (this.T.w || 0)); } }
@@ -665,7 +708,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -1577,17 +1620,22 @@ function genPatch(style, wild) {
   const groove = (st, o = {}) => { con('clock.x4', 'groove.clk'); used.add('groove');
     set('groove', 'style', st); set('groove', 'var', rr(0, 1)); set('groove', 'chaos', o.chaos ?? rr(0, 0.15 + wild * 0.3)); set('groove', 'swing', o.swing ?? rr(0, 0.25));
     set('groove', 'kDen', o.k ?? rr(0.45, 0.6)); set('groove', 'sDen', o.s ?? rr(0.45, 0.65)); set('groove', 'hDen', o.h ?? rr(0.4, 0.7)); set('groove', 'pDen', o.p ?? rr(0.35, 0.65));
-    con('groove.kick', 'drums.tk'); con('groove.hat', 'drums.th'); con('groove.open', 'drums.to');
-    if (o.clap !== false) con('groove.clap', 'drums.tc');
-    if (o.snare !== null) con('groove.snare', o.snare || 'perc.ts'); con('groove.perc', o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt']));
+    const T = x => SMP ? ({ 'drums.tk': 'sampler.tk', 'drums.tc': 'sampler.tc', 'drums.th': 'sampler.th', 'drums.to': 'sampler.to', 'perc.ts': 'sampler.ts', 'perc.tr': 'sampler.tp' }[x] || x) : x;
+    con('groove.kick', T('drums.tk')); con('groove.hat', T('drums.th')); con('groove.open', T('drums.to'));
+    if (o.clap !== false) con('groove.clap', T('drums.tc'));
+    if (o.snare !== null) con('groove.snare', T(o.snare || 'perc.ts')); con('groove.perc', o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt']));
     return 'groove.kick'; };
   const drumKnobs = (soft) => { for (const [s, a, b] of [['k', 'Tune', [0.25, 0.5]], ['k', 'Dec', [0.35, 0.6]], ['c', 'Tune', [0.3, 0.7]], ['c', 'Dec', [0.2, 0.45]], ['h', 'Tune', [0.4, 0.8]], ['h', 'Dec', [0.1, 0.35]], ['o', 'Tune', [0.4, 0.75]], ['o', 'Dec', [0.25, 0.5]]]) set('drums', s + a, rr(...b));
     set('drums', 'kLvl', soft ? rr(0.65, 0.8) : 0.95); set('drums', 'cLvl', rr(0.5, 0.75) * (soft ? 0.6 : 1)); set('drums', 'hLvl', rr(0.35, 0.55) * (soft ? 0.6 : 1)); set('drums', 'oLvl', rr(0.3, 0.5) * (soft ? 0.6 : 1));
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
+  let SMP = (style === 'house' || style === 'tinez') && chance(0.65);
+  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'tinez' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
+    for (const k of ['k', 'c', 's', 'h', 'o', 'p']) { set('sampler', k + 'Tune', chance(0.25) ? rr(-1.5, 1.5) : 0); set('sampler', k + 'Dec', k === 'o' ? rr(0.4, 0.7) : k === 'h' ? rr(0.5, 1) : 1); }
+    Object.assign(K.sampler, { kLvl: 0.95, cLvl: rr(0.6, 0.8), sLvl: rr(0.55, 0.75), hLvl: rr(0.35, 0.55), oLvl: rr(0.3, 0.45), pLvl: rr(0.35, 0.55) }); };
   const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
   const cleanDrums = () => { set('drums', 'cDec', rr(0.1, 0.28)); set('drums', 'cTune', rr(0.3, 0.6)); set('drums', 'hDec', rr(0.06, 0.22)); set('drums', 'oDec', rr(0.2, 0.4)); set('perc', 'sDec', rr(0.12, 0.3)); set('perc', 'sTune', rr(0.45, 0.75)); set('perc', 'rDec', rr(0.1, 0.3)); };
-  const drumBus = () => { con('drums.mix', 'mix.in1'); con('perc.mix', 'mix.in2'); set('mix', 'lvl1', 0.8); set('mix', 'lvl2', 0.7); set('mix', 'lvl3', 0); set('mix', 'lvl4', 0); return 'mix.out'; };
+  const drumBus = () => { if (SMP) { useKit(); con('sampler.mix', 'mix.in1'); con('perc.mix', 'mix.in2'); set('mix', 'lvl1', 0.85); set('mix', 'lvl2', 0.55); set('mix', 'lvl3', 0); set('mix', 'lvl4', 0); return 'mix.out'; } con('drums.mix', 'mix.in1'); con('perc.mix', 'mix.in2'); set('mix', 'lvl1', 0.8); set('mix', 'lvl2', 0.7); set('mix', 'lvl3', 0); set('mix', 'lvl4', 0); return 'mix.out'; };
   const pattern = (tr) => { const on = (r, ks) => ks.forEach(k => tr['b' + r + '_' + k] = 1), rand = (r, pool, n) => { const a = [...pool].sort(() => Math.random() - 0.5).slice(0, n); on(r, a); }; return { on, rand }; };
   const sendDelay = (beats, fb) => { set('delay', 'time', beats * 60 / K.clock.tempo); set('delay', 'fb', fb); set('delay', 'mix', 1); set('delay', 'tone', rexp(1800, 6000)); set('delay', 'mod', rr(0, 0.15)); };
   const master = (verbDecay, verbMix) => { con('mix6.L', 'verb.inL'); con('mix6.R', 'verb.inR'); set('verb', 'decay', verbDecay); set('verb', 'mix', verbMix); set('verb', 'pre', 0.01); };
@@ -1595,7 +1643,7 @@ function genPatch(style, wild) {
     const sub = rpick([0, 0, 1, 2, 3, 4]), tempo = [ri(120, 126), ri(116, 122), ri(124, 128), ri(128, 134), ri(115, 122)][sub];
     set('clock', 'tempo', tempo); const tr = {}, P = pattern(tr); trigOn();
     let kick = 'trig.g1';
-    if (sub === 3 || chance(0.55)) { kick = groove(sub, { swing: sub === 3 ? rr(0.3, 0.5) : rr(0, 0.3), ...backbeat() }); con(drumBus(), 'mix6.in1'); }
+    if (SMP || sub === 3 || chance(0.55)) { kick = groove(sub, { swing: sub === 3 ? rr(0.3, 0.5) : rr(0, 0.3), ...backbeat() }); con(drumBus(), 'mix6.in1'); }
     else {
       P.on(0, [0, 4, 8, 12]); if (chance(0.25)) P.on(0, [rpick([10, 14, 15])]); P.on(1, chance(0.8) ? [4, 12] : [4, 12, 15]);
       const hat = rpick(['off', '16', '8', 'rnd']); P.on(2, hat === 'off' ? [2, 6, 10, 14] : hat === '16' ? [...Array(16).keys()] : hat === '8' ? [0, 2, 4, 6, 8, 10, 12, 14] : [...Array(16).keys()].filter(() => chance(0.6)));
@@ -1714,7 +1762,7 @@ function genPatch(style, wild) {
   return { v: 1, knobs: K, cables: C };
 }
 // knob shuffle / nudge with safe limits (normalised ranges)
-const SAFE = { 'out.vol': null, 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
+const SAFE = { 'out.vol': null, 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
   'lvl': [0.35, 0.9], 'level': [0.45, 0.9], 'master': [0.6, 0.85], 'kLvl': [0.75, 1], 'vca.bias1': [0, 0.15], 'vca.bias2': [0, 0.15], 'drive': [0, 0.6], 'verb.mix': [0.15, 0.7], 'verb.decay': [0.2, 0.85], 'oct': [0.2, 0.8], 'depth': [0.3, 0.8], 'fold': [0, 0.7], 'mix6.lvl1': [0.7, 0.95], 'hiss': [0, 0.4], 'dust': [0, 0.6], 'chaos': [0, 0.5], 'kDen': [0.35, 0.75], 'sDen': [0.35, 0.75], 'hDen': [0.3, 0.8], 'pDen': [0.2, 0.8], 'groove.style': null, 'wow': [0, 0.7], 'stab.chord': [0, 1], 'bass.oct': [0.33, 1] };
 function safeRange(m, k) { const s = SAFE[m.id + '.' + k] !== undefined ? SAFE[m.id + '.' + k] : SAFE[k.replace(/\d+$/, '')] !== undefined ? SAFE[k.replace(/\d+$/, '')] : SAFE[k]; return s === undefined ? [0.05, 0.95] : s; }
 function tweenKnob(kn, to) { to = clamp(to, 0, 1); if (window.__noRender) { kn.set(to); return; } RND.tw = RND.tw.filter(t => t.kn !== kn); RND.tw.push({ kn, from: kn.norm, to, t: 0 }); }
@@ -1977,6 +2025,55 @@ function pollPad(dt) {
   PAD.prev = now;
 }
 
+
+// ================================================================ SAMPLER kits: built-in sets, your own sounds, saved on this device (IndexedDB)
+const KIT_LOADING = new Set(), SMP_CACHE = new Map();
+const kdb = () => new Promise((res, rej) => { const r = indexedDB.open('nightrack', 1); r.onupgradeneeded = () => r.result.createObjectStore('kits'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+async function kdbAll() { try { const db = await kdb(); return await new Promise(res => { const out = {}, tx = db.transaction('kits').objectStore('kits').openCursor(); tx.onsuccess = e => { const c = e.target.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); }; tx.onerror = () => res(out); }); } catch (e) { return {}; } }
+async function kdbPut(i, v) { const db = await kdb(); await new Promise((res, rej) => { const t = db.transaction('kits', 'readwrite'); v === null ? t.objectStore('kits').delete(i) : t.objectStore('kits').put(v, i); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+kdbAll().then(all => { Object.assign(USERKITS, all); for (const m of modules) if (m.type === 'sampler') m.screenDirty = true; });
+const kitSlots = i => i < KITS.length ? KITS[i][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') })) : USERKITS[i] ? USERKITS[i].slots : KITS[0][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') }));
+async function decodeSlot(sl) {
+  const key = sl.ref || sl.id; if (key && SMP_CACHE.has(key)) return SMP_CACHE.get(key);
+  const ab = sl.ref ? await (await fetch('samples/' + sl.ref)).arrayBuffer() : sl.data.slice(0);
+  const buf = await new Promise((res, rej) => { const p = AC.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+  const n = buf.length, d = new Float32Array(n), C = buf.numberOfChannels; for (let c = 0; c < C; c++) { const x = buf.getChannelData(c); for (let i = 0; i < n; i++) d[i] += x[i] / C; }
+  let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i])); if (sl.data && pk > 0) for (let i = 0; i < n; i++) d[i] *= 0.9 / pk; // imported sounds are levelled
+  if (key) SMP_CACHE.set(key, d); return d;
+}
+async function loadKit(m) {
+  if (!AC || !ENG) return; const k = m.v('kit'), slots = kitSlots(k), tok = {}; m.kitTok = tok; KIT_LOADING.add(m); m.screenDirty = true;
+  await Promise.all(slots.map(async (sl, i) => { if (!sl) return; try { const d = await decodeSlot(sl); if (m.kitTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d }); } catch (e) { console.warn('sample', sl.name, e); } }));
+  if (m.kitTok === tok) { KIT_LOADING.delete(m); m.screenDirty = true; }
+}
+function samplerMod() { return modules.find(m => m.type === 'sampler'); }
+function setKit(i) { const m = samplerMod(), kn = m.knobs.kit; kn.set(kn.toNorm(i)); }
+window.renderKits = function () {
+  const m = samplerMod(); if (!m) return; const cur = m.v('kit'), L = document.getElementById('kList'); L.innerHTML = '';
+  for (let i = 0; i < NKIT; i++) { if (i >= KITS.length && !USERKITS[i]) continue; const b = document.createElement('button'); b.textContent = kitName(i); if (i === cur) b.className = 'cur'; b.onclick = () => setKit(i); L.appendChild(b); }
+  document.getElementById('kNow').textContent = 'SOUNDS IN ' + kitName(cur);
+  const S = document.getElementById('kSlots'); S.innerHTML = ''; const sl = kitSlots(cur);
+  KIT_SLOTS.forEach((nm, i) => { const r = document.createElement('div'); r.className = 'slot'; r.innerHTML = `<b>${nm}</b><span></span><button>▶</button><button>LOAD</button>`; r.querySelector('span').textContent = sl[i] ? sl[i].name : '—';
+    const [pl, ld] = r.querySelectorAll('button'); pl.onclick = () => { if (!AC || AC.state !== 'running') powerOn().catch(() => { }); send({ t: 'hit', id: m.id, slot: i }); };
+    ld.onclick = () => { const f = document.getElementById('kFile'); f.dataset.slot = i; f.value = ''; f.click(); }; S.appendChild(r); });
+  const own = cur >= KITS.length && USERKITS[cur]; document.getElementById('kOwn').style.display = own ? 'flex' : 'none'; if (own) document.getElementById('kName').value = USERKITS[cur].name;
+};
+document.getElementById('kFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return; const i = +e.target.dataset.slot, m = samplerMod(); let k = m.v('kit');
+  try {
+    if (!AC) await powerOn();
+    const data = await f.arrayBuffer(), sl = { id: 'u' + Date.now() + '_' + i, name: f.name.replace(/\.\w+$/, '').slice(0, 30), data };
+    await decodeSlot(sl); // check it decodes before saving
+    if (k < KITS.length || !USERKITS[k]) { let free = -1; for (let j = KITS.length; j < NKIT; j++) if (!USERKITS[j]) { free = j; break; } if (free < 0) { toast('All 9 MY KIT spots are used · delete one first'); return; }
+      USERKITS[free] = { name: 'MY KIT ' + (free - KITS.length + 1), slots: kitSlots(k).map(x => x && { ...x }) }; k = free; }
+    USERKITS[k].slots[i] = sl; await kdbPut(k, USERKITS[k]);
+    if (m.v('kit') !== k) setKit(k); else loadKit(m); renderKits(); toast(KIT_SLOTS[i] + ' loaded into ' + USERKITS[k].name, true);
+  } catch (err) { toast('Could not read that file as audio'); }
+};
+document.getElementById('kRen').onclick = async () => { const m = samplerMod(), k = m.v('kit'); if (!USERKITS[k]) return; USERKITS[k].name = (document.getElementById('kName').value || USERKITS[k].name).toUpperCase().slice(0, 24); await kdbPut(k, USERKITS[k]); m.screenDirty = true; renderKits(); };
+document.getElementById('kDel').onclick = async () => { const m = samplerMod(), k = m.v('kit'); if (!USERKITS[k]) return; delete USERKITS[k]; await kdbPut(k, null); setKit(0); renderKits(); toast('Kit deleted', true); };
+['bScene', 'bPatches', 'bRand', 'bHelp'].forEach(id => document.getElementById(id).addEventListener('click', () => document.getElementById('kits').classList.add('hide')));
+document.getElementById('bKits').onclick = () => { const el = document.getElementById('kits'), was = !el.classList.contains('hide'); closePanels(); if (!was) { el.classList.remove('hide'); renderKits(); } };
 // ================================================================ free camera mode (UI hidden, fly anywhere)
 const CAM = { on: false, yaw: 0, pitch: 0, keys: new Set(), pad: { mx: 0, mz: 0, my: 0, lx: 0, ly: 0, fast: 1 }, ptr: new Map(), pinch: 0, mid: null, vel: new THREE.Vector3() };
 function camToggle(on = !CAM.on) {
@@ -2088,11 +2185,11 @@ canvas.addEventListener('pointerup', e => {
   if (tLast && now - tLast.t < 350 && Math.hypot(e.clientX - tLast.x, e.clientY - tLast.y) < 30 && h && h.module) { const m = h.module, c = new THREE.Vector3(m.x0 + m.w / 2, m.y0 + U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1))), c); tLast = null; return; }
   tLast = { t: now, x: e.clientX, y: e.clientY };
 }, true);
-const PANELS = ['patches', 'rand', 'scene', 'help'];
+const PANELS = ['patches', 'rand', 'scene', 'help', 'kits'];
 function panelsOpen() { return PANELS.some(id => !document.getElementById(id).classList.contains('hide')); }
 function closePanels() { PANELS.forEach(id => document.getElementById(id).classList.add('hide')); document.body.classList.remove('menuopen'); }
 PANELS.forEach(id => { const el = document.getElementById(id), b = document.createElement('button'); b.className = 'xclose'; b.textContent = '✕ CLOSE'; b.onclick = closePanels; el.prepend(b); });
-document.getElementById('bMenu').onclick = () => { if (document.body.classList.contains('menuopen') || ['patches', 'rand', 'scene'].some(id => !document.getElementById(id).classList.contains('hide'))) closePanels(); else document.body.classList.add('menuopen'); };
+document.getElementById('bMenu').onclick = () => { if (document.body.classList.contains('menuopen') || ['patches', 'rand', 'scene', 'kits'].some(id => !document.getElementById(id).classList.contains('hide'))) closePanels(); else document.body.classList.add('menuopen'); };
 document.getElementById('bar').addEventListener('click', e => { if (e.target.tagName === 'BUTTON' && e.target.id !== 'bMenu') document.body.classList.remove('menuopen'); });
 try { if (sessionStorage.getItem('ha.pad') === '1') { const s = document.querySelector('#start p'); if (s) s.innerHTML += '<br><br>Controller: press <b>A</b> (or tap) to power on.'; } } catch (e) { }
 
@@ -2126,6 +2223,7 @@ async function startEngine() {
     ENG = { post: ms => ms.forEach(m => e.handle(m)), node, kind: 'fallback' };
   }
   for (const m of modules) if (m.type in CLASSES) engineAdd(m);
+  for (const m of modules) if (m.type === 'sampler') loadKit(m);
   for (const c of cables) if (c.connected) { c.uid = cableUid++; send({ t: 'con', c: c.uid, om: c.out.module.id, op: c.out.id, im: c.inp.module.id, ip: c.inp.id }); }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -6; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.25;
   ENG.node.connect(comp); comp.connect(AC.destination);
@@ -2158,7 +2256,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 const DESC = {
   groove: 'Drum pattern generator. Pick a STYLE (house, deep, tech, garage, disco, breaks, DnB, dusty), then turn the density knobs to add or remove hits. Feed it CLOCK ×4.',
   perc: 'Snare, rim, shaker and tom. Trigger them from GROOVE or TRIG SEQ.', stab: 'Chord synth for deep-house stabs and pads: each trigger plays a whole chord through its own filter. V/OCT sets the root.',
-  bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
+  bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
   clock: 'Master clock. Sends steady pulses at the tempo: ×4 = 16th notes, ×1 = quarter notes, ÷ = slower.', random: 'Takes a new random voltage each time TRIG fires (sample & hold). SMOOTH glides between values.',
   quant: 'Snaps any voltage to the nearest note of a scale, so random voltages become melodies.', vcoA: 'Oscillator: makes the raw tone. V/OCT sets pitch (1 volt per octave). Five waveforms out.', vcoB: 'Oscillator: makes the raw tone. V/OCT sets pitch (1 volt per octave). Five waveforms out.',
   lfo: 'Two slow oscillators for movement — patch them into anything you want to sweep or wobble.', mixer: 'Mixes four signals into one.', noise: 'White and pink noise: wind, hiss, percussion, randomness.', scope: 'Oscilloscope: shows the waveform at IN (or the main output if nothing is patched).',

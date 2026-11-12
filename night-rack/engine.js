@@ -804,13 +804,36 @@ class Keys extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys };
+// ---------------------------------------------------------------- SAMPLER: 6 one-shot slots (kick, clap, snare, hat, open hat, perc); samples arrive from the page
+class Sampler extends DSP {
+  static IN = ['tk', 'tc', 'ts', 'th', 'to', 'tp']; static OUT = ['k', 'c', 's', 'h', 'o', 'p', 'mix'];
+  constructor(e) { super(e); this.buf = [null, null, null, null, null, null]; this.pos = new Float64Array(6).fill(-1); this.t = new Float64Array(6); this.st = [0, 1, 2, 3, 4, 5].map(() => new Schmitt()); this.fade = new Float32Array(6); this.O = Sampler.OUT.slice(0, 6).map(k => this.out[k]); this.I = Sampler.IN; }
+  setSample(i, data) { this.buf[i] = data; this.pos[i] = -1; }
+  hit(i) { if (!this.buf[i]) return; this.pos[i] = 0; this.t[i] = 0; if (i === 3) this.pos[4] = -1; this.flash('s' + i, 1); }
+  process(n) {
+    const P = this.p, sr = this.sr, K = ['k', 'c', 's', 'h', 'o', 'p'], M = this.out.mix; M.fill(0);
+    for (let j = 0; j < 6; j++) {
+      const o = this.O[j], b = this.buf[j], tr = this.in[this.I[j]], has = this.has[this.I[j]], key = K[j];
+      const rate = Math.pow(2, (P[key + 'Tune'] ?? 0) / 12), dec = P[key + 'Dec'] ?? 1, lvl = P[key + 'Lvl'] ?? 0.8, td = 0.015 + dec * dec * 1.6, kd = dec >= 0.99 ? 1 : Math.exp(-1 / (td * sr));
+      for (let i = 0; i < n; i++) {
+        if (has && this.st[j].step(tr[i])) this.hit(j);
+        let y = 0, p = this.pos[j];
+        if (p >= 0 && b) { const i0 = p | 0; if (i0 + 1 >= b.length) this.pos[j] = -1; else { const f = p - i0; y = (b[i0] * (1 - f) + b[i0 + 1] * f) * (kd === 1 ? 1 : Math.pow(kd, this.t[j])); this.t[j]++; this.pos[j] = p + rate; } }
+        y *= 5; o[i] = y; M[i] += y * lvl * 0.8;
+      }
+    }
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
   handle(m) {
     if (m.t === 'add') { const C = DSPS[m.type]; if (!C) return; const d = new C(this); d.id = m.id; Object.assign(d.p, m.p || {}); d.onParam(); this.mods.set(m.id, d); this.dirty = true; }
     else if (m.t === 'param') { const d = this.mods.get(m.id); if (d) { d.p[m.k] = m.v; d.onParam(m.k, m.v); } }
+    else if (m.t === 'smp') { const d = this.mods.get(m.id); if (d && d.setSample) d.setSample(m.slot, m.data); }
+    else if (m.t === 'hit') { const d = this.mods.get(m.id); if (d && d.hit) d.hit(m.slot); }
     else if (m.t === 'note') { const d = this.mods.get(m.id); if (d && d.note) d.note(m.n, m.v); }
     else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
     else if (m.t === 'con') { this.cables.set(m.c, m); this.dirty = true; }
