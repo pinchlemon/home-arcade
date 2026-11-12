@@ -1,0 +1,1 @@
+Versilian Community Sample Library (VCSL) by Versilian Studios / Sam Gossner, CC0 1.0 public domain. Source: github.com/sgossner/VCSL via github.com/danigb/samples. Unmodified audio; "#" in file names changed to "s".

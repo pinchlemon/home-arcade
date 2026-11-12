@@ -190,8 +190,10 @@ body.cam #cambar{display:flex}
   <div class="row"><span>Fog</span><input type="range" id="sFog" min="0" max="0.025" step="0.0005"></div>
   <div class="row"><span>Light shafts</span><input type="range" id="sShafts" min="0" max="1" step="0.01"></div>
   <div class="row"><span>Cable opacity</span><input type="range" id="sCable" min="0.1" max="1" step="0.01"></div>
+  <div class="row"><span>Cable slack</span><input type="range" id="sSlack" min="0" max="1" step="0.01"></div>
+  <div class="row"><span>Neon cables</span><input type="checkbox" id="tNeon"></div>
   <div class="sec">GARDEN</div>
-  <div class="row"><span>Tropical plants</span><input type="checkbox" id="tPlants"></div>
+  <div class="row"><span>Hanging plants</span><input type="checkbox" id="tPlants"></div>
 </div>
 <div id="help" class="hud">
   <b>Patch:</b> drag from a jack to another jack. Outputs sit in the inverted boxes. Any output can go into any input.<br>
@@ -467,7 +469,7 @@ DEFS.tape = lay('TAPE', 12, 'silver',
    [ld('wow', 'amber')]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio'), ji('wow', 'WOW CV', 'param')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.blank10 = { title: '', hp: 10, theme: 'navy', knobs: [], jacks: [], logo: true };
-const ROWX = [['groove', 'groove'], ['perc', 'perc'], ['stab', 'stab'], ['bass', 'bass'], ['tape', 'tape'], ['blank6', 'blank10']];
+const ROWX = [['groove', 'groove'], ['perc', 'perc'], ['stab', 'stab'], ['bass', 'bass'], ['tape', 'tape'], ['mbira', 'mbira']];
 if (LAYOUT_ISSUES.length) console.warn('layout:', LAYOUT_ISSUES.join(' | '));
 // ---- polish row (bottom): GLUE, EQ, WIDE, LIMIT
 const fDb = v => (v > 0.05 ? '+' : '') + v.toFixed(1) + ' dB';
@@ -502,22 +504,36 @@ const KITS = [
   ['808 DEEP', ['tr808/BD2575.WAV', 'tr808/CP.WAV', 'tr808/SD2525.WAV', 'tr808/CH.WAV', 'tr808/OH10.WAV', 'tr808/CL.WAV']],
   ['707 GARAGE', ['tr707/BassDrum1.wav', 'tr707/HandClap.wav', 'tr707/Snare1.wav', 'tr707/HhC.wav', 'tr707/HhO.wav', 'tr707/Tamb.wav']],
   ['CLUB', ['samplepi/bd_haus.m4a', 'samplepi/perc_snap.m4a', 'samplepi/sn_dolf.m4a', 'samplepi/drum_cymbal_closed.m4a', 'samplepi/drum_cymbal_open.m4a', 'samplepi/elec_tick.m4a']],
-  ['DUSTY', ['samplepi/bd_klub.m4a', 'samplepi/perc_snap2.m4a', 'samplepi/elec_lo_snare.m4a', 'samplepi/drum_cymbal_pedal.m4a', 'samplepi/drum_cymbal_closed.m4a', 'samplepi/elec_wood.m4a']]];
-const NKIT = 16, USERKITS = {}; // user kits live at positions KITS.length .. NKIT-1
-const kitName = i => i < KITS.length ? KITS[i][0] : (USERKITS[i] ? USERKITS[i].name : 'MY KIT ' + (i - KITS.length + 1) + ' (empty)');
+  ['DUSTY', ['samplepi/bd_klub.m4a', 'samplepi/perc_snap2.m4a', 'samplepi/elec_lo_snare.m4a', 'samplepi/drum_cymbal_pedal.m4a', 'samplepi/drum_cymbal_closed.m4a', 'samplepi/elec_wood.m4a']],
+  ['ORGANIC', ['vcsl/HDrumL_Hit_v3_rr1_Sum.m4a', 'vcsl/Clap_rr1.m4a', 'vcsl/Cajon_hit2_f_rr1.m4a', 'vcsl/Mid_Shaker_Slap_rr1.m4a', 'vcsl/Cabasa1_Rub_v1_rr1_Mid.m4a', 'vcsl/wood_click_mp.m4a']],
+  ['HANDS', ['vcsl/HDrumL_HitMuted_v3_rr1_Sum.m4a', 'vcsl/SoloClap_vl3.m4a', 'vcsl/Cajon_hit3_mp_rr1.m4a', 'vcsl/Mid_ShakerDouble_Down_rr1.m4a', 'vcsl/Cabasa1_Rub_v1_rr1_Mid.m4a', 'vcsl/Claves1_Hit_v2_rr1_Mid.m4a']]];
+const USER0 = 12, NKIT = USER0 + 9, USERKITS = {}; // built-in kits 0..USER0-1 (room to grow), your kits USER0..NKIT-1
+const kitName = i => i < KITS.length ? KITS[i][0] : i < USER0 ? KITS[0][0] : (USERKITS[i] ? USERKITS[i].name : 'MY KIT ' + (i - USER0 + 1) + ' (empty)');
 DEFS.sampler = lay('SAMPLER', 20, 'black',
   [[sc(1.5)],
    SK.map((k, i) => kn(k + 'Tune', KIT_SLOTS[i], 'T', { min: -12, max: 12, def: 0, fmt: v => (v > 0 ? '+' : '') + v.toFixed(1) + ' st' })),
    SK.map((k, i) => kn(k + 'Dec', 'DECAY', 'T', { def: i === 4 ? 0.6 : 1, fmt: v => v >= 0.99 ? 'FULL' : fS(0.015 + v * v * 1.6) })),
    [kn('kit', 'KIT', 'S', { min: 0, max: NKIT - 1, step: 1, def: 0, fmt: v => kitName(v) }), ...SK.map((k, i) => kn(k + 'Lvl', 'LEVEL', 'T', { def: [0.9, 0.7, 0.6, 0.45, 0.4, 0.45][i], fmt: fPct }))]],
   [SK.map((k, i) => ji('t' + k, 'TRIG', 'trig')), [...SK.map(k => jo(k, 'OUT')), jo('mix', 'MIX')]]);
+const MBIRA_SETS = [['KALIMBA', [['MBira3_pluck_Main_G2_k15_50_100_rr2', 43], ['MBira3_pluck_Main_Cs3_k16_50_100_rr2', 49], ['MBira3_pluck_Main_F3_k17_50_100_rr2', 53], ['MBira3_pluck_Main_As3_k18_50_100_rr2', 58], ['MBira3_pluck_Main_Ds4_k20_50_100_rr2', 63], ['MBira3_pluck_Main_G4_k22_50_100_rr2', 67], ['MBira3_pluck_Main_Cs5_k24_50_100_rr2', 73]]],
+  ['MARIMBA', [['Marimba_hit_Outrigger_C2_med_01', 36], ['Marimba_hit_Outrigger_G2_med_01', 43], ['Marimba_hit_Outrigger_F3_med_01', 53], ['Marimba_hit_Outrigger_C4_med_01', 60], ['Marimba_hit_Outrigger_G4_med_01', 67], ['Marimba_hit_Outrigger_F5_med_01', 77], ['Marimba_hit_Outrigger_C6_med_01', 84]]]];
+const FIELDS = [['BIRDS', 'birdschirping'], ['FOREST', 'forest'], ['RAIN', 'raindripping'], ['RIVER', 'riverlight'], ['STREAM', 'stream'], ['WAVES', 'wavelight'], ['CHIMES', 'windchimes']];
+DEFS.mbira = lay('MBIRA', 10, 'navy',
+  [[kn('type', 'SOUND', 'S', { min: 0, max: MBIRA_SETS.length - 1, step: 1, def: 0, fmt: v => MBIRA_SETS[v][0] }), kn('oct', 'OCTAVE', 'S', { min: -2, max: 2, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v })],
+   [kn('dec', 'DECAY', 'S', { def: 0.8, fmt: v => v >= 0.99 ? 'FULL' : fS(0.03 + v * v * 2.5) }), ld('led', 'amber'), kn('lvl', 'LEVEL', 'S', { def: 0.8, fmt: fPct })]],
+  [[ji('voct', 'V/OCT', 'param'), ji('trig', 'TRIG', 'trig')], [jo('out', 'OUT')]]);
+DEFS.field = lay('FIELD', 8, 'silver',
+  [[kn('rec', 'PLACE', 'M', { min: 0, max: FIELDS.length - 1, step: 1, def: 0, fmt: v => FIELDS[v][0] })],
+   [kn('tone', 'TONE', 'S', { min: 300, max: 16000, def: 9000, curve: 'exp', fmt: fHz }), kn('lvl', 'LEVEL', 'S', { def: 0.6, fmt: fPct })],
+   [kn('width', 'WIDTH', 'S', { def: 0.8, fmt: fPct }), ld('led', 'green')]],
+  [[ji('cv', 'LEVEL CV', 'param')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.blank16 = { title: '', hp: 16, theme: 'navy', knobs: [], jacks: [], logo: true };
 DEFS.blank20 = { title: '', hp: 20, theme: 'navy', knobs: [], jacks: [], logo: true };
 if (LAYOUT_ISSUES.length) console.warn('layout2:', LAYOUT_ISSUES.join(' | '));
 const ROWM = [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['keys', 'keys'], ['blank7', 'blank6'], ['sampler', 'sampler']];
 const ROWD = [['trig', 'trigseq'], ['drums', 'drums'], ['mix6', 'mix6'], ['duck', 'duck'], ['blank5', 'blank8c']];
 
-const ROWT = [['macro', 'macro'], ['texture', 'texture'], ['folder', 'folder'], ['lpg', 'lpg'], ['turing', 'turing'], ['atten', 'atten'], ['blank3', 'blank8'], ['blank4b', 'blank6b']];
+const ROWT = [['macro', 'macro'], ['texture', 'texture'], ['folder', 'folder'], ['lpg', 'lpg'], ['turing', 'turing'], ['atten', 'atten'], ['field', 'field'], ['blank4b', 'blank6b']];
 const ROW0 = [['clock', 'clock'], ['rnd', 'random'], ['quant', 'quant'], ['vcoA', 'vcoA'], ['vcoB', 'vcoB'], ['lfo', 'lfo'], ['mix', 'mixer'], ['noise', 'noise'], ['scope', 'scope'], ['blank1', 'blank6']];
 const ROW1 = [['seq', 'seq'], ['vcfA', 'vcfA'], ['vcfB', 'vcfB'], ['env', 'env'], ['vca', 'vca'], ['delay', 'delay'], ['verb', 'reverb'], ['out', 'output'], ['blank2', 'blank4']];
 const DEFAULT_PATCH = [
@@ -671,6 +687,8 @@ class TrigSeqM extends Mod {
 }
 class DrumsM extends Mod { visual() { const L = this.T; for (const p of ['k', 'c', 'h', 'o']) this.leds['l' + p].vu(L[p] || 0); } }
 class Mix6M extends Mod { visual() { const L = this.T; this.leds.vuL.vu(clamp((L.vuL || 0) * 1.5, 0, 1)); this.leds.vuR.vu(clamp((L.vuR || 0) * 1.5, 0, 1)); } }
+class MbiraM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
+class FieldM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'rec') loadSet(this); } visual() { this.leds.led.set(clamp((this.T.led || 0) * 2, 0, 1)); } }
 class SamplerM extends Mod {
   constructor(id, type) { super(id, type); this.fl = [0, 0, 0, 0, 0, 0]; this.names = []; }
   knobChanged(id, v) { super.knobChanged(id, v); if (id === 'kit') { loadKit(this); if (window.renderKits) renderKits(); } }
@@ -708,7 +726,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -722,7 +740,7 @@ scene.background = new THREE.Color(0x020309);
 scene.fog = new THREE.FogExp2(0x020309, 0.0065);
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.5, 1200);
 const FR = CASE_H / 68.45; // framing scale (the case grew from 5 to 6 rows)
-const HOME = { pos: new THREE.Vector3(0, 40 * FR, 118 * FR), target: new THREE.Vector3(0, 34 * FR, 0) };
+const HOME = { pos: new THREE.Vector3(0, 42 * FR, 128 * FR), target: new THREE.Vector3(0, 36 * FR, 0) };
 { const asp = innerWidth / innerHeight; if (asp < 1.2) { const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(19)) * asp), d = Math.min(185, 27 / Math.tan(hf)); HOME.pos.set(0, 34 * FR + d * 0.05, d); } else if (innerHeight < 500) HOME.pos.set(0, 37 * FR, 100 * FR); }
 if (innerWidth < 760 || innerHeight < 500) document.getElementById('help').classList.add('hide');
 camera.position.copy(HOME.pos);
@@ -999,7 +1017,7 @@ function buildDecor(hpW, rows, seed, pos, rotY, anchor = 'left', tight = false, 
     const a = JK[Math.floor(rnd() * JK.length)], b = JK[Math.floor(rnd() * JK.length)]; const [ax, ay] = toL(a[0], a[1]), [bx, by] = toL(b[0], b[1]);
     const dist = Math.hypot(ax - bx, ay - by); if (dist < 3 || dist > (tight ? 22 : 40)) continue;
     const rope = new Rope(24, r => { for (let k = 0; k < r.n; k++) { if (!r.W[k]) continue; const iz = k * 3 + 2, iy = k * 3 + 1; if (r.P[iz] < 0.35) r.P[iz] = 0.35; const fl = tight ? 0.4 : FLOOR_Y - grp.position.y + CR; if (r.P[iy] < fl) r.P[iy] = fl; } });
-    rope.seg = (tight ? dist * 1.02 + 1.5 + rnd() * 2 : dist * (1.15 + rnd() * 0.3) + 6) / 23; rope.place(ax, ay, 2.2, bx, by, 2.2);
+    rope.seg = (tight ? dist * 1.02 + 1.5 + rnd() * 2 : dist * (1.04 + rnd() * 0.12) + 2 + rnd() * 4) / 23; rope.place(ax, ay, 2.2, bx, by, 2.2);
     rope.pin(0, ax, ay, 2.2); rope.pin(1, ax, ay, 3.1); rope.pin(23, bx, by, 2.2); rope.pin(22, bx, by, 3.1);
     for (let s = 0; s < (opts.steps || 500); s++) rope.step(1 / 90);
     const pts = []; for (let k = 0; k < 24; k++) pts.push(new THREE.Vector3(rope.P[k * 3], rope.P[k * 3 + 1], rope.P[k * 3 + 2]));
@@ -1061,7 +1079,7 @@ function buildHall() {
       }
     }
     g.fillStyle = '#4b525e'; g.fillRect(0, H - RAIL, W, RAIL);
-    const nc = rnd() < 0.75 ? 3 + Math.floor(rnd() * 9) : 0; // flat patch cables
+    const nc = 0; // (flat painted cables looked cut off at the tile edges)
     for (let k = 0; k < nc; k++) { const x1 = rnd() * W, y1 = RAIL + Math.floor(rnd() * 3) * (U3 + RAIL) + (rnd() < 0.5 ? 8.1 : 10.2), x2 = Math.min(W, Math.max(0, x1 + (rnd() - 0.5) * 30)), y2 = RAIL + Math.floor(rnd() * 3) * (U3 + RAIL) + 8.1, sag = 6 + rnd() * 12; g.strokeStyle = ['#3b6cff', '#5aa9ff', '#9fb6d9', '#2c3f7a', '#ff7a2e', '#c43cff', '#e8eef8'][Math.floor(rnd() * 7)]; g.lineWidth = 0.38; g.lineCap = 'round'; g.beginPath(); g.moveTo(x1, y1); g.bezierCurveTo(x1, Math.max(y1, y2) + sag, x2, Math.max(y1, y2) + sag, x2, y2); g.stroke(); }
     g.restore(); e.restore();
   }
@@ -1069,14 +1087,15 @@ function buildHall() {
   const FW = 84 * HP, FH = 3 * U3 + 4 * RAIL, faces = [], bodies = [], leds = [];
   // walls: list of [x, z, dir(+1 = along x), length, facing yaw]
   const walls = [];
-  for (let k = 0; k < (LITE ? 6 : 10); k++) { const z = -95 - k * 110; for (let seg = LITE ? -3 : -4; seg < (LITE ? 3 : 4); seg++) { const x0 = seg * 420 + 60; walls.push({ x0, z, along: 'x', len: 360, both: true }); } }
+  for (let k = 0; k < (LITE ? 6 : 10); k++) { const z = -95 - k * 110; for (let seg = LITE ? -2 : -3; seg <= (LITE ? 2 : 3); seg++) { const x0 = seg * 420 - 180; walls.push({ x0, z, along: 'x', len: 360, both: true }); } }
   for (const sd of [-1, 1]) for (let k = 0; k < (LITE ? 4 : 7); k++) { const x = sd * (230 + k * 110); for (let seg = 0; seg < 3; seg++) walls.push({ x0: x, z: -40 + seg * 330, along: 'z', len: 290, both: true }); }
-  const levels = 5;
+  const levels = 5, real3D = [];
   for (const w of walls) {
     const n = Math.floor(w.len / (FW + 0.6));
     for (const side of w.both ? [1, -1] : [1]) for (let i = 0; i < n; i++) for (let lv = 0; lv < levels; lv++) {
       const a = (i + 0.5) * (FW + 0.6), y = 2 + lv * (FH + 0.8) + FH / 2;
       let x, z, ry; if (w.along === 'x') { x = w.x0 + a; z = w.z + (side > 0 ? 0 : -40); ry = side > 0 ? 0 : Math.PI; } else { const sg = Math.sign(w.x0); z = w.z + a; if (side > 0) { x = w.x0; ry = Math.atan2(-sg, 0); } else { x = w.x0 + sg * 40; ry = Math.atan2(sg, 0); } }
+      if (!LITE && w.along === 'x' && w.z === -95 && side > 0 && lv < 2 && Math.abs(x) < 160) { real3D.push({ x, y, z, lv }); continue; }
       faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: rnd() < 0.5 ? 1 : 0 });
       for (let q = 0; q < 3; q++) leds.push({ x, y, z, ry, u: (rnd() - 0.5) * FW * 0.9, v: (rnd() - 0.5) * FH * 0.9, c: [COL.cyan, COL.amber, COL.red, COL.white, COL.blue][Math.floor(rnd() * 5)], s: rnd() });
     }
@@ -1115,6 +1134,8 @@ function buildHall() {
   hallStrips.mat = new THREE.MeshBasicMaterial({ color: 0x4a6dff, toneMapped: false });
   const sim = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), hallStrips.mat, strips.length);
   strips.forEach((st, i) => { o.position.set(st.x, 330, st.z); o.scale.set(st.sx, 1.2, st.sz); o.updateMatrix(); sim.setMatrixAt(i, o.matrix); }); scene.add(sim);
+  // computer: the racks nearest the back are real 3D (knobs, jacks, hanging cables)
+  real3D.forEach((f, i) => buildDecor(84, 3, 500 + i, new THREE.Vector3(f.x, f.y - FH / 2, f.z), 0, 'center', true, { S: 13, cf: 0.3, steps: 260 }));
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 1 })); ceil.rotation.x = Math.PI / 2; ceil.position.y = 335; scene.add(ceil);
 }
 
@@ -1179,14 +1200,14 @@ class Tube {
 const cables = [], pickPlugs = [], pickTubes = [];
 let colorIdx = 0;
 const STD = [15, 20, 30, 45, 60, 80, 100, 120, 150, 180, 240];
-const stdLen = (d, extra = 0) => { let i = STD.findIndex(l => l >= d * 1.08 + 6); if (i < 0) i = STD.length - 1; return STD[Math.min(STD.length - 1, i + extra)]; };
+const stdLen = (d, extra = 0) => { const S = typeof SET === 'object' ? (SET.slack ?? 0.2) : 0.2; return Math.ceil(d * (1.03 + 0.22 * S) + 1.5 + 14 * S + extra * (2 + 8 * S)); }; // continuous lengths; SLACK sets the droop
 class Cable {
   constructor(color) {
     this.color = color || CABLE_COLORS[colorIdx++ % CABLE_COLORS.length];
     this.mat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.42, metalness: 0.05, envMapIntensity: 0.8 });
     this.plMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(this.color).multiplyScalar(0.55), roughness: 0.35, metalness: 0.1 });
     this.ends = [0, 1].map(i => ({ port: null, pos: new THREE.Vector3(), from: new THREE.Vector3(), anim: 1, plug: this.makePlug(i) }));
-    this.rope = new Rope(N); this.tube = new Tube(N, this.mat); scene.add(this.tube.mesh); this.length = 30; this.connected = false; cables.push(this);
+    this.rope = new Rope(N); this.tube = new Tube(N, this.mat); scene.add(this.tube.mesh); this.length = 30; this.connected = false; cables.push(this); this.applyNeon();
     this.tube.geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5); this.tube.mesh.userData.tube = this; pickTubes.push(this.tube.mesh); this.applyOpacity();
   }
   makePlug(i) {
@@ -1203,7 +1224,8 @@ class Cable {
       r.pin(i0, p.x, p.y, p.z + 1.75); r.pin(i1, p.x, p.y, p.z + 1.75 + Math.min(r.seg, 1.3)); e.plug.position.copy(p);
     });
   }
-  setColor(col) { this.color = col; this.mat.color.set(col); this.plMat.color.set(col).multiplyScalar(0.55); }
+  setColor(col) { this.color = col; this.mat.color.set(col); this.plMat.color.set(col).multiplyScalar(0.55); this.applyNeon(); }
+  applyNeon() { const on = typeof SET === 'object' && SET.neon; this.mat.emissive.set(on ? this.color : 0x000000); this.mat.emissiveIntensity = on ? 1.6 : 1; this.mat.roughness = on ? 0.25 : 0.42; }
   applyOpacity() { const op = SET.cableOp ?? 1; for (const m of [this.mat, this.plMat]) { m.transparent = op < 0.99; m.opacity = op; m.depthWrite = op >= 0.99; m.needsUpdate = true; } this.tube.mesh.castShadow = op > 0.5; }
   highlight(on) { this.mat.emissive.set(on ? this.color : 0x000000); this.mat.emissiveIntensity = on ? 0.45 : 0; }
   dispose() { const ti = pickTubes.indexOf(this.tube.mesh); if (ti >= 0) pickTubes.splice(ti, 1); scene.remove(this.tube.mesh); this.tube.geo.dispose(); for (const e of this.ends) { scene.remove(e.plug); for (const m of e.plug.children) { const k = pickPlugs.indexOf(m); if (k >= 0) pickPlugs.splice(k, 1); } } }
@@ -1411,29 +1433,32 @@ function vines(origin, list, seed) { // pothos strands hanging from a ledge; lis
     pts.unshift(new THREE.Vector3(vx, 1.2, vz).addScaledVector(out, -3));
     const curve = new THREE.CatmullRomCurve3(pts); stems.push(new THREE.TubeGeometry(curve, 40, 0.22, 4, false));
     const total = curve.getLength(); let sg = 1;
-    for (let d = 3; d < total; d += 2.6 + r() * 1.5) { const u = d / total, p = curve.getPointAt(u), w = (4.5 + r() * 3) * (1 - 0.35 * u); sg = -sg; leaves.push(orient(leafGeo(w, w * 1.15, 0.25, 0.15, 3, 5), p, out.clone().multiplyScalar(0.8).addScaledVector(side, sg * 0.7).addScaledVector(UP, 0.1 + r() * 0.3), sg * 0.4)); }
+    for (let d = 3; d < total; d += 3.2 + r() * 2) { const u = d / total, p = curve.getPointAt(u), w = (3 + r() * 2) * (1 - 0.35 * u); sg = -sg; leaves.push(orient(leafGeo(w, w * 1.15, 0.25, 0.15, 3, 5), p, out.clone().multiplyScalar(0.8).addScaledVector(side, sg * 0.7).addScaledVector(UP, 0.1 + r() * 0.3), sg * 0.4)); }
   }
   addMesh(grp, leaves, M.pothos); addMesh(grp, stems, M.vstem);
 }
 function buildPlants() {
-  monstera(-41, 25, 0.5, 3); monstera(35, 24, 0.5, 9); monstera(-74, 40, 0.6, 21);
-  banana(-49, 31, 0.62, 4); banana(62, 16, 0.6, 12);
-  palm(47, 36, 0.58, 5); palm(-64, 36, 0.62, 6); palm(78, 40, 0.55, 15);
-  const topY = TOP_Y + 0.2 + 2 * U3 + 3 * RAIL + 1.2;
-  fern(-30, topY, -5, 0.95, 7); fern(14, topY, -6, 1.0, 8);
-  const sideTop = 4 * U3 + 5 * RAIL + 1.2, Wd = 96 * HP, hinge = CASE_W / 2 + 2.4;
+  const top = CASE_H + 0.05, Wd = 84 * HP, hinge = CASE_W / 2 + 2.4, M = plantMats();
   const sp = (hx, a, lx, lz) => new THREE.Vector3(hx + lx * Math.cos(a) + lz * Math.sin(a), 0, -lx * Math.sin(a) + lz * Math.cos(a));
-  const fl = sp(-hinge, 0.55, -Wd * 0.55, -6), fr = sp(hinge, -0.55, Wd * 0.42, -6); fern(fl.x, sideTop, fl.z, 1.05, 13); fern(fr.x, sideTop, fr.z, 0.95, 14);
+  const trough = (cx, cz, ry, w) => { const g = new THREE.Group(); g.position.set(cx, top, cz); g.rotation.y = ry; plantGroup.add(g);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, 2.2, 5), MAT.wood); b.position.set(0, 1.1, -1.5); b.castShadow = true; g.add(b);
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(w - 0.6, 0.3, 4.4), new THREE.MeshStandardMaterial({ color: 0x120c08, roughness: 1 })); soil.position.set(0, 2.1, -1.5); g.add(soil); };
+  // middle section
+  trough(0, 0, 0, CASE_W - 4);
   const r = mulberry32(55), Z = new THREE.Vector3(0, 0, 1), list = [];
-  for (const x of [-40, -36, -31, -25, -19, 17, 22, 28, 33, 38]) list.push([x, 1.2, 9 + r() * 15, Z]);
-  list.push([-CASE_W / 2 - 1.2, 1.2, 38, Z], [CASE_W / 2 + 1.2, 1.2, 33, Z]);
-  vines(new THREE.Vector3(0, topY, 0), list, 31);
-  { const r = mulberry32(808), kinds = [palm, banana, monstera]; for (let i = 0; i < 16; i++) { const row = i % 4, z = -95 - 75 - row * 110 + (r() - 0.5) * 30, x = (r() - 0.5) * 700; kinds[i % 3](x, z, 1.0 + r() * 0.6, 300 + i); } for (let i = 0; i < 8; i++) { const sd = i % 2 ? 1 : -1, x = sd * (230 + 75 + Math.floor(r() * 3) * 110 + (r() - 0.5) * 20), z = r() * 500; kinds[i % 3](x, z, 1.0 + r() * 0.5, 400 + i); } }
-  for (const [a, hx, fr0, fr1, sd] of [[0.55, -hinge, -0.95, -0.15, 41], [-0.55, hinge, 0.15, 0.95, 42]]) {
-    const out = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), l2 = [], rr = mulberry32(sd);
-    for (let k = 0; k < 7; k++) { const lx = Wd * (fr0 + (fr1 - fr0) * (k + rr() * 0.6) / 7), p = sp(hx, a, lx, 1.2); l2.push([p.x, p.z, 12 + rr() * 30, out]); }
-    vines(new THREE.Vector3(0, sideTop, 0), l2, sd);
+  for (let k = 0; k < 9; k++) { const x = -CASE_W / 2 + 2 + (CASE_W - 4) * (k + 0.2 + r() * 0.6) / 9, edge = Math.abs(x) > CASE_W * 0.36; list.push([x, 1.2, edge ? 30 + r() * 35 : 4 + r() * 7, Z]); }
+  vines(new THREE.Vector3(0, top + 1.4, 0), list, 31);
+  // wings
+  for (const [a, hx, sd] of [[0.55, -hinge, 41], [-0.55, hinge, 42]]) {
+    const out = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), l2 = [], rr = mulberry32(sd), mid = sp(hx, a, sd === 41 ? -Wd / 2 : Wd / 2, 0);
+    trough(mid.x, mid.z, a, Wd - 4);
+    for (let k = 0; k < 7; k++) { const u = (k + 0.2 + rr() * 0.6) / 7, lx = (sd === 41 ? -1 : 1) * Wd * u, p = sp(hx, a, lx, 1.2); l2.push([p.x, p.z, (u > 0.6 ? 30 : 10) + rr() * 30, out]); }
+    vines(new THREE.Vector3(0, top + 1.4, 0), l2, sd);
   }
+  // the background racks get hanging plants along their tops instead of potted palms
+  const FH = 3 * U3 + 4 * RAIL, wallTop = 2 + 5 * (FH + 0.8), hl = [], hr = mulberry32(909);
+  for (let k = 0; k < (LITE ? 18 : 34); k++) { const x = -175 + 350 * (k + hr()) / (LITE ? 18 : 34); hl.push([x, 1.2, 25 + hr() * 70, Z]); }
+  vines(new THREE.Vector3(0, wallTop - 1, -95), hl, 77);
 }
 
 // ================================================================ scene settings
@@ -1447,9 +1472,9 @@ const PRESETS = {
 };
 const LOOKS = { ps2: { ps2: true, scan: 0.22, bloom: 1.3, blur: 0.6, fogd: 0.0075, shafts: 0.8 }, clean: { ps2: false, scan: 0.25, bloom: 0.85, blur: 0, fogd: 0.0042, shafts: 0.55 } };
 const SKEY = 'nightrack.scene.v3';
-const SET = { ...PRESETS['Night Blue'], ...LOOKS.clean, plants: true, cableOp: 1 };
+const SET = { ...PRESETS['Night Blue'], ...LOOKS.clean, plants: true, cableOp: 1, slack: 0.2, neon: false };
 try { Object.assign(SET, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) { }
-let envTimer = 0, lastPS2 = null;
+let envTimer = 0, lastPS2 = null, lastSlack = null;
 function applyRes() {
   const pr = SET.ps2 ? Math.min(1, 480 / innerHeight) : Math.min(LITE ? 1.5 : 2, devicePixelRatio);
   renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight); composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight);
@@ -1464,12 +1489,13 @@ function applySettings(save = true) {
   shafts.visible = SET.shafts > 0.01;
   MOTE_U.uColor.value.copy(C_('key')).lerp(new THREE.Color(0xffffff), 0.5); MOTE_U.uInt.value = 0.3 + SET.shafts; motes.visible = SET.shafts > 0.01;
   plantGroup.visible = SET.plants; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
-  for (const c of cables) c.applyOpacity(); PS2.enabled = SET.ps2; PS2.uniforms.uScan.value = SET.scan;
+  for (const c of cables) { c.applyOpacity(); c.applyNeon(); }
+  if (lastSlack !== SET.slack) { if (lastSlack !== null) for (const c of cables) if (c.connected) c.length = stdLen(c.ends[0].port.world.distanceTo(c.ends[1].port.world)); lastSlack = SET.slack; } PS2.enabled = SET.ps2; PS2.uniforms.uScan.value = SET.scan;
   if (lastPS2 !== SET.ps2) { lastPS2 = SET.ps2; applyRes(); }
   clearTimeout(envTimer); envTimer = setTimeout(() => buildEnv(SET.key, SET.rimL, SET.rimR, SET.amb, SET.fogc), 120);
   syncUI(); if (save) try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { }
 }
-const UI = { cKey: 'key', cRimL: 'rimL', cRimR: 'rimR', cAmb: 'amb', cFog: 'fogc', sScan: 'scan', sBloom: 'bloom', sBlur: 'blur', sFog: 'fogd', sShafts: 'shafts', t480: 'ps2', tPlants: 'plants', sCable: 'cableOp' };
+const UI = { cKey: 'key', cRimL: 'rimL', cRimR: 'rimR', cAmb: 'amb', cFog: 'fogc', sScan: 'scan', sBloom: 'bloom', sBlur: 'blur', sFog: 'fogd', sShafts: 'shafts', t480: 'ps2', tPlants: 'plants', sCable: 'cableOp', sSlack: 'slack', tNeon: 'neon' };
 function syncUI() { for (const id in UI) { const el = document.getElementById(id), k = UI[id]; if (el.type === 'checkbox') el.checked = !!SET[k]; else el.value = SET[k]; } }
 for (const id in UI) {
   const el = document.getElementById(id), k = UI[id];
@@ -1516,7 +1542,7 @@ function loadPatch(P) {
   try {
     for (const c of [...cables]) removeCable(c);
     for (const m of modules) for (const k in m.knobs) { const kn = m.knobs[k], v = P.knobs && P.knobs[m.id] && P.knobs[m.id][k]; kn.set(v == null ? kn.defNorm : kn.toNorm(v)); }
-    const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.max(len, c.length > len ? len : len); } catch (e) { } }
+    const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
   autosave();
@@ -1623,14 +1649,15 @@ function genPatch(style, wild) {
     const T = x => SMP ? ({ 'drums.tk': 'sampler.tk', 'drums.tc': 'sampler.tc', 'drums.th': 'sampler.th', 'drums.to': 'sampler.to', 'perc.ts': 'sampler.ts', 'perc.tr': 'sampler.tp' }[x] || x) : x;
     con('groove.kick', T('drums.tk')); con('groove.hat', T('drums.th')); con('groove.open', T('drums.to'));
     if (o.clap !== false) con('groove.clap', T('drums.tc'));
-    if (o.snare !== null) con('groove.snare', T(o.snare || 'perc.ts')); con('groove.perc', o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt']));
+    const sT = o.snare === null ? null : T(o.snare || 'perc.ts'); if (sT) con('groove.snare', sT);
+    let pT = T(o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt'])); if (pT === sT) pT = 'perc.tsh'; con('groove.perc', pT);
     return 'groove.kick'; };
   const drumKnobs = (soft) => { for (const [s, a, b] of [['k', 'Tune', [0.25, 0.5]], ['k', 'Dec', [0.35, 0.6]], ['c', 'Tune', [0.3, 0.7]], ['c', 'Dec', [0.2, 0.45]], ['h', 'Tune', [0.4, 0.8]], ['h', 'Dec', [0.1, 0.35]], ['o', 'Tune', [0.4, 0.75]], ['o', 'Dec', [0.25, 0.5]]]) set('drums', s + a, rr(...b));
     set('drums', 'kLvl', soft ? rr(0.65, 0.8) : 0.95); set('drums', 'cLvl', rr(0.5, 0.75) * (soft ? 0.6 : 1)); set('drums', 'hLvl', rr(0.35, 0.55) * (soft ? 0.6 : 1)); set('drums', 'oLvl', rr(0.3, 0.5) * (soft ? 0.6 : 1));
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
-  let SMP = (style === 'house' || style === 'tinez') && chance(0.65);
-  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'tinez' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
+  let SMP = style === 'dnb' || style === 'kiln' || ((style === 'house' || style === 'tinez') && chance(0.65));
+  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([1, 1, 0, 2]) : style === 'tinez' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
     for (const k of ['k', 'c', 's', 'h', 'o', 'p']) { set('sampler', k + 'Tune', chance(0.25) ? rr(-1.5, 1.5) : 0); set('sampler', k + 'Dec', k === 'o' ? rr(0.4, 0.7) : k === 'h' ? rr(0.5, 1) : 1); }
     Object.assign(K.sampler, { kLvl: 0.95, cLvl: rr(0.6, 0.8), sLvl: rr(0.55, 0.75), hLvl: rr(0.35, 0.55), oLvl: rr(0.3, 0.45), pLvl: rr(0.35, 0.55) }); };
   const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
@@ -1687,37 +1714,48 @@ function genPatch(style, wild) {
     tapeOut = true; set('tape', 'wow', rr(0.05, 0.18)); set('tape', 'flutter', rr(0.03, 0.12)); set('tape', 'drive', rr(0.3, 0.55)); set('tape', 'age', rr(0.15, 0.4)); set('tape', 'hiss', rr(0.03, 0.12)); set('tape', 'dust', rr(0.05, 0.2));
     set('lfo', 'rate1', rexp(0.03, 0.2)); set('lfo', 'shape1', 0);
   } else if (style === 'dnb') {
-    set('clock', 'tempo', ri(170, 176));
-    const kick = groove(rpick([6, 6, 5]), { swing: rr(0, 0.08), clap: false, snare: 'perc.ts', perc: rpick(['perc.tr', 'perc.tsh']), h: rr(0.45, 0.75), s: rr(0.5, 0.7), p: rr(0.3, 0.6) });
-    drumKnobs(false); set('perc', 'sTune', rr(0.55, 0.8)); set('perc', 'sLvl', rr(0.8, 0.95)); set('perc', 'sDec', rr(0.3, 0.5)); set('drums', 'kDec', rr(0.3, 0.5));
+    // liquid / rolling DnB: crisp sampled two-step drums, a deep sub with an optional low reese, long pads; no noisy voices
+    set('clock', 'tempo', ri(172, 176));
+    const kick = groove(rpick([6, 6, 5]), { swing: rr(0, 0.06), chaos: rr(0, 0.08), clap: false, snare: 'perc.ts', perc: 'perc.tt', k: rr(0.5, 0.62), s: rr(0.5, 0.62), h: rr(0.35, 0.55), p: rr(0.2, 0.35) });
+    drumKnobs(false); set('perc', 'tLvl', rr(0.2, 0.35)); set('perc', 'shLvl', 0);
     con(drumBus(), 'mix6.in1');
-    pitch.seq = { cv: 'seq.cv', gate: 'seq.gate' }; con(rpick(['clock.d2', 'clock.x1', 'clock.d4']), 'seq.clk'); for (let s = 0; s < 8; s++) set('seq', 's' + s, chance(0.45) ? 0 : rpick([0, 3, 5, 7, 8, 10, 12])); set('seq', 'len', rpick([4, 8, 8])); set('seq', 'prob', 1);
-    const bass = bassM({ cv: 'seq.cv', gate: 'seq.gate' }, { wave: rr(2.6, 3), oct: -1, cut: rexp(150, 600), res: rr(0.1, 0.4), env: rr(0.2, 0.5), dec: rr(0.55, 0.95), glide: rr(0.08, 0.4), drive: rr(0.3, 0.65) });
-    con(rpick(['lfo.uni1', 'lfo.bi1']), 'bass.cut'); set('lfo', 'rate1', rexp(0.4, 3)); set('lfo', 'shape1', rpick([0, 1, 2]));
-    con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2'); set('duck', 'depth', rr(0.35, 0.6)); set('duck', 'rel', rr(0.15, 0.35));
+    set('sampler', 'sTune', rr(1.5, 4)); set('sampler', 'kTune', rr(-1, 1)); set('sampler', 'hDec', rr(0.35, 0.6)); set('sampler', 'hLvl', rr(0.25, 0.38)); set('sampler', 'oLvl', rr(0.2, 0.3)); set('sampler', 'sLvl', rr(0.7, 0.85));
+    pitch.seq = { cv: 'seq.cv', gate: 'seq.gate' }; con(rpick(['clock.d2', 'clock.d2', 'clock.x1']), 'seq.clk');
+    for (let s = 0; s < 8; s++) set('seq', 's' + s, chance(0.5) ? 0 : rpick([0, 0, 3, 5, 7, 10, -2])); set('seq', 'len', rpick([4, 8, 8])); set('seq', 'prob', 1);
+    const reese = chance(0.4);
+    const bass = bassM({ cv: 'seq.cv', gate: 'seq.gate' }, reese ? { wave: rr(2.7, 3), oct: -1, cut: rexp(120, 320), res: rr(0.05, 0.25), env: rr(0.1, 0.3), dec: rr(0.6, 0.95), glide: rr(0.05, 0.25), drive: rr(0.1, 0.25) }
+      : { wave: 0.05, oct: -1, cut: rexp(200, 500), res: 0.05, env: 0.05, dec: rr(0.7, 1), glide: rr(0.05, 0.2), drive: rr(0.05, 0.2) });
+    if (reese) { con('lfo.uni1', 'bass.cut'); set('lfo', 'rate1', rexp(0.15, 0.8)); set('lfo', 'shape1', 0); }
+    con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2'); set('duck', 'depth', rr(0.3, 0.5)); set('duck', 'rel', rr(0.12, 0.25));
     let pad;
-    if (chance(0.6)) pad = stabV('clock.d8', 'seq.cv', { chord: rpick([1, 4, 0, 2]), atk: rr(0.3, 0.7), dec: rr(0.75, 1), cut: rexp(500, 1500), env: rr(0.1, 0.3) });
+    if (chance(0.7)) pad = stabV('clock.d8', 'seq.cv', { chord: rpick([1, 1, 4, 3, 0]), atk: rr(0.35, 0.7), dec: rr(0.8, 1), cut: rexp(500, 1300), env: rr(0.05, 0.2) });
     else pad = voice.macro(getPitch(rpick(['tur', 'rnd'])), rpick(['clock.x1', 'clock.d2']));
-    con(pad, 'mix6.in3'); if (used.has('stab')) { con('stab.R', 'mix6.in6'); set('mix6', 'pan3', -0.5); set('mix6', 'pan6', 0.5); set('mix6', 'lvl6', rr(0.35, 0.5)); } else set('mix6', 'lvl6', 0);
-    con(pad, 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5]), rr(0.35, 0.6));
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.9, pan1: 0, lvl2: rr(0.65, 0.85), pan2: 0, lvl3: rr(0.35, 0.5), lvl4: rr(0.25, 0.4), pan4: -0.7, lvl5: rr(0.25, 0.4), pan5: 0.7, master: 0.8 });
+    set('stab', 'detune', rr(0.1, 0.3)); set('stab', 'res', rr(0.05, 0.2));
+    con(pad, 'mix6.in3'); if (used.has('stab')) { con('stab.R', 'mix6.in6'); set('mix6', 'pan3', -0.5); set('mix6', 'pan6', 0.5); set('mix6', 'lvl6', rr(0.3, 0.42)); } else set('mix6', 'lvl6', 0);
+    con(pad, 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5]), rr(0.3, 0.5)); set('delay', 'tone', rexp(1500, 3500));
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.9, pan1: 0, lvl2: rr(0.75, 0.9), pan2: 0, lvl3: rr(0.3, 0.42), lvl4: rr(0.2, 0.32), pan4: -0.7, lvl5: rr(0.2, 0.32), pan5: 0.7, master: 0.8 });
     if (!K.mix6.pan3) K.mix6.pan3 = 0;
-    master(rr(2.5, 5), rr(0.15, 0.25));
+    master(rr(2, 3.5), rr(0.1, 0.18)); set('verb', 'damp', rexp(2500, 5000));
   } else if (style === 'kiln') {
     set('clock', 'tempo', ri(82, 96));
-    groove(rpick([7, 7, 1]), { swing: rr(0.15, 0.4), chaos: rr(0, 0.15), k: rr(0.4, 0.55), s: rr(0.4, 0.5), h: rr(0.3, 0.5), p: rr(0.45, 0.7), snare: rpick(['perc.tr', 'perc.ts']), perc: 'perc.tsh', clap: false });
+    // organic: hand drums and shakers (real recordings), kalimba or marimba arps, a nature recording underneath
+    groove(rpick([7, 7, 1]), { swing: rr(0.15, 0.4), chaos: rr(0, 0.15), k: rr(0.4, 0.55), s: rr(0.4, 0.5), h: rr(0.3, 0.5), p: rr(0.45, 0.7), snare: 'perc.ts', perc: 'perc.tr', clap: chance(0.35) });
     drumKnobs(true); set('drums', 'kTune', rr(0.18, 0.35)); set('perc', 'sTune', rr(0.3, 0.5)); set('perc', 'sDec', rr(0.15, 0.3));
-    con(drumBus(), 'mix6.in1');
+    con(drumBus(), 'mix6.in1'); set('sampler', 'kLvl', rr(0.75, 0.9)); set('sampler', 'hLvl', rr(0.35, 0.5)); set('sampler', 'cLvl', rr(0.4, 0.6));
     const arp = pitch.seq = { cv: 'seq.cv', gate: 'seq.gate' }; con(rpick(['clock.x2', 'clock.x2', 'clock.x1']), 'seq.clk');
     for (let s = 0; s < 8; s++) set('seq', 's' + s, note(PENT, 0, 24)); set('seq', 'len', rpick([5, 6, 7, 8])); set('seq', 'prob', rr(0.6, 0.9));
-    let m = voice.macro(arp, null); set('macro', 'model', rpick([7, 7, 4, 6, 2])); set('macro', 'decay', rr(0.45, 0.75)); set('macro', 'freq', rpick([12, 12, 24]));
+    let m;
+    if (chance(0.7)) { con(arp.cv, 'mbira.voct'); con(arp.gate, 'mbira.trig'); used.add('mbira'); m = 'mbira.out'; set('mbira', 'type', chance(0.7) ? 0 : 1); set('mbira', 'oct', -1); set('mbira', 'dec', rr(0.6, 1)); set('mbira', 'lvl', rr(0.6, 0.85)); }
+    else { m = voice.macro(arp, null); set('macro', 'model', rpick([7, 7, 4, 6, 2])); set('macro', 'decay', rr(0.45, 0.75)); set('macro', 'freq', rpick([12, 12, 24])); }
+    if (chance(0.8)) { con('field.L', 'mix.in3'); used.add('field'); set('field', 'rec', rpick([0, 0, 1, 2, 2, 3, 4, 6])); set('field', 'lvl', rr(0.3, 0.55)); set('field', 'tone', rexp(2500, 9000)); set('field', 'width', rr(0.6, 1)); set('mix', 'lvl3', rr(0.35, 0.55));
+      if (chance(0.4)) { con('lfo.bi2', 'field.cv'); set('lfo', 'rate2', rexp(0.02, 0.08)); } }
     con(m, 'mix6.in2'); con(m, 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 0.5]), rr(0.35, 0.55));
     if (chance(0.7)) { const pl = voice.pluck(getPitch(rpick(['tur', 'rnd'])), rpick(['clock.d2', 'clock.x1', 'groove.perc'])); con(pl, 'mix6.in3'); set('mix6', 'lvl3', rr(0.35, 0.55)); set('mix6', 'pan3', rr(-0.5, 0.5)); } else set('mix6', 'lvl3', 0);
     const pad = stabV(rpick(['clock.d8', 'clock.d4']), null, { chord: maj ? rpick([3, 7, 2]) : rpick([1, 4, 5]), atk: rr(0.35, 0.8), dec: rr(0.8, 1), cut: rexp(350, 1000), env: rr(0.05, 0.25) });
     con(pad, 'mix6.in6'); set('mix6', 'lvl6', rr(0.3, 0.45)); set('mix6', 'pan6', rr(-0.3, 0.3));
     Object.assign(K.mix6 = K.mix6 || {}, { lvl1: rr(0.6, 0.75), pan1: 0, lvl2: rr(0.45, 0.65), pan2: rr(-0.3, 0.3), lvl4: rr(0.25, 0.4), pan4: -0.7, lvl5: rr(0.25, 0.4), pan5: 0.7, master: 0.8 });
     con('mix6.L', 'tape.inL'); con('mix6.R', 'tape.inR'); con('tape.L', 'verb.inL'); con('tape.R', 'verb.inR'); used.add('tape'); targets.push('tape.wow');
-    set('tape', 'wow', rr(0.25, 0.6)); set('tape', 'flutter', rr(0.1, 0.35)); set('tape', 'drive', rr(0.2, 0.5)); set('tape', 'age', rr(0.35, 0.7)); set('tape', 'hiss', rr(0.1, 0.3)); set('tape', 'dust', rr(0.15, 0.5));
+    set('tape', 'wow', rr(0.2, 0.5)); set('tape', 'flutter', rr(0.08, 0.3)); set('tape', 'drive', rr(0.2, 0.45)); set('tape', 'age', rr(0.3, 0.6)); set('tape', 'hiss', rr(0.02, 0.1)); set('tape', 'dust', rr(0.05, 0.25));
     set('verb', 'decay', rr(3, 7)); set('verb', 'mix', rr(0.25, 0.4)); set('verb', 'pre', 0.02);
     for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.02, 0.2)); set('lfo', 'shape' + c, ri(0, 3)); }
   } else {
@@ -1743,12 +1781,12 @@ function genPatch(style, wild) {
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
   { const dance = style === 'house' || style === 'dnb' || style === 'tinez', kil = style === 'kiln';
     con(fL, 'keys.inL'); con(fR, 'keys.inR'); con('keys.L', 'eq.inL'); con('keys.R', 'eq.inR'); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
-    set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-3, -0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
+    set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-3, -0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
     if (dance) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(2, 3.2)); set('glue', 'atk', rexp(0.015, 0.035)); set('glue', 'rel', rr(0.12, 0.25)); set('glue', 'makeup', rr(1.5, 3)); set('glue', 'mix', rr(0.75, 1)); }
     else if (kil) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(1.8, 2.6)); set('glue', 'atk', rexp(0.02, 0.04)); set('glue', 'rel', rr(0.25, 0.5)); set('glue', 'makeup', rr(2, 3.5)); set('glue', 'mix', rr(0.6, 0.85)); }
     else { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(1.6, 2.2)); set('glue', 'atk', rexp(0.02, 0.05)); set('glue', 'rel', rr(0.3, 0.7)); set('glue', 'makeup', rr(0.5, 2)); set('glue', 'mix', rr(0.5, 0.8)); }
     set('wide', 'width', dance ? rr(1.1, 1.45) : rr(1.2, 1.6)); set('wide', 'mono', dance ? rr(90, 150) : rr(60, 120)); set('wide', 'chorus', kil ? rr(0.25, 0.4) : dance ? rr(0.1, 0.25) : rr(0.2, 0.4)); set('wide', 'depth', rr(0.3, 0.55)); set('wide', 'rate', rexp(0.3, 0.9));
-    set('limit', 'drive', dance ? rr(0.5, 2.5) : rr(0, 2)); set('limit', 'ceil', -1); set('limit', 'rel', rr(0.07, 0.16)); set('limit', 'air', kil ? rr(0.05, 0.15) : rr(0.12, 0.3)); }
+    set('limit', 'drive', dance ? rr(0.5, 2.5) : rr(0, 2)); set('limit', 'ceil', -1); set('limit', 'rel', rr(0.07, 0.16)); set('limit', 'air', kil || style === 'dnb' ? rr(0, 0.08) : rr(0.12, 0.3)); }
   // modulation
   const srcs = ['lfo.bi1', 'lfo.bi2', 'lfo.uni1', 'lfo.uni2', 'rnd.smooth'], tset = [...new Set(targets)].filter(t => !C.some(c => c[1] === t)).sort(() => Math.random() - 0.5);
   const nMod = Math.min(tset.length, ri(1, 3) + Math.round(wild * 3));
@@ -1762,7 +1800,7 @@ function genPatch(style, wild) {
   return { v: 1, knobs: K, cables: C };
 }
 // knob shuffle / nudge with safe limits (normalised ranges)
-const SAFE = { 'out.vol': null, 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
+const SAFE = { 'out.vol': null, 'field.rec': null, 'mbira.type': null, 'field.lvl': [0.2, 0.6], 'mbira.lvl': [0.5, 0.9], 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
   'lvl': [0.35, 0.9], 'level': [0.45, 0.9], 'master': [0.6, 0.85], 'kLvl': [0.75, 1], 'vca.bias1': [0, 0.15], 'vca.bias2': [0, 0.15], 'drive': [0, 0.6], 'verb.mix': [0.15, 0.7], 'verb.decay': [0.2, 0.85], 'oct': [0.2, 0.8], 'depth': [0.3, 0.8], 'fold': [0, 0.7], 'mix6.lvl1': [0.7, 0.95], 'hiss': [0, 0.4], 'dust': [0, 0.6], 'chaos': [0, 0.5], 'kDen': [0.35, 0.75], 'sDen': [0.35, 0.75], 'hDen': [0.3, 0.8], 'pDen': [0.2, 0.8], 'groove.style': null, 'wow': [0, 0.7], 'stab.chord': [0, 1], 'bass.oct': [0.33, 1] };
 function safeRange(m, k) { const s = SAFE[m.id + '.' + k] !== undefined ? SAFE[m.id + '.' + k] : SAFE[k.replace(/\d+$/, '')] !== undefined ? SAFE[k.replace(/\d+$/, '')] : SAFE[k]; return s === undefined ? [0.05, 0.95] : s; }
 function tweenKnob(kn, to) { to = clamp(to, 0, 1); if (window.__noRender) { kn.set(to); return; } RND.tw = RND.tw.filter(t => t.kn !== kn); RND.tw.push({ kn, from: kn.norm, to, t: 0 }); }
@@ -1863,7 +1901,7 @@ function endDrag(e) {
   const c = d.cable, end = c.ends[d.i];
   if (d.target) {
     const t = d.target; if (t.dir === 'in') for (const old of [...t.cables]) if (old !== c) removeCable(old);
-    attachEnd(c, d.i, t, end.pos.clone()); const dist = c.ends[0].port.world.distanceTo(c.ends[1].port.world); c.length = d.base >= dist * 1.08 + 6 ? d.base : stdLen(dist);
+    attachEnd(c, d.i, t, end.pos.clone()); const dist = c.ends[0].port.world.distanceTo(c.ends[1].port.world); c.length = d.base >= dist * 1.03 + 1 ? d.base : stdLen(dist);
     connectCable(c);
   } else { if (d.msg) toast(d.msg); removeCable(c); }
 }
@@ -2031,8 +2069,8 @@ const KIT_LOADING = new Set(), SMP_CACHE = new Map();
 const kdb = () => new Promise((res, rej) => { const r = indexedDB.open('nightrack', 1); r.onupgradeneeded = () => r.result.createObjectStore('kits'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 async function kdbAll() { try { const db = await kdb(); return await new Promise(res => { const out = {}, tx = db.transaction('kits').objectStore('kits').openCursor(); tx.onsuccess = e => { const c = e.target.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); }; tx.onerror = () => res(out); }); } catch (e) { return {}; } }
 async function kdbPut(i, v) { const db = await kdb(); await new Promise((res, rej) => { const t = db.transaction('kits', 'readwrite'); v === null ? t.objectStore('kits').delete(i) : t.objectStore('kits').put(v, i); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
-kdbAll().then(all => { Object.assign(USERKITS, all); for (const m of modules) if (m.type === 'sampler') m.screenDirty = true; });
-const kitSlots = i => i < KITS.length ? KITS[i][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') })) : USERKITS[i] ? USERKITS[i].slots : KITS[0][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') }));
+kdbAll().then(async all => { for (const k in all) { let key = +k; if (key < USER0) { let j = USER0; while (all[j] || USERKITS[j]) j++; await kdbPut(key, null); await kdbPut(j, all[k]); key = j; } USERKITS[key] = all[k]; } for (const m of modules) if (m.type === 'sampler') m.screenDirty = true; });
+const kitSlots = i => i < USER0 && i >= KITS.length ? kitSlots(0) : i < KITS.length ? KITS[i][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') })) : USERKITS[i] ? USERKITS[i].slots : KITS[0][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') }));
 async function decodeSlot(sl) {
   const key = sl.ref || sl.id; if (key && SMP_CACHE.has(key)) return SMP_CACHE.get(key);
   let ab; if (sl.ref) { let r = null; try { r = await fetch('samples/' + sl.ref); } catch (e) { } if (!r || !r.ok) r = await fetch('https://pinchlemon.github.io/home-arcade/night-rack/samples/' + sl.ref); ab = await r.arrayBuffer(); } else ab = sl.data.slice(0);
@@ -2046,17 +2084,22 @@ async function loadKit(m) {
   await Promise.all(slots.map(async (sl, i) => { if (!sl) return; try { const d = await decodeSlot(sl); if (m.kitTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d }); } catch (e) { console.warn('sample', sl.name, e); } }));
   if (m.kitTok === tok) { KIT_LOADING.delete(m); m.screenDirty = true; }
 }
+async function loadSet(m) { // MBIRA notes or a FIELD recording
+  if (!AC || !ENG) return; const tok = {}; m.setTok = tok;
+  const list = m.type === 'mbira' ? MBIRA_SETS[m.v('type')][1].map(([f, root]) => ({ ref: 'vcsl/' + f + '.m4a', name: f, root })) : [{ ref: 'nature/' + FIELDS[m.v('rec')][1] + '.m4a', name: FIELDS[m.v('rec')][0] }];
+  await Promise.all(list.map(async (sl, i) => { try { const d = await decodeSlot(sl); if (m.setTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d, root: sl.root }); } catch (e) { console.warn('sample', sl.name, e); } }));
+}
 function samplerMod() { return modules.find(m => m.type === 'sampler'); }
 function setKit(i) { const m = samplerMod(), kn = m.knobs.kit; kn.set(kn.toNorm(i)); }
 window.renderKits = function () {
   const m = samplerMod(); if (!m) return; const cur = m.v('kit'), L = document.getElementById('kList'); L.innerHTML = '';
-  for (let i = 0; i < NKIT; i++) { if (i >= KITS.length && !USERKITS[i]) continue; const b = document.createElement('button'); b.textContent = kitName(i); if (i === cur) b.className = 'cur'; b.onclick = () => setKit(i); L.appendChild(b); }
+  for (let i = 0; i < NKIT; i++) { if (i >= KITS.length && !USERKITS[i]) continue; if (i >= KITS.length && i < USER0) continue; const b = document.createElement('button'); b.textContent = kitName(i); if (i === cur) b.className = 'cur'; b.onclick = () => setKit(i); L.appendChild(b); }
   document.getElementById('kNow').textContent = 'SOUNDS IN ' + kitName(cur);
   const S = document.getElementById('kSlots'); S.innerHTML = ''; const sl = kitSlots(cur);
   KIT_SLOTS.forEach((nm, i) => { const r = document.createElement('div'); r.className = 'slot'; r.innerHTML = `<b>${nm}</b><span></span><button>▶</button><button>LOAD</button>`; r.querySelector('span').textContent = sl[i] ? sl[i].name : '—';
     const [pl, ld] = r.querySelectorAll('button'); pl.onclick = () => { if (!AC || AC.state !== 'running') powerOn().catch(() => { }); send({ t: 'hit', id: m.id, slot: i }); };
     ld.onclick = () => { const f = document.getElementById('kFile'); f.dataset.slot = i; f.value = ''; f.click(); }; S.appendChild(r); });
-  const own = cur >= KITS.length && USERKITS[cur]; document.getElementById('kOwn').style.display = own ? 'flex' : 'none'; if (own) document.getElementById('kName').value = USERKITS[cur].name;
+  const own = cur >= USER0 && USERKITS[cur]; document.getElementById('kOwn').style.display = own ? 'flex' : 'none'; if (own) document.getElementById('kName').value = USERKITS[cur].name;
 };
 document.getElementById('kFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return; const i = +e.target.dataset.slot, m = samplerMod(); let k = m.v('kit');
@@ -2064,8 +2107,8 @@ document.getElementById('kFile').onchange = async e => {
     if (!AC) await powerOn();
     const data = await f.arrayBuffer(), sl = { id: 'u' + Date.now() + '_' + i, name: f.name.replace(/\.\w+$/, '').slice(0, 30), data };
     await decodeSlot(sl); // check it decodes before saving
-    if (k < KITS.length || !USERKITS[k]) { let free = -1; for (let j = KITS.length; j < NKIT; j++) if (!USERKITS[j]) { free = j; break; } if (free < 0) { toast('All 9 MY KIT spots are used · delete one first'); return; }
-      USERKITS[free] = { name: 'MY KIT ' + (free - KITS.length + 1), slots: kitSlots(k).map(x => x && { ...x }) }; k = free; }
+    if (k < USER0 || !USERKITS[k]) { let free = -1; for (let j = USER0; j < NKIT; j++) if (!USERKITS[j]) { free = j; break; } if (free < 0) { toast('All 9 MY KIT spots are used · delete one first'); return; }
+      USERKITS[free] = { name: 'MY KIT ' + (free - USER0 + 1), slots: kitSlots(k).map(x => x && { ...x }) }; k = free; }
     USERKITS[k].slots[i] = sl; await kdbPut(k, USERKITS[k]);
     if (m.v('kit') !== k) setKit(k); else loadKit(m); renderKits(); toast(KIT_SLOTS[i] + ' loaded into ' + USERKITS[k].name, true);
   } catch (err) { toast('Could not read that file as audio'); }
@@ -2223,7 +2266,7 @@ async function startEngine() {
     ENG = { post: ms => ms.forEach(m => e.handle(m)), node, kind: 'fallback' };
   }
   for (const m of modules) if (m.type in CLASSES) engineAdd(m);
-  for (const m of modules) if (m.type === 'sampler') loadKit(m);
+  for (const m of modules) if (m.type === 'sampler') loadKit(m); else if (m.type === 'mbira' || m.type === 'field') loadSet(m);
   for (const c of cables) if (c.connected) { c.uid = cableUid++; send({ t: 'con', c: c.uid, om: c.out.module.id, op: c.out.id, im: c.inp.module.id, ip: c.inp.id }); }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -6; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.25;
   ENG.node.connect(comp); comp.connect(AC.destination);
@@ -2256,7 +2299,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 const DESC = {
   groove: 'Drum pattern generator. Pick a STYLE (house, deep, tech, garage, disco, breaks, DnB, dusty), then turn the density knobs to add or remove hits. Feed it CLOCK ×4.',
   perc: 'Snare, rim, shaker and tom. Trigger them from GROOVE or TRIG SEQ.', stab: 'Chord synth for deep-house stabs and pads: each trigger plays a whole chord through its own filter. V/OCT sets the root.',
-  bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
+  bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', mbira: 'Real kalimba or marimba notes (recorded, public domain). Plays the note at V/OCT each time TRIG fires; four notes can ring at once. OCTAVE shifts, DECAY shortens.', field: 'Field recording: a looping nature sound (birds, forest, rain, river, stream, waves, wind chimes). TONE darkens it, WIDTH spreads it, LEVEL CV can swell it with an LFO.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
   clock: 'Master clock. Sends steady pulses at the tempo: ×4 = 16th notes, ×1 = quarter notes, ÷ = slower.', random: 'Takes a new random voltage each time TRIG fires (sample & hold). SMOOTH glides between values.',
   quant: 'Snaps any voltage to the nearest note of a scale, so random voltages become melodies.', vcoA: 'Oscillator: makes the raw tone. V/OCT sets pitch (1 volt per octave). Five waveforms out.', vcoB: 'Oscillator: makes the raw tone. V/OCT sets pitch (1 volt per octave). Five waveforms out.',
   lfo: 'Two slow oscillators for movement — patch them into anything you want to sweep or wobble.', mixer: 'Mixes four signals into one.', noise: 'White and pink noise: wind, hiss, percussion, randomness.', scope: 'Oscilloscope: shows the waveform at IN (or the main output if nothing is patched).',
@@ -2316,9 +2359,8 @@ let desk = null;
 async function main() {
   try { await Promise.race([Promise.all([document.fonts.load(`700 40px "Space Grotesk"`), document.fonts.load(`600 40px "Space Grotesk"`), document.fonts.load(`500 40px "Space Grotesk"`)]), new Promise(r => setTimeout(r, 2500))]); } catch (e) { }
   buildRack();
-  const near = [buildDecor(84, 2, 11, new THREE.Vector3(-CASE_W / 2, TOP_Y + 0.2, -0.2), 0, 'left', true),
-    buildDecor(96, 4, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right'),
-    buildDecor(96, 4, 37, new THREE.Vector3(CASE_W / 2 + 2.4, 0, 0), -0.55, 'left')];
+  const near = [buildDecor(84, NROWS, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right'),
+    buildDecor(84, NROWS, 37, new THREE.Vector3(CASE_W / 2 + 2.4, 0, 0), -0.55, 'left')];
   buildHall();
   rackBeams(near);
   desk = buildDesk();
