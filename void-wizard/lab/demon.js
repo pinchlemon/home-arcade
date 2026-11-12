@@ -101,7 +101,9 @@ LAB.shelf('demon', 'Demon', (game) => {
     ab = { t: 0, pieces, mats, legs: D.segs[0] && D.segs[0].legs[0] ? D.segs[0].legs[0].femur.parent : null };
   }
   function endAbsorb(flare) {
-    for (const P of ab.pieces) { P.o.position.copy(P.p0); P.o.scale.copy(P.s0); if (flare) P.o.visible = false; }
+    // when it's done, the pieces are left far too small to see: the game shows the new demon for one frame before it
+    // moves and sizes them, which flashed the old body where it died (it sizes them again from the next frame)
+    for (const P of ab.pieces) { P.o.position.copy(P.p0); if (flare) { P.o.scale.setScalar(1e-4); P.o.visible = false; } else P.o.scale.copy(P.s0); }
     for (const [m, e] of ab.mats) m.emissive.copy(e);
     if (flare && ab.legs) ab.legs.visible = false;
     ab = null;
@@ -155,7 +157,7 @@ LAB.shelf('demon', 'Demon', (game) => {
     const k = (performance.now() / 1000 - disT) / (LAB.get('demon.dissolveLen') ?? 1.5);
     if (k >= 1 || (D.alive && !D.dying)) {   // done (or a new demon already came)
       disT = -1; dis.value = 0;
-      if (!D.alive || D.dying) { for (const o of parts()) o.visible = false; if (D.segs[0] && D.segs[0].legs[0]) D.segs[0].legs[0].femur.parent.visible = false; }
+      if (!D.alive || D.dying) { for (const o of parts()) { o.visible = false; o.scale.setScalar(1e-4); } if (D.segs[0] && D.segs[0].legs[0]) D.segs[0].legs[0].femur.parent.visible = false; }   // tiny: see Absorbed below
       return;
     }
     dis.value = k;

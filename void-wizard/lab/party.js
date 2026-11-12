@@ -40,9 +40,17 @@ LAB.shelf('party', 'Party', (game) => {
   game.changeHook = changePlayer;
 
   // ---- team orders: the D-pad while playing (1 to 4 on a keyboard), when Team orders is on
-  let order = null;
-  const ORDERS = { up: ['spread', 'SPREAD OUT'], down: ['regroup', 'REGROUP'], left: ['attack', 'ATTACK!'], right: ['hold', 'HOLD BACK'] };
+  // up presses the attack, down falls back, left surrounds the demon, right groups up on you. With orders on, nobody
+  // chases a loose Solid by themselves: up while it's loose sends the teammate nearest to it to pick it up.
+  let order = null, grab = null;
+  const ORDERS = { up: ['attack', 'ATTACK!'], down: ['hold', 'FALL BACK'], left: ['surround', 'SURROUND'], right: ['regroup', 'GROUP UP'] };
+  const loose = () => { const o = game.orb; return o.state === 'ground' || (o.state === 'air' && (o.touched || !o.labTo)); };
   function give(dir) {
+    if (dir === 'up' && loose()) {
+      game.solidSpot(spot);
+      let b = null, bd = 1e9; for (const W of game.ALL) if (W !== game.you && W.downT <= 0) { const d = hd(W.pos, spot); if (d < bd) { bd = d; b = W; } }
+      if (b) { grab = b; game.popup('GRAB IT!', b.pos, '#ffd23f', true); game.rumble(game.you, 0.1, 0.4, 60); if (!game.brain) game.popup('TURN ON TEAM BRAIN', game.mate.pos, '#8f8d88', true); return; }
+    }
     const [o, say] = ORDERS[dir];
     order = order === o ? null : o;   // the same order again cancels it
     game.popup(order ? say : 'AS YOU WERE', game.you.pos, '#ffd23f', true); game.rumble(game.you, 0.1, 0.4, 60);
@@ -51,7 +59,7 @@ LAB.shelf('party', 'Party', (game) => {
   function orders(x) {
     LAB.dpad = x ? give : null;
     game.padSkip = x ? new Set([8, 12]) : null;   // the game's own uses of Select (rumble test) and D-pad up (the duel link)
-    if (!x) order = null;
+    if (!x) { order = null; grab = null; }
   }
 
   // ---- more wizards, and the brain that runs every wizard you don't control (game.brain)
@@ -147,7 +155,9 @@ LAB.shelf('party', 'Party', (game) => {
       game.solidSpot(spot);
       const forMe = o.state === 'air' && o.labTo === W;
       const forOther = o.state === 'air' && o.labTo && o.labTo !== W && o.labTo.downT <= 0;
-      if (forMe || (o.state !== 'held' && !forOther && nearestTo(spot) === W)) { target = spot; arrive = 0.1; fetching = true; }
+      if (o.state === 'held' || (grab && (grab.downT > 0 || !game.ALL.includes(grab)))) grab = null;
+      const chase = LAB.dpad ? grab === W : nearestTo(spot) === W;   // with orders on, only the one told to (D-pad up)
+      if (forMe || (o.state !== 'held' && !forOther && chase)) { target = spot; arrive = 0.1; fetching = true; }
       else {
         // get open: spread out to the sides of whoever has it (or you), so the team fans out around the demon,
         // and move up when the demon is out of shooting range
@@ -168,6 +178,11 @@ LAB.shelf('party', 'Party', (game) => {
           // left and right of the line to the demon, alternating, the later ones a little further back
           const side = i % 2 ? -1 : 1, row = Math.floor(i / 2), ang = base + side * (Math.PI / 2 + row * 0.55);
           slot.set(cx + Math.cos(ang) * S, 0, cz + Math.sin(ang) * S);
+          if (order === 'surround') {   // a ring around the demon, evenly spaced, starting from your side of it
+            const yours = Math.atan2(you.pos.z - D.pos.z, you.pos.x - D.pos.x), ring = K + 2.5;
+            const a2 = yours + (i + 1) * Math.PI * 2 / (n + 1);
+            slot.set(D.pos.x + Math.cos(a2) * ring, 0, D.pos.z + Math.sin(a2) * ring);
+          }
           const sd = game.demonNearest(slot); if (sd.d < K + 2) { const ax = slot.x - sd.x, az = slot.z - sd.z, ad = Math.hypot(ax, az) || 1; slot.x += ax / ad * (K + 2 - sd.d); slot.z += az / ad * (K + 2 - sd.d); }
           if (hd(W.pos, slot) > 1.2) { target = slot; arrive = 0.8; run = hd(W.pos, slot) > 5; }
           W.faceTarget = o.p;
@@ -205,7 +220,7 @@ LAB.shelf('party', 'Party', (game) => {
       apply: (x) => { if (!x && mark) mark.visible = false; }, frame: marker },
     { id: 'pick', label: 'Change player', help: 'Triangle (when you are not holding the Solid) takes over the teammate your stick points at, or with the stick let go, the one nearest the Solid. Off: Triangle sets the buddy to follow, stay or wander',
       kind: 'onoff', value: 0, dice: false, frame: (dt) => { if (!LAB.get('party.switch')) marker(dt, 1); }, apply: (x) => { if (!x && mark && !LAB.get('party.switch')) mark.visible = false; } },
-    { id: 'orders', label: 'Team orders', help: 'D-pad while playing: up spread out, down regroup, left attack, right hold back (again: as you were). Select opens the Lab, Select + left or right flips presets',
+    { id: 'orders', label: 'Team orders', help: 'D-pad while playing: up attack (or, with the Solid loose, the nearest teammate grabs it), down fall back, left surround, right group up (again: as you were). Nobody chases a loose Solid unless told. Select opens the Lab, Select + left or right flips presets',
       kind: 'onoff', value: 0, dice: false, setting: true, apply: orders },   // a setting: presets and Reset leave it alone
     { id: 'wizards', label: 'Extra wizards', help: 'Green, purple and gold join your team', min: 0, max: 3, step: 1, value: 0, dice: false, apply: crew },
     { id: 'team', label: 'Team brain', help: 'Your buddy plays like the extra wizards: spreads out, gets open, passes to whoever is free (always on with extra wizards)', kind: 'onoff', value: 0, dice: false, apply: sync },
