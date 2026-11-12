@@ -106,7 +106,7 @@ body.noui #showui{display:block}
 #cambar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:8;display:none;gap:8px;align-items:center;background:rgba(4,8,22,.7);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:11px;color:#b8c8ea}
 #cambar button{padding:7px 12px;font-size:11px}
 #arrbar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:8;display:none;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 20px);background:rgba(4,8,22,.85);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:11px;color:#b8c8ea}
-#arrbar button{padding:7px 12px;font-size:12px}
+#arrbar button{padding:7px 12px;font-size:12px}#arrbar .brk{flex-basis:100%;height:0}#arrbar select,#arrbar input{background:rgba(0,0,0,.4);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;font-size:12px}#arrbar input{width:120px}
 body.arrange #arrbar{display:flex}body.arrange .hud,body.arrange #kb{display:none!important}
 body.cam .hud,body.cam #tip,body.cam #showui,body.cam #kb{display:none!important}
 body.cam #cambar{display:flex}
@@ -192,7 +192,7 @@ body.cam #cambar{display:flex}
   <div class="row"><span>Bloom</span><input type="range" id="sBloom" min="0" max="2.5" step="0.05"></div>
   <div class="row"><span>Motion blur</span><input type="range" id="sBlur" min="0" max="0.94" step="0.01"></div>
   <div class="row"><span>Fog</span><input type="range" id="sFog" min="0" max="0.025" step="0.0005"></div>
-  <div class="row"><span>Light shafts</span><input type="range" id="sShafts" min="0" max="1" step="0.01"></div>
+  <div class="row"><span>Light beams (all)</span><input type="range" id="sShafts" min="0" max="1" step="0.01"></div>
   <div class="row"><span>Cable opacity</span><input type="range" id="sCable" min="0.1" max="1" step="0.01"></div>
   <div class="row"><span>Cable slack</span><input type="range" id="sSlack" min="0" max="1" step="0.01"></div>
   <div class="row"><span>Neon cables</span><input type="checkbox" id="tNeon"></div>
@@ -204,6 +204,9 @@ body.cam #cambar{display:flex}
   <div class="row"><span>Left side</span><select id="selL"><option value="lamp">Washi lamp</option><option value="crt">CRT (static)</option><option value="none">Nothing</option></select></div>
   <div class="row"><span>Right side</span><select id="selR"><option value="lamp">Washi lamp</option><option value="crt">CRT (static)</option><option value="none">Nothing</option></select></div>
   <div class="row"><span>Lamps lit</span><input type="checkbox" id="tLit"></div>
+  <div class="row"><span>Lamp brightness</span><input type="range" id="sLampB" min="0" max="2" step="0.01"></div>
+  <div class="row"><span>CRT brightness</span><input type="range" id="sCrtB" min="0" max="2" step="0.01"></div>
+  <div class="row"><span>Light from above</span><input type="range" id="sSkyB" min="0" max="2.5" step="0.01"></div>
   <div class="row"><span>Rug</span><input type="checkbox" id="tRug"></div>
   <div class="row"><span>Floor plants</span><input type="checkbox" id="tFloorP"></div>
   <div class="chips" style="margin-top:6px"><button id="bArrange">MOVE PROPS</button></div>
@@ -226,7 +229,7 @@ body.cam #cambar{display:flex}
   <div class="nav"><button id="gBack">BACK</button><button id="gNext">NEXT</button><span class="sp"></span><button id="gExit">EXIT GUIDE</button></div></div>
 <button id="showui">SHOW UI (H)</button>
 <div id="kb" class="hide"><div class="top"><button id="kbDn">OCT −</button><span id="kbOct">C3</span><button id="kbUp">OCT +</button><select id="kbSound"></select><select id="kbKey"></select><select id="kbScale"></select><button id="kbMatch" title="Use the key of the current patch">MATCH PATCH</button><span class="sp" id="kbMsg"></span><button id="kbX">✕ CLOSE</button></div><div class="keys" id="kbKeys"></div></div>
-<div id="arrbar"><span>Drag a plant, lamp, TV stack or the rug to move it</span><button id="arrL">⟲</button><button id="arrR">⟳</button><button id="arrReset">RESET LAYOUT</button><button id="arrX">DONE</button></div>
+<div id="arrbar"><span>Drag a plant, lamp, TV stack or the rug to move it</span><button id="arrL">⟲</button><button id="arrR">⟳</button><button id="arrUndo">UNDO</button><button id="arrReset">RESET</button><span class="brk"></span><select id="arrList"></select><input id="arrName" maxlength="20" placeholder="Layout name"><button id="arrSaveAs">SAVE</button><button id="arrDel">DELETE</button><button id="arrX">DONE</button></div>
 <div id="cambar"><span id="camhint"></span><button id="camX">✕ EXIT CAMERA</button></div>
 <div id="toast" class="hud"></div>
 <div id="padhint" class="hud hide"><b>CONTROLLER</b><br>D-pad / stick: move · <b>A</b> grab knob / patch cable · <b>B</b> done / drop cable<br><b>X</b> unplug / reset · <b>Y</b> random patch · <b>R3</b> change style<br><b>LB RB</b> cable color / fine turn · <b>LT RT</b> zoom · right stick: orbit<br><b>View</b> undo · <b>Menu</b> power · <b>L3</b> home view · <b>L3+R3</b> free camera · hold <b>View+Menu</b>: back to Hedron</div>
@@ -1343,7 +1346,7 @@ function beam(pos, dir, r0, r1, len, color, aspect, level, light, gain = 1, pare
 function godRays() { // soft light falling from far above onto the rack, like a skylight
   const V = (x, y, z) => new THREE.Vector3(x, y, z), r = mulberry32(5150);
   for (let k = 0; k < 5; k++) { const x = -70 + k * 35 + (r() - 0.5) * 14, top = V(x * 0.6 - 30, 340, 40 + r() * 40), bot = V(x, 0, 8 + r() * 10), d = bot.clone().sub(top);
-    beam(top, d, 6 + r() * 6, 26 + r() * 16, d.length(), k % 2 ? '#dfe6ff' : '#fff1dc', 0, () => 0.55 + 0.15 * Math.sin(performance.now() / 4100 + k * 1.7), false, 0.28); }
+    beam(top, d, 6 + r() * 6, 26 + r() * 16, d.length(), k % 2 ? '#dfe6ff' : '#fff1dc', 0, () => (0.55 + 0.15 * Math.sin(performance.now() / 4100 + k * 1.7)) * SET.skyB, false, 0.28); }
 }
 function rackBeams(decors) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z), rr = mulberry32(77), out = sx => V(sx, -0.42, 1);
@@ -1585,7 +1588,7 @@ function buildRug() {
 }
 const PROPS = {}; // movable props: id -> { obj, home }
 function regProp(id, obj) { window.__props = PROPS; obj.userData.propId = id; PROPS[id] = { obj, home: [obj.position.x, obj.position.z, obj.rotation.y] }; const L = (SET.layout || {})[id]; if (L) { obj.position.x = L[0]; obj.position.z = L[1]; obj.rotation.y = L[2]; } }
-const SIDES = {}, LAMP_LIGHTS = [], LAMP_PAPER = [], CRT_U = { uTime: { value: 0 }, uLevel: { value: 0 } };
+const SIDES = {}, LAMP_LIGHTS = [], LAMP_PAPER = [], CRT_U = { uTime: { value: 0 }, uLevel: { value: 0 }, uBright: { value: 1 } };
 function washiTex() { const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d'), r = mulberry32(31);
   g.fillStyle = '#f3e7d0'; g.fillRect(0, 0, 256, 512); for (let k = 0; k < 500; k++) { g.strokeStyle = r() < 0.5 ? 'rgba(200,180,140,.35)' : 'rgba(255,255,255,.4)'; g.lineWidth = 0.6 + r(); g.beginPath(); const x = r() * 256, y = r() * 512; g.moveTo(x, y); g.quadraticCurveTo(x + (r() - 0.5) * 30, y + (r() - 0.5) * 30, x + (r() - 0.5) * 40, y + (r() - 0.5) * 40); g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
@@ -1601,12 +1604,12 @@ function washiLamp() { // tall paper floor lamp in a dark wood lattice, as tall 
   for (const z of [-W / 6, W / 6]) for (const x of [W / 2, -W / 2]) bx(0.5, H - 8, 0.5, x, 4 + (H - 8) / 2, z);
   const fr = new THREE.Mesh(mergeGeometries(parts), wood); fr.castShadow = true; g.add(fr);
   const L = new THREE.PointLight(0xffa860, 1.1, 150, 0); L.position.y = H * 0.6; g.add(L); LAMP_LIGHTS.push(L);
-  const lit = () => SET.lampsLit ? 0.9 : 0;
+  const lit = () => SET.lampsLit ? 0.9 * SET.lampB : 0;
   beam(new THREE.Vector3(0, H - 2, 0), UP, 9, 34, 70, '#ffc890', 0, lit, false, 0.8, g);          // soft spill up from the top
   beam(new THREE.Vector3(0, H - 6, 0), DOWN, 15, 17, H - 8, '#ffd6a0', 0, lit, false, 0.35, g);    // haze around the paper column
   return g;
 }
-const SCREEN_FS = `uniform float uTime, uSeed, uMode, uLevel; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
+const SCREEN_FS = `uniform float uTime, uSeed, uMode, uLevel, uBright; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
   void main(){ vec2 uv = vUv; float t = uTime; vec3 c = vec3(0.0); vec2 g = floor(uv * vec2(220.0, 160.0)); float tf = floor(t * 30.0);
     if (uMode < 0.5) { float n = h(vec2(g.x * 1.31 + tf * 37.0, g.y * 1.73 - tf * 91.0)); n = fract(n * 7.0 + h(g.yx + tf)); float roll = smoothstep(0.0, 0.08, abs(fract(uv.y - t * 0.17) - 0.5)); c = vec3(n * (0.65 + 0.35 * roll)); }
     else if (uMode < 1.5) { float b = floor(uv.x * 7.0); c = b < 1.0 ? vec3(.8) : b < 2.0 ? vec3(.8,.8,0) : b < 3.0 ? vec3(0,.8,.8) : b < 4.0 ? vec3(0,.8,0) : b < 5.0 ? vec3(.8,0,.8) : b < 6.0 ? vec3(.8,0,0) : vec3(0,0,.8); if (uv.y < 0.22) c = vec3(floor(uv.x * 4.0) / 3.0); c += (h(g + tf) - 0.5) * 0.12; }
@@ -1614,10 +1617,10 @@ const SCREEN_FS = `uniform float uTime, uSeed, uMode, uLevel; varying vec2 vUv; 
     else if (uMode < 3.5) { vec2 p = (uv - 0.5) * 6.0; float v = sin(p.x + t) + sin(p.y * 1.3 - t * 0.8) + sin(length(p) * 2.0 - t * 1.6 - uLevel * 3.0) + sin(p.x * p.y * 0.3 + t * 0.5); c = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + v * 1.4 + t * 0.3); c *= 0.75 + uLevel * 0.6; }
     else if (uMode < 4.5) { vec2 cell = floor(vec2(uv.x * 40.0, uv.y * 22.0 + t * 2.0)); float on = step(0.45, h(cell)) * step(fract(uv.x * 40.0), 0.8) * step(fract(uv.y * 22.0 + t * 2.0), 0.6) * step(h(vec2(cell.y, 3.0)) * 40.0, cell.x + 6.0); c = vec3(0.35, 0.95, 1.0) * on * 0.9 + vec3(0.0, 0.03, 0.12); }
     else { c = vec3(0.05, 0.12, 0.85) * (0.8 + 0.2 * sin(t * 2.0)); vec2 q = abs(uv - vec2(0.5, 0.5)); if (q.x < 0.18 && q.y < 0.05) c = vec3(0.9); }
-    c *= 0.82 + 0.18 * sin(uv.y * 520.0); vec2 v2 = uv - 0.5; c *= 1.0 - dot(v2, v2) * 1.5; gl_FragColor = vec4(c * 1.2, 1.0); }`;
+    c *= 0.82 + 0.18 * sin(uv.y * 520.0); vec2 v2 = uv - 0.5; c *= 1.0 - dot(v2, v2) * 1.5; gl_FragColor = vec4(c * 1.2 * uBright, 1.0); }`;
 const SCREENS = [];
 function crtScreen(w, h, mode) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h, 12, 10), new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uLevel: CRT_U.uLevel, uSeed: { value: Math.random() * 100 }, uMode: { value: mode } }, toneMapped: false,
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h, 12, 10), new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uLevel: CRT_U.uLevel, uBright: CRT_U.uBright, uSeed: { value: Math.random() * 100 }, uMode: { value: mode } }, toneMapped: false,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; vec3 p = position; p.z += ' + (Math.min(w, h) * 0.035).toFixed(3) + ' * (1.0 - pow(uv.x * 2.0 - 1.0, 2.0)) * (1.0 - pow(uv.y * 2.0 - 1.0, 2.0)); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }', fragmentShader: SCREEN_FS }));
   SCREENS.push(m); return m;
 }
@@ -1639,7 +1642,7 @@ function tvSet(kind, w, h, mode, rnd) { // pvm: grey pro monitor with a control 
   g.add(new THREE.Mesh(mergeGeometries(parts.map(x => x.toNonIndexed())), btn));
   const led = new THREE.Mesh(new THREE.CircleGeometry(strip * 0.06, 10), new THREE.MeshBasicMaterial({ color: kind === 'home' ? 0xff3030 : 0x40ff70, toneMapped: false })); led.position.set(w * 0.42, strip * 0.5, 0.31); g.add(led);
   if (kind === 'pvm') { const lab = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.16, strip * 0.18), new THREE.MeshBasicMaterial({ color: 0xc8ccd4 })); lab.position.set(-w * 0.36, h - strip * 0.35, 0.02); g.add(lab); }
-  beam(new THREE.Vector3(0, sy, 1), new THREE.Vector3(0, -0.12, 1), Math.min(sw, sh) * 0.45, Math.min(sw, sh) * 1.5, 55, mode === 2 ? '#55ff99' : mode === 3 ? '#c88cff' : mode === 5 ? '#4a6dff' : '#cfe0ff', sw / sh, () => 0.55 + CRT_U.uLevel.value * 0.6 + Math.random() * 0.15, false, 0.35, g);
+  beam(new THREE.Vector3(0, sy, 1), new THREE.Vector3(0, -0.12, 1), Math.min(sw, sh) * 0.45, Math.min(sw, sh) * 1.5, 55, mode === 2 ? '#55ff99' : mode === 3 ? '#c88cff' : mode === 5 ? '#4a6dff' : '#cfe0ff', sw / sh, () => (0.55 + CRT_U.uLevel.value * 0.6 + Math.random() * 0.15) * SET.crtB, false, 0.35, g);
   for (let k = 0; k < 2; k++) floorCable(g, new THREE.Vector3(-w / 2 + 1 + k * 2, h * (0.3 + k * 0.2), -d * 0.7), new THREE.Vector3(-1, -0.2, -0.3).normalize(), rnd() < 0.5 ? 0x15151a : 0xb8bcc4, rnd);
   return { g, w, h, d };
 }
@@ -1681,7 +1684,7 @@ const PRESETS = {
 };
 const LOOKS = { ps2: { ps2: true, scan: 0.22, bloom: 1.3, blur: 0.6, fogd: 0.0075, shafts: 0.8 }, clean: { ps2: false, scan: 0.25, bloom: 0.85, blur: 0, fogd: 0.0042, shafts: 0.55 } };
 const SKEY = 'nightrack.scene.v3';
-const SET = { ...PRESETS['Night Blue'], ...LOOKS.clean, plants: true, cableOp: 1, slack: 0.2, neon: false, dance: false, room: 'wall', sideL: 'lamp', sideR: 'lamp', lampsLit: true, rug: true, floorPlants: true, layout: {} };
+const SET = { ...PRESETS['Night Blue'], ...LOOKS.clean, plants: true, cableOp: 1, slack: 0.2, neon: false, dance: false, room: 'wall', sideL: 'lamp', sideR: 'lamp', lampsLit: true, rug: true, floorPlants: true, layout: {}, lampB: 1, crtB: 1, skyB: 1 };
 try { Object.assign(SET, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) { }
 let envTimer = 0, lastPS2 = null, lastSlack = null;
 function applyRes() {
@@ -1699,7 +1702,7 @@ function applySettings(save = true) {
   MOTE_U.uColor.value.copy(C_('key')).lerp(new THREE.Color(0xffffff), 0.5); MOTE_U.uInt.value = 0.3 + SET.shafts; motes.visible = SET.shafts > 0.01;
   plantGroup.visible = SET.plants; floorPlantGroup.visible = SET.floorPlants; rugGroup.visible = SET.rug; hallGroup.visible = SET.room !== 'black';
   for (const k in SIDES) { const v = SET['side' + k]; SIDES[k].lamp.visible = v === 'lamp'; SIDES[k].crt.visible = v === 'crt'; }
-  for (const L of LAMP_LIGHTS) L.intensity = SET.lampsLit ? 1.1 : 0; for (const m of LAMP_PAPER) m.emissiveIntensity = SET.lampsLit ? 0.9 : 0.03; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
+  for (const L of LAMP_LIGHTS) L.intensity = SET.lampsLit ? 1.1 * SET.lampB : 0; for (const m of LAMP_PAPER) m.emissiveIntensity = SET.lampsLit ? 0.9 * SET.lampB : 0.03; CRT_U.uBright.value = 0.15 + 0.85 * SET.crtB; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
   for (const c of cables) { c.applyOpacity(); c.applyNeon(); }
   for (const m of DECOR_CABLE_MATS) { m.emissive.copy(SET.neon ? m.color : new THREE.Color(0)); m.emissiveIntensity = SET.neon ? 1.3 : 1; }
   if (lastSlack !== SET.slack) { if (lastSlack !== null) for (const c of cables) if (c.connected) c.length = stdLen(c.ends[0].port.world.distanceTo(c.ends[1].port.world)); lastSlack = SET.slack; } PS2.enabled = SET.ps2; PS2.uniforms.uScan.value = SET.scan;
@@ -1707,7 +1710,7 @@ function applySettings(save = true) {
   clearTimeout(envTimer); envTimer = setTimeout(() => buildEnv(SET.key, SET.rimL, SET.rimR, SET.amb, SET.fogc), 120);
   syncUI(); if (save) try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { }
 }
-const UI = { cKey: 'key', cRimL: 'rimL', cRimR: 'rimR', cAmb: 'amb', cFog: 'fogc', sScan: 'scan', sBloom: 'bloom', sBlur: 'blur', sFog: 'fogd', sShafts: 'shafts', t480: 'ps2', tPlants: 'plants', sCable: 'cableOp', sSlack: 'slack', tNeon: 'neon', tDance: 'dance', selRoom: 'room', selL: 'sideL', selR: 'sideR', tLit: 'lampsLit', tRug: 'rug', tFloorP: 'floorPlants' };
+const UI = { cKey: 'key', cRimL: 'rimL', cRimR: 'rimR', cAmb: 'amb', cFog: 'fogc', sScan: 'scan', sBloom: 'bloom', sBlur: 'blur', sFog: 'fogd', sShafts: 'shafts', t480: 'ps2', tPlants: 'plants', sCable: 'cableOp', sSlack: 'slack', tNeon: 'neon', tDance: 'dance', selRoom: 'room', selL: 'sideL', selR: 'sideR', tLit: 'lampsLit', tRug: 'rug', tFloorP: 'floorPlants', sLampB: 'lampB', sCrtB: 'crtB', sSkyB: 'skyB' };
 function syncUI() { for (const id in UI) { const el = document.getElementById(id), k = UI[id]; if (el.type === 'checkbox') el.checked = !!SET[k]; else el.value = SET[k]; } }
 for (const id in UI) {
   const el = document.getElementById(id), k = UI[id];
@@ -2330,7 +2333,10 @@ document.getElementById('kDel').onclick = async () => { const m = samplerMod(), 
 ['bScene', 'bPatches', 'bRand', 'bHelp'].forEach(id => document.getElementById(id).addEventListener('click', () => document.getElementById('kits').classList.add('hide')));
 document.getElementById('bKits').onclick = () => { const el = document.getElementById('kits'), was = !el.classList.contains('hide'); closePanels(); if (!was) { el.classList.remove('hide'); renderKits(); } };
 // ================================================================ arrange props (drag on the floor, rotate, saved)
-const ARR = { on: false, sel: null, drag: null, ring: null };
+const ARR = { on: false, sel: null, drag: null, ring: null, hist: [] };
+const arrSnap = () => { const L = {}; for (const id in PROPS) { const o = PROPS[id].obj; L[id] = [o.position.x, o.position.z, o.rotation.y]; } return L; };
+function arrApply(L) { for (const id in PROPS) { const P = PROPS[id], v = L[id] || P.home; P.obj.position.x = v[0]; P.obj.position.z = v[1]; P.obj.rotation.y = v[2]; } SET.layout = {}; for (const id in PROPS) { const o = PROPS[id].obj; if (L[id]) SET.layout[id] = [+o.position.x.toFixed(1), +o.position.z.toFixed(1), +o.rotation.y.toFixed(3)]; } try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { } if (ARR.ring) arrRing(); }
+const arrPush = () => { ARR.hist.push(arrSnap()); if (ARR.hist.length > 60) ARR.hist.shift(); };
 const arrRay = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLOOR_Y);
 function arrToggle(on = !ARR.on) { ARR.on = on; document.body.classList.toggle('arrange', on); if (on) { closePanels(); closeMenu(); kbShow(false); showTip({}, null); if (!ARR.ring) { ARR.ring = new THREE.Mesh(new THREE.RingGeometry(1, 1.15, 48), new THREE.MeshBasicMaterial({ color: 0x4fe3ff, toneMapped: false, transparent: true, opacity: 0.85 })); ARR.ring.rotation.x = -Math.PI / 2; scene.add(ARR.ring); } } else { ARR.sel = null; ARR.drag = null; ctl.enabled = true; } if (ARR.ring) ARR.ring.visible = false; }
 function arrPick(e) { const r = canvas.getBoundingClientRect(), v = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); arrRay.setFromCamera(v, camera); return arrRay; }
@@ -2339,16 +2345,23 @@ function arrRing() { const o = ARR.sel; if (!o) { ARR.ring.visible = false; retu
 function arrSave(o) { SET.layout = SET.layout || {}; SET.layout[o.userData.propId] = [+o.position.x.toFixed(1), +o.position.z.toFixed(1), +o.rotation.y.toFixed(3)]; try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { } }
 addEventListener('pointerdown', e => { if (!ARR.on || e.target !== canvas) return; const ray = arrPick(e), objs = Object.values(PROPS).map(p => p.obj).filter(o => o.visible && (!o.parent || o.parent.visible));
   const hit = ray.intersectObjects(objs, true).find(h => h.object.renderOrder !== 5 && h.object.visible); if (!hit) return; const o = propOf(hit.object); if (!o) return;
-  e.stopImmediatePropagation(); ctl.enabled = false; ARR.sel = o; const p = ray.ray.intersectPlane(floorPlane, new THREE.Vector3()) || o.position.clone(); ARR.drag = { id: e.pointerId, dx: o.position.x - p.x, dz: o.position.z - p.z }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { } arrRing(); }, true);
+  e.stopImmediatePropagation(); ctl.enabled = false; arrPush(); ARR.sel = o; const p = ray.ray.intersectPlane(floorPlane, new THREE.Vector3()) || o.position.clone(); ARR.drag = { id: e.pointerId, dx: o.position.x - p.x, dz: o.position.z - p.z }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { } arrRing(); }, true);
 addEventListener('pointermove', e => { if (!ARR.on || !ARR.drag || ARR.drag.id !== e.pointerId) return; e.stopImmediatePropagation(); const p = arrPick(e).ray.intersectPlane(floorPlane, new THREE.Vector3()); if (!p) return; ARR.sel.position.x = clamp(p.x + ARR.drag.dx, -300, 300); ARR.sel.position.z = clamp(p.z + ARR.drag.dz, WALLZ + 25, 260); arrRing(); }, true);
 const arrUp = e => { if (!ARR.on || !ARR.drag || ARR.drag.id !== e.pointerId) return; e.stopImmediatePropagation(); ARR.drag = null; ctl.enabled = true; arrSave(ARR.sel); };
 addEventListener('pointerup', arrUp, true); addEventListener('pointercancel', arrUp, true);
-const arrRot = d => { if (!ARR.sel) { toast('Tap a prop first'); return; } ARR.sel.rotation.y += d; arrRing(); arrSave(ARR.sel); };
+const arrRot = d => { if (!ARR.sel) { toast('Tap a prop first'); return; } arrPush(); ARR.sel.rotation.y += d; arrRing(); arrSave(ARR.sel); };
 document.getElementById('arrL').onclick = () => arrRot(Math.PI / 12); document.getElementById('arrR').onclick = () => arrRot(-Math.PI / 12);
 document.getElementById('arrX').onclick = () => arrToggle(false);
-document.getElementById('arrReset').onclick = () => { for (const id in PROPS) { const P = PROPS[id]; P.obj.position.x = P.home[0]; P.obj.position.z = P.home[1]; P.obj.rotation.y = P.home[2]; } SET.layout = {}; try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { } arrRing(); toast('Layout reset', true); };
-document.getElementById('bArrange').onclick = () => arrToggle(true);
-addEventListener('keydown', e => { if (!ARR.on) return; if (e.key === 'Escape') { arrToggle(false); e.stopImmediatePropagation(); } else if (e.key === 'q' || e.key === 'Q') { arrRot(Math.PI / 24); e.stopImmediatePropagation(); } else if (e.key === 'e' || e.key === 'E') { arrRot(-Math.PI / 24); e.stopImmediatePropagation(); } }, true);
+document.getElementById('arrReset').onclick = () => { arrPush(); for (const id in PROPS) { const P = PROPS[id]; P.obj.position.x = P.home[0]; P.obj.position.z = P.home[1]; P.obj.rotation.y = P.home[2]; } SET.layout = {}; try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { } arrRing(); toast('Layout reset', true); };
+document.getElementById('bArrange').onclick = () => { arrToggle(true); arrLists(); };
+function arrUndo() { const L = ARR.hist.pop(); if (!L) { toast('Nothing to undo'); return; } arrApply(L); }
+document.getElementById('arrUndo').onclick = arrUndo;
+const LKEY = 'nightrack.layouts', layouts = () => { try { return JSON.parse(localStorage.getItem(LKEY) || '{}'); } catch (e) { return {}; } };
+function arrLists() { const sel = document.getElementById('arrList'), L = layouts(); sel.innerHTML = ''; sel.add(new Option(Object.keys(L).length ? 'Saved layouts…' : 'No saved layouts', '')); for (const n in L) sel.add(new Option(n, n)); }
+document.getElementById('arrList').onchange = e => { const n = e.target.value; if (!n) return; arrPush(); arrApply(layouts()[n]); document.getElementById('arrName').value = n; toast('Loaded ' + n, true); };
+document.getElementById('arrSaveAs').onclick = () => { const n = (document.getElementById('arrName').value || '').trim() || 'Layout ' + (Object.keys(layouts()).length + 1), L = layouts(); L[n] = arrSnap(); try { localStorage.setItem(LKEY, JSON.stringify(L)); } catch (e) { } arrLists(); document.getElementById('arrList').value = n; document.getElementById('arrName').value = n; toast('Saved ' + n, true); };
+document.getElementById('arrDel').onclick = () => { const n = document.getElementById('arrList').value; if (!n) { toast('Pick a saved layout first'); return; } const L = layouts(); delete L[n]; try { localStorage.setItem(LKEY, JSON.stringify(L)); } catch (e) { } arrLists(); toast('Deleted ' + n, true); };
+addEventListener('keydown', e => { if (!ARR.on) return; if (e.key === 'Escape') { arrToggle(false); e.stopImmediatePropagation(); } else if ((e.key === 'z' || e.key === 'Z') && document.activeElement.tagName !== 'INPUT') { arrUndo(); e.stopImmediatePropagation(); e.preventDefault(); } else if (document.activeElement.tagName === 'INPUT') return; else if (e.key === 'q' || e.key === 'Q') { arrRot(Math.PI / 24); e.stopImmediatePropagation(); } else if (e.key === 'e' || e.key === 'E') { arrRot(-Math.PI / 24); e.stopImmediatePropagation(); } }, true);
 
 // ================================================================ free camera mode (UI hidden, fly anywhere)
 const CAM = { on: false, yaw: 0, pitch: 0, keys: new Set(), pad: { mx: 0, mz: 0, my: 0, lx: 0, ly: 0, fast: 1 }, ptr: new Map(), pinch: 0, mid: null, vel: new THREE.Vector3() };
