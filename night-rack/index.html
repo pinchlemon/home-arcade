@@ -90,6 +90,7 @@ body.noui #showui{display:block}
 #scene .row span{color:#b8c8ea}
 #scene input[type=color]{width:46px;height:24px;border:1px solid var(--line);border-radius:6px;background:none;padding:0;cursor:pointer}
 #scene input[type=range]{width:130px;accent-color:#4fd8ff}
+#scene select{background:rgba(0,0,0,.4);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:11px}
 #scene input[type=checkbox]{accent-color:#4fd8ff;width:15px;height:15px}
 #err{position:fixed;inset:auto 0 0 0;z-index:20;padding:10px;font-size:12px;color:#ffb3c0;background:#200810;display:none}
 
@@ -195,6 +196,13 @@ body.cam #cambar{display:flex}
   <div class="row"><span>Cables bounce to the beat</span><input type="checkbox" id="tDance"></div>
   <div class="sec">GARDEN</div>
   <div class="row"><span>Hanging plants</span><input type="checkbox" id="tPlants"></div>
+  <div class="sec">ROOM</div>
+  <div class="row"><span>Background</span><select id="selRoom"><option value="wall">Rack wall</option><option value="black">Black room</option></select></div>
+  <div class="row"><span>Left side</span><select id="selL"><option value="lamp">Washi lamp</option><option value="crt">CRT (static)</option><option value="none">Nothing</option></select></div>
+  <div class="row"><span>Right side</span><select id="selR"><option value="lamp">Washi lamp</option><option value="crt">CRT (static)</option><option value="none">Nothing</option></select></div>
+  <div class="row"><span>Lamps lit</span><input type="checkbox" id="tLit"></div>
+  <div class="row"><span>Rug</span><input type="checkbox" id="tRug"></div>
+  <div class="row"><span>Floor plants</span><input type="checkbox" id="tFloorP"></div>
 </div>
 <div id="help" class="hud">
   <b>Patch:</b> drag from a jack to another jack. Outputs sit in the inverted boxes. Any output can go into any input.<br>
@@ -965,7 +973,7 @@ const decorLEDs = [], DECOR_CABLE_MATS = [];
 const BACKQ = []; // background racks built a few per frame after the page is up
 const SCOPES = [], SCOPE_U = { uTime: { value: 0 } };
 function addScope(pos, quat, w, h, col) { SCOPES.push({ pos: pos.clone(), quat: quat.clone(), w, h, col: new THREE.Color(col), seed: Math.random() }); }
-function buildScopes() {
+function buildScopes(parent = scene) {
   if (!SCOPES.length) return; const n = SCOPES.length, geo = new THREE.PlaneGeometry(1, 1), cols = new Float32Array(n * 3), seeds = new Float32Array(n);
   SCOPES.forEach((s, i) => { cols.set([s.col.r, s.col.g, s.col.b], i * 3); seeds[i] = s.seed; });
   geo.setAttribute('aCol', new THREE.InstancedBufferAttribute(cols, 3)); geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
@@ -990,11 +998,11 @@ function buildScopes() {
   mat.uniforms.uTime = SCOPE_U.uTime;
   const im = new THREE.InstancedMesh(geo, mat, n), o = new THREE.Object3D();
   SCOPES.forEach((s, i) => { o.position.copy(s.pos); o.quaternion.copy(s.quat); o.scale.set(s.w, s.h, 1); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
-  im.frustumCulled = false; scene.add(im); SCOPES.length = 0;
+  im.frustumCulled = false; parent.add(im); SCOPES.length = 0;
 }
 function buildDecor(hpW, rows, seed, pos, rotY, anchor = 'left', tight = false, opts = {}) {
   const rnd = mulberry32(seed), W = hpW * HP, H = rows * U3 + (rows + 1) * RAIL, S = opts.S || 26, SRC = [];
-  const grp = new THREE.Group(); grp.position.copy(pos); grp.rotation.y = rotY; scene.add(grp);
+  const grp = new THREE.Group(); grp.position.copy(pos); grp.rotation.y = rotY; (opts.parent || scene).add(grp);
   const inner = new THREE.Group(); inner.position.x = anchor === 'right' ? -W : anchor === 'center' ? -W / 2 : 0; grp.add(inner);
   const cv = document.createElement('canvas'); cv.width = Math.round(W * S); cv.height = Math.round(H * S); const g = cv.getContext('2d'); g.scale(S, S);
   const ec = document.createElement('canvas'); ec.width = cv.width; ec.height = cv.height; const e = ec.getContext('2d'); e.scale(S, S); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
@@ -1087,13 +1095,14 @@ function buildDesk() {
 
 
 // ================================================================ the endless hall (instanced, procedurally drawn case faces)
-const HALL_U = { uTime: { value: 0 } }, WALLZ = -150, WALL_LV = 7;
+const HALL_U = { uTime: { value: 0 } }, WALLZ = -150, WALL_LV = 10;
+const hallGroup = new THREE.Group(); scene.add(hallGroup); // everything in the background (Scene > Background: black room hides it)
 const hallStrips = { mat: null };
 function buildHall() {
   const TW = 256, TH = 248, NC = 8, NR = 8, cw = TW * NC, ch = TH * NR, rnd = mulberry32(2024);
   const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const g = cv.getContext('2d');
   const ec = document.createElement('canvas'); ec.width = cw; ec.height = ch; const e = ec.getContext('2d'); e.fillStyle = '#000'; e.fillRect(0, 0, cw, ch);
-  const S = TW / (84 * HP), tileScr = []; // px per cm; tileScr: screens per tile (animated overlays)
+  const S = TW / (84 * HP), tileScr = [], tileKn = [], tileJk = []; // px per cm; tileScr: screens per tile (animated overlays)
   for (let t = 0; t < NC * NR; t++) {
     const ox = (t % NC) * TW, oy = Math.floor(t / NC) * TH;
     g.save(); g.translate(ox, oy); g.scale(S, S); e.save(); e.translate(ox, oy); e.scale(S, S);
@@ -1108,8 +1117,8 @@ function buildHall() {
         const cols = Math.max(1, Math.round(mw / 1.9)), cx = i => mx + (i + 0.5) * mw / cols, kind = rnd();
         if (kind < 0.2 && mw > 3) { const sx = mx + 0.4, sy = top + 1.6, sw = mw - 0.8, sh = 2.6; g.fillStyle = '#02040a'; g.fillRect(sx, sy, sw, sh); const sc0 = rnd() < 0.7 ? '#3fd2ff' : '#ffae4a'; for (let k = 0; k <= 24; k++) rnd(); (tileScr[t] = tileScr[t] || []).push([sx + sw / 2, sy + sh / 2, sw, sh, sc0]); }
         else if (kind < 0.32 && mw > 3) { const n = Math.min(6, Math.floor(mw / 0.7)), sp = (mw - 0.8) / n, col = rnd() < 0.6 ? '#ffae4a' : rnd() < 0.5 ? '#ff3b5c' : '#3fd2ff'; e.fillStyle = col; for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (rnd() < 0.55) { e.beginPath(); e.arc(mx + 0.4 + (a + 0.5) * sp, top + 1.8 + (b + 0.5) * sp * 0.8, 0.16, 0, 7); e.fill(); } }
-        else for (let i = 0; i < cols; i++) for (const ky of [2.6, 4.8]) { if (rnd() < 0.2) continue; const big = rnd() < 0.4, kr = big ? 0.6 : 0.42, kx = cx(i), kyy = top + ky; const gr = g.createRadialGradient(kx - kr * 0.3, kyy - kr * 0.3, 0.05, kx, kyy, kr); gr.addColorStop(0, '#3a4252'); gr.addColorStop(1, '#0c0e13'); g.fillStyle = gr; g.beginPath(); g.arc(kx, kyy, kr, 0, 7); g.fill(); g.fillStyle = '#9aa6bc'; g.fillRect(kx - 0.03, kyy - kr * 0.85, 0.06, kr * 0.5); }
-        for (const jy of [8.1, 10.2]) for (let i = 0; i < cols; i++) if (rnd() < 0.85) { const jx = cx(i); g.fillStyle = '#8f99aa'; g.beginPath(); g.arc(jx, top + jy, 0.36, 0, 7); g.fill(); g.fillStyle = '#000'; g.beginPath(); g.arc(jx, top + jy, 0.16, 0, 7); g.fill(); }
+        else for (let i = 0; i < cols; i++) for (const ky of [2.6, 4.8]) { if (rnd() < 0.2) continue; const big = rnd() < 0.4, kr = big ? 0.6 : 0.42, kx = cx(i), kyy = top + ky; (tileKn[t] = tileKn[t] || []).push([kx, kyy, big]); const gr = g.createRadialGradient(kx - kr * 0.3, kyy - kr * 0.3, 0.05, kx, kyy, kr); gr.addColorStop(0, '#3a4252'); gr.addColorStop(1, '#0c0e13'); g.fillStyle = gr; g.beginPath(); g.arc(kx, kyy, kr, 0, 7); g.fill(); g.fillStyle = '#9aa6bc'; g.fillRect(kx - 0.03, kyy - kr * 0.85, 0.06, kr * 0.5); }
+        for (const jy of [8.1, 10.2]) for (let i = 0; i < cols; i++) if (rnd() < 0.85) { const jx = cx(i); (tileJk[t] = tileJk[t] || []).push([jx, top + jy]); g.fillStyle = '#8f99aa'; g.beginPath(); g.arc(jx, top + jy, 0.36, 0, 7); g.fill(); g.fillStyle = '#000'; g.beginPath(); g.arc(jx, top + jy, 0.16, 0, 7); g.fill(); }
         if (rnd() < 0.3) { e.fillStyle = ['#3fd2ff', '#ff3b5c', '#ffae4a', '#dfe8ff', '#3d6bff'][Math.floor(rnd() * 5)]; e.beginPath(); e.arc(cx(0), top + 6.3, 0.17, 0, 7); e.fill(); }
         x += hp;
       }
@@ -1122,11 +1131,11 @@ function buildHall() {
   const map = new THREE.CanvasTexture(cv); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4; const emap = new THREE.CanvasTexture(ec); emap.colorSpace = THREE.SRGBColorSpace;
   const FW = 84 * HP, FH = 3 * U3 + 4 * RAIL, faces = [], bodies = [], leds = [];
   // one tall wall of racks behind the main rack, every rack facing it (3D up close on computers, flat further out and on phones)
-  const LV = WALL_LV, PITCH = FW + 0.6, NW = LITE ? 14 : 22, real3D = [];
+  const LV = WALL_LV, PITCH = FW + 0.6, NW = LITE ? 16 : 34, real3D = [];
   for (let i = -NW; i < NW; i++) for (let lv = 0; lv < LV; lv++) {
     const x = (i + 0.5) * PITCH, y = 2 + lv * (FH + 0.8) + FH / 2, z = WALLZ, ry = 0;
-    if (!LITE && Math.abs(x) < 265) { real3D.push({ x, y, z, lv, idx: faces.length }); faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: 0, real: true }); continue; }
-    faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: rnd() < 0.5 ? 1 : 0, near: Math.abs(x) < (LITE ? 320 : 700) });
+    if (!LITE && Math.abs(x) < 265 && lv < 4) { real3D.push({ x, y, z, lv, idx: faces.length }); faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: 0, real: true }); continue; }
+    faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: rnd() < 0.5 ? 1 : 0, near: Math.abs(x) < (LITE ? 320 : 900), parts: !LITE && Math.abs(x) < 640 });
     for (let q = 0; q < 3; q++) leds.push({ x, y, z, ry, u: (rnd() - 0.5) * FW * 0.9, v: (rnd() - 0.5) * FH * 0.9, c: [COL.cyan, COL.amber, COL.red, COL.white, COL.blue][Math.floor(rnd() * 5)], s: rnd() });
   }
   bodies.push({ x: -PITCH / 2 + 0.3 + PITCH / 2 - 0.3, y: (LV * (FH + 0.8) + 4) / 2, z: WALLZ - 20.3, sx: 2 * NW * PITCH, sy: LV * (FH + 0.8) + 4, sz: 39 });
@@ -1146,11 +1155,22 @@ function buildHall() {
   mat.customProgramCacheKey = () => 'hallface';
   const im = new THREE.InstancedMesh(geo, mat, faces.length), o = new THREE.Object3D();
   faces.forEach((f, i) => { o.position.set(f.x, f.y, f.z); o.rotation.set(0, f.ry, 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
-  im.frustumCulled = false; scene.add(im);
+  im.frustumCulled = false; hallGroup.add(im);
+  // instanced 3D knobs, jacks and hanging cables on the flat racks (computers): the whole wall reads as 3D
+  if (!LITE) { const KN = [], KS = [], JK = [], CB = {}, cr = mulberry32(77), q = new THREE.Quaternion(), e3 = new THREE.Euler(), V = (a, b, c) => new THREE.Vector3(a, b, c);
+    for (const f of faces) { if (!f.parts) continue; q.setFromEuler(e3.set(0, f.ry, 0)); const W = p => V((f.f ? FW - p[0] : p[0]) - FW / 2, FH / 2 - p[1], 0).applyQuaternion(q).add(V(f.x, f.y, f.z));
+      for (const k of tileKn[f.t] || []) (k[2] ? KN : KS).push(W(k)); const jl = tileJk[f.t] || []; for (const k of jl) JK.push(W(k));
+      const nc = 3 + Math.floor(cr() * 7); for (let c = 0; c < nc && jl.length > 2; c++) { const a = jl[Math.floor(cr() * jl.length)], b = jl[Math.floor(cr() * jl.length)], A = W(a), B = W(b), d = A.distanceTo(B); if (d < 3 || d > 26) continue;
+        const sag = d * (0.12 + cr() * 0.25) + 1, pts = []; for (let u = 0; u <= 12; u++) { const t = u / 12, P = A.clone().lerp(B, t); P.y -= Math.sin(Math.PI * t) * sag; P.z += 1.1 + Math.sin(Math.PI * t) * 0.8; pts.push(P); }
+        const col = ['#3b6cff', '#5aa9ff', '#35e0ff', '#c43cff'][Math.floor(cr() * 4)]; (CB[col] = CB[col] || []).push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 14, CR * 0.9, 5, false)); } }
+    const put = (geo, mat, list) => { if (!list.length) return; const m = new THREE.InstancedMesh(geo, mat, list.length), o2 = new THREE.Object3D(); list.forEach((p, i) => { o2.position.copy(p); o2.updateMatrix(); m.setMatrixAt(i, o2.matrix); }); hallGroup.add(m); };
+    const cyl = (r, h, n) => { const g2 = new THREE.CylinderGeometry(r * 0.9, r, h, n); g2.rotateX(Math.PI / 2); g2.translate(0, 0, h / 2); return g2; };
+    put(cyl(0.6, 0.9, 12), MAT.knob, KN); put(cyl(0.42, 0.7, 10), MAT.knob, KS); put(cyl(0.36, 0.3, 6), MAT.metal, JK);
+    for (const col in CB) { const mt = new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.05 }); DECOR_CABLE_MATS.push(mt); hallGroup.add(new THREE.Mesh(mergeGeometries(CB[col]), mt)); } }
   { const q = new THREE.Quaternion(), e3 = new THREE.Euler(); for (const f of faces) { if (!f.near || f.real) continue; const list = tileScr[f.t]; if (!list) continue; q.setFromEuler(e3.set(0, f.ry, 0));
       for (const [cx, cy, sw, sh, col] of list) { const lx = (f.f ? FW - cx : cx) - FW / 2, ly = FH / 2 - cy, p = new THREE.Vector3(lx, ly, 0.08).applyQuaternion(q).add(new THREE.Vector3(f.x, f.y, f.z)); addScope(p, q, sw, sh, col); } } }
   const bim = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), MAT.wood, bodies.length);
-  bodies.forEach((b, i) => { o.position.set(b.x, b.y, b.z); o.rotation.set(0, 0, 0); o.scale.set(b.sx, b.sy, b.sz); o.updateMatrix(); bim.setMatrixAt(i, o.matrix); }); o.scale.set(1, 1, 1); scene.add(bim);
+  bodies.forEach((b, i) => { o.position.set(b.x, b.y, b.z); o.rotation.set(0, 0, 0); o.scale.set(b.sx, b.sy, b.sz); o.updateMatrix(); bim.setMatrixAt(i, o.matrix); }); o.scale.set(1, 1, 1); hallGroup.add(bim);
   // blinking LEDs (animated on the GPU)
   const lg = new THREE.CircleGeometry(0.28, 8), seeds = new Float32Array(leds.length); leds.forEach((l, i) => seeds[i] = l.s); lg.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
   const lm = new THREE.MeshBasicMaterial({ toneMapped: false });
@@ -1158,16 +1178,11 @@ function buildHall() {
   lm.customProgramCacheKey = () => 'hallled';
   const lim = new THREE.InstancedMesh(lg, lm, leds.length);
   leds.forEach((l, i) => { o.position.set(l.x, l.y, l.z); o.rotation.set(0, l.ry, 0); o.translateX(l.u); o.translateY(l.v); o.translateZ(0.25); o.updateMatrix(); lim.setMatrixAt(i, o.matrix); lim.setColorAt(i, new THREE.Color(l.c)); });
-  lim.frustumCulled = false; scene.add(lim);
-  // ceiling light strips running down every aisle
-  const strips = []; for (let k = 0; k < 10; k++) strips.push({ x: 0, z: -95 - k * 110 - 75, sx: 3400, sz: 3 }); for (const sd of [-1, 1]) for (let k = 0; k < 7; k++) strips.push({ x: sd * (230 + k * 110 + 75), z: 400, sx: 3, sz: 1100 }); strips.push({ x: 0, z: 30, sx: 400, sz: 3 });
-  hallStrips.mat = new THREE.MeshBasicMaterial({ color: 0x4a6dff, toneMapped: false });
-  const sim = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), hallStrips.mat, strips.length);
-  strips.forEach((st, i) => { o.position.set(st.x, 330, st.z); o.scale.set(st.sx, 1.2, st.sz); o.updateMatrix(); sim.setMatrixAt(i, o.matrix); }); scene.add(sim);
+  lim.frustumCulled = false; hallGroup.add(lim);
+  // no ceiling: the hall fades up into darkness
   // computer: the racks nearest the back are real 3D (knobs, jacks, hanging cables)
   const Z0 = new THREE.Matrix4().makeScale(0, 0, 0), hideFace = i => { im.setMatrixAt(i, Z0); im.instanceMatrix.needsUpdate = true; };
-  real3D.sort((a, b) => a.lv - b.lv || Math.abs(a.x) - Math.abs(b.x)).forEach((f, i) => BACKQ.push(() => { hideFace(f.idx); buildDecor(84, 3, 500 + i, new THREE.Vector3(f.x, f.y - FH / 2, f.z), 0, 'center', true, { S: f.lv < 2 ? 12 : 8, cf: f.lv < 2 ? 0.28 : 0.2, steps: f.lv < 2 ? 200 : 130, lite: true }); }));
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 1 })); ceil.rotation.x = Math.PI / 2; ceil.position.y = 335; scene.add(ceil);
+  real3D.sort((a, b) => a.lv - b.lv || Math.abs(a.x) - Math.abs(b.x)).forEach((f, i) => BACKQ.push(() => { hideFace(f.idx); buildDecor(84, 3, 500 + i, new THREE.Vector3(f.x, f.y - FH / 2, f.z), 0, 'center', true, { S: f.lv < 2 ? 12 : 8, cf: f.lv < 2 ? 0.28 : 0.2, steps: f.lv < 2 ? 200 : 130, lite: true, parent: hallGroup }); }));
 }
 
 // ================================================================ physics cables
@@ -1409,12 +1424,33 @@ function orient(geo, pos, dir, roll = 0) {
 }
 const tubeG = (pts, r, seg = 12) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), seg, r, 5, false);
 function addMesh(group, geos, mats) { if (!geos.length) return; const m = new THREE.Mesh(mergeGeometries(geos), mats.m || mats); m.castShadow = true; m.receiveShadow = true; if (mats.d) m.customDepthMaterial = mats.d; group.add(m); geos.forEach(g => g.dispose()); }
-function addPot(grp, r, h) {
-  const M = plantMats(), pts = [[0, 0], [r * 0.72, 0], [r * 0.78, h * 0.1], [r, h * 0.92], [r * 1.06, h * 0.94], [r * 1.06, h], [r * 0.95, h], [r * 0.93, h * 0.9], [0, h * 0.9]].map(([x, y]) => new THREE.Vector2(x, y));
-  const pot = new THREE.Mesh(new THREE.LatheGeometry(pts, 32), M.pot); pot.castShadow = pot.receiveShadow = true; grp.add(pot);
-  const soil = new THREE.Mesh(new THREE.CircleGeometry(r * 0.93, 24), M.soil); soil.rotation.x = -Math.PI / 2; soil.position.y = h * 0.905; grp.add(soil);
+const GLAZES = [['#7fa79a', '#3f5f55', '#d8e6dc'], ['#2c3f6e', '#141d38', '#7d93c4'], ['#5a3a24', '#2a170c', '#b0703a'], ['#e9e3d6', '#b9ad98', '#ffffff'], ['#1c1c20', '#0a0a0c', '#4a4a52'], ['#a34a2e', '#5a2214', '#e2925a']];
+const glazeTex = {};
+function glazeMap(gi, gold) { const key = gi + (gold ? 'g' : ''); if (glazeTex[key]) return glazeTex[key];
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d'), [base, dark, hi] = GLAZES[gi], r = mulberry32(gi * 7 + 3);
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, hi); gr.addColorStop(0.18, base); gr.addColorStop(0.7, base); gr.addColorStop(1, dark); g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  for (let k = 0; k < 26; k++) { const x = r() * 256, w = 3 + r() * 9, len = 40 + r() * 150; const dg = g.createLinearGradient(0, 0, 0, len); dg.addColorStop(0, hi); dg.addColorStop(1, 'rgba(0,0,0,0)'); g.globalAlpha = 0.35; g.fillStyle = dg; g.beginPath(); g.ellipse(x, len / 2, w / 2, len / 2, 0, 0, 7); g.fill(); }
+  g.globalAlpha = 1; for (let k = 0; k < 900; k++) { g.fillStyle = r() < 0.5 ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.18)'; g.fillRect(r() * 256, r() * 256, 1.2, 1.2); }
+  g.fillStyle = dark; g.fillRect(0, 238, 256, 18); // unglazed foot
+  if (gold) { g.strokeStyle = '#e8b84a'; g.lineWidth = 2.2; for (let k = 0; k < 3; k++) { g.beginPath(); let x = r() * 256, y = 0; g.moveTo(x, y); while (y < 236) { x += (r() - 0.5) * 40; y += 12 + r() * 22; g.lineTo(x, y); } g.stroke(); } }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return glazeTex[key] = t; }
+function jpot(grp, r, h, style, seed) { // Japanese ceramic pots: tsubo jar, tall ribbed cylinder, wide bowl, hexagonal, bonsai tray
+  const M = plantMats(), rr = mulberry32(seed), gi = Math.floor(rr() * GLAZES.length), gold = style === 'cyl' || rr() < 0.2;
+  const mat = new THREE.MeshStandardMaterial({ map: glazeMap(style === 'cyl' ? 4 : gi, gold), roughness: 0.28, metalness: 0.05, envMapIntensity: 0.9 });
+  let geo, top = h;
+  const lathe = pts => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), 40);
+  if (style === 'tsubo') geo = lathe([[0, 0], [r * 0.55, 0], [r * 0.6, h * 0.05], [r * 0.95, h * 0.35], [r * 1.02, h * 0.55], [r * 0.85, h * 0.85], [r * 0.7, h * 0.95], [r * 0.74, h], [r * 0.66, h], [r * 0.62, h * 0.9], [0, h * 0.9]]);
+  else if (style === 'cyl') { const pts = [[0, 0], [r * 0.9, 0]]; for (let k = 0; k <= 12; k++) pts.push([r * (0.95 + (k % 2 ? 0.04 : 0)), h * (0.04 + k * 0.075)]); pts.push([r, h], [r * 0.9, h], [r * 0.88, h * 0.92], [0, h * 0.92]); geo = lathe(pts); }
+  else if (style === 'bowl') geo = lathe([[0, 0], [r * 0.5, 0], [r * 0.55, h * 0.12], [r * 0.85, h * 0.35], [r * 1.0, h * 0.8], [r * 1.04, h], [r * 0.96, h], [r * 0.9, h * 0.82], [0, h * 0.8]]);
+  else if (style === 'hex') { geo = new THREE.CylinderGeometry(r, r * 0.78, h, 6, 1, false); geo.translate(0, h / 2, 0); }
+  else { const b = new THREE.BoxGeometry(r * 2.2, h * 0.7, r * 1.5); b.translate(0, h * 0.35 + h * 0.3, 0); const feet = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, c]) => { const f = new THREE.BoxGeometry(r * 0.3, h * 0.3, r * 0.3); f.translate(a * r * 0.85, h * 0.15, c * r * 0.5); return f; }); geo = mergeGeometries([b.toNonIndexed(), ...feet.map(f => f.toNonIndexed())]); top = h; }
+  const pot = new THREE.Mesh(geo, mat); pot.castShadow = pot.receiveShadow = true; grp.add(pot);
+  const soil = new THREE.Mesh(style === 'bonsai' ? new THREE.PlaneGeometry(r * 2.0, r * 1.3) : new THREE.CircleGeometry(style === 'tsubo' ? r * 0.62 : style === 'hex' ? r * 0.9 : r * 0.9, 24), M.soil); soil.rotation.x = -Math.PI / 2; soil.position.y = top * 0.93; grp.add(soil);
+  return top * 0.93;
 }
-function plantAt(x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); plantGroup.add(g); return g; }
+function addPot(grp, r, h) { const p = grp.position, seed = Math.abs(Math.round(p.x * 13 + p.z * 7)) + 1; return jpot(grp, r, h, ['tsubo', 'cyl', 'bowl', 'hex'][seed % 4], seed); }
+let PLANT_PARENT = null;
+function plantAt(x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); (PLANT_PARENT || plantGroup).add(g); return g; }
 function monstera(x, z, s, seed, y = FLOOR_Y) {
   const M = plantMats(), r = mulberry32(seed), grp = plantAt(x, y, z), pr = 13 * s + 4, ph = 30 * s; addPot(grp, pr, ph);
   const leaves = [], stems = [], n = 8 + Math.floor(r() * 5);
@@ -1461,11 +1497,11 @@ const VINE_KINDS = { pothos: { size: 1, gap: 1, col: null }, golden: { size: 1, 
 const VMAT = {};
 function vineMat(kind) { const K = VINE_KINDS[kind], M = plantMats(); if (!K.col) return M.pothos; if (VMAT[kind]) return VMAT[kind]; const map = M.pothos.m.map;
   return VMAT[kind] = { m: swayPatch(new THREE.MeshStandardMaterial({ map, color: K.col[0], alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.55, envMapIntensity: 0.5, emissive: K.col[1], emissiveMap: map, emissiveIntensity: 0.6 }), 0.009), d: M.pothos.d }; }
-function vines(origin, list, seed, kind = 'pothos', shadow = true) { // strands hanging from a ledge; list: [x, z, len, outDir]
-  const M = plantMats(), r = mulberry32(seed), grp = plantAt(origin.x, origin.y, origin.z), leaves = [], stems = [], K = VINE_KINDS[kind];
-  for (const [vx, vz, len, out] of list) {
+function vines(origin, list, seed, kind = 'pothos', shadow = true, parent = null) { // strands hanging from a ledge; list: [x, z, len, outDir]
+  const M = plantMats(), r = mulberry32(seed), grp = plantAt(origin.x, origin.y, origin.z), leaves = [], stems = [], K = VINE_KINDS[kind]; if (parent) parent.add(grp);
+  for (const [vx, vz, len, out, lead = 0] of list) {
     const side = new THREE.Vector3().crossVectors(out, UP).normalize(), ph = r() * 6, pts = [];
-    for (let k = 0; k <= 9; k++) { const u = k / 9; pts.push(new THREE.Vector3(vx, 0, vz).addScaledVector(out, 1.5 + Math.sin(u * Math.PI) * 2.5 + u * 1.5).addScaledVector(DOWN, len * u).addScaledVector(side, Math.sin(u * 5 + ph) * 2.5 * u)); }
+    for (let k = 0; k <= 12; k++) { const u = k / 12, dn = lead ? (u < 0.2 ? 2.5 * u * u : u - 0.1) / 0.9 : u; pts.push(new THREE.Vector3(vx, 0, vz).addScaledVector(out, lead * Math.min(1, u * 5) + 1.5 + Math.sin(u * Math.PI) * 2.5 + u * 1.5).addScaledVector(DOWN, len * dn).addScaledVector(side, Math.sin(u * 5 + ph) * 2.5 * u)); }
     pts.unshift(new THREE.Vector3(vx, 1.2, vz).addScaledVector(out, -3));
     const curve = new THREE.CatmullRomCurve3(pts); stems.push(new THREE.TubeGeometry(curve, 40, 0.22, 4, false));
     const total = curve.getLength(); let sg = 1;
@@ -1473,41 +1509,51 @@ function vines(origin, list, seed, kind = 'pothos', shadow = true) { // strands 
   }
   addMesh(grp, leaves, vineMat(kind)); addMesh(grp, stems, M.vstem); if (!shadow) grp.traverse(o => { o.castShadow = false; });
 }
+const floorPlantGroup = new THREE.Group(); scene.add(floorPlantGroup);
+function potTop(x, z, ry, r, h, style, seed, strands) { // a pot sitting on top of a rack with a leafy tuft; strands: [[outDir, len, kind, lead]]
+  const top = CASE_H + 0.05, g = plantAt(x, top, z); g.rotation.y = ry; const rim = jpot(g, r, h, style, seed), rr = mulberry32(seed + 9), M = plantMats(), leaves = [];
+  const kind0 = strands.length ? strands[0][2] : 'pothos';
+  for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + rr(), dir = new THREE.Vector3(Math.cos(a) * 0.6, 0.8, Math.sin(a) * 0.6), w = (2.2 + rr() * 1.8) * Math.max(0.6, r / 5); leaves.push(orient(leafGeo(w, w * 1.2, 0.35, 0.15, 3, 5), new THREE.Vector3(Math.cos(a) * r * 0.3, rim, Math.sin(a) * r * 0.3), dir, rr())); }
+  addMesh(g, leaves, vineMat(kind0));
+  const byKind = {}; for (const [out, len, kind, lead] of strands) { const o = out.clone().normalize(), start = new THREE.Vector3(x, 0, z).addScaledVector(o, r * 0.85); (byKind[kind] = byKind[kind] || []).push([start.x, start.z, len, o, lead]); }
+  let sd = seed * 3; for (const k in byKind) vines(new THREE.Vector3(0, top + rim - 1.0, 0), byKind[k], sd++, k);
+}
 function buildPlants() {
-  const top = CASE_H + 0.05, Wd = 84 * HP, hinge = CASE_W / 2 + 2.4, KINDS = ['pothos', 'pothos', 'golden', 'ivy', 'purple', 'string'];
+  const Wd = 84 * HP, hinge = CASE_W / 2 + 2.4, KINDS = ['pothos', 'pothos', 'golden', 'ivy', 'purple', 'string'], rk = mulberry32(71), K = () => rpickR(rk, KINDS);
   const sp = (hx, a, lx, lz) => new THREE.Vector3(hx + lx * Math.cos(a) + lz * Math.sin(a), 0, -lx * Math.sin(a) + lz * Math.cos(a));
-  const trough = (cx, cz, ry, w) => { const g = new THREE.Group(); g.position.set(cx, top, cz); g.rotation.y = ry; plantGroup.add(g);
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, 2.2, 13), MAT.wood); b.position.set(0, 1.1, -6); b.castShadow = true; g.add(b);
-    const soil = new THREE.Mesh(new THREE.BoxGeometry(w - 0.6, 0.3, 12.4), PM.soil); soil.position.set(0, 2.1, -6); g.add(soil); };
-  // strands per kind, gathered then built once per kind: [x, z, len, outDir]
-  const S = {}; const add = (kind, x, z, len, out) => (S[kind] = S[kind] || []).push([x, z, len, out]);
-  plantMats(); trough(0, 0, 0, CASE_W - 2);
-  const r = mulberry32(55), Zf = new THREE.Vector3(0, 0, 1), Zb = new THREE.Vector3(0, 0, -1);
-  // middle: front stays clear over the controls (short), long at the edges; the back gets long curtains
-  for (let k = 0; k < 9; k++) { const x = -CASE_W / 2 + 2 + (CASE_W - 4) * (k + 0.2 + r() * 0.6) / 9, edge = Math.abs(x) > CASE_W * 0.36; add(rpickR(r, KINDS), x, 1.2, edge ? 30 + r() * 35 : 4 + r() * 7, Zf); }
-  for (let k = 0; k < 10; k++) { const x = -CASE_W / 2 + 2 + (CASE_W - 4) * (k + r()) / 10; add(rpickR(r, KINDS), x, -13.5, 25 + r() * 45, Zb); }
-  // wings: front, back and the outer side
-  for (const [a, hx, sd] of [[0.55, -hinge, 41], [-0.55, hinge, 42]]) {
-    const out = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), back = out.clone().negate(), sg = sd === 41 ? -1 : 1, rr = mulberry32(sd), mid = sp(hx, a, sg * Wd / 2, 0);
-    trough(mid.x, mid.z, a, Wd - 2);
-    for (let k = 0; k < 8; k++) { const u = (k + 0.2 + rr() * 0.6) / 8, p = sp(hx, a, sg * Wd * u, 1.2); add(rpickR(rr, KINDS), p.x, p.z, (u > 0.6 ? 30 : 10) + rr() * 32, out); }
-    for (let k = 0; k < 8; k++) { const u = (k + rr()) / 8, p = sp(hx, a, sg * Wd * u, -13.5); add(rpickR(rr, KINDS), p.x, p.z, 25 + rr() * 45, back); }
-    const side = new THREE.Vector3(sg * Math.cos(a), 0, -sg * Math.sin(a));
-    for (let k = 0; k < 4; k++) { const p = sp(hx, a, sg * (Wd + 1.5), -1 - k * 3.2); add(rpickR(rr, KINDS), p.x, p.z, 30 + rr() * 40, side); }
+  plantMats();
+  const F = new THREE.Vector3(0, 0, 1), B = new THREE.Vector3(0, 0, -1), lead = z => Math.max(0, z), FZ = 1.5, BZ = -14.5;
+  // middle: four pots; front strands stay short over the controls except at the edges, long curtains down the back
+  for (const [x, z, r, h, st, front] of [[-15.5, -6, 4.6, 6.5, 'tsubo', 38], [-4, -7.5, 3.2, 9, 'cyl', 7], [7.5, -6, 5.6, 4.2, 'bowl', 8], [17, -5.5, 3.6, 5.5, 'hex', 34]]) {
+    const sd = Math.round(x * 10 + 500), str = [];
+    str.push([F.clone().add(new THREE.Vector3((rk() - 0.5) * 0.4, 0, 0)), front + rk() * 10, K(), FZ - (z + r * 0.85) + 1]);
+    if (front > 20) str.push([F.clone().add(new THREE.Vector3(Math.sign(x) * 0.4, 0, 0)), front * 0.7 + rk() * 12, K(), FZ - (z + r * 0.85) + 1]);
+    str.push([B.clone(), 35 + rk() * 40, K(), (z - r * 0.85) - BZ + 1], [B.clone().add(new THREE.Vector3((rk() - 0.5) * 0.6, 0, 0)), 25 + rk() * 40, K(), (z - r * 0.85) - BZ + 1]);
+    potTop(x, z, 0, r, h, st, sd, str);
   }
-  let seed = 31; for (const kind in S) vines(new THREE.Vector3(0, top + 1.4, 0), S[kind], seed++, kind);
-  // the background wall: dense mixed vines along the top and spilling from the shelves
-  const FH = 3 * U3 + 4 * RAIL, wallTop = 2 + WALL_LV * (FH + 0.8), B = {}, hr = mulberry32(909), N = LITE ? 30 : 90, half = LITE ? 300 : 420;
-  const badd = (kind, x, yOff, len) => (B[kind] = B[kind] || []).push([x, yOff, len, Zf]);
-  for (let k = 0; k < N; k++) badd(rpickR(hr, KINDS), -half + 2 * half * (k + hr()) / N, 0, 30 + hr() * 110);
-  for (const kind in B) vines(new THREE.Vector3(0, wallTop - 1, WALLZ + 1), B[kind].map(([x, , len, o]) => [x, 1.2, len, o]), 700 + kind.length, kind, false);
-  const shelf = {}; for (let k = 0; k < (LITE ? 14 : 45); k++) { const lv = 1 + Math.floor(hr() * (WALL_LV - 1)), kind = rpickR(hr, KINDS); (shelf[lv + kind] = shelf[lv + kind] || { lv, kind, l: [] }).l.push([-half + 2 * half * hr(), 1.2, 12 + hr() * 35, Zf]); }
-  for (const k in shelf) { const g = shelf[k]; vines(new THREE.Vector3(0, 2 + g.lv * (FH + 0.8) - 0.4, WALLZ + 1), g.l, 800 + g.lv, g.kind, false); }
-  // cozy: tall potted plants behind the rack, a round rug, two floor lamps
-  palm(-62, -52, 1.25, 501); banana(-28, -66, 1.1, 502); monstera(34, -60, 1.0, 503); palm(70, -48, 1.15, 504); banana(4, -90, 1.2, 505);
-  buildRug(); floorLamp(-78, 30); floorLamp(80, 28);
+  // wings: three pots each; long strands front and back, the outer pot also spills over the side
+  for (const [a, hx, sd0] of [[0.55, -hinge, 41], [-0.55, hinge, 42]]) {
+    const sg = sd0 === 41 ? -1 : 1, out = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), back = out.clone().negate(), side = new THREE.Vector3(sg * Math.cos(a), 0, -sg * Math.sin(a));
+    [[0.2, 4.2, 5.5, 'hex'], [0.52, 5.4, 4.4, 'bowl'], [0.84, 4.0, 8.5, 'tsubo']].forEach(([u, r, h, st], k) => {
+      const p = sp(hx, a, sg * Wd * u, -6), str = [[out.clone(), (u > 0.5 ? 34 : 12) + rk() * 26, K(), 6.5 - r * 0.85 + 1], [back.clone(), 30 + rk() * 40, K(), 7.5 - r * 0.85 + 1]];
+      if (k === 2) str.push([side.clone(), 40 + rk() * 30, K(), Wd * (1 - u) - r * 0.85 + 1], [side.clone().add(back.clone().multiplyScalar(0.4)), 30 + rk() * 25, K(), Wd * (1 - u) - r * 0.85 + 1]);
+      potTop(p.x, p.z, a, r, h, st, sd0 * 100 + k, str); });
+  }
+  // the background wall: dense mixed vines along the top and spilling from the shelves (part of the background)
+  const FH = 3 * U3 + 4 * RAIL, wallTop = 2 + WALL_LV * (FH + 0.8), Bk = {}, hr = mulberry32(909), N = LITE ? 30 : 110, half = LITE ? 340 : 620, Zf = F;
+  for (let k = 0; k < N; k++) { const kind = rpickR(hr, KINDS); (Bk[kind] = Bk[kind] || []).push([-half + 2 * half * (k + hr()) / N, 1.2, 30 + hr() * 120, Zf]); }
+  for (const kind in Bk) vines(new THREE.Vector3(0, wallTop - 1, WALLZ + 1), Bk[kind], 700 + kind.length, kind, false, hallGroup);
+  const shelf = {}; for (let k = 0; k < (LITE ? 16 : 70); k++) { const lv = 1 + Math.floor(hr() * (WALL_LV - 1)), kind = rpickR(hr, KINDS); (shelf[lv + kind] = shelf[lv + kind] || { lv, kind, l: [] }).l.push([-half + 2 * half * hr(), 1.2, 12 + hr() * 35, Zf]); }
+  for (const k in shelf) { const g = shelf[k]; vines(new THREE.Vector3(0, 2 + g.lv * (FH + 0.8) - 0.4, WALLZ + 1), g.l, 800 + g.lv, g.kind, false, hallGroup); }
+  // floor plants gathered around the back and sides of the rack (kept clear of the lamps and the rack)
+  PLANT_PARENT = floorPlantGroup;
+  banana(-16, -56, 0.82, 502); palm(26, -60, 0.9, 501); monstera(-46, -40, 0.62, 503); monstera(50, -42, 0.62, 506); palm(-4, -82, 0.8, 509);
+  palm(-96, -14, 0.6, 507); banana(98, -12, 0.58, 508); monstera(-84, -40, 0.55, 510); monstera(86, -40, 0.55, 511);
+  PLANT_PARENT = null;
+  buildRug(); buildSides();
 }
 const rpickR = (r, a) => a[Math.floor(r() * a.length)];
+const rugGroup = new THREE.Group(); scene.add(rugGroup);
 function buildRug() {
   const S = 1024, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), R = S / 2, rnd = mulberry32(4242);
   const rings = [['#2a1f3a', 1], ['#c98f5a', 0.97], ['#3a2a52', 0.95], ['#d9c3a0', 0.86], ['#5a3a6a', 0.84], ['#2b3e72', 0.72], ['#c98f5a', 0.70], ['#1d2a50', 0.58], ['#d9c3a0', 0.42], ['#7a4a5a', 0.40], ['#2b3e72', 0.25], ['#c98f5a', 0.12]];
@@ -1517,16 +1563,46 @@ function buildRug() {
   g.restore();
   const id = g.getImageData(0, 0, S, S), d = id.data; for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * 26; d[i] += n; d[i + 1] += n; d[i + 2] += n; } g.putImageData(id, 0, 0); // woven texture
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  const rug = new THREE.Mesh(new THREE.CircleGeometry(78, 96), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 })); rug.rotation.x = -Math.PI / 2; rug.position.set(0, FLOOR_Y + 0.08, 6); rug.receiveShadow = true; scene.add(rug);
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(78, 96), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 })); rug.rotation.x = -Math.PI / 2; rug.position.set(0, FLOOR_Y + 0.08, 6); rug.receiveShadow = true; rugGroup.add(rug);
 }
-function floorLamp(x, z) {
-  const g = new THREE.Group(); g.position.set(x, FLOOR_Y, z); scene.add(g);
-  const metal = new THREE.MeshStandardMaterial({ color: 0x1a1c22, roughness: 0.4, metalness: 0.7 });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 1.2, 24), metal); base.position.y = 0.6; g.add(base);
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 70, 10), metal); pole.position.y = 35; g.add(pole);
-  const shade = new THREE.Mesh(new THREE.CylinderGeometry(7, 11, 13, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xffc78a, emissive: 0xff9a4a, emissiveIntensity: 1.4, side: THREE.DoubleSide, roughness: 0.8 }));
-  shade.position.y = 74; g.add(shade);
-  const glow = new THREE.PointLight(0xffa35c, 0.9, 95, 0); glow.position.y = 72; glow.castShadow = false; g.add(glow);
+const SIDES = {}, LAMP_LIGHTS = [], LAMP_PAPER = [], CRT_U = { uTime: { value: 0 } };
+function washiTex() { const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d'), r = mulberry32(31);
+  g.fillStyle = '#f3e7d0'; g.fillRect(0, 0, 256, 512); for (let k = 0; k < 500; k++) { g.strokeStyle = r() < 0.5 ? 'rgba(200,180,140,.35)' : 'rgba(255,255,255,.4)'; g.lineWidth = 0.6 + r(); g.beginPath(); const x = r() * 256, y = r() * 512; g.moveTo(x, y); g.quadraticCurveTo(x + (r() - 0.5) * 30, y + (r() - 0.5) * 30, x + (r() - 0.5) * 40, y + (r() - 0.5) * 40); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+function washiLamp() { // tall paper floor lamp in a dark wood lattice, as tall as the rack
+  const g = new THREE.Group(), H = CASE_H, W = 20, wood = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.6 }), tex = washiTex();
+  const paper = new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffb36a, emissiveMap: tex, emissiveIntensity: 0.9, side: THREE.DoubleSide, roughness: 0.9 }); LAMP_PAPER.push(paper);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H - 8, W), paper); body.position.y = 4 + (H - 8) / 2; g.add(body);
+  const parts = []; const bx = (w, h, d, x, y, z) => { const b = new THREE.BoxGeometry(w, h, d); b.translate(x, y, z); parts.push(b); };
+  bx(W + 6, 3, W + 6, 0, 1.5, 0); bx(W + 4, 2, W + 4, 0, H - 1, 0);
+  for (const [a, c] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) bx(1.4, H - 3, 1.4, a * W / 2, (H - 3) / 2 + 2, c * W / 2);
+  for (let y = 4 + 16; y < H - 6; y += 16) for (const [w, d, x, z] of [[W, 0.8, 0, W / 2], [W, 0.8, 0, -W / 2], [0.8, W, W / 2, 0], [0.8, W, -W / 2, 0]]) bx(w, 0.8, d, x, y, z);
+  for (const x of [-W / 6, W / 6]) for (const z of [W / 2, -W / 2]) bx(0.5, H - 8, 0.5, x, 4 + (H - 8) / 2, z);
+  for (const z of [-W / 6, W / 6]) for (const x of [W / 2, -W / 2]) bx(0.5, H - 8, 0.5, x, 4 + (H - 8) / 2, z);
+  const fr = new THREE.Mesh(mergeGeometries(parts), wood); fr.castShadow = true; g.add(fr);
+  const L = new THREE.PointLight(0xffa860, 1.1, 150, 0); L.position.y = H * 0.6; g.add(L); LAMP_LIGHTS.push(L);
+  return g;
+}
+function crtTV() { // CRT on a wooden crate, playing static
+  const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x3a2616, roughness: 0.7 }), plastic = new THREE.MeshStandardMaterial({ color: 0x24252b, roughness: 0.45, metalness: 0.1 });
+  const crate = new THREE.Mesh(new THREE.BoxGeometry(42, 26, 34), wood); crate.position.y = 13; crate.castShadow = crate.receiveShadow = true; g.add(crate);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(38, 32, 34), plastic); body.position.set(0, 26 + 16, -1); body.castShadow = true; g.add(body);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(26, 22, 12), plastic); back.position.set(0, 26 + 15, -22); g.add(back);
+  const bezel = new THREE.Mesh(new THREE.BoxGeometry(31, 25, 1), new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.3 })); bezel.position.set(-2.5, 26 + 17, 16.2); g.add(bezel);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(28, 22, 16, 12), new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uSeed: { value: Math.random() * 100 } }, toneMapped: false,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; vec3 p = position; p.z += 0.9 * (1.0 - pow(uv.x * 2.0 - 1.0, 2.0)) * (1.0 - pow(uv.y * 2.0 - 1.0, 2.0)); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+    fragmentShader: `uniform float uTime, uSeed; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
+      void main(){ vec2 g = floor(vUv * vec2(220.0, 160.0)); float t = floor(uTime * 30.0); float n = h(vec2(g.x * 1.31 + t * 37.0, g.y * 1.73 - t * 91.0)); n = fract(n * 7.0 + h(g.yx + t)); float line = 0.75 + 0.25 * sin(vUv.y * 480.0);
+        float roll = smoothstep(0.0, 0.08, abs(fract(vUv.y - uTime * 0.17) - 0.5)); float v = n * line * (0.65 + 0.35 * roll); vec2 c = vUv - 0.5; v *= 1.0 - dot(c, c) * 1.6;
+        gl_FragColor = vec4(vec3(v) * vec3(0.92, 0.97, 1.05) * 1.25, 1.0); }` }));
+  scr.position.set(-2.5, 26 + 17, 16.75); g.add(scr);
+  for (const y of [8, 0]) { const k = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 1.2, 16), plastic); k.rotation.x = Math.PI / 2; k.position.set(15, 26 + 17 + y, 16.4); g.add(k); }
+  const L = new THREE.PointLight(0xbfd4ff, 0.5, 90, 0); L.position.set(0, 42, 30); g.add(L); g.userData.light = L;
+  return g;
+}
+function buildSides() {
+  for (const [k, x, ry] of [['L', -88, 0.62], ['R', 88, -0.62]]) { const root = new THREE.Group(); root.position.set(x, FLOOR_Y, 30); root.rotation.y = ry; scene.add(root);
+    const lamp = washiLamp(), crt = crtTV(); root.add(lamp, crt); SIDES[k] = { lamp, crt }; }
 }
 
 // ================================================================ scene settings
@@ -1540,7 +1616,7 @@ const PRESETS = {
 };
 const LOOKS = { ps2: { ps2: true, scan: 0.22, bloom: 1.3, blur: 0.6, fogd: 0.0075, shafts: 0.8 }, clean: { ps2: false, scan: 0.25, bloom: 0.85, blur: 0, fogd: 0.0042, shafts: 0.55 } };
 const SKEY = 'nightrack.scene.v3';
-const SET = { ...PRESETS['Night Blue'], ...LOOKS.clean, plants: true, cableOp: 1, slack: 0.2, neon: false, dance: false };
+const SET = { ...PRESETS['Night Blue'], ...LOOKS.clean, plants: true, cableOp: 1, slack: 0.2, neon: false, dance: false, room: 'wall', sideL: 'lamp', sideR: 'lamp', lampsLit: true, rug: true, floorPlants: true };
 try { Object.assign(SET, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) { }
 let envTimer = 0, lastPS2 = null, lastSlack = null;
 function applyRes() {
@@ -1556,7 +1632,9 @@ function applySettings(save = true) {
   after.uniforms.damp.value = SET.blur; after.enabled = SET.blur > 0.01;
   shafts.visible = SET.shafts > 0.01;
   MOTE_U.uColor.value.copy(C_('key')).lerp(new THREE.Color(0xffffff), 0.5); MOTE_U.uInt.value = 0.3 + SET.shafts; motes.visible = SET.shafts > 0.01;
-  plantGroup.visible = SET.plants; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
+  plantGroup.visible = SET.plants; floorPlantGroup.visible = SET.floorPlants; rugGroup.visible = SET.rug; hallGroup.visible = SET.room !== 'black';
+  for (const k in SIDES) { const v = SET['side' + k]; SIDES[k].lamp.visible = v === 'lamp'; SIDES[k].crt.visible = v === 'crt'; }
+  for (const L of LAMP_LIGHTS) L.intensity = SET.lampsLit ? 1.1 : 0; for (const m of LAMP_PAPER) m.emissiveIntensity = SET.lampsLit ? 0.9 : 0.03; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
   for (const c of cables) { c.applyOpacity(); c.applyNeon(); }
   for (const m of DECOR_CABLE_MATS) { m.emissive.copy(SET.neon ? m.color : new THREE.Color(0)); m.emissiveIntensity = SET.neon ? 1.3 : 1; }
   if (lastSlack !== SET.slack) { if (lastSlack !== null) for (const c of cables) if (c.connected) c.length = stdLen(c.ends[0].port.world.distanceTo(c.ends[1].port.world)); lastSlack = SET.slack; } PS2.enabled = SET.ps2; PS2.uniforms.uScan.value = SET.scan;
@@ -1564,7 +1642,7 @@ function applySettings(save = true) {
   clearTimeout(envTimer); envTimer = setTimeout(() => buildEnv(SET.key, SET.rimL, SET.rimR, SET.amb, SET.fogc), 120);
   syncUI(); if (save) try { localStorage.setItem(SKEY, JSON.stringify(SET)); } catch (e) { }
 }
-const UI = { cKey: 'key', cRimL: 'rimL', cRimR: 'rimR', cAmb: 'amb', cFog: 'fogc', sScan: 'scan', sBloom: 'bloom', sBlur: 'blur', sFog: 'fogd', sShafts: 'shafts', t480: 'ps2', tPlants: 'plants', sCable: 'cableOp', sSlack: 'slack', tNeon: 'neon', tDance: 'dance' };
+const UI = { cKey: 'key', cRimL: 'rimL', cRimR: 'rimR', cAmb: 'amb', cFog: 'fogc', sScan: 'scan', sBloom: 'bloom', sBlur: 'blur', sFog: 'fogd', sShafts: 'shafts', t480: 'ps2', tPlants: 'plants', sCable: 'cableOp', sSlack: 'slack', tNeon: 'neon', tDance: 'dance', selRoom: 'room', selL: 'sideL', selR: 'sideR', tLit: 'lampsLit', tRug: 'rug', tFloorP: 'floorPlants' };
 function syncUI() { for (const id in UI) { const el = document.getElementById(id), k = UI[id]; if (el.type === 'checkbox') el.checked = !!SET[k]; else el.value = SET[k]; } }
 for (const id in UI) {
   const el = document.getElementById(id), k = UI[id];
@@ -2443,8 +2521,9 @@ async function main() {
   buildRack();
   const near = [buildDecor(84, NROWS, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right'),
     buildDecor(84, NROWS, 37, new THREE.Vector3(CASE_W / 2 + 2.4, 0, 0), -0.55, 'left')];
-  buildHall();
   buildScopes();
+  buildHall();
+  buildScopes(hallGroup);
   rackBeams(near);
   desk = buildDesk();
   buildPlants();
@@ -2460,13 +2539,13 @@ function frame(ts) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016); lastTs = ts; pollPad(dt);
   DANCE.v = SET.dance && AC && AC.state === 'running' ? G.beat.level(ts / 1000, 0.13) : DANCE.v * 0.9;
-  if (window.__noRender) return; if (BACKQ.length && ts > 1500) { const t0 = performance.now(); while (BACKQ.length && performance.now() - t0 < 12) BACKQ.shift()(); if (!BACKQ.length || SCOPES.length > 60) buildScopes(); } acc += dt; let n = 0; stepTweens(dt);
+  if (window.__noRender) return; if (BACKQ.length && ts > 1500) { const t0 = performance.now(); while (BACKQ.length && performance.now() - t0 < 12) BACKQ.shift()(); if (!BACKQ.length || SCOPES.length > 60) buildScopes(hallGroup); } acc += dt; let n = 0; stepTweens(dt);
   while (acc >= 1 / 120 && n < 5) { physics(1 / 120); acc -= 1 / 120; n++; } if (n === 5) acc = 0;
   for (const c of cables) c.tube.update(c.rope.P);
   const live = !!(AC && AC.state === 'running' && ENG), now = ts / 1000;
   for (const m of modules) { if (live) m.visual(now); else if (m.idle) m.idle(); if (m.scr && (m.liveScreen || m.screenDirty)) { m.screenDirty = false; m.drawScreen(now); } }
   // decor LEDs
-  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
+  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; for (const k in SIDES) { const L = SIDES[k].crt.userData.light; if (SIDES[k].crt.visible) L.intensity = 0.35 + Math.random() * 0.25; } PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
   const T = ts / 1000, beat = live ? G.beat.level(now, 0.15) : 0, tick = G.tick || Math.floor(T * 2);
   for (const d of decorLEDs) { for (let i = 0; i < d.list.length; i++) { const l = d.list[i]; let v;
     if (l.type === 0) { l.lv = Math.random() < 0.012 ? 1 : l.lv * 0.93; v = l.lv; } else if (l.type === 1) v = 0.5 + 0.5 * Math.sin(T * l.f + l.ph); else if (l.type === 2) v = live ? beat : 0.3 + 0.3 * Math.sin(T * 0.8 + l.ph); else { const on = ((tick + l.idx * 7 + Math.floor(l.ph * 20)) % 11) < 3; l.lv = on ? 1 : l.lv * 0.9; v = l.lv; }
