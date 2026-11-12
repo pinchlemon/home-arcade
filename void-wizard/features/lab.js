@@ -17,7 +17,7 @@ feature('lab', ({ game, on }) => {
       ['Teammate brains', 'party.spacing party.keepAway party.shoot party.shotRange party.accuracy party.think party.toYou']]],
     ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
       ...['Blue', 'Red', 'Green', 'Purple', 'Gold'].map(n => [n + ' wizard', ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + n.toLowerCase() + '.' + s).join(' ')])]],
-    ['solids', 'Solids', [['Flight', 'bodies.solid world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'],
+    ['solids', 'Solids', [['Flight', 'throws.spiral bodies.solid world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'],
       ['Extra solids', 'spawn.count spawn.size spawn.bounce spawn.kick spawn.pickup spawn.power spawn.damage']]],
     ['demon', 'Demon', [['How it acts', 'bodies.demon demon.aggression demon.health'], ['Hurting you', 'health.contact health.contactDmg'],
       ['When hit', 'demon.flash demon.flashLen demon.flashRate'], ['Spit', 'attacks.attack attacks.spitCount attacks.spitSpread attacks.spitSize attacks.puddles'],

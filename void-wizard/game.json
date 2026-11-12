@@ -176,19 +176,9 @@
     "prototypes": [],
     "ideas": [
       {
-        "id": "imwcue31c",
-        "text": "if ball is loose, d-pad up instructs closest player to grab ball, otherwise no one chases it.",
-        "made": 1794445284576
-      },
-      {
         "id": "imwcuchzb",
         "text": "making centipede polygon",
         "made": 1794445210631
-      },
-      {
-        "id": "imwcuahq2",
-        "text": "for d-pad directions: up should be press / attack, down should be fall back. left should be surround, right should be group up",
-        "made": 1794445116986
       },
       {
         "id": "imwcu8xae",
@@ -199,21 +189,6 @@
         "id": "imwcu7z2u",
         "text": "different indicators for where ball is landing",
         "made": 1794444999510
-      },
-      {
-        "id": "imwcu77ji",
-        "text": "centipede will briefly appear / glitch after being caught (before coming back in)",
-        "made": 1794444963822
-      },
-      {
-        "id": "imwctud9e",
-        "text": "tetrahedron kinda feels like off when thrown, like it’s not going straight or something",
-        "made": 1794444364706
-      },
-      {
-        "id": "imwctrfw5",
-        "text": "stars go away for some reason (i think when moving too far)",
-        "made": 1794444228149
       },
       {
         "id": "imway2swx",
@@ -264,7 +239,12 @@
       "imwb7cyqe",
       "imwaxsqok",
       "imwbdy0lh",
-      "imwawlsgu"
+      "imwawlsgu",
+      "imwcue31c",
+      "imwcuahq2",
+      "imwcu77ji",
+      "imwctud9e",
+      "imwctrfw5"
     ],
     "start": {
       "values": {
@@ -308,7 +288,8 @@
         "ps1.fog": 0.1,
         "rules.when1": 9,
         "rules.then1": 1,
-        "rules.for1": 0.5
+        "rules.for1": 0.5,
+        "throws.spiral": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -351,7 +332,8 @@
         "ps1.fog": "PS1 · Fog 0.10",
         "rules.when1": "Rules 1 and 2 · Rule 1: when DEMON HIT",
         "rules.then1": "Rules 1 and 2 · Rule 1: then SLOW-MO",
-        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S"
+        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S",
+        "throws.spiral": "Throws · Spiral throws TETRAHEDRON"
       },
       "made": 1794356977080
     },

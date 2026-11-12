@@ -689,6 +689,7 @@ const MOTES=Math.round(cfg('world.motes',1100)), SPAN=200, mp=new Float32Array(M
 for(let i=0;i<MOTES;i++){mp[i*3]=(Math.random()-.5)*SPAN;mp[i*3+1]=-24+Math.random()*30;mp[i*3+2]=(Math.random()-.5)*SPAN;}
 const moteGeo=new THREE.BufferGeometry();moteGeo.setAttribute('position',new THREE.BufferAttribute(mp,3));
 const motes=new THREE.Points(moteGeo,new THREE.PointsMaterial({color:0x353a6e,size:1,sizeAttenuation:false}));scene.add(motes);
+motes.frustumCulled=false;   // they wrap around the view, so the bounds three.js measured at the start go stale (far away they all vanished)
 
 // ---- input
 const keys=new Set();
@@ -2008,7 +2009,7 @@ if(DUEL){if(WATCH)player.human=false;duelReset();duelScore();}
 // what features can reach (see engine/features.md): the scene, the wizards, the solid, the demon, effects and multipliers
 FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){return buddy;},ALL, // player and buddy: the blue and red wizards; you and mate: whoever you control now, and the other one
  orb,demon,SOLIDS,MOD,keys,DUEL,PARTY,
-  get solid(){return cur;},get time(){return time;},get pad(){return player.gp;},
+  get solid(){return cur;},setSolid(S){if(S&&S!==cur){orb.nextSolid=S;swapSolid();}},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
   shake(k){shake=Math.max(shake,k);},
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
