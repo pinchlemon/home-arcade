@@ -473,7 +473,7 @@ class Drums extends DSP { // kick, clap, closed hat, open hat (closed chokes ope
   process(n) {
     const P = this.p, sr = this.sr, dt = 1 / sr, I = this.in, O = this.out;
     const kf = 35 + (P.kTune ?? 0.4) * 55, kd = 0.08 + (P.kDec ?? 0.45) * 0.9, kl = P.kLvl ?? 0.9;
-    const cf = 700 + (P.cTune ?? 0.5) * 2000, cd = 0.06 + (P.cDec ?? 0.35) * 0.6, cl = P.cLvl ?? 0.7;
+    const cf = 700 + (P.cTune ?? 0.5) * 2000, cd = 0.03 + (P.cDec ?? 0.35) * 0.3, cl = P.cLvl ?? 0.7;
     const hs = 0.8 + (P.hTune ?? 0.5) * 1.2, hd = 0.015 + (P.hDec ?? 0.3) * 0.15, hl = P.hLvl ?? 0.5;
     const os = 0.8 + (P.oTune ?? 0.5) * 1.2, od = 0.1 + (P.oDec ?? 0.4) * 0.8, ol = P.oLvl ?? 0.45;
     const g = Math.tan(Math.PI * cf / sr), kq = 1 / 2.2, a1 = 1 / (1 + g * (g + kq)), a2 = g * a1, a3 = g * a2, hpA = Math.exp(-TAU * 6500 / sr);
