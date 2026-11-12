@@ -288,7 +288,8 @@
         "ps1.fog": 0.1,
         "rules.when1": 9,
         "rules.then1": 1,
-        "rules.for1": 0.5
+        "rules.for1": 0.5,
+        "throws.spiral": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -331,7 +332,8 @@
         "ps1.fog": "PS1 · Fog 0.10",
         "rules.when1": "Rules 1 and 2 · Rule 1: when DEMON HIT",
         "rules.then1": "Rules 1 and 2 · Rule 1: then SLOW-MO",
-        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S"
+        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S",
+        "throws.spiral": "Throws · Spiral throws TETRAHEDRON"
       },
       "made": 1794356977080
     },
