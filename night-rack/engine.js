@@ -825,14 +825,50 @@ class Sampler extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler };
+// ---------------------------------------------------------------- MBIRA: pitched one-shot sampler (kalimba / marimba multisamples), 4 voices
+class Mbira extends DSP {
+  static IN = ['voct', 'trig']; static OUT = ['out'];
+  constructor(e) { super(e); this.S = []; this.st = new Schmitt(); this.V = [0, 1, 2, 3].map(() => ({ b: null, pos: -1, rate: 1, t: 0, g: 1 })); this.k = 0; }
+  setSample(i, data, root) { this.S = this.S.filter(x => x.i !== i); this.S.push({ i, data, root }); this.S.sort((a, b) => a.root - b.root); }
+  process(n) {
+    const P = this.p, sr = this.sr, V = this.in.voct, T = this.in.trig, O = this.out.out, dec = P.dec ?? 0.8, kd = dec >= 0.99 ? 1 : Math.exp(-1 / ((0.03 + dec * dec * 2.5) * sr)), lvl = (P.lvl ?? 0.8) * 5;
+    for (let i = 0; i < n; i++) {
+      if (this.st.step(T[i]) && this.S.length) {
+        const note = 60 + (V[i] + (P.oct | 0)) * 12; let best = this.S[0]; for (const x of this.S) if (Math.abs(x.root - note) < Math.abs(best.root - note)) best = x;
+        const v = this.V[this.k = (this.k + 1) % 4]; v.b = best.data; v.pos = 0; v.t = 0; v.rate = Math.pow(2, (note - best.root) / 12); this.flash('led', 1);
+      }
+      let y = 0; for (const v of this.V) { if (v.pos < 0) continue; const i0 = v.pos | 0; if (i0 + 1 >= v.b.length) { v.pos = -1; continue; } const f = v.pos - i0; y += (v.b[i0] * (1 - f) + v.b[i0 + 1] * f) * (kd === 1 ? 1 : Math.pow(kd, v.t)); v.t++; v.pos += v.rate; }
+      O[i] = y * lvl;
+    }
+  }
+}
+// ---------------------------------------------------------------- FIELD: looping nature recording with a soft crossfade, tone and width
+class Field extends DSP {
+  static IN = ['cv']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.b = null; this.pos = 0; this.lp = [0, 0]; }
+  setSample(i, data) { this.b = data; this.pos = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, b = this.b, OL = this.out.L, OR = this.out.R; if (!b || b.length < sr) { OL.fill(0); OR.fill(0); return; }
+    const L = b.length, xf = Math.min(sr * 1.5, L / 4) | 0, half = L >> 1, lc = 1 - Math.exp(-TAU * (P.tone ?? 9000) / sr), C = this.in.cv, hc = this.has.cv, w = P.width ?? 0.8, lv = (P.lvl ?? 0.6) * 5;
+    const rd = p => { p %= (L - xf); const a = b[p]; if (p < xf) { const u = p / xf; return a * u + b[p + L - xf] * (1 - u); } return a; };
+    for (let i = 0; i < n; i++) {
+      const p = this.pos | 0, m = rd(p), s2 = rd(p + half), g = lv * (hc ? Math.max(0, Math.min(1, C[i] / 10 + 0.5)) : 1);
+      const l = m * (1 - w * 0.5) + s2 * w * 0.5, r = s2 * (1 - w * 0.5) + m * w * 0.5;
+      this.lp[0] += lc * (l - this.lp[0]); this.lp[1] += lc * (r - this.lp[1]); OL[i] = this.lp[0] * g; OR[i] = this.lp[1] * g; this.pos++;
+    }
+    if (this.pos > 1e9) this.pos = 0;
+    this.peak('led', OL, n, 0.5);
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
   handle(m) {
     if (m.t === 'add') { const C = DSPS[m.type]; if (!C) return; const d = new C(this); d.id = m.id; Object.assign(d.p, m.p || {}); d.onParam(); this.mods.set(m.id, d); this.dirty = true; }
     else if (m.t === 'param') { const d = this.mods.get(m.id); if (d) { d.p[m.k] = m.v; d.onParam(m.k, m.v); } }
-    else if (m.t === 'smp') { const d = this.mods.get(m.id); if (d && d.setSample) d.setSample(m.slot, m.data); }
+    else if (m.t === 'smp') { const d = this.mods.get(m.id); if (d && d.setSample) d.setSample(m.slot, m.data, m.root); }
     else if (m.t === 'hit') { const d = this.mods.get(m.id); if (d && d.hit) d.hit(m.slot); }
     else if (m.t === 'note') { const d = this.mods.get(m.id); if (d && d.note) d.note(m.n, m.v); }
     else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
