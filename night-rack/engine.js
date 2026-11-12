@@ -676,7 +676,93 @@ class Tape extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape };
+// ---------------------------------------------------------------- polish row (master bus): GLUE, EQ, WIDE, LIMIT
+class BQ { // RBJ biquad, direct form II transposed
+  constructor() { this.z1 = 0; this.z2 = 0; this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; this.key = ''; }
+  set(type, f, q, gdb, sr) {
+    const key = type + f + '|' + q + '|' + gdb; if (key === this.key) return; this.key = key;
+    f = Math.min(f, sr * 0.45); const w = TAU * f / sr, c = Math.cos(w), sn = Math.sin(w), A = Math.pow(10, gdb / 40); let b0, b1, b2, a0, a1, a2;
+    if (type === 'hp') { const al = sn / (2 * q); b0 = (1 + c) / 2; b1 = -(1 + c); b2 = b0; a0 = 1 + al; a1 = -2 * c; a2 = 1 - al; }
+    else if (type === 'peak') { const al = sn / (2 * q); b0 = 1 + al * A; b1 = -2 * c; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * c; a2 = 1 - al / A; }
+    else { const be = 2 * Math.sqrt(A) * (sn / 2) * Math.SQRT2;
+      if (type === 'low') { b0 = A * ((A + 1) - (A - 1) * c + be); b1 = 2 * A * ((A - 1) - (A + 1) * c); b2 = A * ((A + 1) - (A - 1) * c - be); a0 = (A + 1) + (A - 1) * c + be; a1 = -2 * ((A - 1) + (A + 1) * c); a2 = (A + 1) + (A - 1) * c - be; }
+      else { b0 = A * ((A + 1) + (A - 1) * c + be); b1 = -2 * A * ((A - 1) + (A + 1) * c); b2 = A * ((A + 1) + (A - 1) * c - be); a0 = (A + 1) - (A - 1) * c + be; a1 = 2 * ((A - 1) - (A + 1) * c); a2 = (A + 1) - (A - 1) * c - be; } }
+    this.b0 = b0 / a0; this.b1 = b1 / a0; this.b2 = b2 / a0; this.a1 = a1 / a0; this.a2 = a2 / a0;
+  }
+  step(x) { const y = this.b0 * x + this.z1; this.z1 = this.b1 * x - this.a1 * y + this.z2; this.z2 = this.b2 * x - this.a2 * y; return y; }
+}
+class Glue extends DSP { // stereo bus compressor: soft knee, dB-domain smoothing, makeup and parallel mix; optional sidechain key
+  static IN = ['inL', 'inR', 'sc']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.g = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, thr = P.thr ?? -14, ratio = P.ratio ?? 3, knee = 6, k1 = 1 - 1 / ratio, mk = Math.exp((P.makeup ?? 3) * 0.11512925), mix = P.mix ?? 1;
+    const ac = Math.exp(-1 / (Math.max(0.0003, P.atk ?? 0.01) * sr)), rc = Math.exp(-1 / (Math.max(0.01, P.rel ?? 0.2) * sr));
+    const IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, S = this.in.sc, hs = this.has.sc, OL = this.out.L, OR = this.out.R;
+    for (let i = 0; i < n; i++) {
+      const lv = (hs ? Math.abs(S[i]) : Math.max(Math.abs(IL[i]), Math.abs(IR[i]))) * 0.2, db = 8.685889 * Math.log(lv > 1e-5 ? lv : 1e-5), over = db - thr;
+      const gr = over <= -knee / 2 ? 0 : over >= knee / 2 ? over * k1 : (over + knee / 2) * (over + knee / 2) / (2 * knee) * k1;
+      this.g = gr > this.g ? ac * this.g + (1 - ac) * gr : rc * this.g + (1 - rc) * gr;
+      const gain = Math.exp(-this.g * 0.11512925) * mk;
+      OL[i] = IL[i] * (1 - mix) + IL[i] * gain * mix; OR[i] = IR[i] * (1 - mix) + IR[i] * gain * mix;
+    }
+    this.L.gr = Math.min(1, this.g / 10);
+  }
+}
+class EQ extends DSP { // high-pass, low shelf (110 Hz), sweepable peak, high shelf (7.5 kHz)
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.c = [0, 1].map(() => ({ hp: new BQ(), lo: new BQ(), mid: new BQ(), hi: new BQ() })); }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R;
+    for (const c of this.c) { c.hp.set('hp', P.hp ?? 20, 0.707, 0, sr); c.lo.set('low', 110, 0.7, P.low ?? 0, sr); c.mid.set('peak', P.midf ?? 1000, P.mq ?? 0.9, P.mid ?? 0, sr); c.hi.set('high', 7500, 0.7, P.high ?? 0, sr); }
+    const a = this.c[0], b = this.c[1];
+    for (let i = 0; i < n; i++) {
+      OL[i] = a.hi.step(a.mid.step(a.lo.step(a.hp.step(IL[i]))));
+      OR[i] = b.hi.step(b.mid.step(b.lo.step(b.hp.step(IR[i]))));
+    }
+  }
+}
+class Wide extends DSP { // ensemble chorus + mid/side width with the bass kept mono
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); const n = Math.ceil(e.sr * 0.05); this.dl = new DLine(n); this.dr = new DLine(n); this.ph = 0; this.h = [0, 0, 0, 0]; this.xp = 0; this.xq = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R;
+    const wd = P.width ?? 1.2, mono = P.mono ?? 120, cm = P.chorus ?? 0.25, dp = (P.depth ?? 0.4) * 0.004 * sr, rate = P.rate ?? 0.7, base = 0.0125 * sr, hc = Math.exp(-TAU * mono / sr), h = this.h;
+    for (let i = 0; i < n; i++) {
+      this.ph += rate / sr; if (this.ph > 1) this.ph -= 1;
+      this.dl.write(IL[i]); this.dr.write(IR[i]);
+      const p = this.ph, tl = (this.dl.readf(base + dp * Math.sin(TAU * p)) + this.dl.readf(base * 1.3 + dp * Math.sin(TAU * (p + 0.33)))) * 0.5, tr = (this.dr.readf(base + dp * Math.sin(TAU * (p + 0.5))) + this.dr.readf(base * 1.3 + dp * Math.sin(TAU * (p + 0.83)))) * 0.5;
+      let l = IL[i] * (1 - cm * 0.4) + tl * cm * 0.8, r = IR[i] * (1 - cm * 0.4) + tr * cm * 0.8;
+      const m = (l + r) * 0.5, sd = (l - r) * 0.5;
+      const y1 = hc * (h[0] + sd - h[1]); h[0] = y1; h[1] = sd; const y2 = hc * (h[2] + y1 - h[3]); h[2] = y2; h[3] = y1;
+      const s2 = y2 * wd; OL[i] = m + s2; OR[i] = m - s2;
+    }
+    this.L.w = Math.min(1, wd / 2);
+  }
+}
+class Limit extends DSP { // drive + high-frequency exciter + look-ahead brick-wall limiter with a soft ceiling
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.D = 40; this.dl = new DLine(64); this.dr = new DLine(64); this.g = 1; this.hl = 0; this.hr = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R;
+    const drv = Math.exp((P.drive ?? 3) * 0.11512925), c = 5 * Math.exp((P.ceil ?? -1) * 0.11512925), air = P.air ?? 0.2, ac = 1 - Math.exp(-1 / (0.00012 * sr)), rc = 1 - Math.exp(-1 / (Math.max(0.01, P.rel ?? 0.1) * sr)), lp = 1 - Math.exp(-TAU * 3500 / sr), D = this.D, c8 = 0.8 * c;
+    let minG = 1;
+    for (let i = 0; i < n; i++) {
+      let l = IL[i] * drv, r = IR[i] * drv;
+      this.hl += lp * (l - this.hl); this.hr += lp * (r - this.hr);
+      l += air * 0.6 * Math.tanh((l - this.hl) * 0.8); r += air * 0.6 * Math.tanh((r - this.hr) * 0.8);
+      const pk = Math.max(Math.abs(l), Math.abs(r)), need = pk > c8 ? c8 / pk : 1;
+      this.g += need < this.g ? (need - this.g) * ac : (1 - this.g) * rc; if (this.g < minG) minG = this.g;
+      this.dl.write(l); this.dr.write(r);
+      let yl = this.dl.read(D) * this.g, yr = this.dr.read(D) * this.g;
+      const al = Math.abs(yl); if (al > c8) yl = (yl > 0 ? 1 : -1) * (c8 + (c - c8) * Math.tanh((al - c8) / (c - c8)));
+      const ar = Math.abs(yr); if (ar > c8) yr = (yr > 0 ? 1 : -1) * (c8 + (c - c8) * Math.tanh((ar - c8) / (c - c8)));
+      OL[i] = yl; OR[i] = yr;
+    }
+    this.L.gr = 1 - minG;
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
