@@ -357,7 +357,7 @@ DEFS.reverb = lay('REVERB', 10, 'black',
   [[kn('decay', 'DECAY', 'L', { min: 1, max: 16, def: 8, curve: 'exp', fmt: v => v.toFixed(1) + ' s' }), kn('mix', 'MIX', 'L', { def: 0.55, fmt: fPct })],
    [kn('damp', 'DAMP', 'S', { min: 800, max: 16000, def: 5000, curve: 'exp', fmt: fHz }), kn('pre', 'PRE', 'S', { min: 0, max: 0.25, def: 0.03, fmt: fS }), kn('level', 'LEVEL', 'S', { min: 0, max: 1.5, def: 1, fmt: fPct })],
    [ld('led', 'violet')]],
-  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [ji('dryL', 'DRY L', 'audio'), ji('dryR', 'DRY R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.output = lay('OUTPUT', 8, 'silver',
   [[kn('vol', 'VOLUME', 'L', { def: 0.75, fmt: fPct })],
    ...[5, 4, 3, 2, 1, 0].map(i => { const c = i < 4 ? 'cyan' : i < 5 ? 'amber' : 'red'; return { items: [ld('vuL' + i, c), ld('vuR' + i, c)], a: 0.2, b: 0.2 }; })],
@@ -1579,12 +1579,14 @@ function genPatch(style, wild) {
     set('groove', 'kDen', o.k ?? rr(0.45, 0.6)); set('groove', 'sDen', o.s ?? rr(0.45, 0.65)); set('groove', 'hDen', o.h ?? rr(0.4, 0.7)); set('groove', 'pDen', o.p ?? rr(0.35, 0.65));
     con('groove.kick', 'drums.tk'); con('groove.hat', 'drums.th'); con('groove.open', 'drums.to');
     if (o.clap !== false) con('groove.clap', 'drums.tc');
-    con('groove.snare', o.snare || 'perc.ts'); con('groove.perc', o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt']));
+    if (o.snare !== null) con('groove.snare', o.snare || 'perc.ts'); con('groove.perc', o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt']));
     return 'groove.kick'; };
   const drumKnobs = (soft) => { for (const [s, a, b] of [['k', 'Tune', [0.25, 0.5]], ['k', 'Dec', [0.35, 0.6]], ['c', 'Tune', [0.3, 0.7]], ['c', 'Dec', [0.2, 0.45]], ['h', 'Tune', [0.4, 0.8]], ['h', 'Dec', [0.1, 0.35]], ['o', 'Tune', [0.4, 0.75]], ['o', 'Dec', [0.25, 0.5]]]) set('drums', s + a, rr(...b));
     set('drums', 'kLvl', soft ? rr(0.65, 0.8) : 0.95); set('drums', 'cLvl', rr(0.5, 0.75) * (soft ? 0.6 : 1)); set('drums', 'hLvl', rr(0.35, 0.55) * (soft ? 0.6 : 1)); set('drums', 'oLvl', rr(0.3, 0.5) * (soft ? 0.6 : 1));
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
+  const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
+  const cleanDrums = () => { set('drums', 'cDec', rr(0.1, 0.28)); set('drums', 'cTune', rr(0.3, 0.6)); set('drums', 'hDec', rr(0.06, 0.22)); set('drums', 'oDec', rr(0.2, 0.4)); set('perc', 'sDec', rr(0.12, 0.3)); set('perc', 'sTune', rr(0.45, 0.75)); set('perc', 'rDec', rr(0.1, 0.3)); };
   const drumBus = () => { con('drums.mix', 'mix.in1'); con('perc.mix', 'mix.in2'); set('mix', 'lvl1', 0.8); set('mix', 'lvl2', 0.7); set('mix', 'lvl3', 0); set('mix', 'lvl4', 0); return 'mix.out'; };
   const pattern = (tr) => { const on = (r, ks) => ks.forEach(k => tr['b' + r + '_' + k] = 1), rand = (r, pool, n) => { const a = [...pool].sort(() => Math.random() - 0.5).slice(0, n); on(r, a); }; return { on, rand }; };
   const sendDelay = (beats, fb) => { set('delay', 'time', beats * 60 / K.clock.tempo); set('delay', 'fb', fb); set('delay', 'mix', 1); set('delay', 'tone', rexp(1800, 6000)); set('delay', 'mod', rr(0, 0.15)); };
@@ -1593,14 +1595,14 @@ function genPatch(style, wild) {
     const sub = rpick([0, 0, 1, 2, 3, 4]), tempo = [ri(120, 126), ri(116, 122), ri(124, 128), ri(128, 134), ri(115, 122)][sub];
     set('clock', 'tempo', tempo); const tr = {}, P = pattern(tr); trigOn();
     let kick = 'trig.g1';
-    if (sub === 3 || chance(0.55)) { kick = groove(sub, { swing: sub === 3 ? rr(0.3, 0.5) : rr(0, 0.3) }); con(drumBus(), 'mix6.in1'); }
+    if (sub === 3 || chance(0.55)) { kick = groove(sub, { swing: sub === 3 ? rr(0.3, 0.5) : rr(0, 0.3), ...backbeat() }); con(drumBus(), 'mix6.in1'); }
     else {
       P.on(0, [0, 4, 8, 12]); if (chance(0.25)) P.on(0, [rpick([10, 14, 15])]); P.on(1, chance(0.8) ? [4, 12] : [4, 12, 15]);
       const hat = rpick(['off', '16', '8', 'rnd']); P.on(2, hat === 'off' ? [2, 6, 10, 14] : hat === '16' ? [...Array(16).keys()] : hat === '8' ? [0, 2, 4, 6, 8, 10, 12, 14] : [...Array(16).keys()].filter(() => chance(0.6)));
       if (hat !== 'off') P.on(3, chance(0.6) ? [2, 6, 10, 14] : [6, 14]);
       ['tk', 'tc', 'th', 'to'].forEach((t, i) => con('trig.g' + (i + 1), 'drums.' + t)); con('drums.mix', 'mix6.in1');
     }
-    drumKnobs(false);
+    drumKnobs(false); cleanDrums();
     P.rand(4, [3, 6, 7, 10, 11, 13, 14], ri(2, 5)); P.rand(5, [...Array(16).keys()], ri(2, 6)); Object.assign(tr, { len: 16, swing: rr(0, 0.35) }); K.trig = tr;
     const bp = getPitch('seq'), bass = chance(0.5) ? bassM(bp, { oct: rpick([-1, 0]), dec: rr(0.1, 0.35) }) : voice.subA(bp);
     con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2');
@@ -1615,8 +1617,8 @@ function genPatch(style, wild) {
   } else if (style === 'tinez') {
     // deep, jacking warehouse house in the spirit of Ricky Tinez's modular videos: controlled randomness kept in key
     set('clock', 'tempo', ri(119, 125)); const tr = {}, P = pattern(tr); trigOn(); const sw = rr(0.15, 0.35);
-    const kick = groove(rpick([1, 1, 0, 4]), { swing: sw, chaos: rr(0, 0.12), k: rr(0.45, 0.55), s: rr(0.4, 0.55), h: rr(0.5, 0.75), p: rr(0.45, 0.7), snare: 'perc.tr', perc: rpick(['perc.tsh', 'perc.tsh', 'perc.tt']) });
-    drumKnobs(false); set('drums', 'kTune', rr(0.25, 0.4)); set('drums', 'kDec', rr(0.45, 0.65)); set('drums', 'hDec', rr(0.08, 0.2)); set('perc', 'shLvl', rr(0.45, 0.6));
+    const kick = groove(rpick([1, 1, 0, 4]), { swing: sw, chaos: rr(0, 0.12), k: rr(0.45, 0.55), s: rr(0.4, 0.55), h: rr(0.5, 0.75), p: rr(0.45, 0.7), perc: rpick(['perc.tsh', 'perc.tsh', 'perc.tt']), ...backbeat() });
+    drumKnobs(false); cleanDrums(); set('drums', 'kTune', rr(0.25, 0.4)); set('drums', 'kDec', rr(0.45, 0.65)); set('drums', 'hDec', rr(0.08, 0.2)); set('perc', 'shLvl', rr(0.45, 0.6));
     con(drumBus(), 'mix6.in1');
     // TRIG SEQ (the Steppy role): bass rhythm on track 5, chord stabs on track 6
     const bassSteps = [rpick([[0, 3, 6, 10, 14], [2, 6, 10, 14], [0, 3, 7, 10, 11, 14], [2, 3, 6, 10, 13, 14], [0, 6, 7, 10, 14, 15]]), [3, 6, 7, 10, 11, 14, 15].filter(() => chance(0.15))].flat();
@@ -1686,6 +1688,7 @@ function genPatch(style, wild) {
     con(L, 'verb.inL'); con(R, 'verb.inR'); set('verb', 'decay', rr(5, 15)); set('verb', 'mix', rr(0.4, 0.65)); set('verb', 'damp', rexp(2500, 9000));
     for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.008, 0.25 + wild)); set('lfo', 'shape' + c, ri(0, 3)); }
   }
+  if (style === 'house' || style === 'tinez' || style === 'dnb') { for (const c of C) if (c[1] === 'mix6.in1') c[1] = 'verb.dryL'; set('mix6', 'lvl1', 0); }
   let fL = 'verb.L', fR = 'verb.R';
   if (tapeOut) { con('verb.L', 'tape.inL'); con('verb.R', 'tape.inR'); fL = 'tape.L'; fR = 'tape.R'; }
   set('verb', 'level', 1);

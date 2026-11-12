@@ -225,8 +225,8 @@ class Delay extends DSP {
     this.flash('led', pk * 0.2);
   }
 }
-class Reverb extends DSP { // Dattorro plate
-  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+class Reverb extends DSP { // Dattorro plate; DRY L/R pass straight to the output (keeps drums clean)
+  static IN = ['inL', 'inR', 'dryL', 'dryR']; static OUT = ['L', 'R'];
   constructor(e) {
     super(e); const s = e.sr / 29761, D = x => Math.max(2, Math.round(x * s)); this.D = D;
     this.pre = new DLine(Math.ceil(0.3 * e.sr) + 4);
@@ -240,7 +240,7 @@ class Reverb extends DSP { // Dattorro plate
   }
   process(n) {
     const P = this.p, sr = this.sr, g = Math.min(0.985, Math.pow(10, -3 * 0.358 / Math.max(0.3, P.decay ?? 8))), dc = 1 - Math.exp(-TAU * (P.damp ?? 5000) / sr);
-    const mix = P.mix ?? 0.55, lvl = P.level ?? 1, pre = Math.max(1, Math.round((P.pre ?? 0.03) * sr)), IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R;
+    const mix = P.mix ?? 0.55, lvl = P.level ?? 1, pre = Math.max(1, Math.round((P.pre ?? 0.03) * sr)), IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R, DL = this.in.dryL, DR = this.has.dryR ? this.in.dryR : this.in.dryL;
     const t = this.t, ln = this.len, dw = TAU * 0.9 / sr; let pk = 0;
     for (let i = 0; i < n; i++) {
       this.pre.write((IL[i] + IR[i]) * 0.1); let x = this.pre.read(pre);
@@ -253,7 +253,7 @@ class Reverb extends DSP { // Dattorro plate
       const yl = this.d1R.read(t[0]) + this.d1R.read(t[1]) - this.a2R.d.read(t[2]) + this.d2R.read(t[3]) - this.d1L.read(t[4]) - this.a2L.d.read(t[5]) - this.d2L.read(t[6]);
       const yr = this.d1L.read(t[7]) + this.d1L.read(t[8]) - this.a2L.d.read(t[9]) + this.d2L.read(t[10]) - this.d1R.read(t[11]) - this.a2R.d.read(t[12]) - this.d2R.read(t[13]);
       const wl = yl * 3.5, wr = yr * 3.5;
-      OL[i] = (IL[i] * (1 - mix) + wl * mix) * lvl; OR[i] = (IR[i] * (1 - mix) + wr * mix) * lvl;
+      OL[i] = (IL[i] * (1 - mix) + wl * mix) * lvl + DL[i]; OR[i] = (IR[i] * (1 - mix) + wr * mix) * lvl + DR[i];
       const a = Math.abs(wl); if (a > pk) pk = a;
     }
     if (!isFinite(this.dL + this.dR)) { this.dL = this.dR = 0; }
@@ -476,7 +476,7 @@ class Drums extends DSP { // kick, clap, closed hat, open hat (closed chokes ope
     const cf = 700 + (P.cTune ?? 0.5) * 2000, cd = 0.06 + (P.cDec ?? 0.35) * 0.6, cl = P.cLvl ?? 0.7;
     const hs = 0.8 + (P.hTune ?? 0.5) * 1.2, hd = 0.015 + (P.hDec ?? 0.3) * 0.15, hl = P.hLvl ?? 0.5;
     const os = 0.8 + (P.oTune ?? 0.5) * 1.2, od = 0.1 + (P.oDec ?? 0.4) * 0.8, ol = P.oLvl ?? 0.45;
-    const g = Math.tan(Math.PI * cf / sr), kq = 1 / 1.4, a1 = 1 / (1 + g * (g + kq)), a2 = g * a1, a3 = g * a2, hpA = Math.exp(-TAU * 6500 / sr);
+    const g = Math.tan(Math.PI * cf / sr), kq = 1 / 2.2, a1 = 1 / (1 + g * (g + kq)), a2 = g * a1, a3 = g * a2, hpA = Math.exp(-TAU * 6500 / sr);
     const K = O.k, C = O.c, H = O.h, OH = O.o, M = O.mix;
     for (let i = 0; i < n; i++) {
       if (this.st[0].step(I.tk[i])) { this.kt = 0; this.kph = 0; this.flash('k', 1); }
@@ -485,8 +485,8 @@ class Drums extends DSP { // kick, clap, closed hat, open hat (closed chokes ope
       if (this.st[3].step(I.to[i])) { this.ot = 0; this.lastScale = os; this.flash('o', 1); }
       let k = 0; if (this.kt < kd * 7) { const t = this.kt; this.kph += kf * (1 + 3.5 * Math.exp(-t * 32)) * dt; k = Math.sin(TAU * this.kph) * Math.exp(-t / kd); if (t < 0.003) k += (Math.random() * 2 - 1) * 0.35 * (1 - t / 0.003); k = Math.tanh(k * 1.7); this.kt += dt; }
       let c = 0; if (this.ct < cd * 7) {
-        const t = this.ct; let env = t < 0.031 ? Math.exp(-(t % 0.0105) / 0.0035) : 0; if (t >= 0.021) env = Math.max(env, Math.exp(-(t - 0.021) / cd) * 0.85);
-        const x = Math.random() * 2 - 1, v3 = x - this.ic2, v1 = a1 * this.ic1 + a2 * v3, v2 = this.ic2 + a2 * this.ic1 + a3 * v3; this.ic1 = 2 * v1 - this.ic1; this.ic2 = 2 * v2 - this.ic2; c = v1 * env * 2.4; this.ct += dt;
+        const t = this.ct; let env = t < 0.032 ? Math.exp(-(t % 0.008) / 0.0022) : 0; if (t >= 0.024) env = Math.max(env, Math.exp(-(t - 0.024) / cd) * 0.8);
+        const x = Math.random() * 2 - 1, v3 = x - this.ic2, v1 = a1 * this.ic1 + a2 * v3, v2 = this.ic2 + a2 * this.ic1 + a3 * v3; this.ic1 = 2 * v1 - this.ic1; this.ic2 = 2 * v2 - this.ic2; c = v1 * env * 3; this.ct += dt;
       }
       let h = 0, o = 0; const hon = this.ht < hd * 7, oon = this.ot < od * 7;
       if (hon || oon) {
