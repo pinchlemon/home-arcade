@@ -2035,7 +2035,7 @@ kdbAll().then(all => { Object.assign(USERKITS, all); for (const m of modules) if
 const kitSlots = i => i < KITS.length ? KITS[i][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') })) : USERKITS[i] ? USERKITS[i].slots : KITS[0][1].map(u => ({ ref: u, name: u.split('/').pop().replace(/\.\w+$/, '') }));
 async function decodeSlot(sl) {
   const key = sl.ref || sl.id; if (key && SMP_CACHE.has(key)) return SMP_CACHE.get(key);
-  const ab = sl.ref ? await (await fetch('samples/' + sl.ref)).arrayBuffer() : sl.data.slice(0);
+  let ab; if (sl.ref) { let r = null; try { r = await fetch('samples/' + sl.ref); } catch (e) { } if (!r || !r.ok) r = await fetch('https://pinchlemon.github.io/home-arcade/night-rack/samples/' + sl.ref); ab = await r.arrayBuffer(); } else ab = sl.data.slice(0);
   const buf = await new Promise((res, rej) => { const p = AC.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
   const n = buf.length, d = new Float32Array(n), C = buf.numberOfChannels; for (let c = 0; c < C; c++) { const x = buf.getChannelData(c); for (let i = 0; i < n; i++) d[i] += x[i] / C; }
   let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i])); if (sl.data && pk > 0) for (let i = 0; i < n; i++) d[i] *= 0.9 / pk; // imported sounds are levelled
