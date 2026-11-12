@@ -8,7 +8,8 @@ export const CODE_GAMES = [
   { name: 'Void Wizard', path: '../void-wizard/', kind: '3D · three.js', size: '97 KB', file: 'void-wizard', editable: true },
   { name: 'Phosphor', path: '../phosphor/', kind: '2D · Canvas', size: '239 KB', file: 'phosphor' },
   { name: 'Purgatory Bowl', path: '../purgatory-bowl/', kind: '3D · three.js + cannon', size: '287 KB', file: 'purgatory-bowl' },
-  { name: 'Circuit Crush', path: '../circuit-crush/', kind: '2D · Canvas · study game', size: '371 KB', file: 'circuit-crush' }
+  { name: 'Circuit Crush', path: '../circuit-crush/', kind: '2D · Canvas · study game', size: '371 KB', file: 'circuit-crush' },
+  { name: 'Night Rack', path: '../night-rack/', kind: '3D · three.js · modular synth', size: '1.2 MB', file: 'night-rack' }
 ];
 // games made with New game (newGame.js): the ones on this phone, then (once loaded) the ones listed in games/index.json on GitHub
 import * as made from './newGame.js';
