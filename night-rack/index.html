@@ -783,7 +783,9 @@ const PS2 = new ShaderPass({
     }`
 });
 PS2.enabled = false;
-composer.addPass(bloom); composer.addPass(after); composer.addPass(new OutputPass()); composer.addPass(PS2);
+const CLEAN = new ShaderPass({ uniforms: { tDiffuse: { value: null } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); bool bad = !(c.r == c.r) || !(c.g == c.g) || !(c.b == c.b) || c.r > 6e4 || c.g > 6e4 || c.b > 6e4; gl_FragColor = bad ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(max(c.rgb, 0.0), c.a); }' });
+composer.addPass(CLEAN); composer.addPass(bloom); composer.addPass(after); composer.addPass(new OutputPass()); composer.addPass(PS2);
 
 
 // ================================================================ materials & geometry
@@ -954,7 +956,38 @@ function buildCaseFrame(parent, x0, y0, W, H, rows) {
 }
 
 // ================================================================ decor (non-interactive rigs around the main case)
-const decorLEDs = [];
+const decorLEDs = [], DECOR_CABLE_MATS = [];
+// animated oscilloscope screens on every background rack: one instanced mesh, waves drawn in the shader
+const BACKQ = []; // background racks built a few per frame after the page is up
+const SCOPES = [], SCOPE_U = { uTime: { value: 0 } };
+function addScope(pos, quat, w, h, col) { SCOPES.push({ pos: pos.clone(), quat: quat.clone(), w, h, col: new THREE.Color(col), seed: Math.random() }); }
+function buildScopes() {
+  if (!SCOPES.length) return; const n = SCOPES.length, geo = new THREE.PlaneGeometry(1, 1), cols = new Float32Array(n * 3), seeds = new Float32Array(n);
+  SCOPES.forEach((s, i) => { cols.set([s.col.r, s.col.g, s.col.b], i * 3); seeds[i] = s.seed; });
+  geo.setAttribute('aCol', new THREE.InstancedBufferAttribute(cols, 3)); geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
+  const mat = new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 } }]), fog: true, toneMapped: false,
+    vertexShader: `attribute vec3 aCol; attribute float aSeed; varying vec2 vUv; varying vec3 vCol; varying float vSeed;
+      #include <fog_pars_vertex>
+      void main(){ vUv = uv; vCol = aCol; vSeed = aSeed; vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
+      #include <fog_vertex>
+      }`,
+    fragmentShader: `uniform float uTime; varying vec2 vUv; varying vec3 vCol; varying float vSeed;
+      #include <fog_pars_fragment>
+      void main(){ float t = uTime * (0.8 + vSeed * 2.4) + vSeed * 40.0, k = floor(vSeed * 4.0), x = vUv.x;
+        float f = 1.5 + fract(vSeed * 13.7) * 5.0, amp = 0.22 + 0.12 * sin(uTime * (0.3 + vSeed) + vSeed * 9.0);
+        float w = k < 1.0 ? sin(x * f * 6.2832 + t * 3.0) : k < 2.0 ? (fract(x * f + t * 0.6) * 2.0 - 1.0) : k < 3.0 ? sign(sin(x * f * 6.2832 + t * 2.0)) * 0.8 : sin(x * f * 6.2832 + t * 2.0) * sin(x * 3.1 + t * 0.7);
+        w += 0.12 * sin(x * 47.0 + t * 7.0) * fract(vSeed * 91.0);
+        float y = 0.5 + w * amp, d = abs(vUv.y - y), line = smoothstep(0.06, 0.0, d) + 0.35 * smoothstep(0.2, 0.0, d);
+        float grid = (step(0.97, fract(vUv.x * 8.0)) + step(0.94, fract(vUv.y * 4.0))) * 0.05;
+        float edge = smoothstep(0.0, 0.04, vUv.x) * smoothstep(1.0, 0.96, vUv.x) * smoothstep(0.0, 0.06, vUv.y) * smoothstep(1.0, 0.94, vUv.y);
+        gl_FragColor = vec4(vCol * (line * 2.4 + grid + 0.04) * edge, 1.0);
+        #include <fog_fragment>
+      }` });
+  mat.uniforms.uTime = SCOPE_U.uTime;
+  const im = new THREE.InstancedMesh(geo, mat, n), o = new THREE.Object3D();
+  SCOPES.forEach((s, i) => { o.position.copy(s.pos); o.quaternion.copy(s.quat); o.scale.set(s.w, s.h, 1); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+  im.frustumCulled = false; scene.add(im); SCOPES.length = 0;
+}
 function buildDecor(hpW, rows, seed, pos, rotY, anchor = 'left', tight = false, opts = {}) {
   const rnd = mulberry32(seed), W = hpW * HP, H = rows * U3 + (rows + 1) * RAIL, S = opts.S || 26, SRC = [];
   const grp = new THREE.Group(); grp.position.copy(pos); grp.rotation.y = rotY; scene.add(grp);
@@ -976,9 +1009,7 @@ function buildDecor(hpW, rows, seed, pos, rotY, anchor = 'left', tight = false, 
       if (kind < 0.22 && mw > 3) { // screen
         const sx = mx + 0.45, sy = top + 1.6, sw = mw - 0.9, sh = Math.min(3.2, sw * 0.7);
         g.fillStyle = '#020409'; g.fillRect(sx, sy, sw, sh);
-        const sc = rnd() < 0.7 ? '#3fd2ff' : '#ffb04a'; e.strokeStyle = sc; e.fillStyle = sc; e.lineWidth = 0.05; e.beginPath();
-        for (let k = 0; k <= 40; k++) { const px = sx + 0.2 + k / 40 * (sw - 0.4), py = sy + sh / 2 + Math.sin(k * 0.5 + rnd() * 0.5) * sh * 0.25 * rnd(); k ? e.lineTo(px, py) : e.moveTo(px, py); } e.stroke();
-        for (let k = 0; k < 6; k++) e.fillRect(sx + 0.2 + k * (sw - 0.4) / 6, sy + sh - 0.35, (sw - 0.4) / 8, 0.12);
+        const sc = rnd() < 0.7 ? '#3fd2ff' : '#ffb04a'; for (let k = 0; k <= 40; k++) { rnd(); rnd(); }
         g.fillStyle = '#020409'; g.fillRect(sx, sy, sw, sh); SRC.push({ x: sx + sw / 2, y: sy + sh / 2, w: sw, h: sh, col: sc });
         for (let i = 0; i < cols; i++) (rnd() < 0.5 ? KS : KL).push([cx(i), top + 6.2, rnd()]);
       } else if (kind < 0.36 && mw > 3) { // LED matrix
@@ -1025,9 +1056,10 @@ function buildDecor(hpW, rows, seed, pos, rotY, anchor = 'left', tight = false, 
     (byColor[col] = byColor[col] || []).push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, CR, 6, false));
     for (const [px, py] of [[ax, ay], [bx, by]]) { const pg = mergeGeometries([GEO.plugCollar.clone(), GEO.plugBody.clone(), GEO.plugRelief.clone()]); pg.translate(px, py, 0.48); byColor[col].push(pg); }
   }
-  for (const col in byColor) { const m = new THREE.Mesh(mergeGeometries(byColor[col]), new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.05 })); m.castShadow = true; inner.add(m); }
+  for (const col in byColor) { const mt = new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.05 }); DECOR_CABLE_MATS.push(mt); const m = new THREE.Mesh(mergeGeometries(byColor[col]), mt); m.castShadow = true; inner.add(m); }
   buildCaseFrame(inner, 0, 0, W, H, rows);
   grp.updateMatrixWorld(true); const nrm = new THREE.Vector3(0, 0, 1).applyQuaternion(grp.quaternion);
+  { const wq = grp.getWorldQuaternion(new THREE.Quaternion()); for (const sr of SRC) if (!sr.leds) addScope(inner.localToWorld(new THREE.Vector3(sr.x, H - sr.y, 0.05)), wq, sr.w, sr.h, sr.col); }
   grp.userData.sources = SRC.map(sr => ({ ...sr, pos: inner.localToWorld(new THREE.Vector3(sr.x, H - sr.y, 0.15)), normal: nrm.clone(),
     level: sr.leds ? () => { let a = 0; for (let i = sr.leds[0]; i < sr.leds[1]; i++) a += LD[i].lv || 0; return 0.25 + a / (sr.leds[1] - sr.leds[0]) * 2.2; } : (() => { const ph = Math.random() * 9; return () => 0.45 + 0.12 * Math.sin(performance.now() / 700 + ph); })() }));
   return grp;
@@ -1057,7 +1089,7 @@ function buildHall() {
   const TW = 256, TH = 248, NC = 8, NR = 8, cw = TW * NC, ch = TH * NR, rnd = mulberry32(2024);
   const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const g = cv.getContext('2d');
   const ec = document.createElement('canvas'); ec.width = cw; ec.height = ch; const e = ec.getContext('2d'); e.fillStyle = '#000'; e.fillRect(0, 0, cw, ch);
-  const S = TW / (84 * HP); // px per cm
+  const S = TW / (84 * HP), tileScr = []; // px per cm; tileScr: screens per tile (animated overlays)
   for (let t = 0; t < NC * NR; t++) {
     const ox = (t % NC) * TW, oy = Math.floor(t / NC) * TH;
     g.save(); g.translate(ox, oy); g.scale(S, S); e.save(); e.translate(ox, oy); e.scale(S, S);
@@ -1070,7 +1102,7 @@ function buildHall() {
         g.fillStyle = T.bg; g.fillRect(mx + 0.03, top, mw - 0.06, U3);
         g.fillStyle = T.fg; g.globalAlpha = 0.8; g.fillRect(mx + mw * 0.2, top + 0.7, mw * 0.6, 0.35); g.globalAlpha = 1;
         const cols = Math.max(1, Math.round(mw / 1.9)), cx = i => mx + (i + 0.5) * mw / cols, kind = rnd();
-        if (kind < 0.2 && mw > 3) { const sx = mx + 0.4, sy = top + 1.6, sw = mw - 0.8, sh = 2.6; g.fillStyle = '#02040a'; g.fillRect(sx, sy, sw, sh); e.strokeStyle = rnd() < 0.7 ? '#3fd2ff' : '#ffae4a'; e.lineWidth = 0.12; e.beginPath(); for (let k = 0; k <= 24; k++) { const px = sx + 0.2 + k / 24 * (sw - 0.4), py = sy + sh / 2 + Math.sin(k * 0.7 + rnd() * 2) * sh * 0.3; k ? e.lineTo(px, py) : e.moveTo(px, py); } e.stroke(); }
+        if (kind < 0.2 && mw > 3) { const sx = mx + 0.4, sy = top + 1.6, sw = mw - 0.8, sh = 2.6; g.fillStyle = '#02040a'; g.fillRect(sx, sy, sw, sh); const sc0 = rnd() < 0.7 ? '#3fd2ff' : '#ffae4a'; for (let k = 0; k <= 24; k++) rnd(); (tileScr[t] = tileScr[t] || []).push([sx + sw / 2, sy + sh / 2, sw, sh, sc0]); }
         else if (kind < 0.32 && mw > 3) { const n = Math.min(6, Math.floor(mw / 0.7)), sp = (mw - 0.8) / n, col = rnd() < 0.6 ? '#ffae4a' : rnd() < 0.5 ? '#ff3b5c' : '#3fd2ff'; e.fillStyle = col; for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (rnd() < 0.55) { e.beginPath(); e.arc(mx + 0.4 + (a + 0.5) * sp, top + 1.8 + (b + 0.5) * sp * 0.8, 0.16, 0, 7); e.fill(); } }
         else for (let i = 0; i < cols; i++) for (const ky of [2.6, 4.8]) { if (rnd() < 0.2) continue; const big = rnd() < 0.4, kr = big ? 0.6 : 0.42, kx = cx(i), kyy = top + ky; const gr = g.createRadialGradient(kx - kr * 0.3, kyy - kr * 0.3, 0.05, kx, kyy, kr); gr.addColorStop(0, '#3a4252'); gr.addColorStop(1, '#0c0e13'); g.fillStyle = gr; g.beginPath(); g.arc(kx, kyy, kr, 0, 7); g.fill(); g.fillStyle = '#9aa6bc'; g.fillRect(kx - 0.03, kyy - kr * 0.85, 0.06, kr * 0.5); }
         for (const jy of [8.1, 10.2]) for (let i = 0; i < cols; i++) if (rnd() < 0.85) { const jx = cx(i); g.fillStyle = '#8f99aa'; g.beginPath(); g.arc(jx, top + jy, 0.36, 0, 7); g.fill(); g.fillStyle = '#000'; g.beginPath(); g.arc(jx, top + jy, 0.16, 0, 7); g.fill(); }
@@ -1095,8 +1127,8 @@ function buildHall() {
     for (const side of w.both ? [1, -1] : [1]) for (let i = 0; i < n; i++) for (let lv = 0; lv < levels; lv++) {
       const a = (i + 0.5) * (FW + 0.6), y = 2 + lv * (FH + 0.8) + FH / 2;
       let x, z, ry; if (w.along === 'x') { x = w.x0 + a; z = w.z + (side > 0 ? 0 : -40); ry = side > 0 ? 0 : Math.PI; } else { const sg = Math.sign(w.x0); z = w.z + a; if (side > 0) { x = w.x0; ry = Math.atan2(-sg, 0); } else { x = w.x0 + sg * 40; ry = Math.atan2(sg, 0); } }
-      if (!LITE && w.along === 'x' && w.z === -95 && side > 0 && lv < 2 && Math.abs(x) < 160) { real3D.push({ x, y, z, lv }); continue; }
-      faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: rnd() < 0.5 ? 1 : 0 });
+      if (!LITE && w.along === 'x' && w.z === -95 && side > 0 && Math.abs(x) < 165) { real3D.push({ x, y, z, lv, idx: faces.length }); faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: 0, real: true }); continue; }
+      faces.push({ x, y, z, ry, t: Math.floor(rnd() * 64), f: rnd() < 0.5 ? 1 : 0, near: Math.abs(z) < (LITE ? 220 : 450) && Math.abs(x) < (LITE ? 300 : 700) });
       for (let q = 0; q < 3; q++) leds.push({ x, y, z, ry, u: (rnd() - 0.5) * FW * 0.9, v: (rnd() - 0.5) * FH * 0.9, c: [COL.cyan, COL.amber, COL.red, COL.white, COL.blue][Math.floor(rnd() * 5)], s: rnd() });
     }
     const L = w.len, cx = w.along === 'x' ? w.x0 + L / 2 : w.x0 + (w.x0 < 0 ? -20 : 20), cz = w.along === 'x' ? w.z - 20 : w.z + L / 2;
@@ -1119,6 +1151,8 @@ function buildHall() {
   const im = new THREE.InstancedMesh(geo, mat, faces.length), o = new THREE.Object3D();
   faces.forEach((f, i) => { o.position.set(f.x, f.y, f.z); o.rotation.set(0, f.ry, 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
   im.frustumCulled = false; scene.add(im);
+  { const q = new THREE.Quaternion(), e3 = new THREE.Euler(); for (const f of faces) { if (!f.near || f.real) continue; const list = tileScr[f.t]; if (!list) continue; q.setFromEuler(e3.set(0, f.ry, 0));
+      for (const [cx, cy, sw, sh, col] of list) { const lx = (f.f ? FW - cx : cx) - FW / 2, ly = FH / 2 - cy, p = new THREE.Vector3(lx, ly, 0.08).applyQuaternion(q).add(new THREE.Vector3(f.x, f.y, f.z)); addScope(p, q, sw, sh, col); } } }
   const bim = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), MAT.wood, bodies.length);
   bodies.forEach((b, i) => { o.position.set(b.x, b.y, b.z); o.rotation.set(0, 0, 0); o.scale.set(b.sx, b.sy, b.sz); o.updateMatrix(); bim.setMatrixAt(i, o.matrix); }); o.scale.set(1, 1, 1); scene.add(bim);
   // blinking LEDs (animated on the GPU)
@@ -1135,7 +1169,8 @@ function buildHall() {
   const sim = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), hallStrips.mat, strips.length);
   strips.forEach((st, i) => { o.position.set(st.x, 330, st.z); o.scale.set(st.sx, 1.2, st.sz); o.updateMatrix(); sim.setMatrixAt(i, o.matrix); }); scene.add(sim);
   // computer: the racks nearest the back are real 3D (knobs, jacks, hanging cables)
-  real3D.forEach((f, i) => buildDecor(84, 3, 500 + i, new THREE.Vector3(f.x, f.y - FH / 2, f.z), 0, 'center', true, { S: 13, cf: 0.3, steps: 260 }));
+  const Z0 = new THREE.Matrix4().makeScale(0, 0, 0), hideFace = i => { im.setMatrixAt(i, Z0); im.instanceMatrix.needsUpdate = true; };
+  real3D.sort((a, b) => a.lv - b.lv || Math.abs(a.x) - Math.abs(b.x)).forEach((f, i) => BACKQ.push(() => { hideFace(f.idx); buildDecor(84, 3, 500 + i, new THREE.Vector3(f.x, f.y - FH / 2, f.z), 0, 'center', true, { S: f.lv < 2 ? 13 : 9, cf: f.lv < 2 ? 0.3 : 0.22, steps: f.lv < 2 ? 220 : 150 }); }));
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 1 })); ceil.rotation.x = Math.PI / 2; ceil.position.y = 335; scene.add(ceil);
 }
 
@@ -1190,7 +1225,7 @@ class Tube {
     for (let q = 0; q < m; q++) {
       const a = Math.max(q - 1, 0) * 3, b = Math.min(q + 1, m - 1) * 3; let tx = C[b] - C[a], ty = C[b + 1] - C[a + 1], tz = C[b + 2] - C[a + 2]; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
       if (q === 0) { if (Math.abs(ty) > 0.9) { nx = 1; ny = 0; nz = 0; } else { nx = 0; ny = 1; nz = 0; } }
-      const dt = nx * tx + ny * ty + nz * tz; nx -= tx * dt; ny -= ty * dt; nz -= tz * dt; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      const dt = nx * tx + ny * ty + nz * tz; nx -= tx * dt; ny -= ty * dt; nz -= tz * dt; let nl = Math.hypot(nx, ny, nz); if (!(nl > 1e-4)) { if (Math.abs(ty) < 0.9) { nx = -tz * 0; ny = 1; nz = 0; } else { nx = 1; ny = 0; nz = 0; } const d2 = nx * tx + ny * ty + nz * tz; nx -= tx * d2; ny -= ty * d2; nz -= tz * d2; nl = Math.hypot(nx, ny, nz) || 1; } nx /= nl; ny /= nl; nz /= nl;
       const bx = ty * nz - tz * ny, by = tz * nx - tx * nz, bz = tx * ny - ty * nx;
       for (let j = 0; j < RAD; j++) { const an = j / RAD * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an), ox = nx * ca + bx * sa, oy = ny * ca + by * sa, oz = nz * ca + bz * sa, v = (q * RAD + j) * 3; nor[v] = ox; nor[v + 1] = oy; nor[v + 2] = oz; pos[v] = C[q * 3] + ox * CR; pos[v + 1] = C[q * 3 + 1] + oy * CR; pos[v + 2] = C[q * 3 + 2] + oz * CR; }
     }
@@ -1490,6 +1525,7 @@ function applySettings(save = true) {
   MOTE_U.uColor.value.copy(C_('key')).lerp(new THREE.Color(0xffffff), 0.5); MOTE_U.uInt.value = 0.3 + SET.shafts; motes.visible = SET.shafts > 0.01;
   plantGroup.visible = SET.plants; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
   for (const c of cables) { c.applyOpacity(); c.applyNeon(); }
+  for (const m of DECOR_CABLE_MATS) { m.emissive.copy(SET.neon ? m.color : new THREE.Color(0)); m.emissiveIntensity = SET.neon ? 1.3 : 1; }
   if (lastSlack !== SET.slack) { if (lastSlack !== null) for (const c of cables) if (c.connected) c.length = stdLen(c.ends[0].port.world.distanceTo(c.ends[1].port.world)); lastSlack = SET.slack; } PS2.enabled = SET.ps2; PS2.uniforms.uScan.value = SET.scan;
   if (lastPS2 !== SET.ps2) { lastPS2 = SET.ps2; applyRes(); }
   clearTimeout(envTimer); envTimer = setTimeout(() => buildEnv(SET.key, SET.rimL, SET.rimR, SET.amb, SET.fogc), 120);
@@ -2362,6 +2398,7 @@ async function main() {
   const near = [buildDecor(84, NROWS, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right'),
     buildDecor(84, NROWS, 37, new THREE.Vector3(CASE_W / 2 + 2.4, 0, 0), -0.55, 'left')];
   buildHall();
+  buildScopes();
   rackBeams(near);
   desk = buildDesk();
   buildPlants();
@@ -2376,13 +2413,13 @@ const decorCol = new THREE.Color();
 function frame(ts) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016); lastTs = ts; pollPad(dt);
-  if (window.__noRender) return; acc += dt; let n = 0; stepTweens(dt);
+  if (window.__noRender) return; if (BACKQ.length && ts > 1500) { const t0 = performance.now(); while (BACKQ.length && performance.now() - t0 < 12) BACKQ.shift()(); if (!BACKQ.length || SCOPES.length > 60) buildScopes(); } acc += dt; let n = 0; stepTweens(dt);
   while (acc >= 1 / 120 && n < 5) { physics(1 / 120); acc -= 1 / 120; n++; } if (n === 5) acc = 0;
   for (const c of cables) c.tube.update(c.rope.P);
   const live = !!(AC && AC.state === 'running' && ENG), now = ts / 1000;
   for (const m of modules) { if (live) m.visual(now); else if (m.idle) m.idle(); if (m.scr && (m.liveScreen || m.screenDirty)) { m.screenDirty = false; m.drawScreen(now); } }
   // decor LEDs
-  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
+  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
   const T = ts / 1000, beat = live ? G.beat.level(now, 0.15) : 0, tick = G.tick || Math.floor(T * 2);
   for (const d of decorLEDs) { for (let i = 0; i < d.list.length; i++) { const l = d.list[i]; let v;
     if (l.type === 0) { l.lv = Math.random() < 0.012 ? 1 : l.lv * 0.93; v = l.lv; } else if (l.type === 1) v = 0.5 + 0.5 * Math.sin(T * l.f + l.ph); else if (l.type === 2) v = live ? beat : 0.3 + 0.3 * Math.sin(T * 0.8 + l.ph); else { const on = ((tick + l.idx * 7 + Math.floor(l.ph * 20)) % 11) < 3; l.lv = on ? 1 : l.lv * 0.9; v = l.lv; }
