@@ -90,7 +90,9 @@ body.noui #showui{display:block}
 #scene input[type=checkbox]{accent-color:#4fd8ff;width:15px;height:15px}
 #err{position:fixed;inset:auto 0 0 0;z-index:20;padding:10px;font-size:12px;color:#ffb3c0;background:#200810;display:none}
 
+.xclose{position:sticky;top:0;float:right;z-index:3;margin:-4px -6px 4px 8px;padding:6px 12px;font-size:12px;letter-spacing:.12em;background:rgba(10,16,40,.95);color:#e8eef8;border:1px solid var(--line);border-radius:8px;cursor:pointer}
 @media (max-width:760px),(max-height:500px){
+  .xclose{padding:10px 16px;font-size:13px}
   #bMenu{display:inline-block}
   #bar{max-width:calc(100vw - 20px);top:10px;right:10px}
   #bar button{padding:7px 9px;font-size:11px}
@@ -1814,6 +1816,7 @@ function padA() {
   drag = { type: 'cable', cable, i, base: cable.ends[1 - i].port && cable.connectedOnce ? cable.length : 0, pad: true }; padRing.material.color.set(0xffd36b); padCarryUpdate(); padTip();
 }
 function padB() {
+  if (!(drag && drag.pad) && panelsOpen()) { closePanels(); return; }
   if (drag && drag.type === 'cable' && drag.pad) { drag.target = null; drag.msg = ''; endDrag({}); toast('Cable removed', true); }
   PAD.mode = 'nav'; padRing.material.color.set(0x4fe3ff); padTip();
 }
@@ -1890,7 +1893,11 @@ canvas.addEventListener('pointerup', e => {
   if (tLast && now - tLast.t < 350 && Math.hypot(e.clientX - tLast.x, e.clientY - tLast.y) < 30 && h && h.module) { const m = h.module, c = new THREE.Vector3(m.x0 + m.w / 2, m.y0 + U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1))), c); tLast = null; return; }
   tLast = { t: now, x: e.clientX, y: e.clientY };
 }, true);
-document.getElementById('bMenu').onclick = () => document.body.classList.toggle('menuopen');
+const PANELS = ['patches', 'rand', 'scene', 'help'];
+function panelsOpen() { return PANELS.some(id => !document.getElementById(id).classList.contains('hide')); }
+function closePanels() { PANELS.forEach(id => document.getElementById(id).classList.add('hide')); document.body.classList.remove('menuopen'); }
+PANELS.forEach(id => { const el = document.getElementById(id), b = document.createElement('button'); b.className = 'xclose'; b.textContent = '✕ CLOSE'; b.onclick = closePanels; el.prepend(b); });
+document.getElementById('bMenu').onclick = () => { if (document.body.classList.contains('menuopen') || ['patches', 'rand', 'scene'].some(id => !document.getElementById(id).classList.contains('hide'))) closePanels(); else document.body.classList.add('menuopen'); };
 document.getElementById('bar').addEventListener('click', e => { if (e.target.tagName === 'BUTTON' && e.target.id !== 'bMenu') document.body.classList.remove('menuopen'); });
 try { if (sessionStorage.getItem('ha.pad') === '1') { const s = document.querySelector('#start p'); if (s) s.innerHTML += '<br><br>Controller: press <b>A</b> (or tap) to power on.'; } } catch (e) { }
 
@@ -1969,7 +1976,7 @@ const DESC = {
 };
 document.getElementById('bHide').onclick = () => { document.body.classList.add('noui'); showTip({}, null); };
 document.getElementById('showui').onclick = () => document.body.classList.remove('noui');
-addEventListener('keydown', e => { if ((e.key === 'h' || e.key === 'H') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) document.body.classList.toggle('noui'); if (e.key === 'Escape') closeMenu(); });
+addEventListener('keydown', e => { if ((e.key === 'h' || e.key === 'H') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) document.body.classList.toggle('noui'); if (e.key === 'Escape') { closeMenu(); closePanels(); } });
 
 const has = (a, b) => cables.some(c => c.connected && c.out.module.id + '.' + c.out.id === a && c.inp.module.id + '.' + c.inp.id === b);
 const kv = (m, k) => modById[m].knobs[k].value;
