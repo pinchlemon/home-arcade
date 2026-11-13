@@ -1646,33 +1646,16 @@ function drawFeeds(now) {
 }
 // Void Wizard demo: the real game runs small and hidden in this page, a little bot plays it, its picture goes to a CRT. Your controller and keys never reach it.
 const VW = window.__vw = { fr: null, ok: false, vid: null, bot: 0, held: new Set(), tried: false, q: [], qid: 0 };
-function vwPump() { // run the game's queued frames (its requestAnimationFrame is routed here)
-  if (!VW.fr || !VW.q.length) return; const q = VW.q; VW.q = []; let t = 0; try { t = VW.fr.contentWindow.performance.now(); } catch (e) { return; }
-  for (const cb of q) { try { cb(t); } catch (e) { try { VW.fr.contentWindow.__nrErr = true; } catch (e2) { } } }
-}
-function startVoidWizard() {
+function startVoidWizard() { // a recorded minute of Void Wizard, looped (media/voidwizard.mp4, cropped to the CRT's 4:3)
   if (VW.tried) return; VW.tried = true;
-  const fr = document.createElement('iframe'); fr.src = '../void-wizard/index.html'; fr.setAttribute('aria-hidden', 'true'); fr.tabIndex = -1;
-  fr.style.cssText = 'position:fixed;left:0;bottom:0;width:480px;height:360px;border:0;opacity:0.01;pointer-events:none;z-index:-1'; document.body.appendChild(fr); VW.fr = fr;
-  const patch = () => { try { const w = fr.contentWindow; if (!w || !w.navigator) return; if (w.__nrRaf !== true) { w.__nrRaf = true; w.requestAnimationFrame = cb => { VW.q.push(cb); return ++VW.qid; }; w.cancelAnimationFrame = () => { }; } if (!w.__nrPatched) { Object.defineProperty(w.navigator, 'getGamepads', { value: () => [], configurable: true }); const gc = w.HTMLCanvasElement.prototype.getContext; w.HTMLCanvasElement.prototype.getContext = function (t, o) { if (/webgl/.test(t)) o = Object.assign({}, o, { preserveDrawingBuffer: true }); return gc.call(this, t, o); }; w.__nrPatched = true; } } catch (e) { } };
-  const iv = setInterval(patch, 15); fr.addEventListener('load', () => { patch(); try { fr.contentWindow.addEventListener('error', () => { fr.contentWindow.__nrErr = true; }); } catch (e) { } const iv2 = setInterval(patch, 15); setTimeout(() => clearInterval(iv2), 3000); setTimeout(() => clearInterval(iv), 3000); let n = 0;
-    const find = setInterval(() => { n++; try { const d = fr.contentDocument, c = d && d.querySelector('canvas'); if (c && c.width !== 300) { clearInterval(find); if (VW.tex) { VW.tex.image = c; VW.tex.needsUpdate = true; } else { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; for (const m of SCREENS) if (m.userData.game) { m.material.uniforms.uMap.value = t; m.material.uniforms.uZoom.value.set(0.68, 0.68, 0.16, 0.16); } VW.tex = t; } VW.ok = true; VW.canvas = c; VW.same = 0; } } catch (e) { VW.err = String(e); } if (n > 360) { clearInterval(find); if (!VW.ok) vwFallback(); } }, 250); });
-}
-function vwFallback() { if (VW.fb) return; VW.fb = true; VW.ok = false; if (VW.fr) { VW.fr.remove(); VW.fr = null; } for (const m of SCREENS) if (m.userData.game) { m.material.uniforms.uMap.value = feedTex('cam'); m.material.uniforms.uZoom.value.set(1, 1, 0, 0); } } // back to the rack camera
-function vwWatch(now) { // if the game's picture stops changing for 8 s (or it threw an error), restart it
-  if (!VW.ok || !VW.canvas || now < (VW.chk || 0)) return; VW.chk = now + 2;
-  try { const o = VW.probe || (VW.probe = document.createElement('canvas')); o.width = 24; o.height = 18; const g = o.getContext('2d', { willReadFrequently: true }); g.drawImage(VW.canvas, 0, 0, 24, 18); const d = g.getImageData(0, 0, 24, 18).data; let h = 0; for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) | 0;
-    VW.same = h === VW.hash ? (VW.same || 0) + 1 : 0; VW.hash = h; } catch (e) { VW.same = (VW.same || 0) + 1; }
-  let err = false; try { err = !!VW.fr.contentWindow.__nrErr; } catch (e) { }
-  if (VW.same >= 4 || err) { VW.restarts = (VW.restarts || 0) + 1; VW.same = 0; VW.ok = false; if (VW.restarts > 6) { vwFallback(); return; } VW.q = []; for (const c of VW.held) VW.held.delete(c); try { VW.fr.contentWindow.location.reload(); } catch (e) { } }
-}
-function vwBot(now) { // wander, cast a lot, jump and tackle now and then
-  if (!VW.ok || now < VW.bot) return; const w = VW.fr.contentWindow, key = (code, down) => { try { w.dispatchEvent(new w.KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code, bubbles: true })); } catch (e) { } };
-  for (const c of VW.held) key(c, false); VW.held.clear();
-  const dirs = [['KeyW'], ['KeyS'], ['KeyA'], ['KeyD'], ['KeyW', 'KeyA'], ['KeyW', 'KeyD'], ['KeyS', 'KeyA'], ['KeyS', 'KeyD'], []];
-  for (const c of dirs[Math.floor(Math.random() * dirs.length)]) { key(c, true); VW.held.add(c); }
-  if (Math.random() < 0.7) { key('KeyE', true); VW.held.add('KeyE'); } if (Math.random() < 0.2) { key('Space', true); VW.held.add('Space'); } if (Math.random() < 0.08) { key('KeyQ', true); key('KeyQ', false); }
-  VW.bot = now + 0.35 + Math.random() * 0.8;
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
+  VW.vid = v; const go = () => v.play().catch(() => { });
+  (async () => { // loaded whole into a blob so it also plays offline from the saved copy (iPhone video needs byte ranges, which a blob gives)
+    let r = null; try { r = await fetch('media/voidwizard.mp4'); } catch (e) { } if (!r || !r.ok) { try { r = await fetch('https://pinchlemon.github.io/home-arcade/night-rack/media/voidwizard.mp4'); } catch (e) { } }
+    if (!r || !r.ok) return; v.src = URL.createObjectURL(await r.blob()); go(); })(); addEventListener('pointerdown', go, { once: true }); addEventListener('keydown', go, { once: true });
+  v.addEventListener('playing', () => { if (VW.tex) return; const t = new THREE.VideoTexture(v); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
+    for (const m of SCREENS) if (m.userData.game) { m.material.uniforms.uMap.value = t; m.material.uniforms.uZoom.value.set(1, 1, 0, 0); } VW.tex = t; VW.ok = true; });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) go(); });
 }
 function renderFeed(now) { // a slow security-camera sweep across the rack, rendered small for the CRTs
   if (!FEED.rt) return; const a = Math.sin(now * 0.08) * 0.9, c = FEED.cam; c.position.set(Math.sin(a) * 70, 52 + Math.sin(now * 0.05) * 10, 95 + Math.cos(a) * 15); c.lookAt(Math.sin(a) * 12, 38, -6);
@@ -2788,7 +2771,7 @@ function frame(ts) {
   const live = !!(AC && AC.state === 'running' && ENG), now = ts / 1000;
   for (const m of modules) { if (live) m.visual(now); else if (m.idle) m.idle(); if (m.scr && (m.liveScreen || m.screenDirty)) { m.screenDirty = false; m.drawScreen(now); } }
   // decor LEDs
-  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; { const anyCrt = Object.values(SIDES).some(S => S.crt.visible && S.root.visible); for (const k in SIDE_CABLES) SIDE_CABLES[k].visible = SIDES[k].crt.visible; if (anyCrt && !window.__noRender) { FEED.n++; if (FEED.used.has('game') && SIDES.L && SIDES.L.crt.visible) { startVoidWizard(); vwPump(); vwBot(ts / 1000); vwWatch(ts / 1000); if (VW.tex && FEED.n % 4 === 0) VW.tex.needsUpdate = true; } if (ts / 1000 - FEED.t > 1 / 12) { FEED.t = ts / 1000; drawFeeds(ts / 1000); } if (FEED.n % 3 === 0) renderFeed(ts / 1000); } }
+  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; { const anyCrt = Object.values(SIDES).some(S => S.crt.visible && S.root.visible); for (const k in SIDE_CABLES) SIDE_CABLES[k].visible = SIDES[k].crt.visible; if (anyCrt && !window.__noRender) { FEED.n++; if (FEED.used.has('game') && SIDES.L && SIDES.L.crt.visible) { startVoidWizard(); } if (ts / 1000 - FEED.t > 1 / 12) { FEED.t = ts / 1000; drawFeeds(ts / 1000); } if (FEED.n % 3 === 0) renderFeed(ts / 1000); } }
   CRT_U.uLevel.value += ((AC && modById.out ? clamp((modById.out.pk || 0) * 1.4, 0, 1) : 0) - CRT_U.uLevel.value) * 0.2; PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
   const T = ts / 1000, beat = live ? G.beat.level(now, 0.15) : 0, tick = G.tick || Math.floor(T * 2);
   for (const d of decorLEDs) { for (let i = 0; i < d.list.length; i++) { const l = d.list[i]; let v;
