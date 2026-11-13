@@ -1732,18 +1732,64 @@ function speaker() { // two-way studio monitor: rounded cabinet, woofer with sur
   for (const x of [-7, 7]) { const pad = new THREE.Mesh(new THREE.BoxGeometry(5, 1.2, D * 0.8), black); pad.position.set(x, 0.6, -D / 2); g.add(pad); }
   return { g, jacks: [{ p: new THREE.Vector3(-1.6, 9, -D - 1.2), col: 0x1a1a1e }, { p: new THREE.Vector3(1.6, 9, -D - 1.2), col: 0x7a1818 }] };
 }
-function consoleBox() { // an original early-2000s style console: matte black, ridged top, disc seam, two controller ports, glowing power ring
-  const g = new THREE.Group(), body = new THREE.MeshPhysicalMaterial({ color: 0x17181c, roughness: 0.55, clearcoat: 0.2 }), face = new THREE.MeshStandardMaterial({ color: 0x23252b, roughness: 0.4, metalness: 0.15 });
-  const b = new THREE.Mesh(rrBox(30, 7.4, 23, 1.2, 0.5), body); b.position.y = 3.7; b.castShadow = true; g.add(b);
-  const f = new THREE.Mesh(new THREE.BoxGeometry(28.6, 6, 0.4), face); f.position.set(0, 3.7, 0.15); g.add(f);
-  const parts = []; for (let k = 0; k < 14; k++) { const r = new THREE.BoxGeometry(0.35, 0.3, 19); r.translate(-12 + k * 1.85, 7.45, -11.5); parts.push(r.toNonIndexed()); } g.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.7 })));
-  const seam = new THREE.Mesh(new THREE.BoxGeometry(20, 0.18, 0.2), new THREE.MeshBasicMaterial({ color: 0x050505 })); seam.position.set(-2.5, 5.2, 0.4); g.add(seam);
-  for (const x of [-11, -7.5]) { const p = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.6, 0.3), new THREE.MeshStandardMaterial({ color: 0x0a0a0c })); p.position.set(x, 2.3, 0.4); g.add(p); }
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.16, 8, 28), new THREE.MeshBasicMaterial({ color: 0x3dd6c0, toneMapped: false })); ring.position.set(11.5, 3.2, 0.45); g.add(ring);
-  const pb = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.4, 20), face); pb.rotation.x = Math.PI / 2; pb.position.set(11.5, 3.2, 0.45); g.add(pb);
-  const ej = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 0.3), face); ej.position.set(8, 3.2, 0.45); g.add(ej);
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(28.6, 0.12, 0.2), new THREE.MeshBasicMaterial({ color: 0x2a8f86, toneMapped: false })); stripe.position.set(0, 0.95, 0.45); g.add(stripe);
-  return { g, ports: [new THREE.Vector3(-11, 2.3, 0.6), new THREE.Vector3(-7.5, 2.3, 0.6)], av: new THREE.Vector3(10, 4, -23.4) };
+function consoleBox() { // a dodecahedron console on a hexagonal stand: matte black panels, copper seams, glowing power ring, two braided-cable ports
+  const g = new THREE.Group(), R = 7.4, base = 2.2;
+  const shell = new THREE.MeshPhysicalMaterial({ color: 0x2c2d33, roughness: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.6 }), copper = new THREE.MeshStandardMaterial({ color: 0xc07a45, roughness: 0.32, metalness: 0.9, emissive: 0x3a1a08, emissiveIntensity: 0.35 }), dk = new THREE.MeshStandardMaterial({ color: 0x08080a, roughness: 0.6 });
+  const geo = new THREE.DodecahedronGeometry(R, 0), pos = geo.attributes.position;
+  // faces: group triangles by normal (12 pentagons)
+  const faces = []; const v = i => new THREE.Vector3().fromBufferAttribute(pos, i);
+  for (let i = 0; i < pos.count; i += 3) { const A = v(i), B = v(i + 1), C = v(i + 2), n = new THREE.Vector3().subVectors(B, A).cross(new THREE.Vector3().subVectors(C, A)).normalize(); let f = faces.find(f => f.n.dot(n) > 0.999); if (!f) faces.push(f = { n, pts: [] }); for (const P of [A, B, C]) if (!f.pts.some(q => q.distanceTo(P) < 1e-4)) f.pts.push(P); }
+  // rest it on a face, then turn so a lower face looks straight ahead
+  const bottom = faces[0].n.clone(), q = new THREE.Quaternion().setFromUnitVectors(bottom, new THREE.Vector3(0, -1, 0));
+  for (const f of faces) { f.n.applyQuaternion(q); f.pts.forEach(P => P.applyQuaternion(q)); }
+  const low = faces.find(f => f.n.y < -0.1 && f.n.y > -0.9), yaw = Math.atan2(low.n.x, low.n.z), q2 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -yaw);
+  for (const f of faces) { f.n.applyQuaternion(q2); f.pts.forEach(P => P.applyQuaternion(q2)); f.c = f.pts.reduce((a, P) => a.add(P), new THREE.Vector3()).multiplyScalar(1 / f.pts.length); }
+  const lift = -Math.min(...faces.flatMap(f => f.pts.map(P => P.y))) + base;
+  const body = new THREE.Group(); body.position.y = lift; g.add(body);
+  // each panel slightly inset so the copper seams read between them
+  for (const f of faces) { const ax = new THREE.Vector3().subVectors(f.pts[0], f.c).normalize(), ay = new THREE.Vector3().crossVectors(f.n, ax);
+    const ang = f.pts.map(P => { const d = new THREE.Vector3().subVectors(P, f.c); return [Math.atan2(d.dot(ay), d.dot(ax)), P]; }).sort((a, b) => a[0] - b[0]).map(x => x[1]); f.ring = ang;
+    const sh = new THREE.Shape(ang.map(P => { const d = new THREE.Vector3().subVectors(P, f.c).multiplyScalar(0.94); return new THREE.Vector2(d.dot(ax), d.dot(ay)); }));
+    const pg = new THREE.ExtrudeGeometry(sh, { depth: 0.5, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.12, bevelSegments: 2 }); pg.translate(0, 0, -0.62);
+    const m = new THREE.Mesh(pg, shell); m.matrixAutoUpdate = false; m.matrix.makeBasis(ax, ay, f.n).setPosition(f.c); m.castShadow = true; body.add(m); f.ax = ax; f.ay = ay; }
+  const core = new THREE.Mesh(new THREE.DodecahedronGeometry(R * 0.93, 0), dk); core.quaternion.copy(q2).multiply(q); body.add(core);
+  // copper seams along all 30 edges
+  const seen = new Set(), seams = [];
+  for (const f of faces) for (let k = 0; k < 5; k++) { const A = f.ring[k], B = f.ring[(k + 1) % 5], key = [A, B].map(P => P.toArray().map(x => x.toFixed(2)).join()).sort().join('|'); if (seen.has(key)) continue; seen.add(key);
+    const L = A.distanceTo(B), cg = new THREE.CylinderGeometry(0.11, 0.11, L, 6), mid = A.clone().add(B).multiplyScalar(0.5), dir = B.clone().sub(A).normalize(); cg.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)); cg.translate(mid.x, mid.y, mid.z); seams.push(cg.toNonIndexed()); }
+  body.add(new THREE.Mesh(mergeGeometries(seams), copper));
+  const onFace = (f, obj, x, y, z = 0.02) => { obj.matrixAutoUpdate = false; obj.matrix.makeBasis(f.ax, f.ay, f.n).setPosition(f.c.clone().addScaledVector(f.ax, x).addScaledVector(f.ay, y).addScaledVector(f.n, z)); body.add(obj); return obj; };
+  // turn a face's frame so +y points up the face
+  const upright = f => { const up = new THREE.Vector3(0, 1, 0).projectOnPlane(f.n).normalize(); if (up.lengthSq() < 0.01) up.set(0, 0, -1).projectOnPlane(f.n).normalize(); f.ay = up; f.ax = new THREE.Vector3().crossVectors(up, f.n).normalize(); return f; };
+  const front = upright(low), text = (w, h, str, size, col, track) => new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, map: labelTex(w, h, (c, W, H) => { c.fillStyle = col; c.font = `600 ${size}px "Saira", "Space Grotesk", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; if (track) c.letterSpacing = track + 'px'; c.fillText(str, W / 2, H / 2); }) }));
+  // front panel: power ring, name, two ports with braided leads
+  const ring = onFace(front, new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.13, 10, 40), new THREE.MeshBasicMaterial({ color: 0xffa24a, toneMapped: false })), 0, 2.0, 0.08);
+  onFace(front, new THREE.Mesh(new THREE.CircleGeometry(0.72, 32), new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.4 })), 0, 2.0, 0.04);
+  onFace(front, text(6, 1.1, 'AETHER-12', 20, '#f2e6d8', 3), 0, 0.35, 0.03);
+  const ports = [];
+  for (const x of [-1.7, 1.7]) { const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.5, 6), new THREE.MeshStandardMaterial({ color: 0x0a0a0b, roughness: 0.5 })); sock.geometry.rotateX(Math.PI / 2); onFace(front, sock, x, -1.6, 0.05);
+    const plug = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.45 })); plug.geometry.rotateX(Math.PI / 2); plug.geometry.translate(0, 0, 0.75); onFace(front, plug, x, -1.6, 0.1);
+    const p = front.c.clone().addScaledVector(front.ax, x).addScaledVector(front.ay, -1.6).addScaledVector(front.n, 1.7); p.y += lift; ports.push(p); }
+  // upper panel: model name; side panels: speaker dots; top: vent dots
+  const upper = faces.filter(f => f.n.y > 0.1 && f.n.y < 0.9).sort((a, b) => b.n.z - a.n.z)[0]; upright(upper); onFace(upper, text(9, 1, 'AETHER // MODEL 12', 13, '#d8cbb9', 1.5), 0, -0.3, 0.03);
+  const dot = new THREE.CylinderGeometry(0.09, 0.09, 0.05, 6); dot.rotateX(Math.PI / 2); const dots = [];
+  for (const f of faces.filter(f => f.n.y < -0.1 && f.n.y > -0.9 && f !== low)) { upright(f); for (let i = 0; i < 4; i++) for (let j = 0; j < 7 - i; j++) { const d = dot.clone(); const x = (j - (6 - i) / 2) * 0.32 + (f.n.x > 0 ? -2.6 : 2.6), y = 1.2 - i * 0.3; const P = f.c.clone().addScaledVector(f.ax, x).addScaledVector(f.ay, y).addScaledVector(f.n, 0.03); d.applyMatrix4(new THREE.Matrix4().makeBasis(f.ax, f.ay, f.n).setPosition(P)); dots.push(d.toNonIndexed()); } }
+  const topF = faces.find(f => f.n.y > 0.9); upright(topF); for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { if (i * i + j * j > 10) continue; const d = dot.clone(); d.applyMatrix4(new THREE.Matrix4().makeBasis(topF.ax, topF.ay, topF.n).setPosition(topF.c.clone().addScaledVector(topF.ax, i * 0.55).addScaledVector(topF.ay, j * 0.55).addScaledVector(topF.n, 0.03))); dots.push(d.toNonIndexed()); }
+  body.add(new THREE.Mesh(mergeGeometries(dots), dk));
+  // hexagonal stand with a copper foot line
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.78, R * 0.9, base, 6), new THREE.MeshPhysicalMaterial({ color: 0x232428, roughness: 0.5, clearcoat: 0.3 })); st.position.y = base / 2; st.rotation.y = Math.PI / 6; st.castShadow = st.receiveShadow = true; g.add(st);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.905, R * 0.905, 0.12, 6, 1, true), copper); foot.position.y = 0.2; foot.rotation.y = Math.PI / 6; g.add(foot);
+  const glow = new THREE.PointLight(0xff9a40, 6, 14, 2); glow.position.copy(front.c).addScaledVector(front.n, 1.5); glow.position.y += lift + 2; g.add(glow);
+  return { g, ports, av: new THREE.Vector3(0, lift, -R * 0.95), ring };
+}
+function gameShelf() { // her games as cases standing on the shelf, spines out
+  const g = new THREE.Group(), GAMES = [['VOID WIZARD', '#2d1b5a', '#c9a7ff'], ['CRAB PLATFORMER', '#7a2a12', '#ffb48a'], ['PHOSPHOR', '#0d3b2a', '#7dffb0'], ['PURGATORY BOWL', '#3a1020', '#ff9ac0'], ['NIGHT RACK', '#0b1a3a', '#8ec8ff'], ['HEDRON', '#1a1a1e', '#ff8a4a']];
+  GAMES.forEach(([name, bg, fg], i) => { const w = 1.5, h = 13, d = 10;
+    const spine = labelTex(h, w, (c, W, H) => { c.fillStyle = bg; c.fillRect(0, 0, W, H); c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(0, 0, W, H * 0.08); c.fillStyle = fg; c.font = `700 ${H * 0.52}px "Saira", "Space Grotesk", sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'center'; c.fillText(name, W * 0.46, H * 0.54); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(W * 0.9, H * 0.25, W * 0.06, H * 0.5); });
+    spine.center.set(0.5, 0.5); spine.rotation = Math.PI / 2;
+    const side = new THREE.MeshStandardMaterial({ color: bg, roughness: 0.35 }), mats = [side, side, side, side, new THREE.MeshStandardMaterial({ map: spine, roughness: 0.4 }), side];
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats); m.position.set(i * 1.62, h / 2, -d / 2); m.castShadow = true; g.add(m); });
+  return g;
 }
 function gamepad(color) { // an original dual-grip controller
   const g = new THREE.Group(), m = new THREE.MeshPhysicalMaterial({ color, roughness: 0.5, clearcoat: 0.3 }), dk = new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: 0.5 });
@@ -1760,7 +1806,7 @@ function mediaCabinet() { // low wooden cabinet: console in one cubby, a stack o
   bx(W, t, D, 0, H - t / 2, -D / 2); bx(W, t, D, 0, t / 2 + 2, -D / 2); bx(t, H - 2, D, -W / 2 + t / 2, H / 2 + 1, -D / 2); bx(t, H - 2, D, W / 2 - t / 2, H / 2 + 1, -D / 2); bx(W, H - 2, t, 0, H / 2 + 1, -D + t / 2); bx(t, H - 2 * t - 2, D - 2, 6, H / 2 + 1, -D / 2 - 1);
   for (const [x, z] of [[-W / 2 + 3, -3], [W / 2 - 3, -3], [-W / 2 + 3, -D + 3], [W / 2 - 3, -D + 3]]) bx(2.4, 2, 2.4, x, 1, z);
   const m = new THREE.Mesh(mergeGeometries(parts), wood); m.castShadow = m.receiveShadow = true; g.add(m);
-  const cons = consoleBox(); cons.g.position.set(-12, 2 + t, -6); g.add(cons.g);
+  const cons = consoleBox(); cons.g.position.set(-17, 2 + t, -13); g.add(cons.g); const games = gameShelf(); games.position.set(-6.5, 2 + t, -3); g.add(games);
   const r = mulberry32(64); for (let k = 0; k < 7; k++) { const c = new THREE.Mesh(new THREE.BoxGeometry(1.4, 15, 11), new THREE.MeshStandardMaterial({ color: [0x1a2a6a, 0x0f0f12, 0x2a5a2a, 0x6a1a1a, 0x1a1a1a, 0xe0e0e0, 0x3a3a8a][k], roughness: 0.4 })); c.position.set(10 + k * 1.55, 2 + t + 7.5, -10 - r() * 1.5); c.rotation.z = k > 4 ? -0.12 : 0; g.add(c); }
   return { g, cons, H };
 }
@@ -2259,7 +2305,7 @@ canvas.addEventListener('dblclick', e => {
   if (!h) flyTo(HOME.pos, HOME.target);
 });
 const ctl = new OrbitControls(camera, canvas);
-window.__nr = { camera, get ctl() { return ctl; }, modules, cables, get AC() { return AC; }, get ENG() { return ENG; }, get TEL() { return TEL; } };
+window.__nr = { camera, scene, get ctl() { return ctl; }, modules, cables, get AC() { return AC; }, get ENG() { return ENG; }, get TEL() { return TEL; } };
 ctl.target.copy(HOME.target); ctl.enableDamping = true; ctl.dampingFactor = 0.08; ctl.minDistance = 3; ctl.maxDistance = 420;
 ctl.minPolarAngle = 0.05; ctl.maxPolarAngle = 1.75; ctl.screenSpacePanning = true; ctl.rotateSpeed = 0.6; ctl.zoomSpeed = 0.9; ctl.update();
 let fly = null;
