@@ -1616,11 +1616,12 @@ const SCREEN_FS = `uniform float uTime, uSeed, uMode, uBright; uniform sampler2D
     if (uMode < 0.5) { vec2 g = floor(uv * vec2(220.0, 160.0)); float tf = floor(t * 30.0); float n = h(vec2(g.x * 1.31 + tf * 37.0, g.y * 1.73 - tf * 91.0)); n = fract(n * 7.0 + h(g.yx + tf)); float roll = smoothstep(0.0, 0.08, abs(fract(uv.y - t * 0.17) - 0.5)); c = vec3(n * (0.6 + 0.4 * roll)); }
     else { float o = 0.0016; c = vec3(texture2D(uMap, uv + vec2(o, 0.0)).r, texture2D(uMap, uv).g, texture2D(uMap, uv - vec2(o, 0.0)).b); c *= 1.0 + 0.04 * sin(t * 50.0 + uSeed); c += (h(floor(uv * vec2(320.0, 240.0)) + floor(t * 24.0)) - 0.5) * 0.035; }
     c *= 0.78 + 0.22 * sin(uv.y * 240.0 * 3.14159); c *= 1.0 - dot(cc, cc) * 1.3; gl_FragColor = vec4(c * 1.15 * uBright, 1.0); }`;
-const SCREENS = [];
+const SCREENS = window.__screens = [];
 // ---- what the screens show: live from the rack
 const FEED = { cv: {}, tex: {}, t: 0, rt: null, cam: null, n: 0, used: new Set() };
 function feedTex(mode) {
   FEED.used.add(mode); if (FEED.tex[mode]) return FEED.tex[mode];
+  if (mode === 'game') return feedTex('cam'); // shows the rack camera until the game is running
   if (mode === 'cam') { FEED.rt = new THREE.WebGLRenderTarget(320, 240); FEED.cam = new THREE.PerspectiveCamera(40, 4 / 3, 1, 4000); return FEED.tex.cam = FEED.rt.texture; }
   const c = document.createElement('canvas'); c.width = 320; c.height = 240; FEED.cv[mode] = c; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return FEED.tex[mode] = t;
 }
@@ -1643,6 +1644,25 @@ function drawFeeds(now) {
       g.fillStyle = G; lines.forEach((l, k) => g.fillText(l, 12, 10 + k * 24)); if (Math.floor(now * 2) % 2) g.fillRect(12, 10 + lines.length * 24, 9, 15); }
     FEED.tex[mode].needsUpdate = true; }
 }
+// Void Wizard demo: the real game runs small and hidden in this page, a little bot plays it, its picture goes to a CRT. Your controller and keys never reach it.
+const VW = window.__vw = { fr: null, ok: false, vid: null, bot: 0, held: new Set(), tried: false };
+function startVoidWizard() {
+  if (VW.tried) return; VW.tried = true;
+  const fr = document.createElement('iframe'); fr.src = '../void-wizard/index.html?demo=1'; fr.setAttribute('aria-hidden', 'true'); fr.tabIndex = -1;
+  fr.style.cssText = 'position:fixed;left:0;bottom:0;width:480px;height:360px;border:0;opacity:0.01;pointer-events:none;z-index:-1'; document.body.appendChild(fr); VW.fr = fr;
+  const patch = () => { try { const w = fr.contentWindow; if (!w || !w.navigator) return; if (!w.__nrPatched) { Object.defineProperty(w.navigator, 'getGamepads', { value: () => [], configurable: true }); const gc = w.HTMLCanvasElement.prototype.getContext; w.HTMLCanvasElement.prototype.getContext = function (t, o) { if (/webgl/.test(t)) o = Object.assign({}, o, { preserveDrawingBuffer: true }); return gc.call(this, t, o); }; w.__nrPatched = true; } } catch (e) { } };
+  const iv = setInterval(patch, 15); fr.addEventListener('load', () => { patch(); setTimeout(() => clearInterval(iv), 3000); let n = 0;
+    const find = setInterval(() => { n++; try { const d = fr.contentDocument, c = d && d.querySelector('canvas'); if (c && c.width !== 300) { clearInterval(find); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; for (const m of SCREENS) if (m.userData.game) m.material.uniforms.uMap.value = t; VW.tex = t; VW.ok = true; } } catch (e) { VW.err = String(e); } if (n > 360) { clearInterval(find); if (!VW.ok) vwFallback(); } }, 250); });
+}
+function vwFallback() { if (VW.ok || VW.fb) return; VW.fb = true; if (VW.fr) { VW.fr.remove(); VW.fr = null; } } // stays on the rack camera
+function vwBot(now) { // wander, cast a lot, jump and tackle now and then
+  if (!VW.ok || now < VW.bot) return; const w = VW.fr.contentWindow, key = (code, down) => { try { w.dispatchEvent(new w.KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code, bubbles: true })); } catch (e) { } };
+  for (const c of VW.held) key(c, false); VW.held.clear();
+  const dirs = [['KeyW'], ['KeyS'], ['KeyA'], ['KeyD'], ['KeyW', 'KeyA'], ['KeyW', 'KeyD'], ['KeyS', 'KeyA'], ['KeyS', 'KeyD'], []];
+  for (const c of dirs[Math.floor(Math.random() * dirs.length)]) { key(c, true); VW.held.add(c); }
+  if (Math.random() < 0.7) { key('KeyE', true); VW.held.add('KeyE'); } if (Math.random() < 0.2) { key('Space', true); VW.held.add('Space'); } if (Math.random() < 0.08) { key('KeyQ', true); key('KeyQ', false); }
+  VW.bot = now + 0.35 + Math.random() * 0.8;
+}
 function renderFeed(now) { // a slow security-camera sweep across the rack, rendered small for the CRTs
   if (!FEED.rt) return; const a = Math.sin(now * 0.08) * 0.9, c = FEED.cam; c.position.set(Math.sin(a) * 70, 52 + Math.sin(now * 0.05) * 10, 95 + Math.cos(a) * 15); c.lookAt(Math.sin(a) * 12, 38, -6);
   const hv = hallGroup.visible; hallGroup.visible = false; shafts.visible = false; renderer.setRenderTarget(FEED.rt); renderer.render(scene, c); renderer.setRenderTarget(null); hallGroup.visible = hv; shafts.visible = SET.shafts > 0.01;
@@ -1653,7 +1673,7 @@ function crtScreen(w, h, mode) {
   const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uBright: CRT_U.uBright, uSeed: { value: Math.random() * 100 }, uMode: { value: mode === 'static' ? 0 : 1 }, uMap: { value: mode === 'static' ? null : feedTex(mode) } }, toneMapped: false,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: SCREEN_FS }));
   const glass = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0x0a0c10, transparent: true, opacity: 0.16, roughness: 0.06, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.4, depthWrite: false })); glass.position.z = 0.12; m.add(glass);
-  SCREENS.push(m); return m;
+  if (mode === 'game') m.userData.game = true; SCREENS.push(m); return m;
 }
 function rrShape(w, h, r, ox = 0, oy = 0, hole = false) { const s = hole ? new THREE.Path() : new THREE.Shape(), x = -w / 2 + ox, y = -h / 2 + oy; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
 function rrBox(w, h, d, r, bev = 0.5) { const g = new THREE.ExtrudeGeometry(rrShape(w - 2 * bev, h - 2 * bev, Math.max(0.1, r - bev)), { depth: d - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 8 }); g.translate(0, 0, -(d - 2 * bev) - bev); return g; } // front face at z = 0
@@ -1672,21 +1692,24 @@ function tvSet(kind, w, h, mode) { // pvm: grey pro monitor with a control strip
   const frame = rrShape(sw + w * 0.07, sh + w * 0.07, R * 0.7); frame.holes.push(rrShape(sw, sh, R * 0.5, 0, 0, true));
   const fr = new THREE.Mesh(new THREE.ExtrudeGeometry(frame, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.25, bevelSegments: 2, curveSegments: 8 }), dark); fr.position.set(0, sy, -2.3); g.add(fr);
   const scr = crtScreen(sw, sh, mode); scr.position.set(0, sy, -1.9); g.add(scr);
-  // control strip, drawn as a printed panel plus real buttons and knobs
-  const pw = w * 0.92, ph = strip * 0.78, panel = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ roughness: 0.6, map: labelTex(pw, ph, (c, W, H) => {
-    c.fillStyle = home ? '#141418' : kind === 'pvm' ? '#25272c' : '#33353b'; c.fillRect(0, 0, W, H); c.fillStyle = home ? '#6c6c74' : '#b9bec8'; c.font = `600 ${Math.round(Math.min(H * 0.15, W * 0.022))}px sans-serif`; c.textAlign = 'center';
-    const labels = home ? ['MENU', 'TV/AV', 'VOL', '', 'CH', ''] : kind === 'pvm' ? ['LINE A', 'LINE B', 'RGB', 'UNDER', 'H/V', 'BLUE'] : ['POWER', 'INPUT', 'CONTR', 'BRIGHT', 'COLOR', 'VOL'];
-    labels.forEach((l, k) => c.fillText(l, W * (kind === 'pvm' ? 0.08 + 0.5 * k / (labels.length - 1) : 0.1 + 0.8 * k / Math.max(1, labels.length - 1)), H * 0.22));
-    if (home) { c.fillStyle = '#0a0a0c'; for (let k = 0; k < 14; k++) c.fillRect(W * 0.62 + k * W * 0.022, H * 0.35, W * 0.011, H * 0.5); }
-    c.fillStyle = home ? '#2a2a30' : '#5c6068'; c.fillRect(W * 0.02, H * 0.92, W * 0.96, 1.5); }) }));
+  // control strip: one layout drives both the printed labels and the real buttons/knobs, so they line up
+  const pw = w * 0.92, ph = strip * 0.86, cy = strip * 0.36, CTRL = home ? [[0.07, 'b', 'MENU'], [0.16, 'b', 'TV/AV'], [0.25, 'b', 'VOL'], [0.34, 'b', 'CH'], [0.89, 'p', 'POWER']]
+    : kind === 'pvm' ? [[0.06, 'b', 'LINE A'], [0.15, 'b', 'LINE B'], [0.24, 'b', 'RGB'], [0.33, 'b', 'UNDER'], [0.42, 'b', 'H/V'], [0.51, 'b', 'BLUE'], [0.65, 'k', 'CHROMA'], [0.78, 'k', 'BRIGHT'], [0.91, 'p', 'POWER']]
+    : [[0.08, 'b', 'A'], [0.17, 'b', 'B'], [0.26, 'b', 'MENU'], [0.5, 'k', 'CONTR'], [0.66, 'k', 'BRIGHT'], [0.88, 'p', 'POWER']];
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ roughness: 0.6, map: labelTex(pw, ph, (c, W, H) => {
+    c.fillStyle = home ? '#141418' : kind === 'pvm' ? '#25272c' : '#33353b'; c.fillRect(0, 0, W, H);
+    const fs = Math.max(7, Math.round(Math.min(H * 0.17, W * 0.024))), ty = H * 0.08, by = (ph / 2 + strip * 0.5 - cy) / ph * H; c.font = `600 ${fs}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top';
+    for (const [x, t, l] of CTRL) { c.fillStyle = home ? '#7a7a84' : '#c3c8d2'; c.fillText(l, x * W, ty); c.fillStyle = 'rgba(0,0,0,.45)'; const bw = (t === 'b' ? w * 0.05 : t === 'k' ? strip * 0.42 : strip * 0.36) / pw * W; c.fillRect(x * W - bw / 2 - 2, by - bw * 0.42 - 2, bw + 4, bw * 0.84 + 4); }
+    if (home) { c.fillStyle = '#08080a'; for (let k = 0; k < 16; k++) c.fillRect(W * (0.46 + k * 0.022), H * 0.3, W * 0.01, H * 0.55); }
+    c.fillStyle = home ? '#2a2a30' : '#5c6068'; c.fillRect(W * 0.02, H * 0.96, W * 0.96, 1.5); }) }));
   panel.position.set(0, strip * 0.5, 0.02); g.add(panel);
-  const parts = [], bm = new THREE.MeshStandardMaterial({ color: home ? 0x26262c : 0x9ca2ac, roughness: 0.45, metalness: 0.35 });
-  const nb = kind === 'pvm' ? 6 : kind === 'jvc' ? 4 : 5; for (let k = 0; k < nb; k++) { const b = new THREE.BoxGeometry(w * 0.035, strip * 0.18, 0.5); b.translate((kind === 'pvm' ? -pw / 2 + pw * (0.08 + 0.5 * k / (nb - 1)) : home ? -pw * 0.38 + k * pw * 0.06 : -pw * 0.3 + k * pw * 0.1), strip * 0.42, 0.26); parts.push(b.toNonIndexed()); }
-  if (!home) for (let k = 0; k < (kind === 'pvm' ? 4 : 2); k++) { const c = new THREE.CylinderGeometry(strip * 0.13, strip * 0.15, 0.9, 20); c.rotateX(Math.PI / 2); c.translate(pw * (kind === 'pvm' ? 0.22 : 0.18) + k * pw * 0.065, strip * 0.45, 0.45); parts.push(c.toNonIndexed()); }
-  const pwr = new THREE.CylinderGeometry(strip * 0.12, strip * 0.12, 0.7, 20); pwr.rotateX(Math.PI / 2); pwr.translate(pw * 0.44, strip * 0.45, 0.35); parts.push(pwr.toNonIndexed());
-  g.add(new THREE.Mesh(mergeGeometries(parts), bm));
-  const led = new THREE.Mesh(new THREE.CircleGeometry(strip * 0.045, 12), new THREE.MeshBasicMaterial({ color: home ? 0xff2a2a : 0x40ff70, toneMapped: false })); led.position.set(pw * 0.44, strip * 0.75, 0.05); g.add(led);
-  if (!home) { const plate = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.13, strip * 0.16), new THREE.MeshStandardMaterial({ color: 0xc9ced8, metalness: 0.8, roughness: 0.3 })); plate.position.set(-w * 0.36, h - (h - sy - sh / 2) * 0.5, 0.05); g.add(plate); }
+  const parts = [], bm = new THREE.MeshStandardMaterial({ color: home ? 0x26262c : 0x9ca2ac, roughness: 0.45, metalness: 0.35 }), km = new THREE.MeshStandardMaterial({ color: 0x1a1b1f, roughness: 0.4 }), kparts = [];
+  for (const [x, t] of CTRL) { const X = -pw / 2 + x * pw;
+    if (t === 'b') { const b = new THREE.BoxGeometry(w * 0.05, strip * 0.2, 0.45); b.translate(X, cy, 0.24); parts.push(b.toNonIndexed()); }
+    else if (t === 'k') { const k = new THREE.CylinderGeometry(strip * 0.15, strip * 0.17, 0.8, 24); k.rotateX(Math.PI / 2); k.translate(X, cy, 0.42); kparts.push(k.toNonIndexed()); const d2 = new THREE.BoxGeometry(strip * 0.03, strip * 0.12, 0.2); d2.translate(X, cy + strip * 0.07, 0.85); parts.push(d2.toNonIndexed()); }
+    else { const p2 = new THREE.CylinderGeometry(strip * 0.14, strip * 0.14, 0.55, 24); p2.rotateX(Math.PI / 2); p2.translate(X, cy, 0.3); parts.push(p2.toNonIndexed()); } }
+  g.add(new THREE.Mesh(mergeGeometries(parts), bm)); if (kparts.length) g.add(new THREE.Mesh(mergeGeometries(kparts), km));
+  const led = new THREE.Mesh(new THREE.CircleGeometry(strip * 0.045, 12), new THREE.MeshBasicMaterial({ color: home ? 0xff2a2a : 0x40ff70, toneMapped: false })); led.position.set(-pw / 2 + (CTRL[CTRL.length - 1][0] - 0.05) * pw, cy, 0.05); g.add(led);
   // vents on top, rubber feet, rear jacks
   const vents = []; for (let r = 0; r < 3; r++) for (let k = 0; k < 9; k++) { const v = new THREE.BoxGeometry(w * 0.05, 0.12, 0.6); v.translate(-w * 0.3 + k * w * 0.075, h * (home ? 0.78 : 0.92) + 0.05, -fd - (d - fd) * (0.25 + r * 0.18)); vents.push(v.toNonIndexed()); }
   g.add(new THREE.Mesh(mergeGeometries(vents), dark));
@@ -1751,8 +1774,8 @@ const SIDE_CABLES = {};
 function crtSetup(side) { // monitors on a media cabinet, a speaker, a console with two controllers on the floor; every cord runs back into the rack
   const root = new THREE.Group(), cab = mediaCabinet(); root.add(cab.g); const top = cab.H, ports = [];
   const put = (t, x, y, z = -4, ry = 0) => { t.g.position.set(x, y, z); t.g.rotation.y = ry; root.add(t.g); for (const j of t.jacks.slice(0, 1)) ports.push({ obj: t.g, p: j.p, col: j.col }); return t; };
-  if (side === 'L') { const a = put(tvSet('pvm', 31, 27, 'cam'), -13, top, -2); put(tvSet('pvm', 23, 20, 'scope'), 15, top, -3, -0.06); put(tvSet('jvc', 18, 16, 'info'), -16, top + 27, -4, 0.05); put(tvSet('pvm', 29, 24, 'seq'), 9, top + 20, -5, -0.08); }
-  else { put(tvSet('home', 31, 26, 'vu'), -2, top, -2); put(tvSet('home', 29, 24, 'scope'), -1.5, top + 26, -3, 0.03); put(tvSet('home', 27, 22, 'static'), -2.5, top + 50, -4, -0.04); put(tvSet('jvc', 17, 15, 'cam'), 21, top, -1, -0.18); }
+  if (side === 'L') { const a = put(tvSet('pvm', 31, 27, 'game'), -13, top, -2); put(tvSet('pvm', 23, 20, 'scope'), 15, top, -3, -0.06); put(tvSet('jvc', 18, 16, 'info'), -16, top + 27, -4, 0.05); put(tvSet('pvm', 25, 22, 'seq'), 16, top + 20, -5, -0.06); }
+  else { put(tvSet('home', 31, 26, 'vu'), -2, top, -2); put(tvSet('home', 29, 24, 'scope'), -1.5, top + 26, -3, 0.03); put(tvSet('home', 27, 22, 'static'), -2.5, top + 50, -4, -0.04); put(tvSet('jvc', 17, 15, 'cam'), 24, top, -1, -0.18); }
   const spk = speaker(); spk.g.position.set(side === 'L' ? -44 : 44, 0, -8); spk.g.rotation.y = side === 'L' ? 0.3 : -0.3; root.add(spk.g); for (const j of spk.jacks) ports.push({ obj: spk.g, p: j.p, col: j.col });
   // controllers on the floor, corded to the console
   const loc = [], cg = []; const cons = cab.cons;
@@ -2754,7 +2777,7 @@ function frame(ts) {
   const live = !!(AC && AC.state === 'running' && ENG), now = ts / 1000;
   for (const m of modules) { if (live) m.visual(now); else if (m.idle) m.idle(); if (m.scr && (m.liveScreen || m.screenDirty)) { m.screenDirty = false; m.drawScreen(now); } }
   // decor LEDs
-  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; { const anyCrt = Object.values(SIDES).some(S => S.crt.visible && S.root.visible); for (const k in SIDE_CABLES) SIDE_CABLES[k].visible = SIDES[k].crt.visible; if (anyCrt && !window.__noRender) { FEED.n++; if (ts / 1000 - FEED.t > 1 / 12) { FEED.t = ts / 1000; drawFeeds(ts / 1000); } if (FEED.n % 3 === 0) renderFeed(ts / 1000); } }
+  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; { const anyCrt = Object.values(SIDES).some(S => S.crt.visible && S.root.visible); for (const k in SIDE_CABLES) SIDE_CABLES[k].visible = SIDES[k].crt.visible; if (anyCrt && !window.__noRender) { FEED.n++; if (FEED.used.has('game') && SIDES.L && SIDES.L.crt.visible) { startVoidWizard(); vwBot(ts / 1000); if (VW.tex && FEED.n % 4 === 0) VW.tex.needsUpdate = true; } if (ts / 1000 - FEED.t > 1 / 12) { FEED.t = ts / 1000; drawFeeds(ts / 1000); } if (FEED.n % 3 === 0) renderFeed(ts / 1000); } }
   CRT_U.uLevel.value += ((AC && modById.out ? clamp((modById.out.pk || 0) * 1.4, 0, 1) : 0) - CRT_U.uLevel.value) * 0.2; PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
   const T = ts / 1000, beat = live ? G.beat.level(now, 0.15) : 0, tick = G.tick || Math.floor(T * 2);
   for (const d of decorLEDs) { for (let i = 0; i < d.list.length; i++) { const l = d.list[i]; let v;
