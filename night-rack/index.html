@@ -1610,11 +1610,11 @@ function washiLamp() { // tall paper floor lamp in a dark wood lattice, as tall 
   return g;
 }
 // ---------------------------------------------------------------- CRT corner: monitors fed live by the rack, a speaker, a media cabinet with a console
-const SCREEN_FS = `uniform float uTime, uSeed, uMode, uBright; uniform sampler2D uMap; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
+const SCREEN_FS = `uniform float uTime, uSeed, uMode, uBright; uniform sampler2D uMap; uniform vec4 uZoom; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
   void main(){ vec2 cc = vUv - 0.5; vec2 uv = 0.5 + cc * (1.0 + 0.09 * dot(cc, cc)); vec3 c = vec3(0.0); float t = uTime;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
     if (uMode < 0.5) { vec2 g = floor(uv * vec2(220.0, 160.0)); float tf = floor(t * 30.0); float n = h(vec2(g.x * 1.31 + tf * 37.0, g.y * 1.73 - tf * 91.0)); n = fract(n * 7.0 + h(g.yx + tf)); float roll = smoothstep(0.0, 0.08, abs(fract(uv.y - t * 0.17) - 0.5)); c = vec3(n * (0.6 + 0.4 * roll)); }
-    else { float o = 0.0016; c = vec3(texture2D(uMap, uv + vec2(o, 0.0)).r, texture2D(uMap, uv).g, texture2D(uMap, uv - vec2(o, 0.0)).b); c *= 1.0 + 0.04 * sin(t * 50.0 + uSeed); c += (h(floor(uv * vec2(320.0, 240.0)) + floor(t * 24.0)) - 0.5) * 0.035; }
+    else { float o = 0.0016; vec2 su = uZoom.zw + uv * uZoom.xy; c = vec3(texture2D(uMap, su + vec2(o, 0.0)).r, texture2D(uMap, su).g, texture2D(uMap, su - vec2(o, 0.0)).b); c *= 1.0 + 0.04 * sin(t * 50.0 + uSeed); c += (h(floor(uv * vec2(320.0, 240.0)) + floor(t * 24.0)) - 0.5) * 0.035; }
     c *= 0.78 + 0.22 * sin(uv.y * 240.0 * 3.14159); c *= 1.0 - dot(cc, cc) * 1.3; gl_FragColor = vec4(c * 1.15 * uBright, 1.0); }`;
 const SCREENS = window.__screens = [];
 // ---- what the screens show: live from the rack
@@ -1648,13 +1648,20 @@ function drawFeeds(now) {
 const VW = window.__vw = { fr: null, ok: false, vid: null, bot: 0, held: new Set(), tried: false };
 function startVoidWizard() {
   if (VW.tried) return; VW.tried = true;
-  const fr = document.createElement('iframe'); fr.src = '../void-wizard/index.html?demo=1'; fr.setAttribute('aria-hidden', 'true'); fr.tabIndex = -1;
+  const fr = document.createElement('iframe'); fr.src = '../void-wizard/index.html?duel&ai'; // the game's own watch mode: the computer plays both sides fr.setAttribute('aria-hidden', 'true'); fr.tabIndex = -1;
   fr.style.cssText = 'position:fixed;left:0;bottom:0;width:480px;height:360px;border:0;opacity:0.01;pointer-events:none;z-index:-1'; document.body.appendChild(fr); VW.fr = fr;
   const patch = () => { try { const w = fr.contentWindow; if (!w || !w.navigator) return; if (!w.__nrPatched) { Object.defineProperty(w.navigator, 'getGamepads', { value: () => [], configurable: true }); const gc = w.HTMLCanvasElement.prototype.getContext; w.HTMLCanvasElement.prototype.getContext = function (t, o) { if (/webgl/.test(t)) o = Object.assign({}, o, { preserveDrawingBuffer: true }); return gc.call(this, t, o); }; w.__nrPatched = true; } } catch (e) { } };
-  const iv = setInterval(patch, 15); fr.addEventListener('load', () => { patch(); setTimeout(() => clearInterval(iv), 3000); let n = 0;
-    const find = setInterval(() => { n++; try { const d = fr.contentDocument, c = d && d.querySelector('canvas'); if (c && c.width !== 300) { clearInterval(find); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; for (const m of SCREENS) if (m.userData.game) m.material.uniforms.uMap.value = t; VW.tex = t; VW.ok = true; } } catch (e) { VW.err = String(e); } if (n > 360) { clearInterval(find); if (!VW.ok) vwFallback(); } }, 250); });
+  const iv = setInterval(patch, 15); fr.addEventListener('load', () => { patch(); try { fr.contentWindow.addEventListener('error', () => { fr.contentWindow.__nrErr = true; }); } catch (e) { } const iv2 = setInterval(patch, 15); setTimeout(() => clearInterval(iv2), 3000); setTimeout(() => clearInterval(iv), 3000); let n = 0;
+    const find = setInterval(() => { n++; try { const d = fr.contentDocument, c = d && d.querySelector('canvas'); if (c && c.width !== 300) { clearInterval(find); if (VW.tex) { VW.tex.image = c; VW.tex.needsUpdate = true; } else { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; for (const m of SCREENS) if (m.userData.game) { m.material.uniforms.uMap.value = t; m.material.uniforms.uZoom.value.set(0.68, 0.68, 0.16, 0.16); } VW.tex = t; } VW.ok = true; VW.canvas = c; VW.same = 0; } } catch (e) { VW.err = String(e); } if (n > 360) { clearInterval(find); if (!VW.ok) vwFallback(); } }, 250); });
 }
 function vwFallback() { if (VW.ok || VW.fb) return; VW.fb = true; if (VW.fr) { VW.fr.remove(); VW.fr = null; } } // stays on the rack camera
+function vwWatch(now) { // if the game's picture stops changing for 8 s (or it threw an error), restart it
+  if (!VW.ok || !VW.canvas || now < (VW.chk || 0)) return; VW.chk = now + 2;
+  try { const o = VW.probe || (VW.probe = document.createElement('canvas')); o.width = 24; o.height = 18; const g = o.getContext('2d', { willReadFrequently: true }); g.drawImage(VW.canvas, 0, 0, 24, 18); const d = g.getImageData(0, 0, 24, 18).data; let h = 0; for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) | 0;
+    VW.same = h === VW.hash ? (VW.same || 0) + 1 : 0; VW.hash = h; } catch (e) { VW.same = (VW.same || 0) + 1; }
+  let err = false; try { err = !!VW.fr.contentWindow.__nrErr; } catch (e) { }
+  if (VW.same >= 4 || err) { VW.restarts = (VW.restarts || 0) + 1; VW.same = 0; VW.ok = false; if (VW.restarts > 6) { vwFallback(); return; } try { VW.fr.contentWindow.location.reload(); } catch (e) { } }
+}
 function vwBot(now) { // wander, cast a lot, jump and tackle now and then
   if (!VW.ok || now < VW.bot) return; const w = VW.fr.contentWindow, key = (code, down) => { try { w.dispatchEvent(new w.KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code, bubbles: true })); } catch (e) { } };
   for (const c of VW.held) key(c, false); VW.held.clear();
@@ -1670,7 +1677,7 @@ function renderFeed(now) { // a slow security-camera sweep across the rack, rend
 function crtScreen(w, h, mode) {
   const geo = new THREE.PlaneGeometry(w, h, 14, 10), bulge = Math.min(w, h) * 0.04, pa = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pa.count; i++) { const u = uv.getX(i) * 2 - 1, v = uv.getY(i) * 2 - 1; pa.setZ(i, bulge * (1 - u * u) * (1 - v * v)); } geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uBright: CRT_U.uBright, uSeed: { value: Math.random() * 100 }, uMode: { value: mode === 'static' ? 0 : 1 }, uMap: { value: mode === 'static' ? null : feedTex(mode) } }, toneMapped: false,
+  const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uBright: CRT_U.uBright, uSeed: { value: Math.random() * 100 }, uMode: { value: mode === 'static' ? 0 : 1 }, uZoom: { value: new THREE.Vector4(1, 1, 0, 0) }, uMap: { value: mode === 'static' ? null : feedTex(mode) } }, toneMapped: false,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: SCREEN_FS }));
   const glass = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0x0a0c10, transparent: true, opacity: 0.16, roughness: 0.06, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.4, depthWrite: false })); glass.position.z = 0.12; m.add(glass);
   if (mode === 'game') m.userData.game = true; SCREENS.push(m); return m;
@@ -2777,7 +2784,7 @@ function frame(ts) {
   const live = !!(AC && AC.state === 'running' && ENG), now = ts / 1000;
   for (const m of modules) { if (live) m.visual(now); else if (m.idle) m.idle(); if (m.scr && (m.liveScreen || m.screenDirty)) { m.screenDirty = false; m.drawScreen(now); } }
   // decor LEDs
-  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; { const anyCrt = Object.values(SIDES).some(S => S.crt.visible && S.root.visible); for (const k in SIDE_CABLES) SIDE_CABLES[k].visible = SIDES[k].crt.visible; if (anyCrt && !window.__noRender) { FEED.n++; if (FEED.used.has('game') && SIDES.L && SIDES.L.crt.visible) { startVoidWizard(); vwBot(ts / 1000); if (VW.tex && FEED.n % 4 === 0) VW.tex.needsUpdate = true; } if (ts / 1000 - FEED.t > 1 / 12) { FEED.t = ts / 1000; drawFeeds(ts / 1000); } if (FEED.n % 3 === 0) renderFeed(ts / 1000); } }
+  SWAY.value = ts / 1000; HALL_U.uTime.value = ts / 1000; SCOPE_U.uTime.value = ts / 1000; CRT_U.uTime.value = ts / 1000; { const anyCrt = Object.values(SIDES).some(S => S.crt.visible && S.root.visible); for (const k in SIDE_CABLES) SIDE_CABLES[k].visible = SIDES[k].crt.visible; if (anyCrt && !window.__noRender) { FEED.n++; if (FEED.used.has('game') && SIDES.L && SIDES.L.crt.visible) { startVoidWizard(); vwWatch(ts / 1000); if (VW.tex && FEED.n % 4 === 0) VW.tex.needsUpdate = true; } if (ts / 1000 - FEED.t > 1 / 12) { FEED.t = ts / 1000; drawFeeds(ts / 1000); } if (FEED.n % 3 === 0) renderFeed(ts / 1000); } }
   CRT_U.uLevel.value += ((AC && modById.out ? clamp((modById.out.pk || 0) * 1.4, 0, 1) : 0) - CRT_U.uLevel.value) * 0.2; PS2.uniforms.uField.value = 1 - PS2.uniforms.uField.value;
   const T = ts / 1000, beat = live ? G.beat.level(now, 0.15) : 0, tick = G.tick || Math.floor(T * 2);
   for (const d of decorLEDs) { for (let i = 0; i < d.list.length; i++) { const l = d.list[i]; let v;
