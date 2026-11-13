@@ -1811,14 +1811,35 @@ function gameShelf() { // her games as cases standing on the shelf, spines out
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats); m.position.set(i * 1.62, h / 2, -d / 2); m.castShadow = true; g.add(m); });
   return g;
 }
-function gamepad(color) { // an original dual-grip controller
-  const g = new THREE.Group(), m = new THREE.MeshPhysicalMaterial({ color, roughness: 0.5, clearcoat: 0.3 }), dk = new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: 0.5 });
-  const mid = new THREE.Mesh(rrBox(11, 5.6, 2.6, 2.2, 0.6), m); mid.rotation.x = -Math.PI / 2; mid.position.y = 1.3; g.add(mid);
-  for (const s of [-1, 1]) { const grip = new THREE.Mesh(new THREE.CapsuleGeometry(1.7, 3.4, 6, 14), m); grip.rotation.x = Math.PI / 2; grip.rotation.y = s * 0.45; grip.position.set(s * 4.6, 1.2, 2.6); g.add(grip);
-    const st = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.6, 0.9, 16), dk); st.position.set(s * 2.4, 2.9, 1.3); g.add(st); }
-  const dp = [new THREE.BoxGeometry(2, 0.5, 0.65), new THREE.BoxGeometry(0.65, 0.5, 2)].map(x => { x.translate(-3.6, 2.7, -0.6); return x.toNonIndexed(); }); g.add(new THREE.Mesh(mergeGeometries(dp), dk));
-  [[3.6, -1.4, 0x6aa9ff], [4.7, -0.5, 0xff6a6a], [2.5, -0.5, 0xf0d060], [3.6, 0.4, 0x7ee08a]].forEach(([x, z, c]) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.5, 14), new THREE.MeshStandardMaterial({ color: c, roughness: 0.35 })); b.position.set(x, 2.75, z - 0.2); g.add(b); });
-  return { g, cord: new THREE.Vector3(0, 1.4, -2.8) };
+function gamepad(color) { // AETHER-12 controller: matte shell with rounded edges, copper waist line, faceted grips, dark controls with copper rims, glowing home ring
+  const g = new THREE.Group(), shell = new THREE.MeshPhysicalMaterial({ color, roughness: 0.78, clearcoat: 0.06, clearcoatRoughness: 0.85, emissive: 0x1a1612 }),
+    copper = new THREE.MeshStandardMaterial({ color: 0xb8764a, roughness: 0.3, metalness: 0.95, emissive: 0x6a3410, emissiveIntensity: 0.6 }), dk = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.55 });
+  // outline seen from above (x across, z toward the player), right half mirrored; corners rounded like the console plates
+  const half = [[0, -3.3], [3.9, -3.5], [5.7, -2.9], [6.9, -1.0], [7.3, 1.9], [6.7, 4.7], [5.2, 5.5], [3.9, 4.7], [2.9, 2.3], [0, 2.1]];
+  const P = [...half.map(([x, z]) => new THREE.Vector2(x, -z)), ...half.slice(1, -1).reverse().map(([x, z]) => new THREE.Vector2(-x, -z))];
+  const outline = (grow) => { const sh = new THREE.Shape(), n = P.length, cr = 0.3;
+    for (let k = 0; k < n; k++) { const A = P[(k + n - 1) % n], B = P[k], C = P[(k + 1) % n], a = B.clone().lerp(A, cr), b = B.clone().lerp(C, cr); k ? sh.lineTo(a.x, a.y) : sh.moveTo(a.x, a.y); sh.quadraticCurveTo(B.x, B.y, b.x, b.y); } sh.closePath(); return sh; };
+  const ext = (sh, depth, bev, y) => { const e = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: bev[0], bevelSize: bev[1], bevelSegments: bev[2], curveSegments: 6 }); e.rotateX(-Math.PI / 2); e.translate(0, y, 0); return e; };
+  const body = new THREE.Mesh(ext(outline(), 1.1, [0.42, 0.42, 6], 0.42), shell); body.castShadow = body.receiveShadow = true; g.add(body); // top at y 1.94
+  g.add(new THREE.Mesh(ext(outline(), 0.1, [0.02, 0.5, 1], 0.88), copper)); // copper line round the waist
+  const T = 1.94, on = (m, x, z, y = 0) => { m.position.set(x, T + y, z); g.add(m); return m; };
+  // thumbsticks: copper collar, hex stem, dark cap
+  for (const [x, z] of [[-4.2, -0.7], [2.3, 1.5]]) { on(new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.07, 8, 40).rotateX(Math.PI / 2), copper), x, z, 0.02); on(new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 0.06, 40), dk), x, z, 0.0);
+    on(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.6, 6), dk), x, z, 0.3); const cap = on(new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.66, 0.26, 10), new THREE.MeshPhysicalMaterial({ color: 0x18181b, roughness: 0.7, clearcoat: 0.2 })), x, z, 0.7); cap.castShadow = true;
+    on(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.035, 6, 30).rotateX(Math.PI / 2), copper), x, z, 0.84); }
+  // d-pad: a chamfered cross
+  { const c = new THREE.Shape(), w = 0.36, L = 1.05, ch = 0.16, q = [[w, L - ch], [w - ch, L], [-w + ch, L], [-w, L - ch], [-w, w], [-L + ch, w], [-L, w - ch], [-L, -w + ch], [-L + ch, -w], [-w, -w], [-w, -L + ch], [-w + ch, -L], [w - ch, -L], [w, -L + ch], [w, -w], [L - ch, -w], [L, -w + ch], [L, w - ch], [L - ch, w], [w, w]];
+    q.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); const m = new THREE.Mesh(new THREE.ExtrudeGeometry(c, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 }).rotateX(-Math.PI / 2), dk); on(m, -2.3, 1.5, 0.02); }
+  // face buttons: dark, each in a copper rim
+  for (const [dx, dz] of [[0, -0.85], [0.85, 0], [0, 0.85], [-0.85, 0]]) { on(new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.38, 0.28, 18), dk), 4.2 + dx, -0.7 + dz, 0.12); on(new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24).rotateX(Math.PI / 2), copper), 4.2 + dx, -0.7 + dz, 0.02); }
+  // home: a small glowing ring (a real emitter, like the console's), plus two tiny menu buttons
+  on(new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.045, 8, 32).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.52, 0.18).multiplyScalar(2.4), toneMapped: false })), 0, -1.7, 0.03);
+  on(new THREE.Mesh(new THREE.CircleGeometry(0.3, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x060607 })), 0, -1.7, 0.02);
+  for (const x of [-1.0, 1.0]) on(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 6), dk), x, -0.6, 0.04);
+  { const L = aetherTex('AETHER-12', '#efe1cd'), h = 0.2 / L.capFrac; on(new THREE.Mesh(new THREE.PlaneGeometry(h * L.aspect, h).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: L.t, transparent: true, depthWrite: false, toneMapped: false, color: 0xd8cab6 })), 0, 0.55, 0.01); }
+  // shoulder buttons along the back edge
+  for (const sx of [-1, 1]) { const sb = new THREE.Mesh(rrBox(2.6, 0.7, 0.9, 0.3, 0.2), dk); sb.position.set(sx * 4.6, 1.25, -3.35); sb.rotation.y = sx * 0.28; g.add(sb); }
+  return { g, cord: new THREE.Vector3(0, 1.0, -3.4) };
 }
 function mediaCabinet() { // low wooden cabinet: console in one cubby, a stack of game cases in the other
   const g = new THREE.Group(), W = 60, H = 22, D = 40, t = 1.6, wood = new THREE.MeshStandardMaterial({ color: 0x3b2718, roughness: 0.62 }), parts = [];
@@ -1828,7 +1849,7 @@ function mediaCabinet() { // low wooden cabinet: console in one cubby, a stack o
   const m = new THREE.Mesh(mergeGeometries(parts), wood); m.castShadow = m.receiveShadow = true; g.add(m);
   const cons = consoleBox(); cons.g.position.set(-17, 2 + t, -13); g.add(cons.g); const games = gameShelf(); games.position.set(-6.5, 2 + t, -3); g.add(games);
   const r = mulberry32(64); for (let k = 0; k < 7; k++) { const c = new THREE.Mesh(new THREE.BoxGeometry(1.4, 15, 11), new THREE.MeshStandardMaterial({ color: [0x1a2a6a, 0x0f0f12, 0x2a5a2a, 0x6a1a1a, 0x1a1a1a, 0xe0e0e0, 0x3a3a8a][k], roughness: 0.4 })); c.position.set(10 + k * 1.55, 2 + t + 7.5, -10 - r() * 1.5); c.rotation.z = k > 4 ? -0.12 : 0; g.add(c); }
-  return { g, cons, H };
+  return { g, cons, H, D, shelfY: 2 + t };
 }
 const SIDE_CABLES = {};
 function crtSetup(side) { // monitors on a media cabinet, a speaker, a console with two controllers on the floor; every cord runs back into the rack
@@ -1841,12 +1862,15 @@ function crtSetup(side) { // monitors on a media cabinet, a speaker, a console w
   const loc = [], cg = []; const cons = cab.cons;
   [[0x2a2c33, -20, 16, 0.4], [0x6e7078, -3, 21, -0.5]].forEach(([c, x, z, ry], k) => { const pad = gamepad(c); pad.g.position.set(x, 0, z); pad.g.rotation.y = ry; root.add(pad.g); root.updateMatrixWorld(true);
     const a = cons.g.localToWorld(cons.ports[k].clone()), b = pad.g.localToWorld(pad.cord.clone()); root.worldToLocal(a); root.worldToLocal(b);
-    const pts = [a, a.clone().add(new THREE.Vector3(0, -0.5, 3)), new THREE.Vector3(a.x + (k ? 4 : -3), 0.5, a.z + 7), new THREE.Vector3((a.x + b.x) / 2 + (k ? 6 : -8), 0.45, (a.z + b.z) / 2 + 3), b.clone().add(new THREE.Vector3(0, -0.6, -4)), b];
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.21, 10, false), BRAID(150)); tube.castShadow = true; root.add(tube); });
+    const sh = cab.shelfY, cr = 0.22, x1 = a.x + (k ? 0.6 : -0.6), x2 = a.x + (k ? 1.4 : -1.6); // shelf top, cord radius
+    const pts = [a, new THREE.Vector3(a.x, a.y - 0.5, a.z + 1.0), new THREE.Vector3(x1, sh + cr, a.z + 2.8), new THREE.Vector3(x1, sh + cr, -0.5), new THREE.Vector3(x1, sh - 0.35, cr + 0.12),
+      new THREE.Vector3(x1, 1.2, cr + 0.25), new THREE.Vector3(x2, cr, 1.8), new THREE.Vector3((x2 + b.x) / 2 + (k ? 3 : -3), cr, (1.8 + b.z) / 2 - 1), b.clone().add(new THREE.Vector3(0, -b.y + cr, -2.5)), b];
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 140, 0.21, 10, false), BRAID(200)); tube.castShadow = true; root.add(tube); });
   // console AV cable up to the bottom monitor
   { root.updateMatrixWorld(true); const a = cons.g.localToWorld(cons.av.clone()); root.worldToLocal(a); const tvBack = new THREE.Vector3(side === 'L' ? -13 : -2, top + 8, -30);
-    const pts = [a, a.clone().add(new THREE.Vector3(0, 0, -3)), new THREE.Vector3(a.x + 4, top - 4, -42), new THREE.Vector3(tvBack.x, tvBack.y - 2, tvBack.z - 6), tvBack];
-    root.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.28, 6, false), new THREE.MeshStandardMaterial({ color: 0xd8a818, roughness: 0.45 }))); }
+    const hz = -cab.D, hy = a.y; const gr = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.22, 8, 24), new THREE.MeshStandardMaterial({ color: 0x0a0a0b, roughness: 0.6 })); gr.position.set(a.x, hy, hz + 1.65); root.add(gr); // cable grommet in the back panel
+    const pts = [a, new THREE.Vector3(a.x, hy, a.z - 3), new THREE.Vector3(a.x, hy, hz + 3), new THREE.Vector3(a.x, hy, hz - 1.5), new THREE.Vector3(a.x + 1, hy + 4, hz - 3.5), new THREE.Vector3((a.x + tvBack.x) / 2, top + 3, hz - 3), new THREE.Vector3(tvBack.x, top + 6, -36), tvBack];
+    root.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 60, 0.28, 6, false), new THREE.MeshStandardMaterial({ color: 0xd8a818, roughness: 0.45 }))); }
   root.userData.ports = ports; return root;
 }
 function sideCables(k) { // every monitor and speaker cord runs down to the floor and across into the back of the rack
