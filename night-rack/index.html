@@ -166,13 +166,13 @@ body.cam #cambar{display:flex}
 </div>
 <div id="rand" class="hud hide">
   <div class="sec">NEW RANDOM PATCH</div>
-  <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rSurp">SURPRISE</button></div>
+  <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rJazz">JAZZY</button><button id="rSurp">SURPRISE</button></div>
   <div class="muted" style="margin-top:6px">Rewires the whole rack into a new playable patch. Press R to roll again.</div>
   <div class="sec">DECKS</div>
   <div class="chips"><button id="rBlend">BLEND TO DECK B</button></div>
   <div class="muted" style="margin-top:6px">Builds a new patch in the same style and key on the resting deck (the left rack is deck B), then fades over to it. BLEND's BARS knob sets how long.</div>
   <div class="sec">CONDUCTOR</div>
-  <div class="chips"><button id="cOn">ON / OFF</button><button id="cHold">HOLD</button><button id="cBack">BACK</button><button id="cLike">LIKE</button><button id="cNope">DISLIKE</button></div>
+  <div class="chips"><button id="cOn">ON / OFF</button><button id="cHold">HOLD</button><button id="cBack">BACK</button><button id="cNext">NEXT</button><button id="cLike">LIKE</button><button id="cNope">DISLIKE</button></div>
   <div class="muted" style="margin-top:6px">Makes small changes to the playing deck every few bars and runs builds, drops and breakdowns. Like and dislike teach it your taste. Its knobs are on the right rack.</div>
   <div class="sec">KNOBS ONLY</div>
   <div class="chips"><button id="rShuf">SHUFFLE</button><button id="rNudge">NUDGE</button></div>
@@ -596,9 +596,9 @@ const ROW1 = [['seq', 'seq'], ['vcfA', 'vcfA'], ['vcfB', 'vcfB'], ['env', 'env']
 const BTN = (id, label) => kn(id, label, 'S', { btn: true, min: 0, max: 1, step: 1, def: 0 });
 DEFS.cond = lay('CONDUCTOR', 36, 'black',
   [[sc(1.7)],
-   [kn('drift', 'DRIFT', 'M', { min: 0, max: 3, step: 1, def: 1, fmt: v => 'A CHANGE EVERY ' + [4, 8, 16, 32][v] + ' BARS' }), kn('depth', 'DEPTH', 'M', { def: 0.5, fmt: v => v < 0.3 ? 'SUBTLE ' + fPct(v) : v > 0.7 ? 'BOLD ' + fPct(v) : fPct(v) }), kn('energy', 'ENERGY', 'M', { def: 0.5, fmt: v => v < 0.35 ? 'CALMING' : v > 0.65 ? 'BUILDING' : 'STEADY' })],
-   [BTN('on', 'ON'), BTN('hold', 'HOLD'), BTN('back', 'BACK'), BTN('like', 'LIKE'), BTN('nope', 'DISLIKE')],
-   [tx('ON'), tx('HOLD'), tx('BACK'), tx('LIKE'), tx('DISLIKE')]], []);
+   [kn('drift', 'DRIFT', 'M', { min: 0, max: 3, step: 1, def: 1, fmt: v => 'A CHANGE EVERY ' + [4, 8, 16, 32][v] + ' BARS' }), kn('depth', 'DEPTH', 'M', { def: 0.5, fmt: v => v < 0.3 ? 'SUBTLE ' + fPct(v) : v > 0.7 ? 'BOLD ' + fPct(v) : fPct(v) }), kn('energy', 'ENERGY', 'M', { def: 0.5, fmt: v => v < 0.35 ? 'CALMING' : v > 0.65 ? 'BUILDING' : 'STEADY' }), kn('swap', 'NEW PATCH', 'M', { min: 0, max: 4, step: 1, def: 2, fmt: v => v ? 'EVERY ' + [0, 2, 4, 8, 16][v] + ' MIN' : 'NEVER' })],
+   [BTN('on', 'ON'), BTN('hold', 'HOLD'), BTN('back', 'BACK'), BTN('next', 'NEXT'), BTN('like', 'LIKE'), BTN('nope', 'DISLIKE')],
+   [tx('ON'), tx('HOLD'), tx('BACK'), tx('NEXT'), tx('LIKE'), tx('DISLIKE')]], []);
 const DECK_SHARED = new Set(['clock', 'scope', 'out', 'keys']);
 const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^blank/.test(type) ? bl(DEFS[type].hp, DEFS[type].theme === 'silver' ? 'navy' : DEFS[type].theme) : [id + '_b', type]);
 const WROWS = {
@@ -783,8 +783,8 @@ class CondM extends Mod { // the Conductor's panel: a screen, three knobs and fi
     if (loading) return;
     if (id === 'on') { COND.on = v > 0.5; condSay(COND.on ? 'CONDUCTOR ON' : 'CONDUCTOR OFF'); }
     else if (id === 'hold') { COND.hold = v > 0.5; condSay(COND.hold ? 'HOLDING HERE' : 'MOVING AGAIN'); }
-    else if (v > 0.5) { setTimeout(() => this.knobs[id].set(0), 260); if (id === 'back') condBack(); else if (id === 'like') condLike(); else if (id === 'nope') condNope(); } }
-  paint() { const im = this.btnMesh; if (!im) return; const C = { on: 0x57e8ff, hold: 0xffb347, back: 0x9aa8ff, like: 0x7dff9a, nope: 0xff6b6b };
+    else if (v > 0.5 && ['back', 'next', 'like', 'nope'].includes(id)) { setTimeout(() => this.knobs[id].set(0), 260); if (id === 'back') condBack(); else if (id === 'next') blendNext(); else if (id === 'like') condLike(); else if (id === 'nope') condNope(); } }
+  paint() { const im = this.btnMesh; if (!im) return; const C = { on: 0x57e8ff, hold: 0xffb347, back: 0x9aa8ff, next: 0xd59bff, like: 0x7dff9a, nope: 0xff6b6b };
     for (const kn of im.userData.btns) { _bc.set(C[kn.def.id]).multiplyScalar(kn.value > 0.5 ? 1.6 : 0.12); im.setColorAt(kn.bi, _bc); } im.instanceColor.needsUpdate = true; }
   visual() { if (!this.painted) { this.painted = true; this.paint(); } if (COND.dirty) { COND.dirty = false; this.screenDirty = true; } }
   drawScreen() { const s = this.scr, g = s.g, W = s.cw, H = s.ch, k = H / 84, F = (w, px) => w + ' ' + Math.round(px * k) + 'px "Space Grotesk", sans-serif'; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H); g.textBaseline = 'top'; g.textAlign = 'left';
@@ -792,7 +792,7 @@ class CondM extends Mod { // the Conductor's panel: a screen, three knobs and fi
     g.fillStyle = '#57e8ff'; g.font = F(700, 26); g.fillText(!COND.on ? 'OFF' : COND.hold ? 'HOLDING' : (sec ? sec.name : 'WAITING'), 12 * k, 8 * k);
     g.textAlign = 'right'; g.fillStyle = '#3d86ff'; g.font = F(600, 15); g.fillText('DECK ' + DECK.live + ' · ' + st + (sec && COND.on ? ' · BAR ' + (Math.floor(COND.secBar) + 1) + ' OF ' + sec.len : ''), W - 12 * k, 14 * k);
     g.textAlign = 'left'; g.fillStyle = '#cfe6ff'; g.font = F(600, 18); g.fillText(COND.msg || '', 12 * k, 42 * k);
-    g.fillStyle = '#5f7fae'; g.font = F(500, 14); g.fillText(COND.on && !COND.hold ? 'next change in ' + Math.max(1, Math.ceil(COND.nextMove - COND.bar)) + ' bars' : COND.on ? 'holding: no changes' : 'press ON to let it drift', 12 * k, 64 * k); s.tex.needsUpdate = true; } }
+    g.fillStyle = '#5f7fae'; g.font = F(500, 14); g.fillText(DECK.blending ? 'blending to deck ' + DECK.blending.to : COND.on && !COND.hold ? 'next change in ' + Math.max(1, Math.ceil(COND.nextMove - COND.bar)) + ' bars' + (swapSec() ? ' · new patch in ' + fmtMin(Math.max(0, swapSec() - COND.since)) : '') : COND.on ? 'holding: no changes' : 'press ON to let it drift', 12 * k, 64 * k); s.tex.needsUpdate = true; } }
 class SweepM extends Mod { visual() { this.leds.led.set(Math.abs(this.T.pos || 0)); } }
 class EchoM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class SubM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
@@ -2183,8 +2183,8 @@ function genPatch(style, wild) {
     set('drums', 'kLvl', soft ? rr(0.65, 0.8) : 0.95); set('drums', 'cLvl', rr(0.5, 0.75) * (soft ? 0.6 : 1)); set('drums', 'hLvl', rr(0.35, 0.55) * (soft ? 0.6 : 1)); set('drums', 'oLvl', rr(0.3, 0.5) * (soft ? 0.6 : 1));
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
-  let SMP = style === 'dnb' || style === 'kiln' || ((style === 'house' || style === 'tinez') && chance(0.65));
-  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'tinez' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
+  let SMP = style === 'dnb' || style === 'kiln' || (style === 'jazzy' && chance(0.85)) || ((style === 'house' || style === 'tinez') && chance(0.65));
+  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'tinez' || style === 'jazzy' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
     for (const k of ['k', 'c', 's', 'h', 'o', 'p']) { set('sampler', k + 'Tune', chance(0.25) ? rr(-1.5, 1.5) : 0); set('sampler', k + 'Dec', k === 'o' ? rr(0.4, 0.7) : k === 'h' ? rr(0.5, 1) : 1); }
     Object.assign(K.sampler, { kLvl: 0.95, cLvl: rr(0.6, 0.8), sLvl: rr(0.55, 0.75), hLvl: rr(0.35, 0.55), oLvl: rr(0.3, 0.45), pLvl: rr(0.35, 0.55) }); };
   const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
@@ -2240,6 +2240,29 @@ function genPatch(style, wild) {
     master(rr(1.2, 2.8), rr(0.08, 0.16));
     tapeOut = true; set('tape', 'wow', rr(0.05, 0.18)); set('tape', 'flutter', rr(0.03, 0.12)); set('tape', 'drive', rr(0.3, 0.55)); set('tape', 'age', rr(0.15, 0.4)); set('tape', 'hiss', rr(0.03, 0.12)); set('tape', 'dust', rr(0.05, 0.2));
     set('lfo', 'rate1', rexp(0.03, 0.2)); set('lfo', 'shape1', 0);
+  } else if (style === 'jazzy') {
+    // low-key jazzy deep house: lush 9th/11th chords moving once a bar through a set progression, bass on the chord roots
+    // (no random notes, so nothing eerie), lazy swing, soft brushed drums, warm worn tape
+    set('clock', 'tempo', ri(110, 120)); const tr = {}, P = pattern(tr); trigOn(); const sw = rr(0.32, 0.5);
+    const kick = groove(rpick([1, 1, 0]), { swing: sw, chaos: rr(0, 0.05), k: rr(0.42, 0.5), s: rr(0.32, 0.45), h: rr(0.35, 0.55), p: rr(0.2, 0.4), perc: rpick(['perc.tsh', 'perc.tsh', 'perc.tr']), ...rpick([{ snare: 'perc.tr' }, { snare: null }, { clap: false, snare: 'perc.tr' }]) });
+    drumKnobs(true); cleanDrums(); set('drums', 'kTune', rr(0.25, 0.35)); set('drums', 'kDec', rr(0.4, 0.55)); set('drums', 'hDec', rr(0.06, 0.16));
+    con(drumBus(), 'mix6.in1');
+    // the progression: SEQ steps once a bar (clock.d4) and sets the root for both the chords and the bass
+    const PROG = rpick([[2, 7, 0, 9], [0, 5, 3, 10], [9, 2, 7, 0], [0, 9, 5, 7], [5, 4, 2, 0], [0, 3, 5, 3], [7, 5, 0, 0], [9, 5, 0, 7]]), two = chance(0.4);
+    PROG.forEach((v, i) => { set('seq', 's' + i, v); set('seq', 's' + (i + 4), two && i === 3 ? PROG[1] : v); });
+    set('seq', 'len', two ? 8 : 4); set('seq', 'prob', 1); con('clock.d4', 'seq.clk'); used.add('seq');
+    P.on(4, rpick([[0, 7, 10], [0, 3, 8, 10], [0, 10, 14], [0, 6, 8, 14], [0, 7, 11, 14]])); P.on(5, rpick([[0, 6, 10], [2, 6, 10, 14], [0, 3, 10], [6, 14], [0, 7, 10], [3, 11]]));
+    Object.assign(tr, { len: 16, swing: sw }); K.trig = tr;
+    const bass = bassM({ cv: 'seq.cv', gate: 'trig.g5' }, { wave: rpick([0, 0.1, 0.2]), oct: -1, cut: rexp(240, 480), res: rr(0.08, 0.22), env: rr(0.15, 0.35), dec: rr(0.3, 0.5), glide: chance(0.3) ? rr(0.04, 0.12) : 0, drive: rr(0.05, 0.18) });
+    con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2');
+    const stab = stabV('trig.g6', 'seq.cv', { chord: rpick([1, 1, 4, 3, 1]), cut: rexp(900, 2000), env: rr(0.15, 0.3), atk: rr(0.02, 0.08), dec: rr(0.38, 0.6) });
+    set('stab', 'voice', rr(0.1, 0.35)); set('stab', 'detune', rr(0.1, 0.25)); set('stab', 'res', rr(0.05, 0.2));
+    con(stab, 'duck.inR'); con('duck.R', 'mix6.in3'); con('duck.R', 'delay.in');
+    set('duck', 'depth', rr(0.25, 0.4)); set('duck', 'rel', rr(0.25, 0.4)); set('duck', 'shape', rr(0.3, 0.5));
+    con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 0.75]), rr(0.2, 0.38)); set('mix6', 'lvl6', 0);
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.82, pan1: 0, lvl2: rr(0.62, 0.75), pan2: 0, lvl3: rr(0.55, 0.7), pan3: rr(-0.15, 0.15), lvl4: rr(0.2, 0.32), pan4: -0.6, lvl5: rr(0.2, 0.32), pan5: 0.6, master: 0.8 });
+    master(rr(1.8, 3.2), rr(0.12, 0.2));
+    tapeOut = true; set('tape', 'wow', rr(0.08, 0.18)); set('tape', 'flutter', rr(0.05, 0.12)); set('tape', 'drive', rr(0.3, 0.5)); set('tape', 'age', rr(0.3, 0.55)); set('tape', 'hiss', rr(0.06, 0.14)); set('tape', 'dust', rr(0.15, 0.35));
   } else if (style === 'dnb') {
     // liquid / rolling DnB: crisp sampled two-step drums, a deep sub with an optional low reese, long pads; no noisy voices
     set('clock', 'tempo', ri(172, 176));
@@ -2301,21 +2324,21 @@ function genPatch(style, wild) {
     con(L, 'verb.inL'); con(R, 'verb.inR'); set('verb', 'decay', rr(5, 15)); set('verb', 'mix', rr(0.4, 0.65)); set('verb', 'damp', rexp(2500, 9000));
     for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.008, 0.25 + wild)); set('lfo', 'shape' + c, ri(0, 3)); }
   }
-  if (style === 'house' || style === 'tinez' || style === 'dnb') { for (const c of C) if (c[1] === 'mix6.in1') c[1] = 'verb.dryL'; set('mix6', 'lvl1', 0); }
+  if (style === 'house' || style === 'tinez' || style === 'jazzy' || style === 'dnb') { for (const c of C) if (c[1] === 'mix6.in1') c[1] = 'verb.dryL'; set('mix6', 'lvl1', 0); }
   let fL = 'verb.L', fR = 'verb.R';
   if (tapeOut) { con('verb.L', 'tape.inL'); con('verb.R', 'tape.inR'); fL = 'tape.L'; fR = 'tape.R'; }
   set('verb', 'level', 1);
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
-  { const dance = style === 'house' || style === 'dnb' || style === 'tinez', kil = style === 'kiln';
+  { const dance = style === 'house' || style === 'dnb' || style === 'tinez' || style === 'jazzy', kil = style === 'kiln';
     // mixing side: deck -> BLEND -> KEYS (played live, always heard) -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
     con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'keys.inL'); con('blend.R', 'keys.inR'); con('keys.L', 'sweep.inL'); con('keys.R', 'sweep.inR'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
     con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
     { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
     set('blend', 'blend', 0); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('sweep', 'pos', 0); set('sweep', 'res', rr(0.2, 0.4));
-    const house = style === 'house' || style === 'tinez';
+    const house = style === 'house' || style === 'tinez' || style === 'jazzy';
     set('echo', 'div', style === 'dnb' ? rpick([1, 2, 5]) : house ? rpick([2, 2, 3, 4]) : rpick([2, 3, 4, 5])); set('echo', 'fb', dance ? rr(0.25, 0.45) : rr(0.4, 0.62)); set('echo', 'tone', rr(0.35, 0.6)); set('echo', 'wow', rr(0.15, 0.4)); set('echo', 'spread', rr(0.5, 0.9));
     set('echo', 'mix', style === 'dnb' ? rr(0.04, 0.1) : dance ? rr(0.06, 0.14) : rr(0.12, 0.26));
-    set('pump', 'depth', house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
+    set('pump', 'depth', style === 'jazzy' ? rr(0.08, 0.18) : house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
     set('sub', 'xo', dance ? rr(100, 140) : rr(80, 120)); set('sub', 'sub', style === 'dnb' ? rr(0.15, 0.35) : house ? rr(0, 0.12) : 0); set('sub', 'tight', dance ? rr(26, 34) : rr(18, 26)); set('sub', 'low', 0); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
     set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-3, -0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
     if (dance) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(2, 3.2)); set('glue', 'atk', rexp(0.015, 0.035)); set('glue', 'rel', rr(0.12, 0.25)); set('glue', 'makeup', rr(1.5, 3)); set('glue', 'mix', rr(0.75, 1)); }
@@ -2350,7 +2373,7 @@ function shuffleKnobs(amount) {
   if (window.__noRender) autosave(); toast(amount >= 1 ? 'Knobs shuffled' : 'Knobs nudged', true);
 }
 // ---- decks: A = middle rack, B = left rack (same ids + '_b'); BLEND crossfades between them
-let DECK_IDS = null; const DECK = { live: 'A', blending: null, style: (() => { try { return localStorage.getItem('nightrack.style') || 'house'; } catch (e) { return 'house'; } })() };
+let DECK_IDS = null; const DECK = { live: 'A', blending: null, past: [], style: (() => { try { return localStorage.getItem('nightrack.style') || 'house'; } catch (e) { return 'house'; } })() };
 const deckIds = d => { if (!DECK_IDS) DECK_IDS = Object.keys(modById).filter(id => modById[id + '_b']); return d === 'B' ? DECK_IDS.map(id => id + '_b') : DECK_IDS; };
 function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one deck: its own modules, fed into BLEND's A or B inputs
   const base = new Set(deckIds('A')), sfx = d === 'B' ? '_b' : '', side = d === 'B' ? 'b' : 'a', map = pth => { const [m, q] = pth.split('.'); return base.has(m) ? m + sfx + '.' + q : pth; };
@@ -2391,17 +2414,31 @@ function loadDeck(d, P) { // replace one deck's patch, leaving the other deck an
   } finally { loading = false; }
   autosave();
 }
-function blendNext() { // build a fresh patch (same style, same key) on the resting deck, then fade over to it
+function deckSnapshot(d) { // the playing deck's patch in middle-rack form (so it can be loaded onto either deck later)
+  const ids = new Set(deckIds(d)), base = id => d === 'B' && id.endsWith('_b') ? id.slice(0, -2) : id, cables = [], knobs = {};
+  for (const c of cables_()) { const om = c.out.module.id, im = c.inp.module.id;
+    if (ids.has(om) && im === 'blend' && c.inp.dir === 'in' && /^[ab][LR]$/.test(c.inp.id)) cables.push([base(om) + '.' + c.out.id, 'blend.a' + c.inp.id[1], c.color]);
+    else if (ids.has(im)) cables.push([(ids.has(om) ? base(om) : om) + '.' + c.out.id, base(im) + '.' + c.inp.id, c.color]); }
+  for (const id of ids) { const o = {}, m = modById[id]; for (const k in m.knobs) o[k] = m.knobs[k].value; knobs[base(id)] = o; }
+  return { cables, knobs, style: DECK.style };
+}
+const cables_ = () => cables.filter(c => c.connected);
+const swapSec = () => { const v = modById.cond ? modById.cond.v('swap') : 0; return v ? [0, 2, 4, 8, 16][v] * 60 : 0; };
+const fmtMin = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function blendBack() { const P = DECK.past.pop(); if (!P) { condSay('nothing further back'); return false; } DECK.style = P.style || DECK.style; blendNext(P, true); return true; }
+function blendNext(given, back) { // build a fresh patch (same style, same key) on the resting deck (or bring back an earlier one), then fade over to it
   if (DECK.blending) { toast('A blend is already running', true); return; }
   if (ensureChain()) toast('Wired this patch through the mixing side first', true);
   if (!out1(modById.blend.ports.L)) { toast('This patch is not wired for blending: press a random style first', true); return; }
-  const from = DECK.live, to = from === 'A' ? 'B' : 'A', P = deckPatch(tastePick(() => genPatch(DECK.style || 'house', rr(0, 0.3))), to);
+  const from = DECK.live, to = from === 'A' ? 'B' : 'A', P = deckPatch(given || tastePick(() => genPatch(DECK.style || 'house', rr(0, 0.3))), to);
+  if (!back) { DECK.past.push(deckSnapshot(from)); if (DECK.past.length > 12) DECK.past.shift(); } COND.since = 0;
   const oq = modById[from === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
   P.knobs[qk] = { ...(P.knobs[qk] || {}), scale: oq.v('scale'), root: oq.v('root'), oct: oq.v('oct') };
+  if (DECK.style === 'jazzy' && !given) { const os = modById[from === 'A' ? 'seq' : 'seq_b'], sk = to === 'B' ? 'seq_b' : 'seq', o = { len: os.v('len'), prob: 1 }; for (let i = 0; i < 8; i++) o['s' + i] = os.v('s' + i); P.knobs[sk] = { ...(P.knobs[sk] || {}), ...o }; }
   loadDeck(to, P); deckSleep(to, false); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
   const bm = modById.blend, bars = [16, 32, 64][bm.v('bars')] || 32, sec = bars * 4 * 60 / (modById.clock.v('tempo') || 120);
   DECK.blending = { from, to, t0: performance.now() / 1000, sec, x0: bm.v('blend'), x1: to === 'B' ? 1 : 0 };
-  toast('Blending to deck ' + to + ' over ' + bars + ' bars', true); blendBtn();
+  toast((back ? 'Going back to the previous patch' : 'Blending to a new patch on deck ' + to) + ' over ' + bars + ' bars', true); blendBtn(); COND.dirty = true;
 }
 function blendTick() { const B = DECK.blending; if (!B) return; const t = clamp((performance.now() / 1000 - B.t0) / B.sec, 0, 1), e = t * t * (3 - 2 * t);
   modById.blend.knobs.blend.set(B.x0 + (B.x1 - B.x0) * e);
@@ -2413,10 +2450,10 @@ function blendBtn() { const b = document.getElementById('rBlend'); if (b) b.text
 // Every DRIFT bars it makes one small move (a layer in or out, a filter drifting, a new chord...), gliding over a few bars and always
 // relative to the patch's own settings, so it wanders around a sound that works instead of away from it. On top runs a song shape
 // (groove, breakdown, build, drop). LIKE saves the moment and teaches it what you like; DISLIKE takes the last moves back.
-const COND = { on: false, hold: false, bar: 0, secBar: 0, si: 0, sec: null, nextMove: 8, glides: new Map(), base: {}, hist: [], msg: '', dirty: true, lastT: 0, recent: [] };
+const COND = { since: 0, on: false, hold: false, bar: 0, secBar: 0, si: 0, sec: null, nextMove: 8, glides: new Map(), base: {}, hist: [], msg: '', dirty: true, lastT: 0, recent: [] };
 const TASTE = (() => { try { return JSON.parse(localStorage.getItem('nightrack.taste')) || { f: {}, m: {} }; } catch (e) { return { f: {}, m: {} }; } })();
 const saveTaste = () => { try { localStorage.setItem('nightrack.taste', JSON.stringify(TASTE)); } catch (e) { } };
-const DANCE_ST = new Set(['house', 'tinez', 'dnb']);
+const DANCE_ST = new Set(['house', 'tinez', 'dnb', 'jazzy']);
 function condSay(m) { COND.msg = m; COND.dirty = true; }
 const liveId = id => DECK.live === 'B' && modById[id + '_b'] ? id + '_b' : id;
 const isPatched = id => { const m = modById[id]; return m && Object.values(m.ports).some(p => p.cables.length); };
@@ -2431,7 +2468,7 @@ const safeN = (id, k) => { const r = safeRange({ id }, k) || [0.05, 0.95]; retur
 // small moves: [name, styles ('*' = all, 'd' = dance), module, knobs, kind, label]
 const MOVES = [
   ['hats', 'd', 'groove', ['hDen'], 'layer', 'HATS'], ['perc', 'd', 'groove', ['pDen'], 'layer', 'PERCUSSION'], ['ghosts', 'd', 'groove', ['sDen'], 'glide', 'SNARE GHOSTS'],
-  ['variation', '*', 'groove', ['var'], 'glide', 'GROOVE VARIATION'], ['swing', 'house tinez', 'groove', ['swing'], 'small', 'SWING'], ['fills', 'd', 'groove', ['chaos'], 'small', 'FILLS'],
+  ['variation', '*', 'groove', ['var'], 'glide', 'GROOVE VARIATION'], ['swing', 'house tinez jazzy', 'groove', ['swing'], 'small', 'SWING'], ['fills', 'd', 'groove', ['chaos'], 'small', 'FILLS'],
   ['hatlen', 'd', 'sampler', ['hDec'], 'glide', 'HAT LENGTH'], ['openhats', 'd', 'sampler', ['oLvl'], 'layer', 'OPEN HATS'], ['clap', 'house tinez', 'sampler', ['cLvl'], 'small', 'CLAP LEVEL'],
   ['perctone', '*', 'perc', ['sTune', 'rTune', 'shTune', 'tTune', 'sDec', 'rDec'], 'glide', 'PERC TONES'], ['perclayer', '*', 'perc', ['shLvl', 'tLvl', 'rLvl'], 'layer', 'PERC LAYER'],
   ['stabfilter', '*', 'stab', ['cutoff'], 'glide', 'STAB FILTER'], ['stablen', '*', 'stab', ['decay', 'env'], 'glide', 'STAB SHAPE'], ['chord', 'house tinez kiln', 'stab', ['chord'], 'step', 'NEW CHORD'],
@@ -2485,12 +2522,15 @@ function condTick() {
   const pb = Math.floor(COND.bar); COND.bar += db; if (COND.hold) { COND.nextMove += db; return; }
   COND.secBar += db; if (Math.floor(COND.bar) !== pb) COND.dirty = true;
   const S = sections(DECK.style, modById.cond.v('energy'));
-  if (!COND.sec || COND.secBar >= COND.sec.len) { COND.si = COND.sec ? (COND.si + 1) % S.length : 0; const [n, l] = S[COND.si % S.length]; enterSection(n, l); }
+  COND.since += dt;
+  if (!COND.sec || COND.secBar >= COND.sec.len) { COND.si = COND.sec ? (COND.si + 1) % S.length : 0; const [n, l] = S[COND.si % S.length];
+    if (swapSec() && COND.since >= swapSec() && (n === 'GROOVE' || n === 'FLOW')) { blendNext(); return; } // a new patch arrives where a new section would start
+    enterSection(n, l); }
   if (COND.bar >= COND.nextMove) { const every = [4, 8, 16, 32][modById.cond.v('drift')] || 8; COND.nextMove = Math.ceil(COND.bar / every + 0.01) * every;
     const quiet = COND.sec && (COND.sec.name === 'BUILD' || COND.sec.name === 'BREAKDOWN') && COND.secBar < 1; if (!quiet) { condMove(); if (Math.random() < modById.cond.v('depth') * 0.4) condMove(); } }
 }
 function condRebase() { COND.base = {}; COND.glides.clear(); COND.sectionKeys.clear(); COND.hist = []; COND.sec = null; COND.si = 0; COND.secBar = 0; COND.dirty = true; }
-function condBack() { const h = COND.hist.pop(); if (!h) { condSay('nothing to take back'); return; } glideTo(h.kn, h.from, 1); condSay('TAKEN BACK · ' + h.label); }
+function condBack() { const h = COND.hist.pop(); if (!h) { if (!blendBack()) condSay('nothing to take back'); return; } glideTo(h.kn, h.from, 1); condSay('TAKEN BACK · ' + h.label); }
 function deckFeatures(get) { // what a patch is made of, for learning taste: style, kit, scale, groove family, chord, voice models
   const f = ['style:' + DECK.style], add = (id, k, n) => { const v = get(id, k); if (v != null) f.push(n + ':' + Math.round(v)); };
   add('sampler', 'kit', 'kit'); add('quant', 'scale', 'scale'); add('groove', 'style', 'groove'); add('stab', 'chord', 'chord'); add('macro', 'model', 'model'); add('field', 'rec', 'field'); add('bass', 'wave', 'bass'); add('mbira', 'type', 'mbira');
@@ -2517,24 +2557,25 @@ function condNope() {
 function condToggle(k) { const kn = modById.cond.knobs[k]; kn.set(kn.norm > 0.5 ? 0 : 1); }
 function condPress(k) { modById.cond.knobs[k].set(1); }
 setInterval(() => { try { blendTick(); condTick(); } catch (e) { console.warn(e); } }, 50);
-Object.assign(window, { COND, TASTE, condMove, condPress, condToggle });
+Object.assign(window, { COND, TASTE, condMove, condPress, condToggle, blendBack });
 
 function randomPatch(style) {
-  pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
-  DECK.style = s; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy'].map(k => [k, modById.cond.knobs[k].norm]);
+  pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'jazzy']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
+  DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy'].map(k => [k, modById.cond.knobs[k].norm]);
   loadPatch(tastePick(() => genPatch(s, wild), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
-  toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
+  toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy, low-key patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
 }
 function undoRandom() { const P = RND.undo.pop(); if (!P) return; RND.tw = []; loadPatch(P); document.getElementById('rUndo').disabled = !RND.undo.length; toast('Undone', true); }
 Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom, blendNext, deckPatch, DECK });
 document.getElementById('rBlend').onclick = () => blendNext();
 document.getElementById('cOn').onclick = () => condToggle('on'); document.getElementById('cHold').onclick = () => condToggle('hold');
-document.getElementById('cBack').onclick = () => condPress('back'); document.getElementById('cLike').onclick = () => condPress('like'); document.getElementById('cNope').onclick = () => condPress('nope');
+document.getElementById('cBack').onclick = () => condPress('back'); document.getElementById('cNext').onclick = () => blendNext(); document.getElementById('cLike').onclick = () => condPress('like'); document.getElementById('cNope').onclick = () => condPress('nope');
 document.getElementById('rAmb').onclick = () => randomPatch('ambient');
 document.getElementById('rHouse').onclick = () => randomPatch('house');
 document.getElementById('rDnb').onclick = () => randomPatch('dnb');
 document.getElementById('rKiln').onclick = () => randomPatch('kiln');
 document.getElementById('rTinez').onclick = () => randomPatch('tinez');
+document.getElementById('rJazz').onclick = () => randomPatch('jazzy');
 document.getElementById('rSurp').onclick = () => randomPatch('surprise');
 document.getElementById('rShuf').onclick = () => shuffleKnobs(1);
 document.getElementById('rNudge').onclick = () => shuffleKnobs(0.12);
@@ -2657,7 +2698,7 @@ document.getElementById('cmDel').onclick = () => { if (menuCable) removeCable(me
 // X: unplug a jack / reset a knob · Y: new random patch · LB/RB: cable color (on a jack) or fine turn (on a knob)
 // LT/RT: zoom · right stick: orbit · View: undo · Menu: power · L3: home view · R3: change random style · hold View+Menu: back to Hedron
 const PAD = { active: false, prev: [], focus: null, items: [], mode: 'nav', rep: 0, repDir: null, hold: 0, styleI: 0, idle: 0, hintShown: false };
-const STYLES = ['ambient', 'house', 'tinez', 'dnb', 'kiln', 'surprise'];
+const STYLES = ['ambient', 'house', 'tinez', 'jazzy', 'dnb', 'kiln', 'surprise'];
 const padRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 48), new THREE.MeshBasicMaterial({ color: 0x4fe3ff, toneMapped: false, transparent: true, opacity: 0.95 }));
 padRing.visible = false; scene.add(padRing);
 function padItems() {
