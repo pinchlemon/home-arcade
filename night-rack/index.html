@@ -550,7 +550,35 @@ DEFS.field = lay('FIELD', 8, 'silver',
 DEFS.blank16 = { title: '', hp: 16, theme: 'navy', knobs: [], jacks: [], logo: true };
 DEFS.blank20 = { title: '', hp: 20, theme: 'navy', knobs: [], jacks: [], logo: true };
 if (LAYOUT_ISSUES.length) console.warn('layout2:', LAYOUT_ISSUES.join(' | '));
-const ROWM = [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['keys', 'keys'], ['sampler', 'sampler']];
+// ---- mixing side (right rack): BLEND, SWEEP, ECHO, PUMP, SUB, then the polish row
+DEFS.blend = lay('BLEND', 16, 'silver',
+  [[kn('blend', 'A · B', 'L', { def: 0, fmt: v => v < 0.02 ? 'DECK A' : v > 0.98 ? 'DECK B' : 'A ' + Math.round((1 - v) * 100) + ' · B ' + Math.round(v * 100) })],
+   [kn('lvlA', 'DECK A', 'M', { def: 0.8, fmt: fPct }), kn('lvlB', 'DECK B', 'M', { def: 0.8, fmt: fPct })],
+   [kn('master', 'MASTER', 'S', { def: 0.9, fmt: fPct }), ld('a', 'cyan', 'A'), ld('b', 'amber', 'B')]],
+  [[ji('aL', 'A L', 'audio'), ji('aR', 'A R', 'audio'), ji('bL', 'B L', 'audio'), ji('bR', 'B R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.sweep = lay('SWEEP', 12, 'black',
+  [[kn('pos', 'SWEEP', 'L', { min: -1, max: 1, def: 0, fmt: v => Math.abs(v) < 0.02 ? 'OPEN' : (v < 0 ? 'LOW-PASS ' : 'HIGH-PASS ') + Math.round(Math.abs(v) * 100) + '%' })],
+   [kn('res', 'RES', 'S', { def: 0.3, fmt: fPct }), ld('led', 'cyan')]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio'), ji('cv', 'CV', 'cv')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.echo = lay('ECHO', 16, 'navy',
+  [[kn('div', 'TIME', 'M', { min: 0, max: 5, def: 2, step: 1, fmt: v => ['1/16', '1/8', 'DOT 1/8', '1/4', 'DOT 1/4', '1/2'][v] }), kn('fb', 'REPEATS', 'M', { min: 0, max: 0.92, def: 0.4, fmt: fPct })],
+   [kn('tone', 'TONE', 'S', { def: 0.5, fmt: fPct }), kn('wow', 'WOBBLE', 'S', { def: 0.3, fmt: fPct }), kn('spread', 'PING-PONG', 'S', { def: 0.6, fmt: fPct })],
+   [kn('mix', 'MIX', 'M', { def: 0.2, fmt: fPct }), ld('led', 'amber')]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.pump = lay('PUMP', 10, 'silver',
+  [[kn('depth', 'DEPTH', 'L', { def: 0, fmt: fPct })], [kn('rel', 'RELEASE', 'S', { def: 0.3, fmt: v => fS(0.04 + v * 0.8) }), kn('shape', 'CURVE', 'S', { def: 0.5, fmt: fPct })], [ld('led', 'amber')]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [ji('trig', 'KICK', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.sub = lay('SUB', 12, 'black',
+  [[kn('xo', 'MONO BELOW', 'M', { min: 60, max: 200, def: 120, curve: 'exp', fmt: fHz })], [kn('sub', 'SUB', 'M', { def: 0, fmt: fPct })],
+   [kn('tight', 'RUMBLE CUT', 'S', { min: 15, max: 50, def: 28, fmt: fHz }), kn('low', 'LOW', 'S', { min: -6, max: 6, def: 0, fmt: fDb }), ld('led', 'red')]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+const BLANK = (hp, theme) => { const k = 'blank_' + hp + theme; DEFS[k] = DEFS[k] || { title: '', hp, theme, knobs: [], jacks: [], logo: true }; return k; };
+let blankN = 0; const bl = (hp, theme) => ['bk' + blankN++, BLANK(hp, theme)];
+const ROWM = [['keys', 'keys'], ['sampler', 'sampler'], bl(20, 'navy'), bl(16, 'silver'), bl(12, 'black')];
+// side racks: real rows, top down. Right = mixing (its top two rows; the rows below stay painted until they get modules). Left = deck B, coming next (painted for now).
+const WROWS = {
+  R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], bl(10, 'navy'), bl(8, 'silver')],
+      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], bl(20, 'navy'), bl(16, 'black')]] };
 const ROWD = [['trig', 'trigseq'], ['drums', 'drums'], ['mix6', 'mix6'], ['duck', 'duck'], ['blank5', 'blank8c']];
 
 const ROWT = [['macro', 'macro'], ['texture', 'texture'], ['folder', 'folder'], ['lpg', 'lpg'], ['turing', 'turing'], ['atten', 'atten'], ['field', 'field'], ['blank4b', 'blank6b']];
@@ -728,6 +756,10 @@ class GlueM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 
 class WideM extends Mod { visual() { this.leds.led.set(0.25 + 0.5 * (this.T.w || 0)); } }
 class LimitM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 3, 0, 1)); } }
 class DuckM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 1.6, 0, 1)); } }
+class SweepM extends Mod { visual() { this.leds.led.set(Math.abs(this.T.pos || 0)); } }
+class EchoM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
+class SubM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
+class BlendM extends Mod { visual() { this.leds.a.vu(this.T.a || 0); this.leds.b.vu(this.T.b || 0); } }
 class GrooveM extends Mod {
   constructor(id, type) { super(id, type); this.step = -1; }
   visual() { const L = this.T; if (L.step != null && L.step !== this.step) { this.step = L.step; this.screenDirty = true; } }
@@ -746,7 +778,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -913,9 +945,9 @@ function makeScreen(mod, s, w, h, ppc) {
   m.position.set(s.x + s.w / 2 - w / 2, h / 2 - (s.y + s.h / 2), 0.02); mod.group.add(m);
   mod.scr = { c, g, tex, cw: c.width, ch: c.height };
 }
-function buildModule(mod, x0, y0) {
+function buildModule(mod, x0, y0, W = null) {
   const d = mod.def, w = d.hp * HP, h = U3;
-  const grp = new THREE.Group(); grp.position.set(x0 + w / 2, y0 + h / 2, 0); scene.add(grp); mod.group = grp; mod.w = w; mod.x0 = x0; mod.y0 = y0;
+  const grp = new THREE.Group(); grp.position.set(x0 + w / 2, y0 + h / 2, 0); (W ? W.inner : scene).add(grp); mod.sec = W; mod.group = grp; mod.w = w; mod.x0 = x0; mod.y0 = y0;
   const silver = d.theme === 'silver';
   const front = new THREE.MeshStandardMaterial({ map: panelTexture(d, w, h), roughness: silver ? 0.42 : 0.62, metalness: silver ? 0.55 : 0.3, envMapIntensity: 0.6 });
   const panel = new THREE.Mesh(new THREE.BoxGeometry(w - 0.03, h, 0.2), [MAT.side, MAT.side, MAT.side, MAT.side, front, MAT.side]);
@@ -935,7 +967,7 @@ function buildModule(mod, x0, y0) {
     const body = new THREE.Mesh(kg.body, MAT.knob); body.castShadow = true; const cap = new THREE.Mesh(kg.cap, MAT.cap); const ind = new THREE.Mesh(kg.ind, MAT.ind);
     rot.add(body, cap, ind); kn.rot = rot; kn.updateMesh();
     body.userData.knob = kn; cap.userData.knob = kn; pickKnobs.push(body, cap);
-    gridAdd(knobGrid, { x: x0 + k.x, y: y0 + h - k.y, r: kg.r * 1.18, h: kg.h });
+    gridAdd(W ? W.knobGrid : knobGrid, { x: x0 + k.x, y: y0 + h - k.y, r: kg.r * 1.18, h: kg.h });
   }
   for (const j of d.jacks || []) {
     const port = mod.ports[j.id], [lx, ly] = P(j.x, j.y);
@@ -944,7 +976,7 @@ function buildModule(mod, x0, y0) {
     const pick = new THREE.Mesh(GEO.pick, MAT.hole); pick.visible = false; pick.userData.port = port;
     const ring = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, transparent: true, opacity: 0.9 })); ring.visible = false;
     jg.add(m, hole, pick, ring); pickJacks.push(pick); port.ring = ring;
-    port.world.set(x0 + j.x, y0 + h - j.y, 0.48);
+    port.world.set(x0 + j.x, y0 + h - j.y, 0.48); port.lx = x0 + j.x; port.ly = y0 + h - j.y; if (W) { port.world.applyMatrix4(W.mw); port.n = W.n; port.sec = W; }
   }
   for (const l of d.leds || []) {
     const [lx, ly] = P(l.x, l.y);
@@ -953,15 +985,27 @@ function buildModule(mod, x0, y0) {
     mod.leds[l.id] = new LED(dome, COL[l.color]);
   }
   if (d.screen) makeScreen(mod, d.screen, w, h, d.type === 'scope' || d.screen.w > 5 ? 90 : 110);
-  const sx = d.hp < 8 ? [w / 2] : [0.75, w - 0.75]; for (const x of sx) screws.push([x0 + x, y0 + h - 0.3], [x0 + x, y0 + 0.3]);
+  const sx = d.hp < 8 ? [w / 2] : [0.75, w - 0.75]; for (const x of sx) screws.push([x0 + x, y0 + h - 0.3, W], [x0 + x, y0 + 0.3, W]);
 }
+const WING = {};
+function makeWing(k) { // pivot at the main case's edge, angled 0.55 rad toward the viewer; contents in the inner group from x 0 to CASE_W
+  const s = k === 'L' ? -1 : 1, g = new THREE.Group(); g.position.set(s * (CASE_W / 2 + 2.4), 0, 0); g.rotation.y = -s * 0.55;
+  const inner = new THREE.Group(); inner.position.x = k === 'L' ? -CASE_W : 0; g.add(inner); scene.add(g); g.updateMatrixWorld(true);
+  const q = inner.getWorldQuaternion(new THREE.Quaternion());
+  return WING[k] = { k, g, inner, q, n: new THREE.Vector3(0, 0, 1).applyQuaternion(q), mw: inner.matrixWorld.clone(), inv: inner.matrixWorld.clone().invert(), knobGrid: new Map(), plugGrid: new Map() };
+}
+function modPt(m, x, y, z = 0) { const v = new THREE.Vector3(m.x0 + x, m.y0 + y, z); return m.sec ? v.applyMatrix4(m.sec.mw) : v; }
 function buildRack() {
   [ROWX, ROWT, ROW0, ROW1, ROWD, ROWM].forEach((row, ri) => { const y0 = RAIL + (NROWS - 1 - ri) * (U3 + RAIL);
     let x = -CASE_W / 2;
     for (const [id, type] of row) { const Cls = CLASSES[type] || Mod; const m = new Cls(id, type); modules.push(m); modById[id] = m; buildModule(m, x, y0); x += m.def.hp * HP; }
   });
+  for (const k in WROWS) { const W = makeWing(k), nr = WROWS[k].length, Hr = nr * U3 + (nr + 1) * RAIL;
+    WROWS[k].forEach((row, ri) => { const y0 = RAIL + (NROWS - 1 - ri) * (U3 + RAIL); let x = 0;
+      for (const [id, type] of row) { const Cls = CLASSES[type] || Mod; const m = new Cls(id, type); modules.push(m); modById[id] = m; buildModule(m, x, y0, W); x += m.def.hp * HP; } });
+    buildCaseFrame(W.inner, 0, CASE_H - Hr, CASE_W, Hr, nr); W.rows = nr; }
   const sm = new THREE.InstancedMesh(GEO.screw, MAT.screw, screws.length), sl = new THREE.InstancedMesh(GEO.slot, MAT.hole, screws.length), o = new THREE.Object3D();
-  screws.forEach(([x, y], i) => { o.position.set(x, y, 0); o.rotation.z = (hashStr('s' + i) % 628) / 100; o.updateMatrix(); sm.setMatrixAt(i, o.matrix); sl.setMatrixAt(i, o.matrix); }); scene.add(sm, sl);
+  screws.forEach(([x, y, W], i) => { o.position.set(x, y, 0); o.rotation.z = (hashStr('s' + i) % 628) / 100; o.updateMatrix(); if (W) o.matrix.premultiply(W.mw); sm.setMatrixAt(i, o.matrix); sl.setMatrixAt(i, o.matrix); }); scene.add(sm, sl);
   buildCaseFrame(scene, -CASE_W / 2, 0, CASE_W, CASE_H, NROWS);
   // desk, wall
   const desk = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x07080c, roughness: 0.92, metalness: 0.0, envMapIntensity: 0.12 }));
@@ -1198,6 +1242,17 @@ function buildHall() {
 
 // ================================================================ physics cables
 const plugGrid = new Map();
+const _wl = new THREE.Vector3(), _wo = new THREE.Vector3();
+function collideWing(Wg, P, O, ix) {
+  _wl.set(P[ix], P[ix + 1], P[ix + 2]).applyMatrix4(Wg.inv); let x = _wl.x, y = _wl.y, z = _wl.z, hit = false;
+  if (x < -2.3 || x > CASE_W + 2.3 || z > 4 || z < -10 || y < FLOOR_Y || y > TOP_Y + CASE_H + 2) return;
+  if (z < 0.34) { z = 0.34; hit = true; _wo.set(O[ix], O[ix + 1], O[ix + 2]).applyMatrix4(Wg.inv); _wo.z = z; _wo.x = lerp(_wo.x, x, 0.1); _wo.y = lerp(_wo.y, y, 0.1); _wo.applyMatrix4(Wg.mw); O[ix] = _wo.x; O[ix + 1] = _wo.y; O[ix + 2] = _wo.z; }
+  for (const map of [Wg.knobGrid, Wg.plugGrid]) {
+    const cell = map.get(Math.floor(x / GC) * 1000 + Math.floor(y / GC)); if (!cell) continue;
+    for (const o of cell) { let dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy); const R = o.r + CR; if (d < R && z < o.h + CR) { hit = true; const oz = o.h + CR - z, or = R - d; if (oz < or) z = o.h + CR; else { if (d < 1e-4) { dx = 0; dy = 1; d = 1; } x = o.x + dx / d * R; y = o.y + dy / d * R; } } }
+  }
+  if (hit) { _wl.set(x, y, z).applyMatrix4(Wg.mw); P[ix] = _wl.x; P[ix + 1] = _wl.y; P[ix + 2] = _wl.z; }
+}
 function collideMain(r) {
   const P = r.P, O = r.O, W = r.W;
   for (let i = 0; i < r.n; i++) {
@@ -1209,6 +1264,7 @@ function collideMain(r) {
       for (const o of cell) { let dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy); const R = o.r + CR; if (d < R && z < o.h + CR) { const oz = o.h + CR - z, or = R - d; if (oz < or) z = o.h + CR; else { if (d < 1e-4) { dx = 0; dy = 1; d = 1; } x = o.x + dx / d * R; y = o.y + dy / d * R; } } }
     }
     P[ix] = x; P[ix + 1] = y; P[ix + 2] = z;
+    for (const k in WING) collideWing(WING[k], P, O, ix);
   }
 }
 class Rope {
@@ -1278,7 +1334,8 @@ class Cable {
     this.ends.forEach((e, idx) => {
       if (e.anim < 1) e.anim = Math.min(1, e.anim + dt * 9);
       const p = this.tipPos(e), i0 = idx ? N - 1 : 0, i1 = idx ? N - 2 : 1;
-      r.pin(i0, p.x, p.y, p.z + 1.75); r.pin(i1, p.x, p.y, p.z + 1.75 + Math.min(r.seg, 1.3)); e.plug.position.copy(p);
+      const nn = (e.port && e.port.n) || ZN, a1 = 1.75, a2 = 1.75 + Math.min(r.seg, 1.3);
+      r.pin(i0, p.x + nn.x * a1, p.y + nn.y * a1, p.z + nn.z * a1); r.pin(i1, p.x + nn.x * a2, p.y + nn.y * a2, p.z + nn.z * a2); e.plug.position.copy(p); e.plug.quaternion.copy(e.port && e.port.sec ? e.port.sec.q : QI);
     });
   }
   setColor(col) { this.color = col; this.mat.color.set(col); this.plMat.color.set(col).multiplyScalar(0.55); this.applyNeon(); }
@@ -1296,8 +1353,9 @@ function detachEnd(c, i) { const e = c.ends[i]; if (!e.port) return; disconnectC
 function attachEnd(c, i, port, from) { const e = c.ends[i]; e.port = port; port.cables.push(c); e.from.copy(from || stackPos(port, c)); e.anim = from ? 0 : 1; }
 function removeCable(c) { for (const i of [0, 1]) detachEnd(c, i); c.dispose(); cables.splice(cables.indexOf(c), 1); rebuildPlugGrid(); }
 const STACK = 1.72;
-function stackPos(port, cable) { const k = Math.max(0, port.cables.indexOf(cable)); return k ? port.world.clone().setZ(port.world.z + k * STACK) : port.world; }
-function rebuildPlugGrid() { plugGrid.clear(); const seen = new Set(); for (const c of cables) for (const e of c.ends) if (e.port && !seen.has(e.port)) { seen.add(e.port); gridAdd(plugGrid, { x: e.port.world.x, y: e.port.world.y, r: 0.3, h: 2.2 + (e.port.cables.length - 1) * STACK }); } }
+const ZN = new THREE.Vector3(0, 0, 1), QI = new THREE.Quaternion();
+function stackPos(port, cable) { const k = Math.max(0, port.cables.indexOf(cable)); return k ? port.world.clone().addScaledVector(port.n || ZN, k * STACK) : port.world; }
+function rebuildPlugGrid() { plugGrid.clear(); for (const k in WING) WING[k].plugGrid.clear(); const seen = new Set(); for (const c of cables) for (const e of c.ends) if (e.port && !seen.has(e.port)) { seen.add(e.port); gridAdd(e.port.sec ? e.port.sec.plugGrid : plugGrid, { x: e.port.lx, y: e.port.ly, r: 0.3, h: 2.2 + (e.port.cables.length - 1) * STACK }); } }
 function portByPath(path) { const [m, p] = path.split('.'); return modById[m].ports[p]; }
 function patchCable(a, b, color, extra = 0) {
   const pa = portByPath(a), pb = portByPath(b), c = new Cable(color);
@@ -2211,7 +2269,17 @@ function genPatch(style, wild) {
   set('verb', 'level', 1);
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
   { const dance = style === 'house' || style === 'dnb' || style === 'tinez', kil = style === 'kiln';
-    con(fL, 'keys.inL'); con(fR, 'keys.inR'); con('keys.L', 'eq.inL'); con('keys.R', 'eq.inR'); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
+    con(fL, 'keys.inL'); con(fR, 'keys.inR');
+    // mixing side: BLEND -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
+    con('keys.L', 'blend.aL'); con('keys.R', 'blend.aR'); con('blend.L', 'sweep.inL'); con('blend.R', 'sweep.inR'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
+    con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
+    { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
+    set('blend', 'blend', 0); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('sweep', 'pos', 0); set('sweep', 'res', rr(0.2, 0.4));
+    const house = style === 'house' || style === 'tinez';
+    set('echo', 'div', style === 'dnb' ? rpick([1, 2, 5]) : house ? rpick([2, 2, 3, 4]) : rpick([2, 3, 4, 5])); set('echo', 'fb', dance ? rr(0.25, 0.45) : rr(0.4, 0.62)); set('echo', 'tone', rr(0.35, 0.6)); set('echo', 'wow', rr(0.15, 0.4)); set('echo', 'spread', rr(0.5, 0.9));
+    set('echo', 'mix', style === 'dnb' ? rr(0.04, 0.1) : dance ? rr(0.06, 0.14) : rr(0.12, 0.26));
+    set('pump', 'depth', house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
+    set('sub', 'xo', dance ? rr(100, 140) : rr(80, 120)); set('sub', 'sub', style === 'dnb' ? rr(0.15, 0.35) : house ? rr(0, 0.12) : 0); set('sub', 'tight', dance ? rr(26, 34) : rr(18, 26)); set('sub', 'low', 0); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
     set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-3, -0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
     if (dance) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(2, 3.2)); set('glue', 'atk', rexp(0.015, 0.035)); set('glue', 'rel', rr(0.12, 0.25)); set('glue', 'makeup', rr(1.5, 3)); set('glue', 'mix', rr(0.75, 1)); }
     else if (kil) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(1.8, 2.6)); set('glue', 'atk', rexp(0.02, 0.04)); set('glue', 'rel', rr(0.25, 0.5)); set('glue', 'makeup', rr(2, 3.5)); set('glue', 'mix', rr(0.6, 0.85)); }
@@ -2231,7 +2299,7 @@ function genPatch(style, wild) {
   return { v: 1, knobs: K, cables: C };
 }
 // knob shuffle / nudge with safe limits (normalised ranges)
-const SAFE = { 'out.vol': null, 'field.rec': null, 'mbira.type': null, 'field.lvl': [0.2, 0.6], 'mbira.lvl': [0.5, 0.9], 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
+const SAFE = { 'out.vol': null, 'blend.blend': null, 'blend.lvlA': null, 'blend.lvlB': null, 'blend.master': null, 'sweep.pos': null, 'sweep.res': [0.15, 0.45], 'echo.div': null, 'echo.mix': [0, 0.3], 'echo.fb': [0.2, 0.6], 'pump.depth': [0, 0.45], 'sub.xo': [0.3, 0.6], 'sub.sub': [0, 0.35], 'sub.tight': [0.3, 0.6], 'sub.low': [0.4, 0.6], 'field.rec': null, 'mbira.type': null, 'field.lvl': [0.2, 0.6], 'mbira.lvl': [0.5, 0.9], 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
   'lvl': [0.35, 0.9], 'level': [0.45, 0.9], 'master': [0.6, 0.85], 'kLvl': [0.75, 1], 'vca.bias1': [0, 0.15], 'vca.bias2': [0, 0.15], 'drive': [0, 0.6], 'verb.mix': [0.15, 0.7], 'verb.decay': [0.2, 0.85], 'oct': [0.2, 0.8], 'depth': [0.3, 0.8], 'fold': [0, 0.7], 'mix6.lvl1': [0.7, 0.95], 'hiss': [0, 0.4], 'dust': [0, 0.6], 'chaos': [0, 0.5], 'kDen': [0.35, 0.75], 'sDen': [0.35, 0.75], 'hDen': [0.3, 0.8], 'pDen': [0.2, 0.8], 'groove.style': null, 'wow': [0, 0.7], 'stab.chord': [0, 1], 'bass.oct': [0.33, 1] };
 function safeRange(m, k) { const s = SAFE[m.id + '.' + k] !== undefined ? SAFE[m.id + '.' + k] : SAFE[k.replace(/\d+$/, '')] !== undefined ? SAFE[k.replace(/\d+$/, '')] : SAFE[k]; return s === undefined ? [0.05, 0.95] : s; }
 function tweenKnob(kn, to) { to = clamp(to, 0, 1); if (window.__noRender) { kn.set(to); return; } RND.tw = RND.tw.filter(t => t.kn !== kn); RND.tw.push({ kn, from: kn.norm, to, t: 0 }); }
@@ -2312,7 +2380,7 @@ function moveCable(e) {
   const { cable, i } = drag, end = cable.ends[i]; clearRings(); drag.msg = '';
   const tgt = pickTarget(e); drag.target = null;
   if (tgt) { const v = validTarget(cable, i, tgt); setRing(tgt, v.ok ? 0x4fe3ff : 0xff3355); ringed.push(tgt); if (v.ok) { drag.target = tgt; end.pos.copy(tgt.world).add(new THREE.Vector3(0, 0, 0.9 + (tgt.dir === 'out' ? tgt.cables.filter(x => x !== cable).length * STACK : 0))); } else drag.msg = v.msg; }
-  if (!drag.target) { setRay(e); if (ray.ray.intersectPlane(dragPlane, tmpV)) end.pos.copy(tmpV); }
+  if (!drag.target) { setRay(e); if (ray.ray.intersectPlane(dragPlane, tmpV)) { const sd = tmpV.x < -CASE_W / 2 - 2.4 ? WING.L : tmpV.x > CASE_W / 2 + 2.4 ? WING.R : null; if (sd) { sd.plane = sd.plane || new THREE.Plane().setFromNormalAndCoplanarPoint(sd.n, new THREE.Vector3().setFromMatrixPosition(sd.mw).addScaledVector(sd.n, 2.8)); ray.ray.intersectPlane(sd.plane, tmpV); } end.pos.copy(tmpV); } }
   const other = cable.tipPos(cable.ends[1 - i]); const d = other.distanceTo(end.pos); cable.length = Math.max(drag.base, d * 1.1 + 5);
 }
 canvas.addEventListener('pointermove', e => {
@@ -2345,11 +2413,11 @@ canvas.addEventListener('dblclick', e => {
   const h = pick(e);
   if (h && h.knob && h.knob.def.btn) return;
   if (h && h.knob) { h.knob.set(h.knob.defNorm); showTip(e, `${h.knob.mod.def.title} · ${h.knob.name}<small>${h.knob.text()} (reset)</small>`); return; }
-  if (h && h.module) { const m = h.module, c = new THREE.Vector3(m.x0 + m.w / 2, m.y0 + U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6))), c); return; }
+  if (h && h.module) { const m = h.module, c = modPt(m, m.w / 2, U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6)).applyQuaternion(m.sec ? m.sec.q : QI)), c); return; }
   if (!h) flyTo(HOME.pos, HOME.target);
 });
 const ctl = new OrbitControls(camera, canvas);
-window.__nr = { camera, scene, get ctl() { return ctl; }, modules, cables, get AC() { return AC; }, get ENG() { return ENG; }, get TEL() { return TEL; } };
+window.__nr = { camera, scene, mod: id => { const m = modById[id]; return { c: modPt(m, m.w / 2, U3 / 2, 0), n: m.sec ? m.sec.n : new THREE.Vector3(0, 0, 1) }; }, get ctl() { return ctl; }, modules, cables, get AC() { return AC; }, get ENG() { return ENG; }, get TEL() { return TEL; } };
 ctl.target.copy(HOME.target); ctl.enableDamping = true; ctl.dampingFactor = 0.08; ctl.minDistance = 3; ctl.maxDistance = 420;
 ctl.minPolarAngle = 0.05; ctl.maxPolarAngle = 1.75; ctl.screenSpacePanning = true; ctl.rotateSpeed = 0.6; ctl.zoomSpeed = 0.9; ctl.update();
 let fly = null;
@@ -2382,14 +2450,14 @@ padRing.visible = false; scene.add(padRing);
 function padItems() {
   if (PAD.items.length) return PAD.items;
   for (const m of modules) {
-    for (const k in m.knobs) { const kn = m.knobs[k], d = kn.def; PAD.items.push({ knob: kn, pos: new THREE.Vector3(m.x0 + d.x, m.y0 + U3 - d.y, 0), r: d.btn ? 0.55 : KR[d.size] * 1.45 }); }
-    for (const p in m.ports) PAD.items.push({ port: m.ports[p], pos: m.ports[p].world, r: 0.7 });
+    for (const k in m.knobs) { const kn = m.knobs[k], d = kn.def; PAD.items.push({ knob: kn, pos: modPt(m, d.x, U3 - d.y, 0), q: m.sec ? m.sec.q : null, r: d.btn ? 0.55 : KR[d.size] * 1.45 }); }
+    for (const p in m.ports) PAD.items.push({ port: m.ports[p], pos: m.ports[p].world, q: m.sec ? m.sec.q : null, r: 0.7 });
   }
   return PAD.items;
 }
 function padFocus(it) {
   PAD.focus = it; if (!it) { padRing.visible = false; return; }
-  padRing.visible = PAD.active; padRing.position.set(it.pos.x, it.pos.y, (it.port ? 0.5 : 0.25)); padRing.scale.setScalar(it.r);
+  padRing.visible = PAD.active; padRing.position.copy(it.pos).addScaledVector(it.q ? ZN.clone().applyQuaternion(it.q) : ZN, it.port ? (it.q ? 0.02 : 0.5 - it.pos.z) : 0.25 - (it.q ? 0 : it.pos.z)); padRing.quaternion.copy(it.q || QI); padRing.scale.setScalar(it.r);
   padTip();
 }
 function padTip() {
@@ -2700,7 +2768,7 @@ canvas.addEventListener('pointerup', e => {
   if (e.pointerType !== 'touch' || !tTap) return; const moved = Math.hypot(e.clientX - tTap.x, e.clientY - tTap.y) > 10, h = tTap.h; tTap = null; if (moved) return;
   if (h && h.tube) { openMenu(h.end.cable, e.clientX, e.clientY); return; }
   const now = performance.now();
-  if (tLast && now - tLast.t < 350 && Math.hypot(e.clientX - tLast.x, e.clientY - tLast.y) < 30 && h && h.module) { const m = h.module, c = new THREE.Vector3(m.x0 + m.w / 2, m.y0 + U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1))), c); tLast = null; return; }
+  if (tLast && now - tLast.t < 350 && Math.hypot(e.clientX - tLast.x, e.clientY - tLast.y) < 30 && h && h.module) { const m = h.module, c = modPt(m, m.w / 2, U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1)).applyQuaternion(m.sec ? m.sec.q : QI)), c); tLast = null; return; }
   tLast = { t: now, x: e.clientX, y: e.clientY };
 }, true);
 const PANELS = ['patches', 'rand', 'scene', 'help', 'kits'];
@@ -2834,8 +2902,8 @@ let desk = null;
 async function main() {
   try { await Promise.race([Promise.all([document.fonts.load(`700 40px "Space Grotesk"`), document.fonts.load(`600 40px "Space Grotesk"`), document.fonts.load(`500 40px "Space Grotesk"`)]), new Promise(r => setTimeout(r, 2500))]); } catch (e) { }
   buildRack();
-  const near = [buildDecor(84, NROWS, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right'),
-    buildDecor(84, NROWS, 37, new THREE.Vector3(CASE_W / 2 + 2.4, 0, 0), -0.55, 'left')];
+  const near = [buildDecor(84, NROWS, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right')];
+  for (const k in WING) { const W = WING[k], r = NROWS - W.rows; if (r > 0) near.push(buildDecor(84, r, k === 'R' ? 37 : 23, new THREE.Vector3(0, 0, 0), 0, 'left', false, { parent: W.inner })); }
   buildScopes();
   buildHall();
   buildScopes(hallGroup);
