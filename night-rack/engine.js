@@ -593,16 +593,31 @@ class Perc extends DSP {
   }
 }
 // STAB: chord synth (detuned saw pairs → resonant low-pass with its own envelope), stereo
-const STAB_CHORDS = [[0, 3, 7, 10], [0, 3, 7, 10, 14], [0, 4, 7, 11], [0, 4, 7, 11, 14], [0, 3, 7, 10, 17], [0, 5, 7, 10], [0, 4, 7, 10, 14], [0, 4, 7, 14], [0, 3, 7, 12], [0, 7, 12]];
-export const STAB_NAMES = ['MIN 7', 'MIN 9', 'MAJ 7', 'MAJ 9', 'MIN 11', '7 SUS 4', 'DOM 9', 'ADD 9', 'MINOR', 'FIFTHS'];
+export const STAB_CHORDS = [[0, 3, 7, 10], [0, 3, 7, 10, 14], [0, 4, 7, 11], [0, 4, 7, 11, 14], [0, 3, 7, 10, 17], [0, 5, 7, 10], [0, 4, 7, 10, 14], [0, 4, 7, 14], [0, 3, 7, 12], [0, 7, 12],
+  [0, 4, 10, 14, 21], [0, 4, 7, 10, 13], [0, 3, 6, 10], [0, 4, 9, 14], [0, 3, 9, 14], [0, 5, 10, 14], [0, 4, 7, 11, 18]];
+export const STAB_NAMES = ['MIN 7', 'MIN 9', 'MAJ 7', 'MAJ 9', 'MIN 11', '7 SUS 4', 'DOM 9', 'ADD 9', 'MINOR', 'FIFTHS', 'DOM 13', '7 FLAT 9', 'MIN 7 FLAT 5', '6/9', 'MIN 6/9', '9 SUS 4', 'MAJ 7 #11'];
+function leadVoicing(ch, root, prev, home) { // jazz voicing: drop the root (the bass has it) when there are 4+ notes, then choose the inversion and octave that moves least
+  let iv = ch.length >= 4 ? ch.filter(x => x % 12 !== 0) : ch.slice(); if (iv.length < 3) iv = ch.slice();
+  let best = null, bc = 1e9;
+  for (let r = 0; r < iv.length; r++) for (const o of [-24, -12, 0, 12]) {
+    const v = iv.map((x, i) => root + x + (i < r ? 12 : 0) + o).sort((a, b) => a - b), mean = v.reduce((a, b) => a + b, 0) / v.length;
+    if (v[0] < -7 || v[v.length - 1] > 26) continue;
+    let c = Math.abs(mean - home) * (prev ? 0.35 : 1);
+    if (prev) for (const x of v) { let d = 99; for (const y of prev) d = Math.min(d, Math.abs(x - y)); c += d; }
+    if (c < bc) { bc = c; best = v; } }
+  return best || iv.map(x => root + x);
+}
 class Stab extends DSP {
   static IN = ['voct', 'trig', 'chord']; static OUT = ['L', 'R'];
   constructor(e) { super(e); this.ph = new Float32Array(10).map(() => Math.random()); this.ts = new Schmitt(); this.env = 0; this.fenv = 0; this.att = false; this.z = [0, 0, 0, 0]; }
   process(n) {
     const P = this.p, sr = this.sr, I = this.in, OL = this.out.L, OR = this.out.R;
     const cv = this.has.chord ? I.chord[0] : 0, ci = Math.max(0, Math.min(STAB_CHORDS.length - 1, Math.round((P.chord ?? 0) + cv))), ch = STAB_CHORDS[ci];
-    const inv = Math.floor((P.voice ?? 0) * ch.length * 0.99), det = (P.detune ?? 0.3) * 0.012, notes = ch.map((s, i) => (i < inv ? s + 12 : s) - (inv > ch.length / 2 ? 12 : 0));
-    const base = 130.81 * Math.pow(2, (this.has.voct ? I.voct[0] : 0) + (P.oct ?? 0));
+    const inv = Math.floor((P.voice ?? 0) * ch.length * 0.99), det = (P.detune ?? 0.3) * 0.012; let notes = ch.map((s, i) => (i < inv ? s + 12 : s) - (inv > ch.length / 2 ? 12 : 0));
+    let base = 130.81 * Math.pow(2, (this.has.voct ? I.voct[0] : 0) + (P.oct ?? 0));
+    if (this.has.chord) { const rs = Math.round(((this.has.voct ? I.voct[0] : 0) + (P.oct ?? 0)) * 12), key = ci + ':' + rs;
+      if (key !== this.vkey) { this.vkey = key; this.voicing = leadVoicing(ch, rs, this.voicing, 2 + Math.round((P.voice ?? 0.25) * 8)); }
+      notes = this.voicing; base = 130.81; }
     const dec = 0.08 + (P.decay ?? 0.35) * 1.6, atk = 0.002 + (P.attack ?? 0) * 0.4, kd = Math.exp(-1 / (dec * sr)), kfd = Math.exp(-1 / (dec * 0.55 * sr)), ka = 1 - Math.exp(-1 / (atk * sr));
     const cut = P.cutoff ?? 1200, envAmt = (P.env ?? 0.5) * 5, res = (P.res ?? 0.2) * 1.8, gate = this.has.trig, T = I.trig, lvl = P.level ?? 0.8;
     const inc = []; for (let v = 0; v < notes.length; v++) { const f = base * Math.pow(2, notes[v] / 12); inc.push(f * (1 - det) / sr, f * (1 + det) / sr); }
@@ -878,6 +893,71 @@ class Field extends DSP {
 }
 
 
+
+// ---------------------------------------------------------------- HARMONY: writes chord progressions the way jazz and deep house do
+// Each chord has a job (T home, S away, D tension that pulls home). Phrases follow patterns those styles use (ii-V-I, turnarounds,
+// secondary dominants, tritone subs, borrowed minor chords), always end on a chord that leads back to the start, and change on the
+// bar (or a 16th-pair early: the house "push"). Outputs: ROOT (V/oct) + TYPE (chord shape index) for STAB, BASS (root, steady range,
+// optional approach notes) and CHG (a trigger on each change). Settings only take effect at the next phrase, so changes are never abrupt.
+const HQ = { m7: 0, m9: 1, maj7: 2, maj9: 3, m11: 4, sus: 5, d9: 6, add9: 7, d13: 10, d7b9: 11, hdim: 12, six9: 13, m69: 14, sus9: 15, lyd: 16 };
+const HQ_NAME = ['m7', 'm9', 'maj7', 'maj9', 'm11', '7sus', '9', 'add9', 'm', '5', '13', '7b9', 'm7b5', '6/9', 'm6/9', '9sus4', 'maj7#11'];
+const NOTE_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+// vocabulary per mode: [degree, plain shapes, rich shapes, colour needed]
+const HVOC = [
+  { T: [[0, ['maj9'], ['six9', 'maj7', 'lyd']], [9, ['m9'], ['m7', 'm11']], [4, ['m7'], ['m9'], 0.4]], S: [[2, ['m9'], ['m11', 'm7']], [5, ['maj9'], ['lyd', 'six9']], [5, ['m69'], ['m9'], 0.55]], D: [[7, ['d9'], ['d13', 'sus9']], [1, ['d9'], ['d13'], 0.5], [10, ['d9'], ['d13'], 0.6]] }, // major
+  { T: [[0, ['m9'], ['m11', 'm69']], [3, ['maj9'], ['lyd'], 0.3], [8, ['maj9'], ['lyd'], 0.3]], S: [[5, ['m9'], ['m11']], [2, ['hdim'], ['hdim'], 0.4], [8, ['maj7'], ['lyd']]], D: [[10, ['d9'], ['sus9', 'd13']], [7, ['m9'], ['d7b9'], 0], [1, ['d9'], ['d13'], 0.7]] }, // minor
+  { T: [[0, ['m9'], ['m11']], [3, ['maj9'], ['six9'], 0.3]], S: [[5, ['d9'], ['d13']], [2, ['m7'], ['m9']], [10, ['maj9'], ['add9'], 0.2]], D: [[7, ['m9'], ['m11']], [10, ['add9'], ['maj9']], [5, ['sus9'], ['d13'], 0.3]] } // dorian
+];
+const HFORM = [['T', 'S', 'D', 'D'], ['T', 'T', 'S', 'D'], ['T', 'S', 'S', 'D'], ['S', 'D', 'T', 'T'], ['T', 'D', 'S', 'D'], ['T', 'S', 'T', 'D'], ['S', 'S', 'D', 'T'], ['T', 'T', 'D', 'D']];
+function hrand(seed) { let x = (seed * 2654435761) >>> 0 || 1; return () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; }
+const hpick = (r, a) => a[Math.floor(r() * a.length)];
+export function harmPhrase(seed, mode, color, move, bars) { // -> [{at (16ths), deg, q, fn}]
+  const r = hrand(seed * 7919 + 13), V = HVOC[mode] || HVOC[0], ev = [], halves = bars / 4;
+  const pickChord = (fn, prev) => { const opts = V[fn].filter(o => (o[3] ?? 0) <= color + 1e-6 && !(prev && o[0] === prev.deg)); const o = hpick(r, opts.length ? opts : V[fn]); const sh = r() < color ? o[2] : o[1]; return { deg: o[0], q: HQ[hpick(r, sh)], fn }; };
+  let prev = null;
+  for (let h = 0; h < halves; h++) { const form = hpick(r, HFORM).slice(); if (h === halves - 1) form[3] = 'D'; if (h === 0 && form[0] !== 'T' && r() < 0.75) form[0] = 'T';
+    for (let b = 0; b < 4; b++) { const at = (h * 4 + b) * 16;
+      if (form[b] && form[b].pre) { ev.push({ at, ...form[b].pre }); prev = form[b].pre; continue; }
+      let c = pickChord(form[b], prev); if (h === 0 && b === 0 && form[0] === 'T' && r() < 0.6) { const o = V.T[0]; c = { deg: o[0], q: HQ[hpick(r, r() < color ? o[2] : o[1])], fn: 'T' }; }
+      // a ii-V (or V of the next chord) squeezed into the second half of a bar, more often with MOVE
+      if (b < 3 && r() < move * 0.5 && form[b + 1] !== 'D' && typeof form[b + 1] === 'string') { const nxt = pickChord(form[b + 1], c); if ((nxt.deg + 7) % 12 === c.deg || nxt.deg === c.deg) { ev.push({ at, ...c }); prev = c; continue; } ev.push({ at, ...c }); form[b + 1] = { pre: nxt };
+        ev.push({ at: at + 8, deg: (nxt.deg + 7) % 12, q: r() < color ? HQ.d7b9 : HQ.d9, fn: 'D' }); prev = ev[ev.length - 1]; continue; }
+      if (b === 3 && h === halves - 1 && r() < move * 0.6) { const ii = { deg: ((c.deg - 5) % 12 + 12) % 12, q: mode === 1 ? HQ.hdim : HQ.m9, fn: 'S' }; ev.push({ at, ...ii }); ev.push({ at: at + 8, ...c }); prev = c; continue; } // ii-V into the top
+      ev.push({ at, ...c }); prev = c; } }
+  // the push: some changes land a 16th-pair early (never the first chord)
+  for (let i = 1; i < ev.length; i++) if (ev[i].at % 16 === 0 && r() < move * 0.45) ev[i].at -= 2;
+  return ev;
+}
+const hname = (key, e) => NOTE_FLAT[(key + e.deg) % 12] + HQ_NAME[e.q];
+class Harmony extends DSP {
+  static IN = ['clk', 'rst']; static OUT = ['root', 'type', 'bass', 'chg'];
+  constructor(e) { super(e); this.cs = new Schmitt(); this.rs = new Schmitt(); this.step = -1; this.n = 0; this.ev = null; this.cur = -1; this.g = 0; this.bv = 0; }
+  phrase() { const P = this.p, bars = (P.len | 0) === 4 ? 4 : 8, ev = (P.evolve ?? 0.3), key = [P.seed | 0, P.mode | 0, Math.round((P.color ?? 0.5) * 20), Math.round((P.move ?? 0.3) * 20), bars, P.key | 0].join();
+    if (this.n === 0 || key !== this.k || !this.ev) this.gen = 0; else if (hrand((P.seed | 0) * 31 + this.n)() < ev) this.gen++;
+    this.k = key; this.bars = bars; this.ev = harmPhrase((P.seed | 0) * 101 + this.gen, P.mode | 0, P.color ?? 0.5, P.move ?? 0.3, bars); this.n++; }
+  process(n) {
+    const C = this.in.clk, R = this.in.rst, O = this.out, P = this.p, key = P.key | 0;
+    for (let i = 0; i < n; i++) {
+      if (this.rs.step(R[i])) { this.step = -1; this.n = 0; }
+      if (this.cs.step(C[i])) {
+        if (this.step < 0) this.n = 0;
+        this.step = this.step + 1; if (!this.ev || this.step >= (this.bars || 8) * 16) { this.step = 0; } if (this.step === 0 || !this.ev) this.phrase();
+        // the chord sounding now
+        let idx = 0; for (let j = 0; j < this.ev.length; j++) if (this.ev[j].at <= this.step) idx = j;
+        if (idx !== this.cur) { this.cur = idx; this.g = Math.round(0.008 * this.sr); this.flash('chg', 1); }
+        const e = this.ev[idx], nx = this.ev[idx + 1] || this.ev[0], untilNext = (idx + 1 < this.ev.length ? nx.at : this.bars * 16) - this.step;
+        // bass: the root, kept between a fourth below and a fifth above the key so it never leaps; approach notes before a change
+        let bs = (e.deg + key) % 12; if (bs > 7) bs -= 12; let nb = (nx.deg + key) % 12; if (nb > 7) nb -= 12;
+        if (untilNext <= 2 && untilNext > 0 && hrand(this.n * 977 + this.step)() < (P.walk ?? 0)) bs = nb + (hrand(this.step + 3)() < 0.5 ? -1 : 7) ;
+        this.bv = bs / 12; this.rv = ((e.deg + key) % 12) / 12; this.tv = e.q;
+        this.info = { name: hname(key, e), next: hname(key, nx), bar: Math.floor(this.step / 16) + 1, bars: this.bars, prog: this.ev.map(x => hname(key, x)).join(' ') };
+      }
+      O.root[i] = this.rv || 0; O.type[i] = this.tv || 0; O.bass[i] = this.bv; O.chg[i] = this.g > 0 ? 10 : 0; if (this.g > 0) this.g--;
+    }
+    if (this.info) Object.assign(this.L, this.info);
+  }
+}
+
 // ---------------------------------------------------------------- mixing side (right rack): BLEND, SWEEP, ECHO, PUMP (= Duck), SUB
 class Blend extends DSP { // two stereo decks, equal-power crossfade, per-deck level, master; MATCH evens out the decks' loudness so a blend never jumps in volume
   static IN = ['aL', 'aR', 'bL', 'bR']; static OUT = ['L', 'R'];
@@ -963,7 +1043,7 @@ class Sub extends DSP { // low end: everything below the crossover in mono, a cl
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub };
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
