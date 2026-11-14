@@ -37,10 +37,10 @@ class Clock extends DSP {
   static IN = ['reset']; static OUT = ['x4', 'x2', 'x1', 'd2', 'd4', 'd8'];
   constructor(e) { super(e); this.ph = 0; this.c = 0; this.rs = new Schmitt(); this.O = Clock.OUT.map(k => this.out[k]); }
   process(n) {
-    const f = (this.p.tempo || 52) / 60 * 4 / this.sr, O = this.O, D = [1, 2, 4, 8, 16, 32], rst = this.in.reset;
+    const f = (this.p.tempo || 52) / 60 * 4 / this.sr, O = this.O, D = [1, 2, 4, 8, 16, 32], rst = this.in.reset; this.barAt = -1;
     for (let i = 0; i < n; i++) {
       if (this.rs.step(rst[i])) { this.ph = 0; this.c = 0; }
-      this.ph += f; if (this.ph >= 1) { this.ph -= 1; this.c++; }
+      this.ph += f; if (this.ph >= 1) { this.ph -= 1; this.c++; if (this.c % 16 === 0 && this.barAt < 0) this.barAt = i; }
       for (let k = 0; k < 6; k++) { const d = D[k]; O[k][i] = ((this.c % d) + this.ph) / d < 0.5 ? 10 : 0; }
     }
     this.flash('beat', ((this.c % 4) + this.ph) / 4 < 0.5 ? 1 : 0); this.L.count = this.c;
@@ -890,9 +890,13 @@ class Blend extends DSP { // two stereo decks, equal-power crossfade, per-deck l
     for (let d = 0; d < 2; d++) { let e = 0; const [l, r] = S[d]; for (let i = 0; i < n; i++) e += l[i] * l[i] + r[i] * r[i]; e /= 2 * n;
       if (e > 1e-5) this.ms[d] += (e - this.ms[d]) * (n / (3 * this.sr));
       const want = match ? Math.min(2, Math.max(0.5, 1.6 / Math.sqrt(this.ms[d] + 1e-9))) : 1; this.g[d] += (want - this.g[d]) * (n / (1.5 * this.sr)); }
-    let pa = 0, pb = 0;
-    for (let i = 0; i < n; i++) { this.x += (tgt - this.x) * k; const ga = Math.cos(this.x * Math.PI / 2) * la * m * 1.25 * this.g[0], gb = Math.sin(this.x * Math.PI / 2) * lb * m * 1.25 * this.g[1];
-      OL[i] = AL[i] * ga + BL[i] * gb; OR[i] = AR[i] * ga + BR[i] * gb; const a = Math.abs(AL[i] * ga), b = Math.abs(BL[i] * gb); if (a > pa) pa = a; if (b > pb) pb = b; }
+    let pa = 0, pb = 0; const lc = 1 - Math.exp(-6.2832 * 170 / this.sr), Z = this.z || (this.z = new Float64Array(8)), swap = (this.p.swap ?? 1) > 0.5;
+    for (let i = 0; i < n; i++) { this.x += (tgt - this.x) * k; const x = this.x, ga = Math.cos(x * Math.PI / 2) * la * m * 1.25 * this.g[0], gb = Math.sin(x * Math.PI / 2) * lb * m * 1.25 * this.g[1];
+      const t = swap ? Math.min(1, Math.max(0, (x - 0.42) / 0.16)) : x, sw = t * t * (3 - 2 * t), la2 = (1 - sw) * la * m * 1.25 * this.g[0], lb2 = sw * lb * m * 1.25 * this.g[1];
+      const ins = [AL[i], AR[i], BL[i], BR[i]]; for (let j = 0; j < 4; j++) { Z[j] += lc * (ins[j] - Z[j]); Z[j + 4] += lc * (Z[j] - Z[j + 4]); }
+      // lows (two one-poles, ~170 Hz) follow the bass swap, the rest follows the crossfade
+      OL[i] = (AL[i] - Z[4]) * ga + Z[4] * la2 + (BL[i] - Z[6]) * gb + Z[6] * lb2; OR[i] = (AR[i] - Z[5]) * ga + Z[5] * la2 + (BR[i] - Z[7]) * gb + Z[7] * lb2;
+      const a = Math.abs(AL[i] * ga), b = Math.abs(BL[i] * gb); if (a > pa) pa = a; if (b > pb) pb = b; }
     this.flash('a', pa * 0.2); this.flash('b', pb * 0.2); this.peak('vu', OL, n); this.L.x = this.x; this.L.g = this.g;
   }
 }
@@ -972,6 +976,7 @@ export class Engine {
     else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
     else if (m.t === 'con') { this.cables.set(m.c, m); this.dirty = true; }
     else if (m.t === 'dis') { this.cables.delete(m.c); this.dirty = true; }
+    else if (m.t === 'barsync') { const P = this.pend || (this.pend = { wake: new Set(), reset: new Set() }); for (const id of m.wake || []) P.wake.add(id); for (const id of m.reset || []) P.reset.add(id); } // on the next bar: wake a deck and start its sequencers on the downbeat
     else if (m.t === 'sleep') { for (const id of m.ids) { const d = this.mods.get(id); if (!d) continue; d.sleep = m.on; if (m.on) for (const k in d.out) d.out[k].fill(0); } } // a resting deck costs nothing
   }
   rebuild() {
@@ -993,6 +998,10 @@ export class Engine {
     for (const d of this.order) {
       if (d.sleep) continue;
       d.process(n);
+      if (this.pend && d.barAt >= 0) { // the clock just started a bar inside this block: sequencers processed after it step to 0 on that downbeat
+        for (const id of this.pend.wake) { const m = this.mods.get(id); if (m) m.sleep = false; }
+        for (const id of this.pend.reset) { const m = this.mods.get(id); if (!m) continue; if ('step' in m) m.step = -1; if ('wait' in m) m.wait = -1; if (m.cs) m.cs.s = false; }
+        this.pend = null; }
       for (const k in d.out) { const o = d.out[k]; for (let i = 0; i < n; i++) { const x = o[i]; if (x > 10 || x < -10) { const a = x > 0 ? x : -x; o[i] = (x > 0 ? 1 : -1) * (10 + 1.8 * Math.tanh((a - 10) / 1.8)); } } }
     }
   }
