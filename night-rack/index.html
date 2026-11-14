@@ -492,8 +492,8 @@ DEFS.groove = lay('GROOVE', 16, 'black',
 DEFS.stab = lay('STAB', 14, 'navy',
   [[kn('voice', 'VOICING', 'S', { def: 0.25, fmt: fPct }), kn('chord', 'CHORD', 'L', { min: 0, max: STAB_NAMES.length - 1, step: 1, def: 1, fmt: v => STAB_NAMES[v] }), kn('detune', 'DETUNE', 'S', { def: 0.3, fmt: fPct })],
    [kn('res', 'RES', 'S', { def: 0.2, fmt: fPct }), kn('cutoff', 'CUTOFF', 'L', { min: 80, max: 12000, def: 1100, curve: 'exp', fmt: fHz }), kn('env', 'ENV', 'S', { def: 0.45, fmt: fPct })],
-   [kn('attack', 'ATTACK', 'S', { def: 0, fmt: v => fS(0.002 + v * 0.4) }), ld('led', 'cyan'), kn('decay', 'DECAY', 'S', { def: 0.35, fmt: v => fS(0.08 + v * 1.6) })]],
-  [[ji('voct', 'V/OCT', 'param'), ji('trig', 'TRIG', 'trig'), ji('chord', 'CHORD', 'param')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+   [kn('attack', 'ATTACK', 'S', { def: 0, fmt: v => fS(0.002 + v * 0.4) }), kn('sound', 'SOUND', 'S', { min: 0, max: 1, step: 1, def: 0, fmt: v => ['SYNTH', 'RHODES'][v] }), kn('trem', 'TREM', 'S', { def: 0, fmt: fPct }), kn('decay', 'DECAY', 'S', { def: 0.35, fmt: v => fS(0.08 + v * 1.6) })]],
+  [[ji('voct', 'V/OCT', 'param'), ji('trig', 'TRIG', 'trig'), ji('chord', 'CHORD', 'param')], [jo('L', 'OUT L'), ld('led', 'cyan'), jo('R', 'OUT R')]]);
 const waveF = v => v < 0.5 ? 'SUB' : v < 1.5 ? 'SAW' : v < 2.5 ? 'SQUARE' : 'REESE';
 DEFS.bass = lay('BASS', 12, 'black',
   [[kn('oct', 'OCTAVE', 'S', { min: -2, max: 1, step: 1, def: -1, fmt: v => (v > 0 ? '+' : '') + v }), kn('cutoff', 'CUTOFF', 'L', { min: 40, max: 8000, def: 400, curve: 'exp', fmt: fHz }), kn('res', 'RES', 'S', { def: 0.3, fmt: fPct })],
@@ -674,7 +674,7 @@ function compileTune(t, comp, seed = 1) {
 
 DEFS.band = lay('BAND', 16, 'silver',
   [[sc(1.4)],
-   [kn('inst', 'KEYS', 'S', { min: 0, max: 2, step: 1, def: 0, fmt: v => ['UPRIGHT PIANO', 'ELECTRIC PIANO', 'VIBES'][v] }), kn('lead', 'VIBES LINE', 'S', { def: 0.3, fmt: v => v < 0.03 ? 'OFF' : fPct(v) }), kn('human', 'FEEL', 'S', { def: 0.55, fmt: v => v < 0.3 ? 'TIGHT ' + fPct(v) : v > 0.7 ? 'LOOSE ' + fPct(v) : fPct(v) })],
+   [kn('inst', 'KEYS', 'S', { min: 0, max: 3, step: 1, def: 0, fmt: v => ['UPRIGHT PIANO', 'FM PIANO', 'VIBES', 'RHODES'][v] }), kn('lead', 'VIBES LINE', 'S', { def: 0.3, fmt: v => v < 0.03 ? 'OFF' : fPct(v) }), kn('human', 'FEEL', 'S', { def: 0.55, fmt: v => v < 0.3 ? 'TIGHT ' + fPct(v) : v > 0.7 ? 'LOOSE ' + fPct(v) : fPct(v) })],
    [kn('comp', 'COMPING', 'S', { min: 0, max: 3, step: 1, def: 0, fmt: v => COMPS[v] }), kn('tone', 'TONE', 'S', { def: 0.55, fmt: fPct }), kn('level', 'LEVEL', 'S', { def: 0.8, fmt: fPct })],
    [kn('tune', 'TUNE', 'S', { min: 0, max: SONGBOOK.length - 1, step: 1, def: 0, fmt: v => SONGBOOK[v] ? SONGBOOK[v].name.toUpperCase() : '' }), ld('led', 'amber')]],
   [[ji('clk', 'CLOCK', 'trig'), ji('rst', 'RESET', 'trig'), jo('chg', 'CHANGE', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R'), jo('bass', 'BASS', 'param'), jo('bgate', 'B GATE', 'trig')]]);
@@ -881,11 +881,12 @@ class BandM extends Mod { // sends its tune to the engine whenever the tune or c
     g.textAlign = 'left'; g.fillStyle = '#d8c39a'; g.font = F(600, 16); g.fillText(t ? t.name + (BOOK.kept[t.id] ? '  ★' : '') : '', 12 * k, 44 * k);
     g.fillStyle = '#8f7a55'; g.font = F(500, 12); g.fillText(t ? (t.feel === 'lofi' ? 'lo-fi' : 'deep house') + ' · ' + COMPS[this.v('comp')].toLowerCase() : '', 12 * k, 66 * k); s.tex.needsUpdate = true; } }
 function sendTune(m, when) { const t = SONGBOOK[m.v('tune')]; if (!t) return; send({ t: 'tune', id: m.id, tune: compileTune(t, m.v('comp'), (m.v('tune') + 1) * 7 + m.v('comp')), when }); }
-const KEYZ = { piano: [49, 51, 53, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91, 93, 95], ep: [36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80], vibes: [41, 45, 48, 52, 55, 59, 62, 65, 69, 72, 76] };
-async function loadKeys() { // recorded keys (VCSL, public domain), shared by both decks' BAND
+const RHZ = [29, 35, 40, 45, 50, 55, 59, 62, 65, 71, 76, 81, 86, 91, 96];
+const KEYZ = { rhodes: RHZ.flatMap(n => [n + 's', n + 'h']), piano: [49, 51, 53, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91, 93, 95], ep: [36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80], vibes: [41, 45, 48, 52, 55, 59, 62, 65, 69, 72, 76] };
+async function loadKeys() { // recorded keys (Rhodes: jRhodes3d; others VCSL, public domain), shared by both decks' BAND and STAB
   if (loadKeys.done || !AC) return; loadKeys.done = true;
   for (const inst in KEYZ) for (const n of KEYZ[inst]) { try { const f = 'samples/keys/' + inst + '/' + n + '.m4a'; let r = null; try { r = await fetch(f); } catch (e) { } if (!r || !r.ok) r = await fetch('https://pinchlemon.github.io/home-arcade/night-rack/' + f);
-    const b = await AC.decodeAudioData(await r.arrayBuffer()); send({ t: 'zone', inst, note: n, data: new Float32Array(b.getChannelData(0)), sr: b.sampleRate }); } catch (e) { console.warn('keys', inst, n, e && e.message); } }
+    const b = await AC.decodeAudioData(await r.arrayBuffer()); send({ t: 'zone', inst, note: parseInt(n), lay: typeof n === 'string' ? n.slice(-1) : undefined, data: new Float32Array(b.getChannelData(0)), sr: b.sampleRate }); } catch (e) { console.warn('keys', inst, n, e && e.message); } }
 }
 class HarmM extends Mod { // shows the chord now, the next one, and the phrase
   visual() { const L = this.T; this.leds.led.vu(L.chg || 0); if (L.name !== this.shown || L.bar !== this.sb) { this.shown = L.name; this.sb = L.bar; this.screenDirty = true; } }
@@ -2348,7 +2349,10 @@ function genPatch(style, wild) {
     con('turing.cv', 'quant.in'); set('quant', 'scale', rpick([2, 2, 4, 0])); set('quant', 'root', 0); set('quant', 'oct', 0); used.add('turing'); used.add('quant');
     const bass = bassM({ cv: 'quant.out', gate: 'trig.g5' }, { wave: rpick([0.1, 0.4, 1, 1.2]), oct: -1, cut: rexp(220, 650), res: rr(0.15, 0.45), env: rr(0.35, 0.65), dec: rr(0.12, 0.3), glide: chance(0.4) ? rr(0.05, 0.2) : 0, drive: rr(0.15, 0.4) });
     con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2');
-    const stab = stabV('trig.g6', null, { chord: rpick([1, 1, 0, 4, 5]), cut: rexp(700, 1800), env: rr(0.3, 0.6), dec: rr(0.15, 0.35) });
+    // chords on a recorded Rhodes (the Tinez sound) most of the time, the old synth stab sometimes
+    const rh = chance(0.85), stab = rh ? stabV('trig.g6', null, { chord: rpick([1, 1, 4, 4, 0, 3]), cut: rexp(1500, 4200), env: rr(0.2, 0.6), dec: rr(0.25, 0.6) })
+      : stabV('trig.g6', null, { chord: rpick([1, 1, 0, 4, 5]), cut: rexp(700, 1800), env: rr(0.3, 0.6), dec: rr(0.15, 0.35) });
+    set('stab', 'sound', rh ? 1 : 0); set('stab', 'trem', rh ? rr(0.1, 0.45) : 0); if (rh) set('stab', 'voice', rr(0.2, 0.7));
     con(stab, 'duck.inR'); con('duck.R', 'mix6.in3'); con('duck.R', 'delay.in');
     set('duck', 'depth', rr(0.4, 0.65)); set('duck', 'rel', rr(0.2, 0.4)); set('duck', 'shape', rr(0.3, 0.6));
     con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 0.75, 1.5, 0.5]), rr(0.25, 0.45));

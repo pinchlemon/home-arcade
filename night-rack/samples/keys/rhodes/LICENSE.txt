@@ -1,0 +1,7 @@
+Rhodes electric piano for STAB (KEYS mode) and BAND.
+Source: jRhodes3d by Jeff Learman, a 1977 Rhodes Mark I Stage 73, github.com/sfzinstruments/jlearman.jRhodes3d
+Samples: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/). Credit: Jeff Learman. Shared here non-commercially.
+Music you make with them: CC0, per the author ("You can use the sounds in any way in your works as an artist").
+To ship the samples in a paid product, ask the author for a license.
+  {note}s.m4a = soft layer (jRhodes3d-mono _4), {note}h.m4a = hard layer with bark (_2). note = MIDI.
+Processing: cut to 6 s with a fade, -3 dB, mono, AAC 80k.
