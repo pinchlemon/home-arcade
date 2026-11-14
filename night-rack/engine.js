@@ -879,16 +879,21 @@ class Field extends DSP {
 
 
 // ---------------------------------------------------------------- mixing side (right rack): BLEND, SWEEP, ECHO, PUMP (= Duck), SUB
-class Blend extends DSP { // two stereo decks, equal-power crossfade, per-deck level, master
+class Blend extends DSP { // two stereo decks, equal-power crossfade, per-deck level, master; MATCH evens out the decks' loudness so a blend never jumps in volume
   static IN = ['aL', 'aR', 'bL', 'bR']; static OUT = ['L', 'R'];
-  constructor(e) { super(e); this.x = this.p.blend ?? 0; }
+  constructor(e) { super(e); this.x = 0; this.ms = [2, 2]; this.g = [1, 1]; }
   process(n) {
     const I = this.in, AL = I.aL, AR = this.has.aR ? I.aR : I.aL, BL = I.bL, BR = this.has.bR ? I.bR : I.bL, OL = this.out.L, OR = this.out.R;
-    const la = this.p.lvlA ?? 0.8, lb = this.p.lvlB ?? 0.8, m = this.p.master ?? 0.9, tgt = clamp01(this.p.blend ?? 0), k = 1 - Math.exp(-1 / (0.03 * this.sr));
+    const la = this.p.lvlA ?? 0.8, lb = this.p.lvlB ?? 0.8, m = this.p.master ?? 0.9, tgt = clamp01(this.p.blend ?? 0), k = 1 - Math.exp(-1 / (0.03 * this.sr)), match = (this.p.match ?? 1) > 0.5;
+    // loudness of each deck over ~3 s; gain toward a common level, within +-6 dB, moving slowly
+    const S = [[AL, AR], [BL, BR]];
+    for (let d = 0; d < 2; d++) { let e = 0; const [l, r] = S[d]; for (let i = 0; i < n; i++) e += l[i] * l[i] + r[i] * r[i]; e /= 2 * n;
+      if (e > 1e-5) this.ms[d] += (e - this.ms[d]) * (n / (3 * this.sr));
+      const want = match ? Math.min(2, Math.max(0.5, 1.6 / Math.sqrt(this.ms[d] + 1e-9))) : 1; this.g[d] += (want - this.g[d]) * (n / (1.5 * this.sr)); }
     let pa = 0, pb = 0;
-    for (let i = 0; i < n; i++) { this.x += (tgt - this.x) * k; const ga = Math.cos(this.x * Math.PI / 2) * la * m * 1.25, gb = Math.sin(this.x * Math.PI / 2) * lb * m * 1.25;
+    for (let i = 0; i < n; i++) { this.x += (tgt - this.x) * k; const ga = Math.cos(this.x * Math.PI / 2) * la * m * 1.25 * this.g[0], gb = Math.sin(this.x * Math.PI / 2) * lb * m * 1.25 * this.g[1];
       OL[i] = AL[i] * ga + BL[i] * gb; OR[i] = AR[i] * ga + BR[i] * gb; const a = Math.abs(AL[i] * ga), b = Math.abs(BL[i] * gb); if (a > pa) pa = a; if (b > pb) pb = b; }
-    this.flash('a', pa * 0.2); this.flash('b', pb * 0.2); this.peak('vu', OL, n); this.L.x = this.x;
+    this.flash('a', pa * 0.2); this.flash('b', pb * 0.2); this.peak('vu', OL, n); this.L.x = this.x; this.L.g = this.g;
   }
 }
 class SVF2 { // TPT state-variable filter
@@ -967,6 +972,7 @@ export class Engine {
     else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
     else if (m.t === 'con') { this.cables.set(m.c, m); this.dirty = true; }
     else if (m.t === 'dis') { this.cables.delete(m.c); this.dirty = true; }
+    else if (m.t === 'sleep') { for (const id of m.ids) { const d = this.mods.get(id); if (!d) continue; d.sleep = m.on; if (m.on) for (const k in d.out) d.out[k].fill(0); } } // a resting deck costs nothing
   }
   rebuild() {
     const deps = new Map();
@@ -985,6 +991,7 @@ export class Engine {
   process(n) {
     if (this.dirty) this.rebuild();
     for (const d of this.order) {
+      if (d.sleep) continue;
       d.process(n);
       for (const k in d.out) { const o = d.out[k]; for (let i = 0; i < n; i++) { const x = o[i]; if (x > 10 || x < -10) { const a = x > 0 ? x : -x; o[i] = (x > 0 ? 1 : -1) * (10 + 1.8 * Math.tanh((a - 10) / 1.8)); } } }
     }

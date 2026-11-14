@@ -163,6 +163,9 @@ body.cam #cambar{display:flex}
   <div class="sec">NEW RANDOM PATCH</div>
   <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rSurp">SURPRISE</button></div>
   <div class="muted" style="margin-top:6px">Rewires the whole rack into a new playable patch. Press R to roll again.</div>
+  <div class="sec">DECKS</div>
+  <div class="chips"><button id="rBlend">BLEND TO DECK B</button></div>
+  <div class="muted" style="margin-top:6px">Builds a new patch in the same style and key on the resting deck (the left rack is deck B), then fades over to it. BLEND's BARS knob sets how long.</div>
   <div class="sec">KNOBS ONLY</div>
   <div class="chips"><button id="rShuf">SHUFFLE</button><button id="rNudge">NUDGE</button></div>
   <div class="muted" style="margin-top:6px">Turns the knobs on patched modules. Shuffle goes anywhere sensible; nudge makes small moves.</div>
@@ -554,7 +557,7 @@ if (LAYOUT_ISSUES.length) console.warn('layout2:', LAYOUT_ISSUES.join(' | '));
 DEFS.blend = lay('BLEND', 16, 'silver',
   [[kn('blend', 'A · B', 'L', { def: 0, fmt: v => v < 0.02 ? 'DECK A' : v > 0.98 ? 'DECK B' : 'A ' + Math.round((1 - v) * 100) + ' · B ' + Math.round(v * 100) })],
    [kn('lvlA', 'DECK A', 'M', { def: 0.8, fmt: fPct }), kn('lvlB', 'DECK B', 'M', { def: 0.8, fmt: fPct })],
-   [kn('master', 'MASTER', 'S', { def: 0.9, fmt: fPct }), ld('a', 'cyan', 'A'), ld('b', 'amber', 'B')]],
+   [kn('master', 'MASTER', 'S', { def: 0.9, fmt: fPct }), kn('bars', 'BARS', 'S', { min: 0, max: 2, def: 1, step: 1, fmt: v => [16, 32, 64][v] + ' BARS' }), ld('a', 'cyan', 'A'), ld('b', 'amber', 'B')]],
   [[ji('aL', 'A L', 'audio'), ji('aR', 'A R', 'audio'), ji('bL', 'B L', 'audio'), ji('bR', 'B R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.sweep = lay('SWEEP', 12, 'black',
   [[kn('pos', 'SWEEP', 'L', { min: -1, max: 1, def: 0, fmt: v => Math.abs(v) < 0.02 ? 'OPEN' : (v < 0 ? 'LOW-PASS ' : 'HIGH-PASS ') + Math.round(Math.abs(v) * 100) + '%' })],
@@ -575,15 +578,19 @@ DEFS.sub = lay('SUB', 12, 'black',
 const BLANK = (hp, theme) => { const k = 'blank_' + hp + theme; DEFS[k] = DEFS[k] || { title: '', hp, theme, knobs: [], jacks: [], logo: true }; return k; };
 let blankN = 0; const bl = (hp, theme) => ['bk' + blankN++, BLANK(hp, theme)];
 const ROWM = [['keys', 'keys'], ['sampler', 'sampler'], bl(20, 'navy'), bl(16, 'silver'), bl(12, 'black')];
-// side racks: real rows, top down. Right = mixing (its top two rows; the rows below stay painted until they get modules). Left = deck B, coming next (painted for now).
-const WROWS = {
-  R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], bl(10, 'navy'), bl(8, 'silver')],
-      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], bl(20, 'navy'), bl(16, 'black')]] };
+// side racks: real rows, top down. Right = mixing (its top two rows; the rows below stay painted until they get modules). Left = deck B, a mirror of the middle rack's sound makers.
+
 const ROWD = [['trig', 'trigseq'], ['drums', 'drums'], ['mix6', 'mix6'], ['duck', 'duck'], ['blank5', 'blank8c']];
 
 const ROWT = [['macro', 'macro'], ['texture', 'texture'], ['folder', 'folder'], ['lpg', 'lpg'], ['turing', 'turing'], ['atten', 'atten'], ['field', 'field'], ['blank4b', 'blank6b']];
 const ROW0 = [['clock', 'clock'], ['rnd', 'random'], ['quant', 'quant'], ['vcoA', 'vcoA'], ['vcoB', 'vcoB'], ['lfo', 'lfo'], ['mix', 'mixer'], ['noise', 'noise'], ['scope', 'scope'], ['blank1', 'blank6']];
 const ROW1 = [['seq', 'seq'], ['vcfA', 'vcfA'], ['vcfB', 'vcfB'], ['env', 'env'], ['vca', 'vca'], ['delay', 'delay'], ['verb', 'reverb'], ['out', 'output'], ['blank2', 'blank4']];
+const DECK_SHARED = new Set(['clock', 'scope', 'out', 'keys']);
+const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^blank/.test(type) ? bl(DEFS[type].hp, DEFS[type].theme === 'silver' ? 'navy' : DEFS[type].theme) : [id + '_b', type]);
+const WROWS = {
+  L: [ROWX, ROWT, ROW0, ROW1, ROWD, ROWM].map(mirrorRow),
+  R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], bl(10, 'navy'), bl(8, 'silver')],
+      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], bl(20, 'navy'), bl(16, 'black')]] };
 const DEFAULT_PATCH = [
   ['clock.d2', 'rnd.trig', '#35e0ff'], ['rnd.step', 'quant.in', '#3b6cff'], ['quant.out', 'vcoA.voct', '#e8eef8'], ['quant.trig', 'env.trig1', '#ff7a2e'],
   ['vcoA.saw', 'vcfA.in', '#5aa9ff'], ['vcfA.lp', 'vca.in1', '#2c3f7a'], ['env.env1', 'vca.cv1', '#ffcf3a'], ['env.env1', 'vcfA.cv2', '#ffcf3a'],
@@ -2034,6 +2041,7 @@ function loadPatch(P) {
     const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
+  DECK.blending = null; deckRestore();
   autosave();
 }
 function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
@@ -2269,9 +2277,8 @@ function genPatch(style, wild) {
   set('verb', 'level', 1);
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
   { const dance = style === 'house' || style === 'dnb' || style === 'tinez', kil = style === 'kiln';
-    con(fL, 'keys.inL'); con(fR, 'keys.inR');
-    // mixing side: BLEND -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
-    con('keys.L', 'blend.aL'); con('keys.R', 'blend.aR'); con('blend.L', 'sweep.inL'); con('blend.R', 'sweep.inR'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
+    // mixing side: deck -> BLEND -> KEYS (played live, always heard) -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
+    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'keys.inL'); con('blend.R', 'keys.inR'); con('keys.L', 'sweep.inL'); con('keys.R', 'sweep.inR'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
     con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
     { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
     set('blend', 'blend', 0); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('sweep', 'pos', 0); set('sweep', 'res', rr(0.2, 0.4));
@@ -2312,13 +2319,52 @@ function shuffleKnobs(amount) {
     else if (!kn.def.step || Math.random() < 0.25) tweenKnob(kn, clamp(kn.norm + (Math.random() + Math.random() - 1) * amount, r[0], r[1])); } }
   if (window.__noRender) autosave(); toast(amount >= 1 ? 'Knobs shuffled' : 'Knobs nudged', true);
 }
+// ---- decks: A = middle rack, B = left rack (same ids + '_b'); BLEND crossfades between them
+let DECK_IDS = null; const DECK = { live: 'A', blending: null, style: (() => { try { return localStorage.getItem('nightrack.style') || 'house'; } catch (e) { return 'house'; } })() };
+const deckIds = d => { if (!DECK_IDS) DECK_IDS = Object.keys(modById).filter(id => modById[id + '_b']); return d === 'B' ? DECK_IDS.map(id => id + '_b') : DECK_IDS; };
+function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one deck: its own modules, fed into BLEND's A or B inputs
+  const base = new Set(deckIds('A')), sfx = d === 'B' ? '_b' : '', side = d === 'B' ? 'b' : 'a', map = pth => { const [m, q] = pth.split('.'); return base.has(m) ? m + sfx + '.' + q : pth; };
+  const cables = [], knobs = {};
+  for (const [a, b, col, len] of P.cables) { const am = a.split('.')[0], bm = b.split('.')[0];
+    if (b === 'blend.aL' || b === 'blend.aR') cables.push([map(a), 'blend.' + side + b.slice(-1), col, len]);
+    else if (base.has(bm)) cables.push([base.has(am) ? map(a) : a, map(b), col, len]); }
+  for (const m in P.knobs) if (base.has(m)) knobs[m + sfx] = P.knobs[m];
+  return { cables, knobs };
+}
+function deckSleep(d, on) { DECK['sleep' + d] = on; send({ t: 'sleep', ids: deckIds(d), on }); }
+function loadDeck(d, P) { // replace one deck's patch, leaving the other deck and the mixing side alone
+  const ids = new Set(deckIds(d)), side = d === 'B' ? 'b' : 'a'; loading = true;
+  try {
+    for (const c of [...cables]) if (c.ends.some(e => e.port && (ids.has(e.port.module.id) || (e.port.module.id === 'blend' && e.port.dir === 'in' && e.port.id[0] === side)))) removeCable(c);
+    for (const id of ids) { const m = modById[id]; for (const k in m.knobs) { const kn = m.knobs[k], v = P.knobs[id] && P.knobs[id][k]; kn.set(v == null ? kn.defNorm : kn.toNorm(v)); } }
+    const r = mulberry32(11); for (const [a, b, col] of P.cables) { try { patchCable(a, b, col, r() < 0.4 ? 1 : 0); } catch (e) { } }
+    for (let i = 0; i < 200; i++) physics(1 / 120);
+  } finally { loading = false; }
+  autosave();
+}
+function blendNext() { // build a fresh patch (same style, same key) on the resting deck, then fade over to it
+  if (DECK.blending) { toast('A blend is already running', true); return; }
+  const from = DECK.live, to = from === 'A' ? 'B' : 'A', P = deckPatch(genPatch(DECK.style || 'house', rr(0, 0.3)), to);
+  const oq = modById[from === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
+  P.knobs[qk] = { ...(P.knobs[qk] || {}), scale: oq.v('scale'), root: oq.v('root'), oct: oq.v('oct') };
+  loadDeck(to, P); deckSleep(to, false); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
+  const bm = modById.blend, bars = [16, 32, 64][bm.v('bars')] || 32, sec = bars * 4 * 60 / (modById.clock.v('tempo') || 120);
+  DECK.blending = { from, to, t0: performance.now() / 1000, sec, x0: bm.v('blend'), x1: to === 'B' ? 1 : 0 };
+  toast('Blending to deck ' + to + ' over ' + bars + ' bars', true); blendBtn();
+}
+function blendTick() { const B = DECK.blending; if (!B) return; const t = clamp((performance.now() / 1000 - B.t0) / B.sec, 0, 1), e = t * t * (3 - 2 * t);
+  modById.blend.knobs.blend.set(B.x0 + (B.x1 - B.x0) * e);
+  if (t >= 1) { DECK.blending = null; DECK.live = B.to; deckSleep(B.from, true); blendBtn(); toast('Deck ' + B.to + ' is playing', true); } }
+function deckRestore() { const x = modById.blend.v('blend'), lv = x > 0.5 ? 'B' : 'A'; DECK.live = lv; modById.blend.knobs.blend.set(lv === 'B' ? 1 : 0); deckSleep(lv === 'A' ? 'B' : 'A', true); deckSleep(lv, false); blendBtn(); }
+function blendBtn() { const b = document.getElementById('rBlend'); if (b) b.textContent = DECK.blending ? 'BLENDING TO ' + DECK.blending.to + '…' : 'BLEND TO DECK ' + (DECK.live === 'A' ? 'B' : 'A'); }
 function randomPatch(style) {
   pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
-  loadPatch(genPatch(s, wild)); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
+  DECK.style = s; try { localStorage.setItem('nightrack.style', s); } catch (e) { } loadPatch(genPatch(s, wild)); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
   toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
 }
 function undoRandom() { const P = RND.undo.pop(); if (!P) return; RND.tw = []; loadPatch(P); document.getElementById('rUndo').disabled = !RND.undo.length; toast('Undone', true); }
-Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom });
+Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom, blendNext, deckPatch, DECK });
+document.getElementById('rBlend').onclick = () => blendNext();
 document.getElementById('rAmb').onclick = () => randomPatch('ambient');
 document.getElementById('rHouse').onclick = () => randomPatch('house');
 document.getElementById('rDnb').onclick = () => randomPatch('dnb');
@@ -2809,6 +2855,7 @@ async function startEngine() {
     ENG = { post: ms => ms.forEach(m => e.handle(m)), node, kind: 'fallback' };
   }
   for (const m of modules) if (m.type in CLASSES) engineAdd(m);
+  deckRestore();
   for (const m of modules) if (m.type === 'sampler') loadKit(m); else if (m.type === 'mbira' || m.type === 'field') loadSet(m);
   for (const c of cables) if (c.connected) { c.uid = cableUid++; send({ t: 'con', c: c.uid, om: c.out.module.id, op: c.out.id, im: c.inp.module.id, ip: c.inp.id }); }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -6; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.25;
@@ -2902,7 +2949,7 @@ let desk = null;
 async function main() {
   try { await Promise.race([Promise.all([document.fonts.load(`700 40px "Space Grotesk"`), document.fonts.load(`600 40px "Space Grotesk"`), document.fonts.load(`500 40px "Space Grotesk"`)]), new Promise(r => setTimeout(r, 2500))]); } catch (e) { }
   buildRack();
-  const near = [buildDecor(84, NROWS, 23, new THREE.Vector3(-CASE_W / 2 - 2.4, 0, 0), 0.55, 'right')];
+  const near = [];
   for (const k in WING) { const W = WING[k], r = NROWS - W.rows; if (r > 0) near.push(buildDecor(84, r, k === 'R' ? 37 : 23, new THREE.Vector3(0, 0, 0), 0, 'left', false, { parent: W.inner })); }
   buildScopes();
   buildHall();
@@ -2920,6 +2967,7 @@ async function main() {
 let lastTs = 0, acc = 0;
 const decorCol = new THREE.Color();
 function frame(ts) {
+  blendTick();
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016); lastTs = ts; pollPad(dt);
   DANCE.v = SET.dance && AC && AC.state === 'running' ? G.beat.level(ts / 1000, 0.13) : DANCE.v * 0.9;
