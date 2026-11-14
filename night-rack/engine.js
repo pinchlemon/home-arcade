@@ -877,7 +877,84 @@ class Field extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field };
+
+// ---------------------------------------------------------------- mixing side (right rack): BLEND, SWEEP, ECHO, PUMP (= Duck), SUB
+class Blend extends DSP { // two stereo decks, equal-power crossfade, per-deck level, master
+  static IN = ['aL', 'aR', 'bL', 'bR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.x = this.p.blend ?? 0; }
+  process(n) {
+    const I = this.in, AL = I.aL, AR = this.has.aR ? I.aR : I.aL, BL = I.bL, BR = this.has.bR ? I.bR : I.bL, OL = this.out.L, OR = this.out.R;
+    const la = this.p.lvlA ?? 0.8, lb = this.p.lvlB ?? 0.8, m = this.p.master ?? 0.9, tgt = clamp01(this.p.blend ?? 0), k = 1 - Math.exp(-1 / (0.03 * this.sr));
+    let pa = 0, pb = 0;
+    for (let i = 0; i < n; i++) { this.x += (tgt - this.x) * k; const ga = Math.cos(this.x * Math.PI / 2) * la * m * 1.25, gb = Math.sin(this.x * Math.PI / 2) * lb * m * 1.25;
+      OL[i] = AL[i] * ga + BL[i] * gb; OR[i] = AR[i] * ga + BR[i] * gb; const a = Math.abs(AL[i] * ga), b = Math.abs(BL[i] * gb); if (a > pa) pa = a; if (b > pb) pb = b; }
+    this.flash('a', pa * 0.2); this.flash('b', pb * 0.2); this.peak('vu', OL, n); this.L.x = this.x;
+  }
+}
+class SVF2 { // TPT state-variable filter
+  constructor() { this.a = 0; this.b = 0; }
+  run(x, g, k) { const h = (x - (k + g) * this.a - this.b) / (1 + g * (k + g)), bp = g * h + this.a, lp = g * bp + this.b; this.a = g * h + bp; this.b = g * bp + lp; this.h = h; this.bp = bp; return lp; }
+}
+class Sweep extends DSP { // one-knob DJ filter: left = low-pass closing down, right = high-pass opening up, centre = clean
+  static IN = ['inL', 'inR', 'cv']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.f = [new SVF2(), new SVF2()]; this.pos = 0; }
+  process(n) {
+    const I = this.in, IL = I.inL, IR = this.has.inR ? I.inR : I.inL, CV = I.cv, hc = this.has.cv, OL = this.out.L, OR = this.out.R, sr = this.sr;
+    const res = this.p.res ?? 0.3, k = 2 - 1.85 * res, sm = 1 - Math.exp(-1 / (0.02 * sr)), base = this.p.pos ?? 0;
+    for (let i = 0; i < n; i++) {
+      const tgt = Math.max(-1, Math.min(1, base + (hc ? CV[i] * 0.1 : 0))); this.pos += (tgt - this.pos) * sm; const p = this.pos, a = Math.abs(p);
+      if (a < 0.02) { OL[i] = IL[i]; OR[i] = IR[i]; this.f[0].a = this.f[0].b = this.f[1].a = this.f[1].b = 0; continue; }
+      const fc = p < 0 ? 20000 * Math.pow(110 / 20000, a) : 18 * Math.pow(7000 / 18, a), g = Math.tan(Math.PI * Math.min(fc, sr * 0.45) / sr), w = Math.min(1, (a - 0.02) * 12);
+      const l = this.f[0].run(IL[i], g, k), r = this.f[1].run(IR[i], g, k), yl = p < 0 ? l : this.f[0].h, yr = p < 0 ? r : this.f[1].h;
+      OL[i] = IL[i] + (yl - IL[i]) * w; OR[i] = IR[i] + (yr - IR[i]) * w;
+    }
+    this.L.pos = this.pos;
+  }
+}
+class Echo extends DSP { // tape echo synced to the CLOCK tempo: wobble, darkening repeats, ping-pong spread
+  static IN = ['inL', 'inR', 'clock']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); const N = Math.ceil(e.sr * 2.6); this.dl = new DLine(N); this.dr = new DLine(N); this.d = e.sr * 0.375; this.ph = 0; this.lp = [0, 0]; this.hp = [0, 0]; }
+  process(n) {
+    const P = this.p, sr = this.sr, I = this.in, IL = I.inL, IR = this.has.inR ? I.inR : I.inL, OL = this.out.L, OR = this.out.R;
+    const ck = this.e.mods.get('clock'), bpm = (ck && ck.p.tempo) || 120, DIV = [0.25, 0.5, 0.75, 1, 1.5, 2], beats = DIV[Math.round(P.div ?? 2)] ?? 0.75, tgt = Math.min(2.5 * sr, beats * 60 / bpm * sr);
+    const fb = Math.min(0.92, P.fb ?? 0.4), mix = P.mix ?? 0.25, wow = (P.wow ?? 0.3) * 0.0025 * sr, spread = P.spread ?? 0.6;
+    const lc = 1 - Math.exp(-6.2832 * (900 + 9000 * Math.pow(P.tone ?? 0.5, 2)) / sr), hc = 1 - Math.exp(-6.2832 * 180 / sr), sm = 1 - Math.exp(-1 / (0.25 * sr));
+    let pk = 0;
+    for (let i = 0; i < n; i++) {
+      this.d += (tgt - this.d) * sm; this.ph += 0.6 / sr; if (this.ph > 1) this.ph -= 1;
+      const dd = Math.max(4, this.d + wow * Math.sin(6.2832 * this.ph)), wl = this.dl.readf(dd), wr = this.dr.readf(dd);
+      for (const [j, w] of [[0, wl], [1, wr]]) { this.lp[j] += lc * (w - this.lp[j]); this.hp[j] += hc * (this.lp[j] - this.hp[j]); }
+      const yl = Math.tanh((this.lp[0] - this.hp[0]) * 0.25) * 4, yr = Math.tanh((this.lp[1] - this.hp[1]) * 0.25) * 4, inm = (IL[i] + IR[i]) * 0.5, s = spread;
+      this.dl.write(IL[i] + (inm - IL[i]) * s + (yl + (yr - yl) * s) * fb); this.dr.write(IR[i] * (1 - s) + (yr + (yl - yr) * s) * fb);
+      OL[i] = IL[i] + yl * mix; OR[i] = IR[i] + yr * mix; const a = Math.abs(yl); if (a > pk) pk = a;
+    }
+    this.flash('led', pk * 0.25 * mix * 4);
+  }
+}
+class Sub extends DSP { // low end: everything below the crossover in mono, a clean octave-down sub, a rumble cut and a low trim
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.lp = [0, 0, 0, 0]; this.sl = [0, 0, 0]; this.sg = 1; this.prev = 0; this.hp = [0, 0, 0, 0]; this.env = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, I = this.in, IL = I.inL, IR = this.has.inR ? I.inR : I.inL, OL = this.out.L, OR = this.out.R;
+    const xo = P.xo ?? 120, c = 1 - Math.exp(-6.2832 * xo / sr), sub = P.sub ?? 0, tight = P.tight ?? 30, ht = Math.exp(-6.2832 * tight / sr), low = Math.pow(10, (P.low ?? 0) / 20), sc = 1 - Math.exp(-6.2832 * 70 / sr);
+    let pk = 0;
+    for (let i = 0; i < n; i++) {
+      let l = IL[i], r = IR[i];
+      // rumble cut (2-pole high-pass at TIGHT)
+      for (let j = 0; j < 2; j++) { const x = j ? r : l, y = ht * (this.hp[j * 2 + 1] + x - this.hp[j * 2]); this.hp[j * 2] = x; this.hp[j * 2 + 1] = y; if (j) r = y; else l = y; }
+      // split at XO (two cascaded one-poles), lows summed to mono
+      this.lp[0] += c * (l - this.lp[0]); this.lp[1] += c * (this.lp[0] - this.lp[1]); this.lp[2] += c * (r - this.lp[2]); this.lp[3] += c * (this.lp[2] - this.lp[3]);
+      const lowM = (this.lp[1] + this.lp[3]) * 0.5;
+      // octave-down sub: flip a sign on every rising zero crossing of the low band, follow its level, smooth hard
+      const z = this.lp[1] + this.lp[3]; if (this.prev <= 0 && z > 0) this.sg = -this.sg; this.prev = z; this.env += (Math.abs(lowM) - this.env) * 0.002;
+      this.sl[0] += sc * (this.sg * this.env * 1.6 - this.sl[0]); this.sl[1] += sc * (this.sl[0] - this.sl[1]); this.sl[2] += sc * (this.sl[1] - this.sl[2]);
+      const lo = (lowM + this.sl[2] * sub) * low; OL[i] = l - this.lp[1] + lo; OR[i] = r - this.lp[3] + lo; const a = Math.abs(lo); if (a > pk) pk = a;
+    }
+    this.flash('led', pk * 0.2);
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
