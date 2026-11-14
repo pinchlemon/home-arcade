@@ -2742,6 +2742,7 @@ document.getElementById('bookExp').onclick = () => { const a = document.createEl
 document.getElementById('bookImp').onclick = () => { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = async () => { try { const d = JSON.parse(await f.files[0].text()); BOOK.kept = {}; BOOK.skipped = {}; for (const k of d.kept || []) BOOK.kept[k] = true; for (const k of d.skipped || []) BOOK.skipped[k] = true; saveBook(); renderBook(); toast('Songbook loaded', true); } catch (e) { toast('That file is not a songbook'); } }; f.click(); };
 document.getElementById('bookClr').onclick = () => { BOOK.kept = {}; saveBook(); renderBook(); };
 Object.assign(window, { auditionTune, renderBook, BOOK });
+setTimeout(() => Object.assign(window, { noteOn, noteOff }));
 document.getElementById('bBook').onclick = () => { const el = document.getElementById('book'); el.classList.toggle('hide'); if (!el.classList.contains('hide')) renderBook(); ['patches', 'scene', 'help', 'rand', 'kits'].forEach(id => { const x = document.getElementById(id); if (x) x.classList.add('hide'); }); };
 document.getElementById('bRand').onclick = () => { document.getElementById('rand').classList.toggle('hide'); ['patches', 'scene', 'help'].forEach(id => document.getElementById(id).classList.add('hide')); };
 addEventListener('keydown', e => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey) return; if (e.key === 'r' || e.key === 'R') randomPatch(RND.style); if ((e.key === 'z' || e.key === 'Z')) undoRandom(); });

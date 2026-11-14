@@ -803,16 +803,19 @@ class Limit extends DSP { // drive + high-frequency exciter + look-ahead brick-w
 
 // ---------------------------------------------------------------- KEYS: play from MIDI, a computer keyboard or the touch keys
 // 8-voice synth with several sounds, mixed over an audio thru, plus mono CV outs (last-note priority). Pitch bend ±2, mod wheel = vibrato.
-export const KEY_SOUNDS = ['E.PIANO', 'ORGAN', 'PAD', 'STRINGS', 'PLUCK', 'BELL', 'LEAD', 'SUB BASS'];
+export const KEY_SOUNDS = ['E.PIANO', 'ORGAN', 'PAD', 'STRINGS', 'PLUCK', 'BELL', 'LEAD', 'SUB BASS', 'RHODES'];
 class Keys extends DSP {
   static IN = ['inL', 'inR']; static OUT = ['voct', 'gate', 'vel', 'mod', 'L', 'R'];
-  constructor(e) { super(e); this.V = Array.from({ length: 8 }, () => ({ n: -1, on: false, a: 0, rel: false, ph: [0, 0, 0], mph: 0, ix: 0, vel: 0, age: 0, l1: 0, l2: 0, ks: null, kp: 0, kl: 0, kz: 0, fe: 0 }));
+  constructor(e) { super(e); this.V = Array.from({ length: 12 }, () => ({ n: -1, on: false, a: 0, rel: false, ph: [0, 0, 0], mph: 0, ix: 0, vel: 0, age: 0, l1: 0, l2: 0, ks: null, kp: 0, kl: 0, kz: 0, fe: 0 }));
     this.stack = []; this.cv = 0; this.vl = 0; this.md = 0; this.gap = 0; this.sus = false; this.tp = 0; this.bend = 0; this.vib = 0; }
   note(n, v) {
     if (v > 0) {
       this.stack = this.stack.filter(x => x !== n); this.stack.push(n); this.cv = (n - 60) / 12; this.vl = v / 127 * 10; if (this.stack.length > 1) this.gap = 48;
       let vo = this.V.find(x => x.n === n) || this.V.find(x => x.a < 0.0005 && !x.on) || this.V.reduce((a, b) => (a.age > b.age ? a : b));
       vo.n = n; vo.on = true; vo.rel = false; vo.vel = v / 127; vo.ix = 1; vo.age = 0; vo.fe = 1; if (vo.a < 0.001) { vo.ph = [Math.random(), Math.random(), Math.random()]; vo.mph = 0; vo.l1 = vo.l2 = 0; }
+      vo.sm = null; if ((this.p.sound | 0) === 8) { const Z = this.e.zones && this.e.zones.rhodes, m = n + (this.p.oct | 0) * 12, vv = v / 127;
+        if (Z) { const pick = lay => { let b = null; for (const z of Z) if (z.lay === lay && (!b || Math.abs(z.note - m) < Math.abs(b.note - m))) b = z; return b; };
+          const hard = Math.min(1, Math.max(0, (vv - 0.3) / 0.6)); vo.sm = [['s', 1 - hard], ['h', hard]].filter(([, g]) => g > 0.02).map(([l, g]) => { const z = pick(l); return z && { d: z.data, pos: 0, k: z.sr / (440 * Math.pow(2, (z.note - 69) / 12)), g }; }).filter(Boolean); vo.a = 1; vo.l1 = vo.l2 = 0; } }
       if ((this.p.sound | 0) === 4) { const f = 440 * Math.pow(2, (n + (this.p.oct | 0) * 12 - 69) / 12), L = Math.max(4, this.sr / f); if (!vo.ks || vo.ks.length < L + 4) vo.ks = new Float32Array(Math.ceil(L) + 8); vo.kl = L; vo.kp = 0; vo.kz = 0; const b = 0.3 + (this.p.tone ?? 0.5) * 0.7; let lp = 0; for (let i = 0; i < vo.ks.length; i++) { const x = Math.random() * 2 - 1; lp += (x - lp) * b; vo.ks[i] = lp * (0.4 + 0.6 * vo.vel); } vo.a = 1; }
       this.flash('act', 1);
     } else {
@@ -831,11 +834,12 @@ class Keys extends DSP {
     let act = 0;
     for (let i = 0; i < n; i++) {
       this.tp += 4.5 / sr; if (this.tp > 1) this.tp -= 1; this.vib += 5.6 / sr; if (this.vib > 1) this.vib -= 1;
-      const pan = Math.sin(TAU * this.tp) * (snd === 0 ? trem : trem * 0.3), pm = Math.pow(2, (this.bend + Math.sin(TAU * this.vib) * vibD) / 12);
+      const pan = Math.sin(TAU * this.tp) * (snd === 0 || snd === 8 ? trem : trem * 0.3), pm = Math.pow(2, (this.bend + Math.sin(TAU * this.vib) * vibD) / 12);
       let l = 0, r = 0;
-      for (let k = 0; k < 8; k++) { const v = this.V[k]; if (v.n < 0) continue;
+      for (let k = 0; k < this.V.length; k++) { const v = this.V[k]; if (v.n < 0) continue;
         const hold = v.on || this.sus;
-        if (snd !== 4) { if (hold && !v.rel && v.age < atk * sr) v.a = Math.min(1, v.a + kA); else if (hold) v.a *= decaying ? kD : 1; else v.a *= kR; }
+        if (snd === 8) { if (!hold) v.a *= kR; }
+        else if (snd !== 4) { if (hold && !v.rel && v.age < atk * sr) v.a = Math.min(1, v.a + kA); else if (hold) v.a *= decaying ? kD : 1; else v.a *= kR; }
         else v.a *= hold ? 1 : kR;
         v.age++; if (v.a < 1e-4 && !v.on && v.age > 64) { v.n = -1; continue; }
         const f = fr[k] * pm; let x = 0;
@@ -848,6 +852,9 @@ class Keys extends DSP {
           v.l1 += g * (s2 * 0.4 - v.l1); v.l2 += g * (v.l1 - v.l2); x = v.l2 * (snd === 2 ? 1.1 : 1); }
         else if (snd === 4) { const L = v.kl / pm, len = v.ks.length; let rp = v.kp - L; while (rp < 0) rp += len; const i0 = rp | 0, fr2 = rp - i0, y = v.ks[i0 % len] * (1 - fr2) + v.ks[(i0 + 1) % len] * fr2;
           const out = (y + v.kz) * 0.5 * (0.982 + 0.0175 * (P.decay ?? 0.45)); v.kz = y; v.ks[v.kp % len] = out; v.kp = (v.kp + 1) % len; x = y * 1.4; }
+        else if (snd === 8) { let s2 = 0, live = false; if (v.sm) for (const q of v.sm) { const p0 = q.pos | 0; if (p0 + 1 >= q.d.length) continue; live = true;
+            s2 += (q.d[p0] + (q.d[p0 + 1] - q.d[p0]) * (q.pos - p0)) * q.g; q.pos += f * q.k; }
+          if (!live) { v.a = 0; v.on = false; } const g = 1 - Math.exp(-TAU * Math.min(0.45 * sr, 1200 + tone * tone * 16000) / sr); v.l1 += g * (s2 - v.l1); v.l2 += g * (v.l1 - v.l2); x = v.l2 * 1.6; }
         else if (snd === 5) { v.ix *= kI; v.mph += f * 3.5; if (v.mph > 1) v.mph -= 1; v.ph[0] += f; if (v.ph[0] > 1) v.ph[0] -= 1; x = Math.sin(TAU * v.ph[0] + (0.5 + tone * 2.5) * (0.4 + 0.6 * v.ix) * Math.sin(TAU * v.mph)); }
         else { v.ph[0] += f; if (v.ph[0] > 1) v.ph[0] -= 1; const t = v.ph[0]; x = Math.sin(TAU * t) * 0.9 + tone * 0.35 * (2 * t - 1 - blep(t, f)); x = Math.tanh(x * (1 + tone)); }
         x *= v.a * (0.4 + 0.6 * v.vel); l += x; r += x; act++; }
