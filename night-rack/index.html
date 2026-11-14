@@ -40,7 +40,9 @@ button.on{color:#021018;background:var(--acc);border-color:var(--acc)}
 #toast{bottom:22px;left:50%;transform:translateX(-50%);font-size:13px;padding:9px 14px;border-radius:8px;background:rgba(36,10,22,.88);border:1px solid rgba(255,90,120,.45);opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
 #toast.ok{background:rgba(6,26,40,.9);border-color:rgba(79,216,255,.45)}
 #patches{top:58px;right:14px;width:290px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-#patches.hide,#rand.hide,#kits.hide{display:none}
+#patches.hide,#rand.hide,#kits.hide,#book.hide{display:none}
+#book{top:58px;right:14px;width:300px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#book .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:0 0 7px}#book .muted{color:var(--dim);margin-bottom:8px;line-height:1.4}#book .t{display:flex;align-items:center;gap:6px;margin:3px 0;padding:3px 4px;border-radius:6px}#book .t.on{background:rgba(255,211,107,.12)}#book .t span{flex:1;color:#e8eef8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#book .t small{color:var(--dim);font-size:10px;margin-left:4px}#book .t button{padding:4px 8px;font-size:12px;min-width:30px}#book .t button.kept{color:#ffd36b;border-color:#ffd36b}#book .t.skip span{opacity:.4;text-decoration:line-through}#book .chips{display:flex;flex-wrap:wrap;gap:5px}#book .chips button{padding:5px 9px;font-size:11px}
 #kits{top:58px;right:14px;width:300px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #kits .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#kits .chips{display:flex;flex-wrap:wrap;gap:5px}#kits .chips button{padding:5px 9px;font-size:11px}#kits .chips button.cur{background:#2a7bff;color:#fff}#kits .muted{color:var(--dim);line-height:1.4;font-size:11px}
 #kits .slot{display:flex;align-items:center;gap:6px;margin:5px 0}#kits .slot b{width:46px;font-size:10px;letter-spacing:.1em;color:#b8c8ea}#kits .slot span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8eef8}#kits .slot button,#kits .row button{padding:5px 8px;font-size:11px}#kits .row{display:flex;gap:6px;margin-top:6px}#kits input{flex:1;min-width:0;background:rgba(0,0,0,.35);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;font-size:12px}
@@ -120,7 +122,7 @@ body.cam #cambar{display:flex}
   #kb .keys{height:84px}
   body.menuopen #bar{flex-direction:column;align-items:stretch;width:160px;max-height:calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;flex-wrap:nowrap}
   #brand p{display:none}#brand{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left))}#brand h1{font-size:12px}
-  #patches,#rand,#scene,#kits{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));right:calc(10px + env(safe-area-inset-right));left:calc(10px + env(safe-area-inset-left));width:auto;max-height:calc(100vh - 72px);max-height:calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  #patches,#rand,#scene,#kits,#book{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));right:calc(10px + env(safe-area-inset-right));left:calc(10px + env(safe-area-inset-left));width:auto;max-height:calc(100vh - 72px);max-height:calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   #rand .muted{display:none}#rand .sec{margin:9px 0 6px}
   .hud.more{-webkit-mask-image:linear-gradient(#000 calc(100% - 34px),transparent);mask-image:linear-gradient(#000 calc(100% - 34px),transparent)}
   #help{left:10px;right:10px;bottom:10px;max-width:none;max-height:55vh;overflow:auto}
@@ -146,6 +148,7 @@ body.cam #cambar{display:flex}
   <button id="bView">RESET VIEW</button>
   <button id="bPatches">PATCHES</button>
   <button id="bRand" title="Random patch (R)">RANDOM</button>
+  <button id="bBook">SONGBOOK</button>
   <button id="bKeys" title="Play notes (K)">KEYS</button>
   <button id="bCam" title="Free camera (C)">CAMERA</button>
   <button id="bKits">KITS</button>
@@ -166,7 +169,7 @@ body.cam #cambar{display:flex}
 </div>
 <div id="rand" class="hud hide">
   <div class="sec">NEW RANDOM PATCH</div>
-  <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rJazz">JAZZY</button><button id="rSurp">SURPRISE</button></div>
+  <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rLofi">LO-FI</button><button id="rJazz">JAZZY</button><button id="rSurp">SURPRISE</button></div>
   <div class="muted" style="margin-top:6px">Rewires the whole rack into a new playable patch. Press R to roll again.</div>
   <div class="sec">DECKS</div>
   <div class="chips"><button id="rBlend">BLEND TO DECK B</button></div>
@@ -179,6 +182,12 @@ body.cam #cambar{display:flex}
   <div class="muted" style="margin-top:6px">Turns the knobs on patched modules. Shuffle goes anywhere sensible; nudge makes small moves.</div>
   <div class="sec">UNDO</div>
   <div class="chips"><button id="rUndo" disabled>UNDO (Z)</button></div>
+</div>
+<div id="book" class="hud hide">
+  <div class="sec">SONGBOOK</div>
+  <div class="muted">Press ▶ to hear a tune, ★ to keep it, ✕ to skip it. LO-FI and JAZZY only play your kept tunes (or everything you haven't skipped, until you keep some).</div>
+  <div id="bookList"></div>
+  <div class="chips" style="margin-top:8px"><button id="bookExp">EXPORT</button><button id="bookImp">IMPORT</button><button id="bookClr">CLEAR STARS</button></div>
 </div>
 <div id="kits" class="hud hide">
   <div class="sec">DRUM KITS (SAMPLER)</div><div class="chips" id="kList"></div>
@@ -590,7 +599,86 @@ DEFS.harm = lay('HARMONY', 20, 'navy',
    [kn('key', 'KEY', 'S', { min: 0, max: 11, step: 1, def: 0, fmt: v => ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'][v] }), kn('mode', 'MODE', 'S', { min: 0, max: 2, step: 1, def: 0, fmt: v => ['MAJOR', 'MINOR', 'DORIAN'][v] }), kn('color', 'COLOUR', 'S', { def: 0.5, fmt: v => v < 0.3 ? 'PLAIN ' + fPct(v) : v > 0.7 ? 'RICH ' + fPct(v) : fPct(v) }), kn('move', 'MOVEMENT', 'S', { def: 0.3, fmt: fPct })],
    [kn('evolve', 'EVOLVE', 'S', { def: 0.3, fmt: v => v < 0.05 ? 'REPEAT' : fPct(v) + ' NEW PHRASES' }), kn('walk', 'WALK', 'S', { def: 0.2, fmt: fPct }), kn('seed', 'TUNE', 'S', { min: 0, max: 99, step: 1, def: 7, fmt: v => '#' + v }), ld('led', 'amber')]],
   [[ji('clk', 'CLOCK', 'trig'), ji('rst', 'RESET', 'trig')], [jo('root', 'ROOT', 'param'), jo('type', 'TYPE', 'param'), jo('bass', 'BASS', 'param'), jo('chg', 'CHANGE', 'trig')]]);
-const ROWM = [['keys', 'keys'], ['sampler', 'sampler'], ['harm', 'harm'], bl(16, 'silver'), bl(12, 'black')];
+// ================================================================ SONGBOOK: tunes for BAND (lo-fi beats and jazzy deep house)
+// Written as chord symbols, bar by bar ('|' between bars, chords in a bar split it evenly). Sections A and B, played in FORM order.
+// Voicings are worked out below (rootless jazz shapes, voice-led), so only the harmony is written here.
+const SONGBOOK = [
+  { id: 'rainy-window', name: 'Rainy Window', feel: 'lofi', A: 'Fmaj9 | Em7 A7b9 | Dm9 | G13 G7b9', B: 'Bbmaj7#11 | Am7 D9 | Gm9 | C13sus4 C7b9', form: 'AABA' },
+  { id: 'late-bus', name: 'Late Bus', feel: 'lofi', A: 'Am9 | D9 | Gmaj9 | Cmaj9', B: 'F#m7b5 | B7b9 | Em9 | Em9 A13', form: 'AABA' },
+  { id: 'tea-2am', name: 'Tea at 2am', feel: 'lofi', A: 'Dm9 | G13 | Cmaj9 | A7b9', B: 'Dm9 | Fm6 | Em7 | A7b9', form: 'AABA' },
+  { id: 'paper-lanterns', name: 'Paper Lanterns', feel: 'lofi', A: 'Ebmaj9 | Dm7 G7b9 | Cm9 | Bbm9 Eb13', B: 'Abmaj9 | Abm6 | Gm7 | C7b9 | Fm9 | Bb13', form: 'AAB' },
+  { id: 'slow-motion', name: 'Slow Motion', feel: 'lofi', A: 'Cmaj9 | Am9 | Dm9 | G13', B: 'Em7 | A7b9 | Dm9 | Fm6/9', form: 'AABA' },
+  { id: 'moon-laundry', name: 'Moon Laundry', feel: 'lofi', A: 'Gm9 | C13 | Fmaj9 | D7#9', B: 'Gm9 | Bbm6 | Am7 | D7b9', form: 'AABA' },
+  { id: 'sunday-pages', name: 'Sunday Pages', feel: 'lofi', A: 'Bbmaj9 | Am7 D7b9 | Gm9 | Fm9 Bb13', B: 'Ebmaj9 | Ebm6 | Dm7 | G7b9 | Cm9 | F13sus4', form: 'AAB' },
+  { id: 'window-seat', name: 'Window Seat', feel: 'lofi', A: 'Am9 | Am9 | Dm9 | E7#9', B: 'Fmaj7#11 | Em7 | Dm9 | E7b9', form: 'AABA' },
+  { id: 'dusty-polaroids', name: 'Dusty Polaroids', feel: 'lofi', A: 'Dbmaj9 | C7#9 | Fm9 | Ebm9 Ab13', B: 'Gbmaj9 | Gbm6 | Fm7 | Bb7b9 | Ebm9 | Ab13sus4', form: 'AAB' },
+  { id: 'corner-store', name: 'Corner Store', feel: 'lofi', A: 'Em9 | A13 | Dmaj9 | Bm9', B: 'Gmaj9 | F#m7 B7b9 | Em9 | A13sus4 A7b9', form: 'AABA' },
+  { id: 'foggy-glasses', name: 'Foggy Glasses', feel: 'lofi', A: 'Cm9 | F13 | Bbmaj9 | Ebmaj7#11', B: 'Am7b5 | D7b9 | Gm9 | Gm9 C13', form: 'AABA' },
+  { id: 'night-ferry', name: 'Night Ferry', feel: 'lofi', A: 'Fm9 | Bb9 | Ebmaj9 | Abmaj9', B: 'Dm7b5 | G7b9 | Cm9 | Cm9 F13', form: 'AABA' },
+  { id: 'sleepy-cat', name: 'Sleepy Cat', feel: 'lofi', A: 'Gmaj9 | Gm9 C13 | Fmaj9 | Fm9 Bb13', B: 'Ebmaj9 | Am7 D7b9 | Gmaj9 | Am7 D13', form: 'AB' },
+  { id: 'rooftop', name: 'Rooftop', feel: 'lofi', A: 'Am9 | D13 | Bm7 E7b9 | Am9 D13', B: 'Gmaj9 | Cmaj7#11 | F#m7b5 | B7b9', form: 'AABA' },
+  { id: 'little-radio', name: 'Little Radio', feel: 'lofi', A: 'Ebm9 | Ab13 | Dbmaj9 | Bbm9', B: 'Gbmaj9 | F7#9 | Bbm9 | Ab13sus4', form: 'AABA' },
+  { id: 'warm-floor', name: 'Warm Floor', feel: 'deep', A: 'Fm9 | Fm9 | Bbm9 | Bbm9', B: 'Dbmaj9 | Cm7 | Bbm9 | C7#9', form: 'AABA' },
+  { id: 'late-glow', name: 'Late Glow', feel: 'deep', A: 'Am9 | D9 | Am9 | D9', B: 'Fmaj9 | Em7 | Dm9 | E7b9', form: 'AABA' },
+  { id: 'velvet-hour', name: 'Velvet Hour', feel: 'deep', A: 'Cm9 | F9 | Cm9 | Abmaj9 G7#9', B: 'Ebmaj9 | Dm7b5 G7b9 | Cm9 | Bbm9 Eb13', form: 'AABA' },
+  { id: 'blue-stairway', name: 'Blue Stairway', feel: 'deep', A: 'Dm9 | Em7 | Fmaj9 | Em7', B: 'Gm9 | Am7 | Bbmaj9 | A7#9', form: 'AABA' },
+  { id: 'soft-machine', name: 'Soft Machine', feel: 'deep', A: 'Gm9 | C9 | Gm9 | C9', B: 'Ebmaj9 | Dm7 | Cm9 | D7b9', form: 'AABA' },
+  { id: 'neon-rain', name: 'Neon Rain', feel: 'deep', A: 'Ebm9 | Ebm9 | Abm9 | Bbm7', B: 'Bmaj9 | Bbm7 | Abm9 | Bb7#9', form: 'AABA' },
+  { id: 'after-hours', name: 'After Hours', feel: 'deep', A: 'Fmaj9 | Em9 | Dm9 | C6/9', B: 'Bbmaj9 | Am9 | Gm9 | C13sus4', form: 'AABA' },
+  { id: 'two-step-home', name: 'Two Step Home', feel: 'deep', A: 'Bbm9 | Eb13 | Abmaj9 | Dbmaj9', B: 'Gm7b5 | C7b9 | Fm9 | Bbm9 Eb13', form: 'AABA' },
+  { id: 'harbour-lights', name: 'Harbour Lights', feel: 'deep', A: 'Dmaj9 | C#m7 | Bm9 | Bm9 E13', B: 'Gmaj9 | F#m7 | Em9 | A13sus4', form: 'AABA' },
+  { id: 'cloud-district', name: 'Cloud District', feel: 'deep', A: 'Em9 | Em9 | Cmaj9 | Cmaj9', B: 'Am9 | Bm7 | Cmaj9 | B7#9', form: 'AABA' }
+];
+const BOOK = (() => { try { return JSON.parse(localStorage.getItem('nightrack.book')) || { kept: {}, skipped: {} }; } catch (e) { return { kept: {}, skipped: {} }; } })();
+const saveBook = () => { try { localStorage.setItem('nightrack.book', JSON.stringify(BOOK)); } catch (e) { } };
+const bookPool = feel => { const all = SONGBOOK.map((t, i) => i).filter(i => SONGBOOK[i].feel === feel), kept = all.filter(i => BOOK.kept[SONGBOOK[i].id]); return kept.length ? kept : all.filter(i => !BOOK.skipped[SONGBOOK[i].id]).length ? all.filter(i => !BOOK.skipped[SONGBOOK[i].id]) : all; };
+// ---- chord symbols to voicings
+const PCN = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+// rootless shapes (intervals above the root), an A form and a B form (Bill Evans style); the bass plays the root
+const VOX = {
+  maj9: [[4, 7, 11, 14], [11, 14, 16, 19]], maj7: [[4, 7, 11, 14], [11, 14, 16, 19]], '6/9': [[4, 9, 14, 19], [9, 14, 16, 19]], '6': [[4, 7, 9, 14], [9, 14, 16, 19]], 'maj7#11': [[4, 11, 14, 18], [11, 14, 16, 18]],
+  m9: [[3, 7, 10, 14], [10, 14, 15, 19]], m7: [[3, 7, 10, 14], [10, 14, 15, 19]], m11: [[3, 10, 14, 17], [10, 14, 15, 17]], m6: [[3, 7, 9, 14], [9, 14, 15, 19]], 'm6/9': [[3, 9, 14, 19], [9, 14, 15, 19]],
+  '7': [[4, 9, 10, 14], [10, 14, 16, 21]], '9': [[4, 9, 10, 14], [10, 14, 16, 21]], '13': [[4, 9, 10, 14], [10, 14, 16, 21]], '7b9': [[4, 7, 10, 13], [10, 13, 16, 19]], '7#9': [[4, 10, 15, 19], [10, 15, 16, 19]],
+  '9sus4': [[5, 10, 14, 19], [10, 14, 17, 19]], '13sus4': [[5, 9, 10, 14], [10, 14, 17, 21]], m7b5: [[3, 6, 10, 14], [10, 14, 15, 18]], dim7: [[3, 6, 9, 12], [9, 12, 15, 18]] };
+function parseChord(sym) { const m = sym.match(/^([A-G][b#]?)(.*)$/); if (!m) return null; let q = m[2] || 'maj7'; if (!VOX[q]) q = q.startsWith('m') ? 'm9' : q.includes('sus') ? '9sus4' : q.includes('maj') ? 'maj9' : '9'; return { root: PCN[m[1]], q, name: sym }; }
+function voiceLead(ch, prev) { let best = null, bc = 1e9;
+  for (const form of VOX[ch.q]) for (let o = 36; o <= 72; o += 12) { const v = form.map(x => ch.root + o + x).sort((a, b) => a - b); if (v[0] < 50 || v[0] > 62) continue;
+    let c = prev ? 0 : Math.abs(v[0] - 55); if (prev) { for (let i = 0; i < v.length; i++) c += Math.abs(v[i] - (prev[i] ?? prev[prev.length - 1])); c += Math.abs(v[v.length - 1] - prev[prev.length - 1]) * 0.5; }
+    if (c < bc) { bc = c; best = v; } }
+  return best; }
+// ---- compile a tune for BAND: chord events, comping hits (by style), a sparse lead line, a bass line
+const COMPS = ['LAID BACK', 'PUSHED', 'OFFBEAT STABS', 'CHARLESTON'];
+function compileTune(t, comp, seed = 1) {
+  let r = (seed * 9301 + 49297) % 233280; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
+  const secs = { A: t.A.split('|').map(b => b.trim().split(/\s+/)), B: t.B.split('|').map(b => b.trim().split(/\s+/)) }, bars = [];
+  for (const S of t.form) for (const b of secs[S]) bars.push({ sec: S, chords: b });
+  const chords = []; let prev = null;
+  bars.forEach((b, bi) => b.chords.forEach((sym, ci) => { const c = parseChord(sym); if (!c) return; const v = voiceLead(c, prev); prev = v; chords.push({ at: bi * 16 + ci * (16 / b.chords.length), name: sym, sec: b.sec, notes: v, root: c.root }); }));
+  const len = bars.length * 16, hits = [], lead = [], bass = [], deep = t.feel === 'deep';
+  chords.forEach((c, i) => { const end = i + 1 < chords.length ? chords[i + 1].at : len, span = end - c.at, nextBar = end % 16 === 0 && i + 1 < chords.length;
+    if (comp === 0) { hits.push({ at: c.at, len: span, notes: c.notes, vel: 0.8 }); if (span >= 16 && rnd() < 0.55) hits.push({ at: c.at + 10, len: span - 10, notes: c.notes.slice(1), vel: 0.42 }); }
+    else if (comp === 1) { hits.push({ at: c.at, len: Math.min(span, 6), notes: c.notes, vel: 0.78 }); if (span >= 8) hits.push({ at: c.at + 6, len: 3, notes: c.notes, vel: 0.5 }); if (nextBar) { const n = chords[i + 1]; hits.push({ at: end - 2, len: 8, notes: n.notes, vel: 0.72, push: true }); } }
+    else if (comp === 2) { for (let s = c.at; s < end; s++) if (s % 4 === 2 && rnd() < 0.85) hits.push({ at: s, len: 1.5, notes: c.notes, vel: 0.62 + rnd() * 0.1 }); }
+    else { for (let s = c.at; s < end; s += 16) { hits.push({ at: s, len: 3, notes: c.notes, vel: 0.76 }); if (s + 6 < end) hits.push({ at: s + 6, len: 6, notes: c.notes, vel: 0.62 }); } }
+    // lead: a few chord tones up high, moving by step, on the 8th grid, resting about half the time
+    if (rnd() < 0.6) { let last = lead.length ? lead[lead.length - 1].midi : 79; const pool = c.notes.map(n => n + 12).concat(c.notes.map(n => n + 24)).filter(n => n >= 69 && n <= 88).sort((a, b) => a - b);
+      const k = 1 + Math.floor(rnd() * 3); for (let j = 0; j < k && pool.length; j++) { const at = c.at + 4 + j * 2 * (1 + Math.floor(rnd() * 2)); if (at >= end) break; let n = pool.reduce((a, b) => Math.abs(b - last) < Math.abs(a - last) && b !== last ? b : a, pool[0]); lead.push({ at, len: 2 + Math.floor(rnd() * 4), midi: n, vel: 0.55 + rnd() * 0.2 }); last = n; } }
+    // bass: root on the change (pushed with the chords), more on offbeats for deep house; an approach note now and then
+    const bcv = pc => (pc > 7 ? pc - 12 : pc) / 12, root = bcv(c.root);
+    if (deep) { for (let s = c.at; s < end; s++) if (s % 4 === 2) bass.push({ at: s, len: 2, cv: root }); if (c.at % 16 === 0) bass.push({ at: c.at, len: 2, cv: root }); }
+    else { bass.push({ at: c.at, len: Math.min(span, 10), cv: root }); if (span >= 16 && rnd() < 0.5) bass.push({ at: c.at + 10, len: 4, cv: rnd() < 0.5 ? root : bcv((c.root + 7) % 12) }); }
+    if (i + 1 < chords.length && rnd() < 0.3) { const n = chords[i + 1].root; bass.push({ at: end - 2, len: 2, cv: bcv((n + 11) % 12) }); } });
+  bass.sort((a, b) => a.at - b.at); hits.sort((a, b) => a.at - b.at);
+  return { name: t.name, feel: t.feel, len, chords: chords.map(c => ({ at: c.at, name: c.name, sec: c.sec })), hits: hits.map(h => ({ ...h, at: ((h.at % len) + len) % len })), lead, bass };
+}
+
+DEFS.band = lay('BAND', 16, 'silver',
+  [[sc(1.4)],
+   [kn('inst', 'KEYS', 'S', { min: 0, max: 2, step: 1, def: 0, fmt: v => ['UPRIGHT PIANO', 'ELECTRIC PIANO', 'VIBES'][v] }), kn('lead', 'VIBES LINE', 'S', { def: 0.3, fmt: v => v < 0.03 ? 'OFF' : fPct(v) }), kn('human', 'FEEL', 'S', { def: 0.55, fmt: v => v < 0.3 ? 'TIGHT ' + fPct(v) : v > 0.7 ? 'LOOSE ' + fPct(v) : fPct(v) })],
+   [kn('comp', 'COMPING', 'S', { min: 0, max: 3, step: 1, def: 0, fmt: v => COMPS[v] }), kn('tone', 'TONE', 'S', { def: 0.55, fmt: fPct }), kn('level', 'LEVEL', 'S', { def: 0.8, fmt: fPct })],
+   [kn('tune', 'TUNE', 'S', { min: 0, max: SONGBOOK.length - 1, step: 1, def: 0, fmt: v => SONGBOOK[v] ? SONGBOOK[v].name.toUpperCase() : '' }), ld('led', 'amber')]],
+  [[ji('clk', 'CLOCK', 'trig'), ji('rst', 'RESET', 'trig'), jo('chg', 'CHANGE', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R'), jo('bass', 'BASS', 'param'), jo('bgate', 'B GATE', 'trig')]]);
+const ROWM = [['keys', 'keys'], ['sampler', 'sampler'], ['harm', 'harm'], ['band', 'band'], bl(12, 'black')];
 // side racks: real rows, top down. Right = mixing (its top two rows; the rows below stay painted until they get modules). Left = deck B, a mirror of the middle rack's sound makers.
 
 const ROWD = [['trig', 'trigseq'], ['drums', 'drums'], ['mix6', 'mix6'], ['duck', 'duck'], ['blank5', 'blank8c']];
@@ -783,6 +871,22 @@ class GlueM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 
 class WideM extends Mod { visual() { this.leds.led.set(0.25 + 0.5 * (this.T.w || 0)); } }
 class LimitM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 3, 0, 1)); } }
 class DuckM extends Mod { visual() { this.leds.led.set(clamp((this.T.gr || 0) * 1.6, 0, 1)); } }
+class BandM extends Mod { // sends its tune to the engine whenever the tune or comping style changes
+  knobChanged(id, v) { super.knobChanged(id, v); if (id === 'tune' || id === 'comp') sendTune(this, this.audition || loading ? 'bar' : 'phrase'); this.audition = false; } // a new patch or an audition switches on the next bar; the Conductor waits for the end of the tune
+  visual() { const L = this.T; this.leds.led.vu((L.vu || 0) * 2); if (L.name !== this.shown || L.bar !== this.sb) { this.shown = L.name; this.sb = L.bar; this.screenDirty = true; } }
+  drawScreen() { const s = this.scr, g = s.g, W = s.cw, H = s.ch, k = H / 84, F = (w, px) => w + ' ' + Math.round(px * k) + 'px "Space Grotesk", sans-serif', L = this.T || {}, t = SONGBOOK[this.v('tune')];
+    g.fillStyle = '#020611'; g.fillRect(0, 0, W, H); g.textBaseline = 'top'; g.textAlign = 'left';
+    g.fillStyle = '#ffd36b'; g.font = F(700, 28); g.fillText(L.name || '—', 12 * k, 6 * k);
+    g.textAlign = 'right'; g.fillStyle = '#c99a4a'; g.font = F(600, 14); g.fillText(L.bar ? 'section ' + (L.sec || '') + ' · bar ' + L.bar + '/' + L.bars : '', W - 12 * k, 14 * k);
+    g.textAlign = 'left'; g.fillStyle = '#d8c39a'; g.font = F(600, 16); g.fillText(t ? t.name + (BOOK.kept[t.id] ? '  ★' : '') : '', 12 * k, 44 * k);
+    g.fillStyle = '#8f7a55'; g.font = F(500, 12); g.fillText(t ? (t.feel === 'lofi' ? 'lo-fi' : 'deep house') + ' · ' + COMPS[this.v('comp')].toLowerCase() : '', 12 * k, 66 * k); s.tex.needsUpdate = true; } }
+function sendTune(m, when) { const t = SONGBOOK[m.v('tune')]; if (!t) return; send({ t: 'tune', id: m.id, tune: compileTune(t, m.v('comp'), (m.v('tune') + 1) * 7 + m.v('comp')), when }); }
+const KEYZ = { piano: [49, 51, 53, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91, 93, 95], ep: [36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80], vibes: [41, 45, 48, 52, 55, 59, 62, 65, 69, 72, 76] };
+async function loadKeys() { // recorded keys (VCSL, public domain), shared by both decks' BAND
+  if (loadKeys.done || !AC) return; loadKeys.done = true;
+  for (const inst in KEYZ) for (const n of KEYZ[inst]) { try { const f = 'samples/keys/' + inst + '/' + n + '.m4a'; let r = null; try { r = await fetch(f); } catch (e) { } if (!r || !r.ok) r = await fetch('https://pinchlemon.github.io/home-arcade/night-rack/' + f);
+    const b = await AC.decodeAudioData(await r.arrayBuffer()); send({ t: 'zone', inst, note: n, data: new Float32Array(b.getChannelData(0)), sr: b.sampleRate }); } catch (e) { console.warn('keys', inst, n, e && e.message); } }
+}
 class HarmM extends Mod { // shows the chord now, the next one, and the phrase
   visual() { const L = this.T; this.leds.led.vu(L.chg || 0); if (L.name !== this.shown || L.bar !== this.sb) { this.shown = L.name; this.sb = L.bar; this.screenDirty = true; } }
   drawScreen() { const s = this.scr, g = s.g, W = s.cw, H = s.ch, k = H / 84, F = (w, px) => w + ' ' + Math.round(px * k) + 'px "Space Grotesk", sans-serif', L = this.T || {};
@@ -828,7 +932,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -2196,8 +2300,8 @@ function genPatch(style, wild) {
     set('drums', 'kLvl', soft ? rr(0.65, 0.8) : 0.95); set('drums', 'cLvl', rr(0.5, 0.75) * (soft ? 0.6 : 1)); set('drums', 'hLvl', rr(0.35, 0.55) * (soft ? 0.6 : 1)); set('drums', 'oLvl', rr(0.3, 0.5) * (soft ? 0.6 : 1));
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
-  let SMP = style === 'dnb' || style === 'kiln' || (style === 'jazzy' && chance(0.85)) || ((style === 'house' || style === 'tinez') && chance(0.65));
-  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'tinez' || style === 'jazzy' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
+  let SMP = style === 'dnb' || style === 'kiln' || ((style === 'jazzy' || style === 'lofi') && chance(0.85)) || ((style === 'house' || style === 'tinez') && chance(0.65));
+  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'lofi' ? rpick([3, 7, 0, 3]) : style === 'tinez' || style === 'jazzy' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
     for (const k of ['k', 'c', 's', 'h', 'o', 'p']) { set('sampler', k + 'Tune', chance(0.25) ? rr(-1.5, 1.5) : 0); set('sampler', k + 'Dec', k === 'o' ? rr(0.4, 0.7) : k === 'h' ? rr(0.5, 1) : 1); }
     Object.assign(K.sampler, { kLvl: 0.95, cLvl: rr(0.6, 0.8), sLvl: rr(0.55, 0.75), hLvl: rr(0.35, 0.55), oLvl: rr(0.3, 0.45), pLvl: rr(0.35, 0.55) }); };
   const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
@@ -2253,28 +2357,27 @@ function genPatch(style, wild) {
     master(rr(1.2, 2.8), rr(0.08, 0.16));
     tapeOut = true; set('tape', 'wow', rr(0.05, 0.18)); set('tape', 'flutter', rr(0.03, 0.12)); set('tape', 'drive', rr(0.3, 0.55)); set('tape', 'age', rr(0.15, 0.4)); set('tape', 'hiss', rr(0.03, 0.12)); set('tape', 'dust', rr(0.05, 0.2));
     set('lfo', 'rate1', rexp(0.03, 0.2)); set('lfo', 'shape1', 0);
-  } else if (style === 'jazzy') {
-    // low-key jazzy deep house. HARMONY writes the chords (ii-V-Is, turnarounds, secondary dominants...) and STAB voice-leads them;
-    // the bass plays the roots in a steady range. Drums: a fixed deep-house groove, no random jitter, gentle swing, rhythms on the 8th grid.
-    set('clock', 'tempo', ri(110, 120)); const tr = {}, P = pattern(tr); trigOn(); const sw = rr(0.12, 0.28);
-    const kick = groove(rpick([1, 1, 0]), { swing: sw, chaos: 0, k: rr(0.45, 0.5), s: rr(0.38, 0.45), h: rr(0.4, 0.55), p: rr(0.2, 0.35), perc: 'perc.tsh', ...rpick([{ snare: 'perc.tr' }, { snare: null }, { clap: false, snare: 'perc.tr' }]) });
-    set('groove', 'var', rr(0, 0.2));
-    drumKnobs(true); cleanDrums(); set('drums', 'kTune', rr(0.25, 0.35)); set('drums', 'kDec', rr(0.4, 0.55)); set('drums', 'hDec', rr(0.06, 0.16));
+  } else if (style === 'jazzy' || style === 'lofi') {
+    // a tune from the songbook played by BAND on recorded keys (voiced and humanised), with a soft round bass on its roots.
+    // LO-FI: dusty boom-bap at 72-86 BPM, lazy swing, heavy tape. JAZZY: deep house at 116-122 BPM.
+    const lofi = style === 'lofi', feel = lofi ? 'lofi' : 'deep', pool = bookPool(feel), tune = (window.__nextTune != null && SONGBOOK[window.__nextTune] && SONGBOOK[window.__nextTune].feel === feel) ? window.__nextTune : rpick(pool);
+    set('clock', 'tempo', lofi ? ri(72, 86) : ri(116, 122)); const sw = lofi ? rr(0.3, 0.45) : rr(0.12, 0.26);
+    const kick = lofi ? groove(7, { swing: sw, chaos: 0, k: rr(0.5, 0.56), s: rr(0.5, 0.56), h: rr(0.42, 0.55), p: rr(0.15, 0.3), clap: false, snare: 'perc.ts', perc: 'perc.tsh' })
+      : groove(rpick([1, 1, 0]), { swing: sw, chaos: 0, k: rr(0.45, 0.5), s: rr(0.38, 0.45), h: rr(0.4, 0.55), p: rr(0.2, 0.35), perc: 'perc.tsh', ...rpick([{ snare: 'perc.tr' }, { snare: null }, { clap: false, snare: 'perc.tr' }]) });
+    set('groove', 'var', rr(0, 0.15));
+    drumKnobs(true); cleanDrums(); set('drums', 'kTune', rr(0.22, 0.32)); set('drums', 'kDec', rr(0.4, 0.55)); set('drums', 'hDec', rr(0.05, 0.14)); if (lofi) { set('perc', 'sDec', rr(0.25, 0.4)); set('perc', 'sTune', rr(0.3, 0.5)); }
     con(drumBus(), 'mix6.in1');
-    con('clock.x4', 'harm.clk'); used.add('harm');
-    set('harm', 'key', ri(0, 11)); set('harm', 'mode', rpick([0, 0, 2, 2, 1])); set('harm', 'color', rr(0.35, 0.75)); set('harm', 'move', rr(0.15, 0.45)); set('harm', 'evolve', rr(0.2, 0.45)); set('harm', 'walk', rr(0, 0.35)); set('harm', 'seed', ri(0, 99));
-    P.on(4, rpick(JAZZ_BASS)); P.on(5, rpick(JAZZ_COMP));
-    Object.assign(tr, { len: 16, swing: sw }); K.trig = tr;
-    const bass = bassM({ cv: 'harm.bass', gate: 'trig.g5' }, { wave: rpick([0, 0.1, 0.2]), oct: -1, cut: rexp(240, 480), res: rr(0.08, 0.22), env: rr(0.15, 0.35), dec: rr(0.3, 0.5), glide: chance(0.3) ? rr(0.03, 0.08) : 0, drive: rr(0.05, 0.18) });
+    con('clock.x4', 'band.clk'); used.add('band');
+    set('band', 'tune', tune); set('band', 'comp', lofi ? rpick([0, 0, 1, 3]) : rpick([2, 2, 1])); set('band', 'inst', lofi ? rpick([0, 0, 1]) : rpick([1, 1, 0]));
+    set('band', 'lead', lofi ? rr(0.2, 0.4) : rr(0.1, 0.25)); set('band', 'human', lofi ? rr(0.55, 0.75) : rr(0.35, 0.5)); set('band', 'tone', lofi ? rr(0.32, 0.48) : rr(0.5, 0.65)); set('band', 'level', 0.8);
+    const bass = bassM({ cv: 'band.bass', gate: 'band.bgate' }, { wave: 0, oct: -1, cut: rexp(200, 380), res: rr(0.04, 0.14), env: rr(0.08, 0.22), dec: lofi ? rr(0.55, 0.8) : rr(0.3, 0.5), glide: rr(0.02, 0.06), drive: rr(0.04, 0.12) });
     con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2');
-    const stab = stabV('trig.g6', 'harm.root', { chord: 0, cut: rexp(900, 2000), env: rr(0.15, 0.3), atk: rr(0.02, 0.08), dec: rr(0.38, 0.6) }); con('harm.type', 'stab.chord');
-    set('stab', 'voice', rr(0.2, 0.5)); set('stab', 'detune', rr(0.1, 0.25)); set('stab', 'res', rr(0.05, 0.2));
-    con(stab, 'duck.inR'); con('duck.R', 'mix6.in3'); con('duck.R', 'delay.in');
-    set('duck', 'depth', rr(0.25, 0.4)); set('duck', 'rel', rr(0.25, 0.4)); set('duck', 'shape', rr(0.3, 0.5));
-    con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 0.75]), rr(0.2, 0.38)); set('mix6', 'lvl6', 0);
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.82, pan1: 0, lvl2: rr(0.62, 0.75), pan2: 0, lvl3: rr(0.55, 0.7), pan3: rr(-0.15, 0.15), lvl4: rr(0.2, 0.32), pan4: -0.6, lvl5: rr(0.2, 0.32), pan5: 0.6, master: 0.8 });
-    master(rr(1.8, 3.2), rr(0.12, 0.2));
-    tapeOut = true; set('tape', 'wow', rr(0.08, 0.18)); set('tape', 'flutter', rr(0.05, 0.12)); set('tape', 'drive', rr(0.3, 0.5)); set('tape', 'age', rr(0.3, 0.55)); set('tape', 'hiss', rr(0.06, 0.14)); set('tape', 'dust', rr(0.15, 0.35));
+    con('band.L', 'mix6.in3'); con('band.R', 'mix6.in6'); con('band.L', 'delay.in'); // the keys stay unpumped, so they breathe naturally
+    set('duck', 'depth', lofi ? rr(0.12, 0.25) : rr(0.25, 0.4)); set('duck', 'rel', rr(0.25, 0.4)); set('duck', 'shape', rr(0.3, 0.5));
+    con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5]), rr(0.2, 0.35));
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: lofi ? 0.78 : 0.82, pan1: 0, lvl2: rr(0.62, 0.75), pan2: 0, lvl3: rr(0.55, 0.68), pan3: -0.25, lvl6: rr(0.55, 0.68), pan6: 0.25, lvl4: rr(0.14, 0.24), pan4: -0.6, lvl5: rr(0.14, 0.24), pan5: 0.6, master: 0.8 });
+    master(lofi ? rr(1.4, 2.4) : rr(1.8, 3.2), lofi ? rr(0.1, 0.18) : rr(0.12, 0.2));
+    tapeOut = true; set('tape', 'wow', lofi ? rr(0.14, 0.26) : rr(0.08, 0.16)); set('tape', 'flutter', rr(0.06, 0.14)); set('tape', 'drive', rr(0.25, 0.45)); set('tape', 'age', lofi ? rr(0.45, 0.65) : rr(0.25, 0.45)); set('tape', 'hiss', lofi ? rr(0.1, 0.2) : rr(0.05, 0.12)); set('tape', 'dust', lofi ? rr(0.3, 0.5) : rr(0.12, 0.3));
   } else if (style === 'dnb') {
     // liquid / rolling DnB: crisp sampled two-step drums, a deep sub with an optional low reese, long pads; no noisy voices
     set('clock', 'tempo', ri(172, 176));
@@ -2336,21 +2439,21 @@ function genPatch(style, wild) {
     con(L, 'verb.inL'); con(R, 'verb.inR'); set('verb', 'decay', rr(5, 15)); set('verb', 'mix', rr(0.4, 0.65)); set('verb', 'damp', rexp(2500, 9000));
     for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.008, 0.25 + wild)); set('lfo', 'shape' + c, ri(0, 3)); }
   }
-  if (style === 'house' || style === 'tinez' || style === 'jazzy' || style === 'dnb') { for (const c of C) if (c[1] === 'mix6.in1') c[1] = 'verb.dryL'; set('mix6', 'lvl1', 0); }
+  if (style === 'house' || style === 'tinez' || style === 'jazzy' || style === 'lofi' || style === 'dnb') { for (const c of C) if (c[1] === 'mix6.in1') c[1] = 'verb.dryL'; set('mix6', 'lvl1', 0); }
   let fL = 'verb.L', fR = 'verb.R';
   if (tapeOut) { con('verb.L', 'tape.inL'); con('verb.R', 'tape.inR'); fL = 'tape.L'; fR = 'tape.R'; }
   set('verb', 'level', 1);
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
-  { const dance = style === 'house' || style === 'dnb' || style === 'tinez' || style === 'jazzy', kil = style === 'kiln';
+  { const dance = style === 'house' || style === 'dnb' || style === 'tinez' || style === 'jazzy' || style === 'lofi', kil = style === 'kiln';
     // mixing side: deck -> BLEND -> KEYS (played live, always heard) -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
     con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'keys.inL'); con('blend.R', 'keys.inR'); con('keys.L', 'sweep.inL'); con('keys.R', 'sweep.inR'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
     con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
     { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
     set('blend', 'blend', 0); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('sweep', 'pos', 0); set('sweep', 'res', rr(0.2, 0.4));
-    const house = style === 'house' || style === 'tinez' || style === 'jazzy';
+    const house = style === 'house' || style === 'tinez' || style === 'jazzy' || style === 'lofi';
     set('echo', 'div', style === 'dnb' ? rpick([1, 2, 5]) : house ? rpick([2, 2, 3, 4]) : rpick([2, 3, 4, 5])); set('echo', 'fb', dance ? rr(0.25, 0.45) : rr(0.4, 0.62)); set('echo', 'tone', rr(0.35, 0.6)); set('echo', 'wow', rr(0.15, 0.4)); set('echo', 'spread', rr(0.5, 0.9));
     set('echo', 'mix', style === 'dnb' ? rr(0.04, 0.1) : dance ? rr(0.06, 0.14) : rr(0.12, 0.26));
-    set('pump', 'depth', style === 'jazzy' ? rr(0.08, 0.18) : house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
+    set('pump', 'depth', style === 'lofi' ? rr(0.04, 0.1) : style === 'jazzy' ? rr(0.08, 0.18) : house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
     set('sub', 'xo', dance ? rr(100, 140) : rr(80, 120)); set('sub', 'sub', style === 'dnb' ? rr(0.15, 0.35) : house ? rr(0, 0.12) : 0); set('sub', 'tight', dance ? rr(26, 34) : rr(18, 26)); set('sub', 'low', 0); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
     set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-3, -0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
     if (dance) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(2, 3.2)); set('glue', 'atk', rexp(0.015, 0.035)); set('glue', 'rel', rr(0.12, 0.25)); set('glue', 'makeup', rr(1.5, 3)); set('glue', 'mix', rr(0.75, 1)); }
@@ -2371,7 +2474,7 @@ function genPatch(style, wild) {
   return { v: 1, knobs: K, cables: C };
 }
 // knob shuffle / nudge with safe limits (normalised ranges)
-const SAFE = { 'out.vol': null, 'harm.key': null, 'harm.mode': null, 'harm.seed': null, 'harm.evolve': null, 'harm.color': [0.25, 0.8], 'harm.move': [0.1, 0.55], 'harm.walk': [0, 0.45], 'blend.blend': null, 'blend.lvlA': null, 'blend.lvlB': null, 'blend.master': null, 'sweep.pos': null, 'sweep.res': [0.15, 0.45], 'echo.div': null, 'echo.mix': [0, 0.3], 'echo.fb': [0.2, 0.6], 'pump.depth': [0, 0.45], 'sub.xo': [0.3, 0.6], 'sub.sub': [0, 0.35], 'sub.tight': [0.3, 0.6], 'sub.low': [0.4, 0.6], 'field.rec': null, 'mbira.type': null, 'field.lvl': [0.2, 0.6], 'mbira.lvl': [0.5, 0.9], 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
+const SAFE = { 'out.vol': null, 'band.tune': null, 'band.inst': null, 'band.comp': null, 'band.level': null, 'band.lead': [0, 0.5], 'band.human': [0.35, 0.75], 'band.tone': [0.35, 0.7], 'harm.key': null, 'harm.mode': null, 'harm.seed': null, 'harm.evolve': null, 'harm.color': [0.25, 0.8], 'harm.move': [0.1, 0.55], 'harm.walk': [0, 0.45], 'blend.blend': null, 'blend.lvlA': null, 'blend.lvlB': null, 'blend.master': null, 'sweep.pos': null, 'sweep.res': [0.15, 0.45], 'echo.div': null, 'echo.mix': [0, 0.3], 'echo.fb': [0.2, 0.6], 'pump.depth': [0, 0.45], 'sub.xo': [0.3, 0.6], 'sub.sub': [0, 0.35], 'sub.tight': [0.3, 0.6], 'sub.low': [0.4, 0.6], 'field.rec': null, 'mbira.type': null, 'field.lvl': [0.2, 0.6], 'mbira.lvl': [0.5, 0.9], 'sampler.kit': null, 'sampler.kTune': [0.42, 0.55], 'sampler.cTune': [0.42, 0.58], 'sampler.sTune': [0.42, 0.58], 'sampler.hTune': [0.42, 0.6], 'sampler.oTune': [0.42, 0.58], 'sampler.pTune': [0.35, 0.65], 'sampler.kDec': [0.75, 1], 'sampler.cDec': [0.5, 1], 'sampler.sDec': [0.5, 1], 'sampler.hDec': [0.3, 1], 'sampler.oDec': [0.35, 0.8], 'sampler.pDec': [0.4, 1], 'glue.thr': [0.35, 0.75], 'glue.ratio': [0.1, 0.5], 'glue.atk': [0.2, 0.7], 'glue.rel': [0.2, 0.7], 'glue.makeup': [0.1, 0.4], 'glue.mix': [0.5, 1], 'eq.hp': [0, 0.35], 'eq.low': [0.42, 0.6], 'eq.mid': [0.36, 0.58], 'eq.high': [0.45, 0.62], 'eq.midf': [0.1, 0.7], 'eq.mq': [0.2, 0.6], 'wide.width': [0.4, 0.8], 'wide.mono': [0.3, 0.7], 'wide.chorus': [0.05, 0.4], 'limit.drive': [0.1, 0.35], 'limit.ceil': [0.7, 0.95], 'limit.air': [0, 0.45], 'limit.rel': [0.2, 0.6], 'clock.tempo': [0.15, 0.6], 'res': [0, 0.75], 'delay.fb': [0, 0.72], 'texture.fb': [0, 0.5], 'fm': [0, 0.3], 'chance': [0.35, 1], 'prob': [0.5, 1], 'seq.len': [0.3, 1], 'trig.len': [0.6, 1],
   'lvl': [0.35, 0.9], 'level': [0.45, 0.9], 'master': [0.6, 0.85], 'kLvl': [0.75, 1], 'vca.bias1': [0, 0.15], 'vca.bias2': [0, 0.15], 'drive': [0, 0.6], 'verb.mix': [0.15, 0.7], 'verb.decay': [0.2, 0.85], 'oct': [0.2, 0.8], 'depth': [0.3, 0.8], 'fold': [0, 0.7], 'mix6.lvl1': [0.7, 0.95], 'hiss': [0, 0.4], 'dust': [0, 0.6], 'chaos': [0, 0.5], 'kDen': [0.35, 0.75], 'sDen': [0.35, 0.75], 'hDen': [0.3, 0.8], 'pDen': [0.2, 0.8], 'groove.style': null, 'wow': [0, 0.7], 'stab.chord': [0, 1], 'bass.oct': [0.33, 1] };
 function safeRange(m, k) { const s = SAFE[m.id + '.' + k] !== undefined ? SAFE[m.id + '.' + k] : SAFE[k.replace(/\d+$/, '')] !== undefined ? SAFE[k.replace(/\d+$/, '')] : SAFE[k]; return s === undefined ? [0.05, 0.95] : s; }
 function tweenKnob(kn, to) { to = clamp(to, 0, 1); if (window.__noRender) { kn.set(to); return; } RND.tw = RND.tw.filter(t => t.kn !== kn); RND.tw.push({ kn, from: kn.norm, to, t: 0 }); }
@@ -2446,6 +2549,7 @@ function blendNext(given, back) { // build a fresh patch (same style, same key) 
   if (!back) { DECK.past.push(deckSnapshot(from)); if (DECK.past.length > 12) DECK.past.shift(); } COND.since = 0;
   const oq = modById[from === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
   P.knobs[qk] = { ...(P.knobs[qk] || {}), scale: oq.v('scale'), root: oq.v('root'), oct: oq.v('oct') };
+  if ((DECK.style === 'jazzy' || DECK.style === 'lofi') && !given) { const ob = modById[from === 'A' ? 'band' : 'band_b'], bk = to === 'B' ? 'band_b' : 'band'; P.knobs[bk] = { ...(P.knobs[bk] || {}), tune: ob.v('tune') }; }
   if (DECK.style === 'jazzy' && !given) { const oh = modById[from === 'A' ? 'harm' : 'harm_b'], hk = to === 'B' ? 'harm_b' : 'harm', o = {}; for (const k of ['key', 'mode', 'color', 'move', 'evolve', 'walk', 'seed']) o[k] = oh.v(k); P.knobs[hk] = { ...(P.knobs[hk] || {}), ...o }; }
   loadDeck(to, P); DECK['sleep' + to] = false; send({ t: 'barsync', wake: deckIds(to), reset: [...deckIds(to), ...deckIds(from)] }); if (!AC || AC.state !== 'running') powerOn().catch(() => { }); // both decks' sequencers restart together on the next downbeat
   const bm = modById.blend, bars = [16, 32, 64][bm.v('bars')] || 32, sec = bars * 4 * 60 / (modById.clock.v('tempo') || 120);
@@ -2465,7 +2569,7 @@ function blendBtn() { const b = document.getElementById('rBlend'); if (b) b.text
 const COND = { since: 0, on: false, hold: false, bar: 0, secBar: 0, si: 0, sec: null, nextMove: 8, glides: new Map(), base: {}, hist: [], msg: '', dirty: true, lastT: 0, recent: [] };
 const TASTE = (() => { try { return JSON.parse(localStorage.getItem('nightrack.taste')) || { f: {}, m: {} }; } catch (e) { return { f: {}, m: {} }; } })();
 const saveTaste = () => { try { localStorage.setItem('nightrack.taste', JSON.stringify(TASTE)); } catch (e) { } };
-const DANCE_ST = new Set(['house', 'tinez', 'dnb', 'jazzy']);
+const DANCE_ST = new Set(['house', 'tinez', 'dnb', 'jazzy', 'lofi']);
 function condSay(m) { COND.msg = m; COND.dirty = true; }
 const liveId = id => DECK.live === 'B' && modById[id + '_b'] ? id + '_b' : id;
 const isPatched = id => { const m = modById[id]; return m && Object.values(m.ports).some(p => p.cables.length); };
@@ -2499,12 +2603,12 @@ const MOVES = [
   ['timbre', '*', 'macro', ['timbre', 'morph', 'harm', 'color'], 'glide', 'TIMBRE'], ['texture', 'kiln ambient', 'texture', ['dens', 'pos', 'blend', 'size'], 'glide', 'TEXTURE'],
   ['voices', '*', 'mix', ['lvl1', 'lvl2', 'lvl3', 'lvl4'], 'fade', 'VOICE'], ['delay', '*', 'delay', ['mix', 'fb'], 'glide', 'DELAY'], ['space', '*', 'verb', ['mix', 'decay'], 'small', 'SPACE'],
   ['field', 'kiln', 'field', ['lvl'], 'glide', 'FIELD RECORDING'], ['mbira', 'kiln', 'mbira', ['lvl'], 'fade', 'MBIRA'], ['wobble', 'kiln ambient', 'tape', ['wow', 'age'], 'small', 'TAPE WOBBLE'],
-  // jazzy: the music moves (progressions, rhythms, chord colour); the drums only fade layers in and out, never reshuffle
-  ['tune', 'jazzy', 'harm', ['seed'], 'tune', 'A NEW TUNE NEXT PHRASE'], ['comp', 'jazzy', 'trig', [5], 'comp', 'NEW CHORD RHYTHM'], ['bassline', 'jazzy', 'trig', [4], 'comp', 'NEW BASS LINE'],
-  ['color', 'jazzy', 'harm', ['color'], 'small', 'HARMONY COLOUR'], ['movement', 'jazzy', 'harm', ['move'], 'small', 'CHORD MOVEMENT'], ['walk', 'jazzy', 'harm', ['walk'], 'small', 'WALKING BASS'], ['hats', 'jazzy', 'sampler|drums', ['hLvl'], 'fade', 'HATS'], ['shaker', 'jazzy', 'perc', ['shLvl'], 'fade', 'SHAKER'],
-  ['openhats', 'jazzy', 'sampler|drums', ['oLvl'], 'fade', 'OPEN HATS'], ['rim', 'jazzy', 'perc', ['rLvl'], 'fade', 'RIM'], ['chordtone', 'jazzy', 'stab', ['cutoff'], 'small', 'CHORD TONE'], ['chordlen', 'jazzy', 'stab', ['decay'], 'small', 'CHORD LENGTH'],
-  ['bassfilter', 'jazzy', 'bass', ['cutoff'], 'small', 'BASS TONE'], ['delay', 'jazzy', 'delay', ['mix'], 'small', 'ECHOES'], ['space', 'jazzy', 'verb', ['mix'], 'small', 'SPACE'], ['wobble', 'jazzy', 'tape', ['wow'], 'small', 'TAPE WOBBLE'], ['swing', 'jazzy', 'groove', ['swing'], 'small', 'SWING']];
-const moveOk = (mv, st) => mv[1] === '*' ? st !== 'jazzy' : mv[1] === 'd' ? ['house', 'tinez', 'dnb'].includes(st) : mv[1].split(' ').includes(st);
+  // jazzy and lo-fi: the band moves (a new tune from your songbook, comping, the vibes line, feel, tone); drums only fade layers, never reshuffle
+  ['tune', 'jazzy lofi', 'band', ['tune'], 'tune', 'NEXT TUNE AT THE END OF THIS ONE'], ['comp', 'jazzy lofi', 'band', ['comp'], 'step', 'NEW COMPING'],
+  ['vibesline', 'jazzy lofi', 'band', ['lead'], 'small', 'VIBES LINE'], ['feel', 'jazzy lofi', 'band', ['human'], 'small', 'LOOSENESS'], ['keystone', 'jazzy lofi', 'band', ['tone'], 'small', 'KEYS TONE'],
+  ['hats', 'jazzy lofi', 'sampler|drums', ['hLvl'], 'fade', 'HATS'], ['shaker', 'jazzy lofi', 'perc', ['shLvl'], 'fade', 'SHAKER'], ['openhats', 'jazzy', 'sampler|drums', ['oLvl'], 'fade', 'OPEN HATS'], ['rim', 'jazzy', 'perc', ['rLvl'], 'fade', 'RIM'],
+  ['bassfilter', 'jazzy lofi', 'bass', ['cutoff'], 'small', 'BASS TONE'], ['delay', 'jazzy lofi', 'delay', ['mix'], 'small', 'ECHOES'], ['space', 'jazzy lofi', 'verb', ['mix'], 'small', 'SPACE'], ['wobble', 'jazzy lofi', 'tape', ['wow'], 'small', 'TAPE WOBBLE'], ['swing', 'jazzy lofi', 'groove', ['swing'], 'small', 'SWING']];
+const moveOk = (mv, st) => mv[1] === '*' ? st !== 'jazzy' && st !== 'lofi' : mv[1] === 'd' ? ['house', 'tinez', 'dnb'].includes(st) : mv[1].split(' ').includes(st);
 function condMove(phrase) {
   const st = DECK.style, depth = modById.cond.v('depth'), pool = MOVES.filter(mv => moveOk(mv, st) && (mv[4] === 'comp' ? phrase && isPatched(liveId(mv[2])) : mv[3].some(k => condKnob(mv[2], k))));
   // now and then, bring something that has wandered back home instead
@@ -2513,8 +2617,8 @@ function condMove(phrase) {
   if (!pool.length) return;
   const w = pool.map(mv => clamp(1 + 0.35 * (TASTE.m[mv[0]] || 0), 0.15, 3)); let r = Math.random() * w.reduce((a, b) => a + b, 0), mv = pool[0];
   for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) { mv = pool[i]; break; } }
-  const [name, , mid, ks, kind, label, vals] = mv, jz = st === 'jazzy'; let say = label;
-  if (kind === 'tune') { const kn = condKnob('harm', 'seed'); setMany([[kn, kn.toNorm((kn.value + 1 + Math.floor(Math.random() * 98)) % 100)]], label); }
+  const [name, , mid, ks, kind, label, vals] = mv, jz = st === 'jazzy' || st === 'lofi'; let say = label;
+  if (kind === 'tune') { const kn = condKnob(mid, ks[0]); if (!kn) return; if (mid === 'band') { const t = SONGBOOK[kn.value], opts = bookPool(t ? t.feel : 'lofi').filter(i => i !== kn.value); if (!opts.length) return; setMany([[kn, kn.toNorm(rpick(opts))]], label); } else setMany([[kn, kn.toNorm((kn.value + 1 + Math.floor(Math.random() * 98)) % 100)]], label); }
   else if (kind === 'comp') { const m = modById[liveId('trig')], row = ks[0], pats = row === 5 ? JAZZ_COMP : JAZZ_BASS, P = new Set(rpick(pats)); setMany(Array.from({ length: 16 }, (_, k) => [m.knobs['b' + row + '_' + k], P.has(k) ? 1 : 0]), label); }
   else { const kn = condKnob(mid, rpick(ks.filter(k => condKnob(mid, k)))); if (!kn) return;
     const b = baseOf(kn), [lo, hi] = safeN(mid.split('|')[0], kn.def.id);
@@ -2527,7 +2631,7 @@ function condMove(phrase) {
 }
 // song shape: lengths in bars, always whole phrases (multiples of 8). ENERGY lengthens drops or breakdowns.
 function sections(st, en) {
-  if (st === 'jazzy') return en < 0.35 ? [['GROOVE', 32], ['LAY BACK', 16], ['GROOVE', 24], ['LAY BACK', 16]] : [['GROOVE', 32], ['LAY BACK', en > 0.65 ? 8 : 16], ['GROOVE', 32], ['GROOVE', 16]];
+  if (st === 'jazzy' || st === 'lofi') return en < 0.35 ? [['GROOVE', 32], ['LAY BACK', 16], ['GROOVE', 24], ['LAY BACK', 16]] : [['GROOVE', 32], ['LAY BACK', en > 0.65 ? 8 : 16], ['GROOVE', 32], ['GROOVE', 16]];
   if (!DANCE_ST.has(st)) return [['FLOW', 32], ['THIN OUT', en > 0.65 ? 8 : 16], ['SWELL', 16], ['FLOW', 32]];
   if (en < 0.3) return [['GROOVE', 32], ['BREAKDOWN', 32], ['GROOVE', 32]];
   return [['GROOVE', 32], ['BREAKDOWN', en > 0.65 ? 8 : 16], ['BUILD', en > 0.65 ? 16 : 8], ['DROP', en > 0.65 ? 48 : 32], ['GROOVE', 32], ['BUILD', 8], ['DROP', 32]];
@@ -2540,7 +2644,7 @@ function enterSection(name, len) {
   if (name === 'BREAKDOWN') { secKnob('groove', 'kDen', () => 0, 0.02); secKnob('groove', 'sDen', b => b * 0.5, 0.02); secKnob('groove', 'hDen', b => b * 0.6, 0.02); secKnob('sweep', 'pos', () => 0.36, 4); secKnob('verb', 'mix', b => Math.min(1, b * 1.35), 4); condSay('BREAKDOWN · kick out, filter down'); }
   else if (name === 'BUILD') { secKnob('groove', 'kDen', home, 0.02); secKnob('groove', 'sDen', b => Math.min(1, b + 0.35), len); secKnob('sweep', 'pos', () => 0.6 + 0.1 * modById.cond.v('energy'), len); secKnob('echo', 'mix', b => Math.min(1, b + 0.12), len); secKnob('pump', 'depth', b => Math.min(1, b + 0.1), len); condSay('BUILD · rising'); }
   else if (name === 'LAY BACK') { secKnob('sampler|drums', 'kLvl', b => b * 0.25, 1); secKnob('sampler|drums', 'hLvl', b => b * 0.55, 4); secKnob('sweep', 'pos', () => 0.43, 6); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 6); condSay('LAYING BACK · kick drops away'); }
-  else if (name === 'DROP' || name === 'GROOVE' || name === 'FLOW') { const was = COND.sectionKeys.size; sectionsHome(name === 'DROP' ? 0.02 : DECK.style === 'jazzy' ? 1 : 2); if (name === 'DROP') condSay('DROP · everything back in'); else if (was && DECK.style === 'jazzy') condSay('BACK IN THE GROOVE'); }
+  else if (name === 'DROP' || name === 'GROOVE' || name === 'FLOW') { const was = COND.sectionKeys.size; sectionsHome(name === 'DROP' ? 0.02 : DECK.style === 'jazzy' || DECK.style === 'lofi' ? 1 : 2); if (name === 'DROP') condSay('DROP · everything back in'); else if (was && (DECK.style === 'jazzy' || DECK.style === 'lofi')) condSay('BACK IN THE GROOVE'); }
   else if (name === 'THIN OUT') { secKnob('sweep', 'pos', () => 0.4, 8); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 8); secKnob('mix', 'lvl2', b => b * 0.5, 8); condSay('THINNING OUT'); }
   else if (name === 'SWELL') { secKnob('sweep', 'pos', () => 0.5, len); secKnob('texture', 'dens', b => Math.min(1, b + 0.2), len); secKnob('verb', 'mix', home, len); secKnob('mix', 'lvl2', home, len); condSay('SWELLING'); }
 }
@@ -2567,7 +2671,7 @@ function condTick() {
     enterSection(n, l); return; }
   if (COND.bar >= COND.nextMove) { const every = [4, 8, 16, 32][modById.cond.v('drift')] || 8; COND.nextMove = Math.floor(COND.bar / every + 1e-6) * every + every;
     const quiet = COND.sec && COND.secBar < 1 && COND.sec.name !== 'GROOVE' && COND.sec.name !== 'FLOW', phrase = Math.round(COND.bar) % 8 === 0;
-    if (!quiet) { condMove(phrase); if (DECK.style !== 'jazzy' && Math.random() < modById.cond.v('depth') * 0.4) condMove(false); } }
+    if (!quiet) { condMove(phrase); if (DECK.style !== 'jazzy' && DECK.style !== 'lofi' && Math.random() < modById.cond.v('depth') * 0.4) condMove(false); } }
 }
 function condRebase() { COND.base = {}; COND.glides.clear(); COND.sectionKeys.clear(); COND.hist = []; COND.sec = null; COND.si = -1; COND.secBar = 0; COND.secStart = null; COND.dirty = true; }
 function condBack() { const h = COND.hist.pop(); if (!h) { if (!blendBack()) condSay('nothing to take back'); return; } for (const [kn, from] of h.ks) glideTo(kn, from, kn.def.step ? 0.02 : 1); condSay('TAKEN BACK · ' + h.label); }
@@ -2600,10 +2704,10 @@ setInterval(() => { try { blendTick(); condTick(); } catch (e) { console.warn(e)
 Object.assign(window, { COND, TASTE, condMove, condPress, condToggle, blendBack });
 
 function randomPatch(style) {
-  pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'jazzy']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
-  DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy', 'swap'].map(k => [k, modById.cond.knobs[k].norm]);
+  pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'jazzy', 'lofi']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
+  setTimeout(() => { window.__nextTune = null; }, 0); DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy', 'swap'].map(k => [k, modById.cond.knobs[k].norm]);
   loadPatch(tastePick(() => genPatch(s, wild), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); send({ t: 'barsync', reset: deckIds('A') }); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
-  toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy, low-key patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
+  toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy deep house patch', lofi: 'New lo-fi patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
 }
 function undoRandom() { const P = RND.undo.pop(); if (!P) return; RND.tw = []; loadPatch(P); document.getElementById('rUndo').disabled = !RND.undo.length; toast('Undone', true); }
 Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom, blendNext, deckPatch, DECK });
@@ -2616,12 +2720,26 @@ document.getElementById('rDnb').onclick = () => randomPatch('dnb');
 document.getElementById('rKiln').onclick = () => randomPatch('kiln');
 document.getElementById('rTinez').onclick = () => randomPatch('tinez');
 document.getElementById('rJazz').onclick = () => randomPatch('jazzy');
+document.getElementById('rLofi').onclick = () => randomPatch('lofi');
 document.getElementById('rSurp').onclick = () => randomPatch('surprise');
 document.getElementById('rShuf').onclick = () => shuffleKnobs(1);
 document.getElementById('rNudge').onclick = () => shuffleKnobs(0.12);
 document.getElementById('rUndo').onclick = undoRandom;
 const moreHint = el => { const f = () => el.classList.toggle('more', el.scrollHeight - el.clientHeight - el.scrollTop > 4); el.addEventListener('scroll', f, { passive: true }); new ResizeObserver(f).observe(el); addEventListener('resize', f); f(); };
-['patches', 'rand', 'scene', 'kits'].forEach(id => { const el = document.getElementById(id); if (el) moreHint(el); });
+['patches', 'rand', 'scene', 'kits', 'book'].forEach(id => { const el = document.getElementById(id); if (el) moreHint(el); });
+function renderBook() { const el = document.getElementById('bookList'); if (!el) return; const cur = modById.band ? SONGBOOK[modById[liveId('band')].v('tune')] : null, live = DECK.style === 'jazzy' || DECK.style === 'lofi';
+  el.innerHTML = ['lofi', 'deep'].map(f => '<div class="sec" style="margin-top:10px">' + (f === 'lofi' ? 'LO-FI' : 'JAZZY DEEP HOUSE') + '</div>' + SONGBOOK.map((t, i) => t.feel !== f ? '' : `<div class="t${live && cur === t ? ' on' : ''}${BOOK.skipped[t.id] ? ' skip' : ''}"><button data-p="${i}" title="Play">▶</button><span>${t.name}<small>${t.A.split('|')[0].trim()}</small></span><button data-k="${i}" class="${BOOK.kept[t.id] ? 'kept' : ''}" title="Keep">★</button><button data-s="${i}" title="Skip">✕</button></div>`).join('')).join(''); }
+function auditionTune(i) { const t = SONGBOOK[i], st = t.feel === 'lofi' ? 'lofi' : 'jazzy', m = modById[liveId('band')];
+  if (DECK.style !== st || !m || !isPatched(m.id)) { window.__nextTune = i; randomPatch(st); } else { m.audition = true; m.knobs.tune.set(m.knobs.tune.toNorm(i)); }
+  toast('Playing ' + t.name + (DECK.style === st ? ' from the next bar' : ''), true); setTimeout(renderBook, 50); }
+document.getElementById('bookList').onclick = e => { const b = e.target.closest('button'); if (!b) return; const i = +(b.dataset.p ?? b.dataset.k ?? b.dataset.s), t = SONGBOOK[i];
+  if (b.dataset.p != null) auditionTune(i); else if (b.dataset.k != null) { if (BOOK.kept[t.id]) delete BOOK.kept[t.id]; else { BOOK.kept[t.id] = true; delete BOOK.skipped[t.id]; } } else { if (BOOK.skipped[t.id]) delete BOOK.skipped[t.id]; else { BOOK.skipped[t.id] = true; delete BOOK.kept[t.id]; } }
+  saveBook(); renderBook(); };
+document.getElementById('bookExp').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ nightRackSongbook: 1, kept: Object.keys(BOOK.kept), skipped: Object.keys(BOOK.skipped), saved: new Date().toISOString() }, null, 2)], { type: 'application/json' })); a.download = 'night-rack-songbook.json'; a.click(); };
+document.getElementById('bookImp').onclick = () => { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = async () => { try { const d = JSON.parse(await f.files[0].text()); BOOK.kept = {}; BOOK.skipped = {}; for (const k of d.kept || []) BOOK.kept[k] = true; for (const k of d.skipped || []) BOOK.skipped[k] = true; saveBook(); renderBook(); toast('Songbook loaded', true); } catch (e) { toast('That file is not a songbook'); } }; f.click(); };
+document.getElementById('bookClr').onclick = () => { BOOK.kept = {}; saveBook(); renderBook(); };
+Object.assign(window, { auditionTune, renderBook, BOOK });
+document.getElementById('bBook').onclick = () => { const el = document.getElementById('book'); el.classList.toggle('hide'); if (!el.classList.contains('hide')) renderBook(); ['patches', 'scene', 'help', 'rand', 'kits'].forEach(id => { const x = document.getElementById(id); if (x) x.classList.add('hide'); }); };
 document.getElementById('bRand').onclick = () => { document.getElementById('rand').classList.toggle('hide'); ['patches', 'scene', 'help'].forEach(id => document.getElementById(id).classList.add('hide')); };
 addEventListener('keydown', e => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey) return; if (e.key === 'r' || e.key === 'R') randomPatch(RND.style); if ((e.key === 'z' || e.key === 'Z')) undoRandom(); });
 
@@ -2738,7 +2856,7 @@ document.getElementById('cmDel').onclick = () => { if (menuCable) removeCable(me
 // X: unplug a jack / reset a knob · Y: new random patch · LB/RB: cable color (on a jack) or fine turn (on a knob)
 // LT/RT: zoom · right stick: orbit · View: undo · Menu: power · L3: home view · R3: change random style · hold View+Menu: back to Hedron
 const PAD = { active: false, prev: [], focus: null, items: [], mode: 'nav', rep: 0, repDir: null, hold: 0, styleI: 0, idle: 0, hintShown: false };
-const STYLES = ['ambient', 'house', 'tinez', 'jazzy', 'dnb', 'kiln', 'surprise'];
+const STYLES = ['ambient', 'house', 'tinez', 'jazzy', 'lofi', 'dnb', 'kiln', 'surprise'];
 const padRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 48), new THREE.MeshBasicMaterial({ color: 0x4fe3ff, toneMapped: false, transparent: true, opacity: 0.95 }));
 padRing.visible = false; scene.add(padRing);
 function padItems() {
@@ -3065,7 +3183,7 @@ canvas.addEventListener('pointerup', e => {
   if (tLast && now - tLast.t < 350 && Math.hypot(e.clientX - tLast.x, e.clientY - tLast.y) < 30 && h && h.module) { const m = h.module, c = modPt(m, m.w / 2, U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1)).applyQuaternion(m.sec ? m.sec.q : QI)), c); tLast = null; return; }
   tLast = { t: now, x: e.clientX, y: e.clientY };
 }, true);
-const PANELS = ['patches', 'rand', 'scene', 'help', 'kits'];
+const PANELS = ['patches', 'rand', 'scene', 'help', 'kits', 'book'];
 function panelsOpen() { return PANELS.some(id => !document.getElementById(id).classList.contains('hide')); }
 function closePanels() { PANELS.forEach(id => document.getElementById(id).classList.add('hide')); document.body.classList.remove('menuopen'); }
 PANELS.forEach(id => { const el = document.getElementById(id), b = document.createElement('button'); b.className = 'xclose'; b.textContent = '✕ CLOSE'; b.onclick = closePanels; el.prepend(b); });
@@ -3103,7 +3221,7 @@ async function startEngine() {
     ENG = { post: ms => ms.forEach(m => e.handle(m)), node, kind: 'fallback' };
   }
   for (const m of modules) if (m.type in CLASSES) engineAdd(m);
-  deckRestore();
+  deckRestore(); for (const m of modules) if (m.type === 'band') sendTune(m, 'phrase'); loadKeys();
   for (const m of modules) if (m.type === 'sampler') loadKit(m); else if (m.type === 'mbira' || m.type === 'field') loadSet(m);
   for (const c of cables) if (c.connected) { c.uid = cableUid++; send({ t: 'con', c: c.uid, om: c.out.module.id, op: c.out.id, im: c.inp.module.id, ip: c.inp.id }); }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -6; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.25;
