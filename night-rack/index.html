@@ -44,7 +44,7 @@ button.on{color:#021018;background:var(--acc);border-color:var(--acc)}
 #kits{top:58px;right:14px;width:300px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #kits .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#kits .chips{display:flex;flex-wrap:wrap;gap:5px}#kits .chips button{padding:5px 9px;font-size:11px}#kits .chips button.cur{background:#2a7bff;color:#fff}#kits .muted{color:var(--dim);line-height:1.4;font-size:11px}
 #kits .slot{display:flex;align-items:center;gap:6px;margin:5px 0}#kits .slot b{width:46px;font-size:10px;letter-spacing:.1em;color:#b8c8ea}#kits .slot span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8eef8}#kits .slot button,#kits .row button{padding:5px 8px;font-size:11px}#kits .row{display:flex;gap:6px;margin-top:6px}#kits input{flex:1;min-width:0;background:rgba(0,0,0,.35);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;font-size:12px}
-#rand{top:58px;right:14px;width:270px;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#rand{top:58px;right:14px;width:270px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #rand .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#rand .sec:first-child{margin-top:0}#rand .chips{display:flex;flex-wrap:wrap;gap:5px}#rand .chips button{padding:5px 9px;font-size:11px;letter-spacing:.04em}#rand .muted{color:var(--dim);line-height:1.4}#rand button:disabled{opacity:.35;cursor:default}
 #patches .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#patches .sec:first-child{margin-top:0}
 #patches .chips{display:flex;flex-wrap:wrap;gap:5px}#patches .chips button{padding:5px 8px;font-size:11px;letter-spacing:.04em}
@@ -120,7 +120,9 @@ body.cam #cambar{display:flex}
   #kb .keys{height:84px}
   body.menuopen #bar{flex-direction:column;align-items:stretch;width:160px}
   #brand p{display:none}#brand{top:12px;left:12px}#brand h1{font-size:12px}
-  #patches,#rand,#scene,#kits{top:auto;bottom:10px;right:10px;left:10px;width:auto;max-height:60vh;overflow:auto}
+  #patches,#rand,#scene,#kits{top:auto;bottom:10px;right:10px;left:10px;width:auto;max-height:calc(100vh - 72px);max-height:calc(100dvh - 72px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  #rand .muted{display:none}#rand .sec{margin:9px 0 6px}
+  .hud.more{-webkit-mask-image:linear-gradient(#000 calc(100% - 34px),transparent);mask-image:linear-gradient(#000 calc(100% - 34px),transparent)}
   #help{left:10px;right:10px;bottom:10px;max-width:none;max-height:55vh;overflow:auto}
   #padhint{left:10px;right:10px;max-width:none}
   #guide{left:10px;bottom:10px}
@@ -2534,6 +2536,8 @@ document.getElementById('rSurp').onclick = () => randomPatch('surprise');
 document.getElementById('rShuf').onclick = () => shuffleKnobs(1);
 document.getElementById('rNudge').onclick = () => shuffleKnobs(0.12);
 document.getElementById('rUndo').onclick = undoRandom;
+const moreHint = el => { const f = () => el.classList.toggle('more', el.scrollHeight - el.clientHeight - el.scrollTop > 4); el.addEventListener('scroll', f, { passive: true }); new ResizeObserver(f).observe(el); addEventListener('resize', f); f(); };
+['patches', 'rand', 'scene', 'kits'].forEach(id => { const el = document.getElementById(id); if (el) moreHint(el); });
 document.getElementById('bRand').onclick = () => { document.getElementById('rand').classList.toggle('hide'); ['patches', 'scene', 'help'].forEach(id => document.getElementById(id).classList.add('hide')); };
 addEventListener('keydown', e => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey) return; if (e.key === 'r' || e.key === 'R') randomPatch(RND.style); if ((e.key === 'z' || e.key === 'Z')) undoRandom(); });
 
