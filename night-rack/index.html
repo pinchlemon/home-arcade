@@ -47,7 +47,7 @@ button.on{color:#021018;background:var(--acc);border-color:var(--acc)}
 #kits .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#kits .chips{display:flex;flex-wrap:wrap;gap:5px}#kits .chips button{padding:5px 9px;font-size:11px}#kits .chips button.cur{background:#2a7bff;color:#fff}#kits .muted{color:var(--dim);line-height:1.4;font-size:11px}
 #kits .slot{display:flex;align-items:center;gap:6px;margin:5px 0}#kits .slot b{width:46px;font-size:10px;letter-spacing:.1em;color:#b8c8ea}#kits .slot span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8eef8}#kits .slot button,#kits .row button{padding:5px 8px;font-size:11px}#kits .row{display:flex;gap:6px;margin-top:6px}#kits input{flex:1;min-width:0;background:rgba(0,0,0,.35);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;font-size:12px}
 #rand{top:58px;right:14px;width:270px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-#rand .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#rand .sec:first-child{margin-top:0}#rand .chips{display:flex;flex-wrap:wrap;gap:5px}#rand .chips button{padding:5px 9px;font-size:11px;letter-spacing:.04em}#rand .muted{color:var(--dim);line-height:1.4}#rand button:disabled{opacity:.35;cursor:default}
+#rand .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#rand .sec:first-child{margin-top:0}#rand .chips{display:flex;flex-wrap:wrap;gap:5px}#rand .chips button{padding:5px 9px;font-size:11px;letter-spacing:.04em}#rand .muted{color:var(--dim);line-height:1.4}#rand button:disabled{opacity:.35;cursor:default}#rMode{margin-bottom:7px}#rMode button.cur{background:#2a7bff;color:#fff;border-color:#2a7bff}
 #patches .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:12px 0 7px}#patches .sec:first-child{margin-top:0}
 #patches .chips{display:flex;flex-wrap:wrap;gap:5px}#patches .chips button{padding:5px 8px;font-size:11px;letter-spacing:.04em}
 #patches .row{display:flex;align-items:center;justify-content:space-between;margin:5px 0;gap:8px}#patches .row span{color:#b8c8ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -169,8 +169,9 @@ body.cam #cambar{display:flex}
 </div>
 <div id="rand" class="hud hide">
   <div class="sec">NEW RANDOM PATCH</div>
+  <div class="chips" id="rMode"><button data-m="clean">CLEAN</button><button data-m="exp">EXPERIMENTAL</button></div>
   <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rLofi">LO-FI</button><button id="rSurp">SURPRISE</button></div>
-  <div class="muted" style="margin-top:6px">Rewires the whole rack into a new playable patch. Press R to roll again.</div>
+  <div class="muted" style="margin-top:6px">Rewires the whole rack into a new playable patch. Press R to roll again. CLEAN keeps each genre's proper sound; EXPERIMENTAL lets anything happen (wild modulation, folding, FM).</div>
   <div class="sec">DECKS</div>
   <div class="chips"><button id="rBlend">BLEND TO DECK B</button></div>
   <div class="muted" style="margin-top:6px">Builds a new patch in the same style and key on the resting deck (the left rack is deck B), then fades over to it. BLEND's BARS knob sets how long.</div>
@@ -369,7 +370,7 @@ DEFS.lfo = lay('DUAL LFO', 8, 'silver',
   [[jo('bi1', 'BI', 'cv'), jo('bi2', 'BI', 'cv')], [jo('uni1', 'UNI', 'cv'), jo('uni2', 'UNI', 'cv')]], { divider: true });
 DEFS.mixer = lay('MIXER', 8, 'black',
   [1, 2, 3, 4].map(i => [ji('in' + i, 'IN ' + i, 'audio'), kn('lvl' + i, 'LEVEL', 'S', { def: [0.8, 0.6, 0.45, 0.55][i - 1], fmt: fPct, name: 'LEVEL ' + i })]),
-  [[ld('vu', 'blue'), jo('out', 'OUT')]]);
+  [[kn('auto', 'AUTO', 'T', { min: 0, max: 1, step: 1, def: 0, name: 'AUTO LEVEL', fmt: v => v ? 'ON: EACH NEW SOUND IS LEVELLED' : 'OFF' }), ld('vu', 'blue'), jo('out', 'OUT')]]);
 DEFS.noise = lay('NOISE', 4, 'silver', [[ld('n', 'white')]], [[jo('white', 'WHITE')], [jo('pink', 'PINK')]]);
 DEFS.scope = lay('SCOPE', 14, 'black', [[sc(5.6)]],
   [[kn('time', 'TIME', 'S', { def: 0.45, fmt: v => (lerp(128, 1536, v) / 48).toFixed(1) + ' ms' }), kn('gain', 'GAIN', 'S', { min: 0.25, max: 4, def: 1.2, curve: 'exp', fmt: v => '×' + v.toFixed(2) }), ji('in', 'IN', 'audio')]]);
@@ -469,7 +470,7 @@ DEFS.mix6 = lay('MIXER 6', 16, 'navy',
   [[1, 2, 3, 4, 5, 6].map(k => kn('lvl' + k, String(k), 'T', { def: 0.7, name: 'LEVEL ' + k, fmt: fPct })),
    [1, 2, 3, 4, 5, 6].map(k => kn('pan' + k, 'PAN', 'T', { min: -1, max: 1, def: 0, name: 'PAN ' + k, fmt: panF }))],
   [[1, 2, 3, 4, 5, 6].map(k => ji('in' + k, 'IN', 'audio')),
-   [kn('master', 'MASTER', 'S', { def: 0.8, fmt: fPct }), ld('vuL', 'cyan'), ld('vuR', 'cyan'), jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+   [kn('master', 'MASTER', 'T', { def: 0.8, fmt: fPct }), kn('auto', 'AUTO', 'T', { min: 0, max: 1, step: 1, def: 0, name: 'AUTO LEVEL', fmt: v => v ? 'ON: EACH NEW SOUND IS LEVELLED' : 'OFF' }), ld('vuL', 'cyan'), ld('vuR', 'cyan'), jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.duck = lay('DUCKER', 8, 'black',
   [[kn('depth', 'DEPTH', 'L', { def: 0.6, fmt: fPct })], [kn('rel', 'RELEASE', 'S', { def: 0.3, fmt: v => fS(0.04 + v * 0.8) }), kn('shape', 'CURVE', 'S', { def: 0.5, fmt: fPct })], [ld('led', 'amber')]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [ji('trig', 'KICK', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
@@ -527,7 +528,7 @@ DEFS.wide = lay('WIDE', 12, 'silver',
 DEFS.limit = lay('LIMIT', 10, 'black',
   [[kn('drive', 'DRIVE', 'L', { min: 0, max: 18, def: 3, fmt: fDb })],
    [kn('ceil', 'CEILING', 'S', { min: -6, max: 0, def: -1, fmt: fDb }), kn('rel', 'RELEASE', 'S', { min: 0.02, max: 0.5, def: 0.1, curve: 'exp', fmt: fS })],
-   [kn('air', 'AIR', 'S', { def: 0.2, fmt: fPct }), ld('led', 'red')]],
+   [kn('air', 'AIR', 'S', { def: 0.2, fmt: fPct }), kn('level', 'LEVEL', 'S', { min: -24, max: -6, step: 1, def: -24, name: 'AUTO LOUDNESS', fmt: v => v <= -24 ? 'OFF' : v + ' LUFS' }), ld('led', 'red')]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.keys = lay('KEYS', 16, 'silver',
   [[kn('sound', 'SOUND', 'S', { min: 0, max: KEY_SOUNDS.length - 1, step: 1, def: 0, fmt: v => KEY_SOUNDS[v] }), kn('tone', 'TONE', 'M', { def: 0.4, fmt: fPct }), kn('oct', 'OCTAVE', 'S', { min: -2, max: 2, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v }), kn('level', 'LEVEL', 'S', { def: 0.7, fmt: fPct })],
@@ -716,7 +717,7 @@ let AC = null, ENG = null, TEL = {}, TELNEW = false, cableUid = 1;
 const G = { beat: null, step: -1, tick: 0, lastCount: -1 };
 class Pulse { constructor() { this.q = []; this.last = -1e9; } push(t) { this.q.push(t); if (this.q.length > 64) this.q.shift(); } level(now, decay = 0.08) { while (this.q.length && this.q[0] <= now) this.last = this.q.shift(); const d = now - this.last; return d < 0 ? 0 : Math.exp(-d / decay); } }
 G.beat = new Pulse();
-function send(m) { if (ENG) ENG.post([m]); }
+function send(m) { if (window.__cap) window.__cap(m); if (ENG) ENG.post([m]); } // __cap: test hook (records what the engine is told)
 function tolerances(m) { // fixed per-module component spread, like real hardware units
   const r = mulberry32(hashStr('unit-' + m.id)), t = {};
   if (m.type === 'vcoA' || m.type === 'vcoB') Object.assign(t, { tol: (r() - 0.5) * 10, trk: 1 + (r() - 0.5) * 0.006, warm: 8 + r() * 12 });
@@ -2189,7 +2190,7 @@ function loadPatch(P) {
     const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
-  DECK.blending = null; ensureChain(); deckRestore(); condRebase(); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
+  DECK.blending = null; ensureChain(); deckRestore(); condRebase(); send({ t: 'param', id: 'limit', k: 'relearn', v: Math.random() }); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
   autosave();
 }
 function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
@@ -2216,7 +2217,7 @@ document.getElementById('pLoadCode').onclick = () => { try { loadPatch(decode(do
 document.getElementById('bPatches').onclick = () => { renderPatchUI(); document.getElementById('rand').classList.add('hide'); document.getElementById('patches').classList.toggle('hide'); document.getElementById('scene').classList.add('hide'); document.getElementById('help').classList.add('hide'); };
 
 // ================================================================ randomizer
-const RND = { undo: [], style: 'ambient', tw: [] };
+const RND = { undo: [], style: 'ambient', tw: [], mode: (() => { try { return localStorage.getItem('nightrack.mode') === 'exp' ? 'exp' : 'clean'; } catch (e) { return 'clean'; } })() };
 const rr = (a, b) => a + (b - a) * Math.random(), ri = (a, b) => Math.floor(rr(a, b + 1)), chance = p => Math.random() < p, rpick = a => a[Math.floor(Math.random() * a.length)];
 const rexp = (a, b) => a * Math.pow(b / a, Math.random());
 function cableColor(a, b) {
@@ -2227,7 +2228,9 @@ function cableColor(a, b) {
   if (port && port.kind === 'audio') return rpick(['#3b6cff', '#5aa9ff', '#9fb6d9', '#2c3f7a']);
   return rpick(['#c43cff', '#ffcf3a', '#3dffa0']);
 }
-function genPatch(style, wild) {
+function genPatch(style, wild, clean) {
+  // clean: the main-genre sound (no pitch/FM/fold modulation, keyed melodies, tame resonance). Experimental: anything goes.
+  const CL = !!clean; if (CL) wild = 0;
   const K = {}, C = [], set = (m, k, v) => ((K[m] = K[m] || {})[k] = v), con = (a, b) => C.push([a, b, cableColor(a, b)]);
   const used = new Set(), targets = [], maj = (style === 'ambient' && chance(0.35)) || (style === 'kiln' && chance(0.6)), PENT = maj ? [0, 2, 4, 7, 9] : [0, 3, 5, 7, 10], MINOR = [0, 2, 3, 5, 7, 8, 10];
   const note = (sc, lo, hi) => { let n; do { n = rpick(sc) + 12 * ri(0, 2); } while (n < lo || n > hi); return n; };
@@ -2237,25 +2240,25 @@ function genPatch(style, wild) {
     if (pitch[kind]) return pitch[kind];
     if (kind === 'seq') {
       con(rpick(style === 'house' ? ['clock.x2', 'clock.x4'] : ['clock.x1', 'clock.d2', 'clock.d2', 'clock.d4']), 'seq.clk');
-      const sc = style === 'house' ? MINOR : PENT; for (let s = 0; s < 8; s++) set('seq', 's' + s, style === 'house' && chance(0.4) ? 0 : note(sc, 0, style === 'house' ? 15 : 24));
+      const sc = style === 'house' ? MINOR : PENT; for (let s = 0; s < 8; s++) set('seq', 's' + s, style === 'house' && chance(0.4) ? 0 : note(sc, 0, style === 'house' ? 15 : CL ? 17 : 24));
       set('seq', 'len', rpick([4, 6, 8, 8, 8, 5, 7])); set('seq', 'prob', style === 'house' ? rr(0.75, 1) : rr(0.55, 0.95));
       return pitch[kind] = { cv: 'seq.cv', gate: 'seq.gate' };
     }
     if (kind === 'tur') {
       con(rpick(['clock.x1', 'clock.x2', 'clock.d2']), 'turing.clk');
-      set('turing', 'chg', rr(0.04, 0.3 + wild * 0.4)); set('turing', 'len', rpick([4, 5, 8, 8, 12, 16])); set('turing', 'range', rr(0.6, 2)); set('turing', 'scale', maj ? 2 : rpick([1, 3]));
+      set('turing', 'chg', CL ? rr(0.03, 0.15) : rr(0.04, 0.3 + wild * 0.4)); set('turing', 'len', rpick([4, 5, 8, 8, 12, 16])); set('turing', 'range', CL ? rr(0.5, 1.1) : rr(0.6, 2)); set('turing', 'scale', maj ? 2 : rpick([1, 3]));
       return pitch[kind] = { cv: 'turing.cv', gate: 'turing.gate' };
     }
     con(rpick(['clock.x1', 'clock.d2', 'clock.d4']), 'rnd.trig'); con('rnd.step', 'quant.in');
-    set('rnd', 'range', rr(1, 2.5)); set('rnd', 'chance', rr(0.5, 1)); set('rnd', 'slew', rexp(0.05, 3));
+    set('rnd', 'range', CL ? rr(0.6, 1.2) : rr(1, 2.5)); set('rnd', 'chance', rr(0.5, 1)); set('rnd', 'slew', CL ? rexp(0.02, 0.1) : rexp(0.05, 3));
     set('quant', 'scale', maj ? rpick([1, 3, 5]) : rpick([0, 0, 2, 4, 6])); set('quant', 'root', 0); set('quant', 'oct', rpick([0, 0, -1]));
     return pitch[kind] = { cv: 'quant.out', gate: 'quant.trig' };
   };
-  const vco = (v, p, octs) => { con(p.cv, v + '.voct'); set(v, 'oct', rpick(octs)); set(v, 'tune', 0); set(v, 'fine', rr(-6, 6)); set(v, 'drift', rr(0.15, 0.5)); set(v, 'fm', 0); used.add(v); targets.push(v + '.fm'); };
-  const filt = (f, cut, res) => { set(f, 'cutoff', cut); set(f, 'res', res); set(f, 'drive', rr(0.05, 0.4 + wild * 0.4)); set(f, 'cv1', rr(0.2, 0.6)); used.add(f); targets.push(f + '.cv1'); };
+  const vco = (v, p, octs) => { con(p.cv, v + '.voct'); set(v, 'oct', rpick(octs)); set(v, 'tune', 0); set(v, 'fine', rr(-6, 6)); set(v, 'drift', CL ? rr(0.1, 0.3) : rr(0.15, 0.5)); set(v, 'fm', 0); used.add(v); if (!CL) targets.push(v + '.fm'); };
+  const filt = (f, cut, res) => { set(f, 'cutoff', cut); set(f, 'res', CL ? Math.min(res, 0.5) : res); set(f, 'drive', CL ? rr(0.05, 0.3) : rr(0.05, 0.4 + wild * 0.4)); set(f, 'cv1', CL ? rr(0.06, 0.16) : rr(0.2, 0.6)); used.add(f); targets.push(f + '.cv1'); };
   const voice = { // each returns an audio output
     subA: p => { vco('vcoA', p, style === 'house' ? [-2, -2, -1] : [-1, 0, 0, 1]); let o = rpick(['vcoA.saw', 'vcoA.sqr', 'vcoA.saw', 'vcoA.tri']);
-      if (chance(0.2 + wild * 0.3) && !used.has('folder')) { con(o, 'folder.in'); o = 'folder.out'; used.add('folder'); set('folder', 'fold', rr(0.15, 0.5 + wild * 0.4)); set('folder', 'symm', rr(0.3, 0.7)); targets.push('folder.cv'); }
+      if (!CL && chance(0.2 + wild * 0.3) && !used.has('folder')) { con(o, 'folder.in'); o = 'folder.out'; used.add('folder'); set('folder', 'fold', rr(0.15, 0.5 + wild * 0.4)); set('folder', 'symm', rr(0.3, 0.7)); targets.push('folder.cv'); }
       con(o, 'vcfA.in'); filt('vcfA', style === 'house' ? rexp(180, 700) : rexp(300, 2500), rr(0.1, style === 'house' ? 0.75 : 0.6));
       con(p.gate, 'env.trig1'); con('env.env1', 'vca.cv1'); if (chance(0.75)) { con('env.env1', 'vcfA.cv2'); set('vcfA', 'cv2', rr(0.25, 0.7)); }
       set('env', 'atk1', style === 'house' ? 0.003 : rexp(0.003, 1.5)); set('env', 'rel1', style === 'house' ? rr(0.12, 0.45) : rexp(0.4, 6)); set('vca', 'lvl1', 1.1); set('vca', 'bias1', 0);
@@ -2264,19 +2267,19 @@ function genPatch(style, wild) {
       con(p.gate, 'env.trig2'); con('env.env2', 'vca.cv2'); if (chance(0.6)) { con('env.env2', 'vcfB.cv2'); set('vcfB', 'cv2', rr(0.25, 0.6)); }
       set('env', 'atk2', rexp(0.003, 2)); set('env', 'rel2', rexp(0.5, 8)); set('vca', 'lvl2', 1.1); set('vca', 'bias2', 0); con(rpick(['vcfB.lp', 'vcfB.lp', 'vcfB.bp']), 'vca.in2'); return 'vca.out2'; },
     drone: () => { used.add('vcoB'); set('vcoB', 'oct', rpick([-2, -1, -1])); set('vcoB', 'tune', rpick([0, 0, 7, -5])); set('vcoB', 'drift', rr(0.3, 0.7)); targets.push('vcoB.fm');
-      let o = rpick(['vcoB.sin', 'vcoB.tri', 'vcoB.saw']); if (!used.has('folder') && chance(0.5)) { con(o, 'folder.in'); o = 'folder.out'; used.add('folder'); set('folder', 'fold', rr(0.2, 0.6)); con(rpick(['lfo.uni1', 'lfo.uni2']), 'folder.cv'); }
-      con(o, 'vcfB.in'); filt('vcfB', rexp(250, 1500), rr(0.1, 0.5)); con(rpick(['lfo.bi1', 'lfo.bi2', 'lfo.uni2']), 'vcfB.cv1'); set('vcfB', 'cv1', rr(0.3, 0.7)); return 'vcfB.lp'; },
-    wind: () => { con(rpick(['noise.pink', 'noise.white']), 'vcfB.in'); filt('vcfB', rexp(300, 2000), rr(0.7, 0.92)); con(rpick(['lfo.bi1', 'lfo.bi2', 'rnd.smooth']), 'vcfB.cv1'); set('vcfB', 'cv1', rr(0.5, 1)); return 'vcfB.bp'; },
+      let o = rpick(['vcoB.sin', 'vcoB.tri', 'vcoB.saw']); if (!used.has('folder') && chance(CL ? 0.12 : 0.5)) { con(o, 'folder.in'); o = 'folder.out'; used.add('folder'); set('folder', 'fold', CL ? rr(0.1, 0.25) : rr(0.2, 0.6)); con(rpick(['lfo.uni1', 'lfo.uni2']), 'folder.cv'); }
+      con(o, 'vcfB.in'); filt('vcfB', rexp(250, 1500), rr(0.1, 0.5)); con(CL ? rpick(['lfo.bi1', 'lfo.bi2']) : rpick(['lfo.bi1', 'lfo.bi2', 'lfo.uni2']), 'vcfB.cv1'); set('vcfB', 'cv1', CL ? rr(0.08, 0.18) : rr(0.3, 0.7)); return 'vcfB.lp'; },
+    wind: () => { con(CL ? 'noise.pink' : rpick(['noise.pink', 'noise.white']), 'vcfB.in'); filt('vcfB', CL ? rexp(250, 900) : rexp(300, 2000), CL ? rr(0.3, 0.5) : rr(0.7, 0.92)); if (CL) set('vcfB', 'res', rr(0.35, 0.55)); con(rpick(['lfo.bi1', 'lfo.bi2', 'rnd.smooth']), 'vcfB.cv1'); set('vcfB', 'cv1', CL ? rr(0.1, 0.25) : rr(0.5, 1)); return 'vcfB.bp'; },
     macro: (p, gate) => { con(p.cv, 'macro.voct'); con(gate || p.gate, 'macro.trig'); used.add('macro');
-      set('macro', 'model', style === 'house' ? rpick([0, 2, 5, 5, 6, 7]) : ri(0, 7)); set('macro', 'freq', style === 'house' ? rpick([0, 12]) : rpick([0, 12, 12, 24]));
-      for (const k of ['harm', 'timbre', 'morph']) set('macro', k, rr(0.15, 0.85)); set('macro', 'decay', style === 'house' ? rr(0.2, 0.45) : rr(0.4, 0.85)); set('macro', 'color', rr(0.3, 0.8));
-      targets.push('macro.timbre', 'macro.morph', 'macro.harm');
+      set('macro', 'model', CL ? rpick(style === 'house' ? [5, 5, 6, 0] : [5, 6, 6, 7]) : style === 'house' ? rpick([0, 2, 5, 5, 6, 7]) : ri(0, 7)); set('macro', 'freq', CL ? (style === 'house' ? rpick([0, 12]) : 0) : style === 'house' ? rpick([0, 12]) : rpick([0, 12, 12, 24]));
+      for (const k of ['harm', 'timbre', 'morph']) set('macro', k, CL ? rr(0.2, 0.5) : rr(0.15, 0.85)); set('macro', 'decay', style === 'house' ? rr(0.2, 0.45) : rr(0.4, 0.85)); set('macro', 'color', CL ? rr(0.25, 0.5) : rr(0.3, 0.8));
+      targets.push('macro.timbre'); if (!CL) targets.push('macro.morph', 'macro.harm');
       if (style !== 'house' && chance(0.5 + wild * 0.2)) { con('macro.out', 'texture.inL'); used.add('texture');
-        set('texture', 'pos', rr(0.1, 0.8)); set('texture', 'size', rr(0.4, 0.85)); set('texture', 'pitch', rpick([0, 0, 12, -12, 7])); set('texture', 'dens', rr(0.4, 0.8)); set('texture', 'blend', rr(0.6, 1)); set('texture', 'spread', rr(0.4, 1)); set('texture', 'fb', rr(0, 0.4)); set('texture', 'tex', rr(0.2, 0.8));
+        set('texture', 'pos', rr(0.1, 0.8)); set('texture', 'size', rr(0.4, 0.85)); set('texture', 'pitch', CL ? rpick([0, 0, 12]) : rpick([0, 0, 12, -12, 7])); set('texture', 'dens', rr(0.4, 0.8)); set('texture', 'blend', CL ? rr(0.5, 0.85) : rr(0.6, 1)); set('texture', 'spread', rr(0.4, 1)); set('texture', 'fb', CL ? rr(0, 0.15) : rr(0, 0.4)); set('texture', 'tex', rr(0.2, 0.8));
         targets.push('texture.pos'); return 'texture.L'; }
       return 'macro.out'; },
     pluck: (p, gate) => { const v = used.has('vcoA') ? 'vcoA' : used.has('vcoB') ? 'vcoB' : null; let src;
-      if (v) src = v + '.' + rpick(['tri', 'sin', 'sqr']); else { vco('vcoA', p, [0, 1]); src = 'vcoA.tri'; }
+      if (v) src = v + '.' + rpick(CL ? ['tri', 'sin'] : ['tri', 'sin', 'sqr']); else { vco('vcoA', p, [0, 1]); src = 'vcoA.tri'; }
       con(src, 'lpg.in1'); con(gate || p.gate, 'lpg.cv1'); set('lpg', 'resp1', rr(0.2, 0.6)); set('lpg', 'mode1', ri(1, 2)); set('lpg', 'off1', 0); used.add('lpg'); return 'lpg.out1'; },
   };
   const outs = [];
@@ -2290,19 +2293,19 @@ function genPatch(style, wild) {
     set('stab', 'env', o.env ?? rr(0.25, 0.7)); set('stab', 'attack', o.atk ?? 0); set('stab', 'decay', o.dec ?? rr(0.12, 0.35)); return 'stab.L'; };
   const groove = (st, o = {}) => { con('clock.x4', 'groove.clk'); used.add('groove');
     set('groove', 'style', st); set('groove', 'var', rr(0, 1)); set('groove', 'chaos', o.chaos ?? rr(0, 0.15 + wild * 0.3)); set('groove', 'swing', o.swing ?? rr(0, 0.25));
-    set('groove', 'kDen', o.k ?? rr(0.45, 0.6)); set('groove', 'sDen', o.s ?? rr(0.45, 0.65)); set('groove', 'hDen', o.h ?? rr(0.4, 0.7)); set('groove', 'pDen', o.p ?? rr(0.35, 0.65));
+    set('groove', 'kDen', o.k ?? rr(0.45, 0.6)); set('groove', 'sDen', o.s ?? rr(0.45, 0.65)); set('groove', 'hDen', o.h ?? (CL ? rr(0.5, 0.7) : rr(0.4, 0.7))); set('groove', 'pDen', o.p ?? rr(0.35, 0.65));
     const T = x => SMP ? ({ 'drums.tk': 'sampler.tk', 'drums.tc': 'sampler.tc', 'drums.th': 'sampler.th', 'drums.to': 'sampler.to', 'perc.ts': 'sampler.ts', 'perc.tr': 'sampler.tp' }[x] || x) : x;
     con('groove.kick', T('drums.tk')); con('groove.hat', T('drums.th')); con('groove.open', T('drums.to'));
     if (o.clap !== false) con('groove.clap', T('drums.tc'));
     const sT = o.snare === null ? null : T(o.snare || 'perc.ts'); if (sT) con('groove.snare', sT);
     let pT = T(o.perc || rpick(['perc.tsh', 'perc.tr', 'perc.tt'])); if (pT === sT) pT = 'perc.tsh'; con('groove.perc', pT);
     return 'groove.kick'; };
-  const drumKnobs = (soft) => { for (const [s, a, b] of [['k', 'Tune', [0.25, 0.5]], ['k', 'Dec', [0.35, 0.6]], ['c', 'Tune', [0.3, 0.7]], ['c', 'Dec', [0.2, 0.45]], ['h', 'Tune', [0.4, 0.8]], ['h', 'Dec', [0.1, 0.35]], ['o', 'Tune', [0.4, 0.75]], ['o', 'Dec', [0.25, 0.5]]]) set('drums', s + a, rr(...b));
+  const drumKnobs = (soft) => { for (const [s, a, b] of [['k', 'Tune', [0.25, 0.5]], ['k', 'Dec', [0.22, 0.4]], ['c', 'Tune', [0.3, 0.7]], ['c', 'Dec', [0.2, 0.45]], ['h', 'Tune', [0.4, 0.8]], ['h', 'Dec', [0.1, 0.35]], ['o', 'Tune', [0.4, 0.75]], ['o', 'Dec', [0.25, 0.5]]]) set('drums', s + a, rr(...b));
     set('drums', 'kLvl', soft ? rr(0.65, 0.8) : 0.95); set('drums', 'cLvl', rr(0.5, 0.75) * (soft ? 0.6 : 1)); set('drums', 'hLvl', rr(0.35, 0.55) * (soft ? 0.6 : 1)); set('drums', 'oLvl', rr(0.3, 0.5) * (soft ? 0.6 : 1));
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
   let SMP = style === 'dnb' || style === 'kiln' || ((style === 'jazzy' || style === 'lofi') && chance(0.85)) || ((style === 'house' || style === 'tinez') && chance(0.65));
-  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'lofi' ? rpick([3, 7, 0, 3]) : style === 'tinez' || style === 'jazzy' ? rpick([0, 0, 3, 4, 6, 5]) : rpick([0, 0, 1, 1, 2, 4, 5]));
+  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'lofi' ? rpick([6, 6, 9, 7, 2]) : style === 'tinez' || style === 'jazzy' ? rpick(CL ? [0, 0, 3, 6, 5] : [0, 0, 3, 4, 6, 5]) : rpick(CL ? [0, 0, 1, 1, 2, 5] : [0, 0, 1, 1, 2, 4, 5]));
     for (const k of ['k', 'c', 's', 'h', 'o', 'p']) { set('sampler', k + 'Tune', chance(0.25) ? rr(-1.5, 1.5) : 0); set('sampler', k + 'Dec', k === 'o' ? rr(0.4, 0.7) : k === 'h' ? rr(0.5, 1) : 1); }
     Object.assign(K.sampler, { kLvl: 0.95, cLvl: rr(0.6, 0.8), sLvl: rr(0.55, 0.75), hLvl: rr(0.35, 0.55), oLvl: rr(0.3, 0.45), pLvl: rr(0.35, 0.55) }); };
   const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
@@ -2324,21 +2327,27 @@ function genPatch(style, wild) {
     }
     drumKnobs(false); cleanDrums();
     P.rand(4, [3, 6, 7, 10, 11, 13, 14], ri(2, 5)); P.rand(5, [...Array(16).keys()], ri(2, 6)); Object.assign(tr, { len: 16, swing: rr(0, 0.35) }); K.trig = tr;
-    const bp = getPitch('seq'), bass = chance(0.5) ? bassM(bp, { oct: rpick([-1, 0]), dec: rr(0.1, 0.35) }) : voice.subA(bp);
+    const bp = getPitch('seq'), bass = chance(0.5) ? bassM(bp, { oct: CL ? -1 : rpick([-1, 0]), dec: rr(0.1, 0.35), res: CL ? rr(0.15, 0.45) : undefined }) : voice.subA(bp);
     con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2');
-    const lead = chance(0.5) ? stabV('trig.g5', chance(0.5) ? bp.cv : null) : voice.macro(getPitch(rpick(['tur', 'rnd'])), 'trig.g5');
+    let lead;
+    if (CL) { // chords most of the time (a Rhodes or a synth stab), otherwise a keyed CHORD/STRING macro line
+      if (chance(0.7)) { const rh = chance(0.5); lead = stabV('trig.g5', chance(0.2) ? bp.cv : null, rh ? { chord: rpick([1, 1, 4, 3, 0]), cut: rexp(1500, 4000), env: rr(0.2, 0.55), dec: rr(0.25, 0.55) } : { cut: rexp(700, 2200) });
+        set('stab', 'sound', rh ? 1 : 0); set('stab', 'trem', rh ? rr(0.1, 0.35) : 0); }
+      else lead = voice.macro(getPitch('tur'), 'trig.g5'); }
+    else lead = chance(0.5) ? stabV('trig.g5', chance(0.5) ? bp.cv : null) : voice.macro(getPitch(rpick(['tur', 'rnd'])), 'trig.g5');
     con(lead, 'duck.inR'); con('duck.R', 'mix6.in3'); con('duck.R', 'delay.in');
     set('duck', 'depth', rr(0.45, 0.8)); set('duck', 'rel', rr(0.2, 0.45)); set('duck', 'shape', rr(0.3, 0.7));
     con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 1, 0.5]), rr(0.25, 0.5));
-    if (chance(0.6)) { const x = chance(0.5) ? voice.pluck(getPitch(), 'trig.g6') : voice.drone(); con(x, 'mix6.in6'); set('mix6', 'lvl6', rr(0.35, 0.6)); set('mix6', 'pan6', rr(-0.4, 0.4)); } else set('mix6', 'lvl6', 0);
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.85, pan1: 0, lvl2: rr(0.6, 0.8), pan2: 0, lvl3: rr(0.4, 0.65), pan3: rr(-0.25, 0.25), lvl4: rr(0.3, 0.5), pan4: -0.6, lvl5: rr(0.3, 0.5), pan5: 0.6, master: 0.8 });
+    if (chance(0.6)) { const x = CL || chance(0.5) ? voice.pluck(getPitch(CL ? rpick(['seq', 'tur']) : undefined), 'trig.g6') : voice.drone(); con(x, 'mix6.in6'); set('mix6', 'lvl6', rr(0.42, 0.52)); set('mix6', 'pan6', rr(-0.4, 0.4)); } else set('mix6', 'lvl6', 0);
+    // the mixer levels each sound (AUTO), so these faders are the balance: bass ~4 dB and chords ~6 dB under the drums, echoes well back
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.85, pan1: 0, lvl2: rr(0.46, 0.54), pan2: 0, lvl3: rr(0.66, 0.76), pan3: rr(-0.2, 0.2), lvl4: rr(0.42, 0.55), pan4: -0.6, lvl5: rr(0.42, 0.55), pan5: 0.6, master: 0.8 });
     master(rr(1.5, 3.5), rr(0.08, 0.2));
-    set('lfo', 'rate1', rexp(0.03, 0.3)); set('lfo', 'shape1', ri(0, 3)); if (used.has('vcfA')) { con('lfo.bi1', 'vcfA.cv1'); set('vcfA', 'cv1', rr(0.15, 0.4)); }
+    set('lfo', 'rate1', rexp(0.03, 0.3)); set('lfo', 'shape1', ri(0, 3)); if (used.has('vcfA')) { con('lfo.bi1', 'vcfA.cv1'); set('vcfA', 'cv1', CL ? rr(0.06, 0.15) : rr(0.15, 0.4)); }
   } else if (style === 'tinez') {
     // deep, jacking warehouse house in the spirit of Ricky Tinez's modular videos: controlled randomness kept in key
     set('clock', 'tempo', ri(119, 125)); const tr = {}, P = pattern(tr); trigOn(); const sw = rr(0.15, 0.35);
     const kick = groove(rpick([1, 1, 0, 4]), { swing: sw, chaos: rr(0, 0.12), k: rr(0.45, 0.55), s: rr(0.4, 0.55), h: rr(0.5, 0.75), p: rr(0.45, 0.7), perc: rpick(['perc.tsh', 'perc.tsh', 'perc.tt']), ...backbeat() });
-    drumKnobs(false); cleanDrums(); set('drums', 'kTune', rr(0.25, 0.4)); set('drums', 'kDec', rr(0.45, 0.65)); set('drums', 'hDec', rr(0.08, 0.2)); set('perc', 'shLvl', rr(0.45, 0.6));
+    drumKnobs(false); cleanDrums(); set('drums', 'kTune', rr(0.25, 0.4)); set('drums', 'kDec', rr(0.28, 0.42)); set('drums', 'hDec', rr(0.08, 0.2)); set('perc', 'shLvl', rr(0.45, 0.6));
     con(drumBus(), 'mix6.in1');
     // TRIG SEQ (the Steppy role): bass rhythm on track 5, chord stabs on track 6
     const bassSteps = [rpick([[0, 3, 6, 10, 14], [2, 6, 10, 14], [0, 3, 7, 10, 11, 14], [2, 3, 6, 10, 13, 14], [0, 6, 7, 10, 14, 15]]), [3, 6, 7, 10, 11, 14, 15].filter(() => chance(0.15))].flat();
@@ -2356,8 +2365,8 @@ function genPatch(style, wild) {
     con(stab, 'duck.inR'); con('duck.R', 'mix6.in3'); con('duck.R', 'delay.in');
     set('duck', 'depth', rr(0.4, 0.65)); set('duck', 'rel', rr(0.2, 0.4)); set('duck', 'shape', rr(0.3, 0.6));
     con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 0.75, 1.5, 0.5]), rr(0.25, 0.45));
-    if (chance(0.45)) { const pl = voice.pluck({ cv: 'quant.out', gate: 'trig.g6' }, rpick(['clock.d2', 'trig.g6'])); con(pl, 'mix6.in6'); set('mix6', 'lvl6', rr(0.25, 0.45)); set('mix6', 'pan6', rr(-0.4, 0.4)); } else set('mix6', 'lvl6', 0);
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.88, pan1: 0, lvl2: rr(0.65, 0.82), pan2: 0, lvl3: rr(0.4, 0.6), pan3: rr(-0.2, 0.2), lvl4: rr(0.25, 0.4), pan4: -0.6, lvl5: rr(0.25, 0.4), pan5: 0.6, master: 0.8 });
+    if (chance(0.45)) { const pl = voice.pluck({ cv: 'quant.out', gate: 'trig.g6' }, rpick(['clock.d2', 'trig.g6'])); con(pl, 'mix6.in6'); set('mix6', 'lvl6', rr(0.38, 0.48)); set('mix6', 'pan6', rr(-0.4, 0.4)); } else set('mix6', 'lvl6', 0);
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.88, pan1: 0, lvl2: rr(0.45, 0.52), pan2: 0, lvl3: rr(0.68, 0.78), pan3: rr(-0.2, 0.2), lvl4: rr(0.42, 0.55), pan4: -0.6, lvl5: rr(0.42, 0.55), pan5: 0.6, master: 0.8 });
     master(rr(1.2, 2.8), rr(0.08, 0.16));
     tapeOut = true; set('tape', 'wow', rr(0.05, 0.18)); set('tape', 'flutter', rr(0.03, 0.12)); set('tape', 'drive', rr(0.3, 0.55)); set('tape', 'age', rr(0.15, 0.4)); set('tape', 'hiss', rr(0.03, 0.12)); set('tape', 'dust', rr(0.05, 0.2));
     set('lfo', 'rate1', rexp(0.03, 0.2)); set('lfo', 'shape1', 0);
@@ -2366,22 +2375,22 @@ function genPatch(style, wild) {
     // LO-FI: dusty boom-bap at 72-86 BPM, lazy swing, heavy tape. JAZZY: deep house at 116-122 BPM.
     const lofi = style === 'lofi', feel = lofi ? 'lofi' : 'deep', pool = bookPool(feel), tune = (window.__nextTune != null && SONGBOOK[window.__nextTune] && SONGBOOK[window.__nextTune].feel === feel) ? window.__nextTune : rpick(pool);
     set('clock', 'tempo', lofi ? ri(72, 86) : ri(116, 122)); const sw = lofi ? rr(0.3, 0.45) : rr(0.12, 0.26);
-    const kick = lofi ? groove(7, { swing: sw, chaos: 0, k: rr(0.5, 0.56), s: rr(0.5, 0.56), h: rr(0.42, 0.55), p: rr(0.15, 0.3), clap: false, snare: 'perc.ts', perc: 'perc.tsh' })
+    const kick = lofi ? groove(7, { swing: sw, chaos: 0, k: rr(0.5, 0.56), s: rr(0.5, 0.56), h: rr(0.5, 0.6), p: rr(0.15, 0.3), clap: false, snare: 'perc.ts', perc: 'perc.tsh' })
       : groove(rpick([1, 1, 0]), { swing: sw, chaos: 0, k: rr(0.45, 0.5), s: rr(0.38, 0.45), h: rr(0.4, 0.55), p: rr(0.2, 0.35), perc: 'perc.tsh', ...rpick([{ snare: 'perc.tr' }, { snare: null }, { clap: false, snare: 'perc.tr' }]) });
     set('groove', 'var', rr(0, 0.15));
     drumKnobs(true); cleanDrums(); set('drums', 'kTune', rr(0.22, 0.32)); set('drums', 'kDec', rr(0.4, 0.55)); set('drums', 'hDec', rr(0.05, 0.14)); if (lofi) { set('perc', 'sDec', rr(0.25, 0.4)); set('perc', 'sTune', rr(0.3, 0.5)); }
-    con(drumBus(), 'mix6.in1');
+    con(drumBus(), 'mix6.in1'); if (K.sampler) { set('sampler', 'kDec', rr(0.45, 0.65)); set('sampler', 'hLvl', rr(0.4, 0.5)); }
     con('clock.x4', 'band.clk'); used.add('band');
     set('band', 'tune', tune); set('band', 'comp', lofi ? rpick([0, 0, 1, 3]) : rpick([2, 2, 1])); set('band', 'inst', lofi ? rpick([0, 0, 1]) : rpick([1, 1, 0]));
-    set('band', 'lead', lofi ? rr(0.2, 0.4) : rr(0.1, 0.25)); set('band', 'human', lofi ? rr(0.55, 0.75) : rr(0.35, 0.5)); set('band', 'tone', lofi ? rr(0.42, 0.56) : rr(0.5, 0.65)); set('band', 'level', 0.8);
+    set('band', 'lead', lofi ? rr(0.2, 0.4) : rr(0.1, 0.25)); set('band', 'human', lofi ? rr(0.55, 0.75) : rr(0.35, 0.5)); set('band', 'tone', lofi ? rr(0.5, 0.62) : rr(0.5, 0.65)); set('band', 'level', 0.8);
     const bass = bassM({ cv: 'band.bass', gate: 'band.bgate' }, { wave: 0, oct: -1, cut: rexp(200, 380), res: rr(0.04, 0.14), env: rr(0.08, 0.22), dec: lofi ? rr(0.55, 0.8) : rr(0.3, 0.5), glide: rr(0.02, 0.06), drive: rr(0.04, 0.12) });
     con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2');
     con('band.L', 'mix6.in3'); con('band.R', 'mix6.in6'); con('band.L', 'delay.in'); // the keys stay unpumped, so they breathe naturally
     set('duck', 'depth', lofi ? rr(0.12, 0.25) : rr(0.25, 0.4)); set('duck', 'rel', rr(0.25, 0.4)); set('duck', 'shape', rr(0.3, 0.5));
     con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5]), rr(0.2, 0.35));
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: lofi ? 0.78 : 0.82, pan1: 0, lvl2: rr(0.62, 0.75), pan2: 0, lvl3: rr(0.55, 0.68), pan3: -0.25, lvl6: rr(0.55, 0.68), pan6: 0.25, lvl4: rr(0.14, 0.24), pan4: -0.6, lvl5: rr(0.14, 0.24), pan5: 0.6, master: 0.8 });
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: lofi ? 0.78 : 0.82, pan1: 0, lvl2: rr(0.55, 0.65), pan2: 0, lvl3: rr(0.4, 0.48), pan3: -0.25, lvl6: rr(0.4, 0.48), pan6: 0.25, lvl4: rr(0.25, 0.35), pan4: -0.6, lvl5: rr(0.25, 0.35), pan5: 0.6, master: 0.8 });
     master(lofi ? rr(1.4, 2.4) : rr(1.8, 3.2), lofi ? rr(0.1, 0.18) : rr(0.12, 0.2));
-    tapeOut = true; set('tape', 'wow', lofi ? rr(0.08, 0.16) : rr(0.08, 0.16)); set('tape', 'flutter', rr(0.03, 0.08)); set('tape', 'drive', rr(0.2, 0.35)); set('tape', 'age', lofi ? rr(0.2, 0.35) : rr(0.25, 0.45)); set('tape', 'hiss', lofi ? rr(0, 0.03) : rr(0.05, 0.12)); set('tape', 'dust', lofi ? rr(0, 0.05) : rr(0.12, 0.3));
+    tapeOut = true; set('tape', 'wow', lofi ? rr(0.08, 0.16) : rr(0.08, 0.16)); set('tape', 'flutter', rr(0.03, 0.08)); set('tape', 'drive', rr(0.2, 0.35)); set('tape', 'age', lofi ? rr(0.12, 0.25) : rr(0.25, 0.45)); set('tape', 'hiss', lofi ? rr(0, 0.03) : rr(0.05, 0.12)); set('tape', 'dust', lofi ? rr(0, 0.05) : rr(0.12, 0.3));
   } else if (style === 'dnb') {
     // liquid / rolling DnB: crisp sampled two-step drums, a deep sub with an optional low reese, long pads; no noisy voices
     set('clock', 'tempo', ri(172, 176));
@@ -2394,15 +2403,15 @@ function genPatch(style, wild) {
     const reese = chance(0.4);
     const bass = bassM({ cv: 'seq.cv', gate: 'seq.gate' }, reese ? { wave: rr(2.7, 3), oct: -1, cut: rexp(120, 320), res: rr(0.05, 0.25), env: rr(0.1, 0.3), dec: rr(0.6, 0.95), glide: rr(0.05, 0.25), drive: rr(0.1, 0.25) }
       : { wave: 0.05, oct: -1, cut: rexp(200, 500), res: 0.05, env: 0.05, dec: rr(0.7, 1), glide: rr(0.05, 0.2), drive: rr(0.05, 0.2) });
-    if (reese) { con('lfo.uni1', 'bass.cut'); set('lfo', 'rate1', rexp(0.15, 0.8)); set('lfo', 'shape1', 0); }
+    if (reese) { if (CL) { con('lfo.uni1', 'atten.in4'); con('atten.out4', 'bass.cut'); set('atten', 'a4', rr(0.1, 0.2)); } else con('lfo.uni1', 'bass.cut'); set('lfo', 'rate1', rexp(0.15, 0.8)); set('lfo', 'shape1', 0); }
     con(bass, 'duck.inL'); con(kick, 'duck.trig'); con('duck.L', 'mix6.in2'); set('duck', 'depth', rr(0.3, 0.5)); set('duck', 'rel', rr(0.12, 0.25));
     let pad;
     if (chance(0.7)) pad = stabV('clock.d8', 'seq.cv', { chord: rpick([1, 1, 4, 3, 0]), atk: rr(0.35, 0.7), dec: rr(0.8, 1), cut: rexp(500, 1300), env: rr(0.05, 0.2) });
     else pad = voice.macro(getPitch(rpick(['tur', 'rnd'])), rpick(['clock.x1', 'clock.d2']));
     set('stab', 'detune', rr(0.1, 0.3)); set('stab', 'res', rr(0.05, 0.2));
-    con(pad, 'mix6.in3'); if (used.has('stab')) { con('stab.R', 'mix6.in6'); set('mix6', 'pan3', -0.5); set('mix6', 'pan6', 0.5); set('mix6', 'lvl6', rr(0.3, 0.42)); } else set('mix6', 'lvl6', 0);
+    con(pad, 'mix6.in3'); if (used.has('stab')) { con('stab.R', 'mix6.in6'); set('mix6', 'pan3', -0.5); set('mix6', 'pan6', 0.5); set('mix6', 'lvl6', rr(0.26, 0.33)); } else set('mix6', 'lvl6', 0);
     con(pad, 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5]), rr(0.3, 0.5)); set('delay', 'tone', rexp(1500, 3500));
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.9, pan1: 0, lvl2: rr(0.75, 0.9), pan2: 0, lvl3: rr(0.3, 0.42), lvl4: rr(0.2, 0.32), pan4: -0.7, lvl5: rr(0.2, 0.32), pan5: 0.7, master: 0.8 });
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.9, pan1: 0, lvl2: rr(0.62, 0.72), pan2: 0, lvl3: used.has('stab') ? rr(0.26, 0.33) : rr(0.38, 0.46), lvl4: rr(0.3, 0.4), pan4: -0.7, lvl5: rr(0.3, 0.4), pan5: 0.7, master: 0.8 });
     if (!K.mix6.pan3) K.mix6.pan3 = 0;
     master(rr(2, 3.5), rr(0.1, 0.18)); set('verb', 'damp', rexp(2500, 5000));
   } else if (style === 'kiln') {
@@ -2412,34 +2421,36 @@ function genPatch(style, wild) {
     drumKnobs(true); set('drums', 'kTune', rr(0.18, 0.35)); set('perc', 'sTune', rr(0.3, 0.5)); set('perc', 'sDec', rr(0.15, 0.3));
     con(drumBus(), 'mix6.in1'); set('sampler', 'kLvl', rr(0.75, 0.9)); set('sampler', 'hLvl', rr(0.35, 0.5)); set('sampler', 'cLvl', rr(0.4, 0.6));
     const arp = pitch.seq = { cv: 'seq.cv', gate: 'seq.gate' }; con(rpick(['clock.x2', 'clock.x2', 'clock.x1']), 'seq.clk');
-    for (let s = 0; s < 8; s++) set('seq', 's' + s, note(PENT, 0, 24)); set('seq', 'len', rpick([5, 6, 7, 8])); set('seq', 'prob', rr(0.6, 0.9));
+    for (let s = 0; s < 8; s++) set('seq', 's' + s, note(PENT, 0, CL ? 17 : 24)); set('seq', 'len', rpick([5, 6, 7, 8])); set('seq', 'prob', rr(0.6, 0.9));
     let m;
     if (chance(0.7)) { con(arp.cv, 'mbira.voct'); con(arp.gate, 'mbira.trig'); used.add('mbira'); m = 'mbira.out'; set('mbira', 'type', chance(0.7) ? 0 : 1); set('mbira', 'oct', -1); set('mbira', 'dec', rr(0.6, 1)); set('mbira', 'lvl', rr(0.6, 0.85)); }
-    else { m = voice.macro(arp, null); set('macro', 'model', rpick([7, 7, 4, 6, 2])); set('macro', 'decay', rr(0.45, 0.75)); set('macro', 'freq', rpick([12, 12, 24])); }
+    else { m = voice.macro(arp, null); set('macro', 'model', rpick(CL ? [7, 7, 6] : [7, 7, 4, 6, 2])); set('macro', 'decay', rr(0.45, 0.75)); set('macro', 'freq', CL ? rpick([0, 12]) : rpick([12, 12, 24])); if (CL) set('macro', 'timbre', rr(0.15, 0.35)); }
     if (chance(0.8)) { con('field.L', 'mix.in3'); used.add('field'); set('field', 'rec', rpick([0, 0, 1, 2, 2, 3, 4, 6])); set('field', 'lvl', rr(0.3, 0.55)); set('field', 'tone', rexp(2500, 9000)); set('field', 'width', rr(0.6, 1)); set('mix', 'lvl3', rr(0.35, 0.55));
       if (chance(0.4)) { con('lfo.bi2', 'field.cv'); set('lfo', 'rate2', rexp(0.02, 0.08)); } }
     con(m, 'mix6.in2'); con(m, 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 0.5]), rr(0.35, 0.55));
-    if (chance(0.7)) { const pl = voice.pluck(getPitch(rpick(['tur', 'rnd'])), rpick(['clock.d2', 'clock.x1', 'groove.perc'])); con(pl, 'mix6.in3'); set('mix6', 'lvl3', rr(0.35, 0.55)); set('mix6', 'pan3', rr(-0.5, 0.5)); } else set('mix6', 'lvl3', 0);
+    if (chance(0.7)) { const pl = voice.pluck(getPitch(rpick(['tur', 'rnd'])), rpick(['clock.d2', 'clock.x1', 'groove.perc'])); con(pl, 'mix6.in3'); set('mix6', 'lvl3', rr(0.32, 0.42)); set('mix6', 'pan3', rr(-0.5, 0.5)); } else set('mix6', 'lvl3', 0);
     const pad = stabV(rpick(['clock.d8', 'clock.d4']), null, { chord: maj ? rpick([3, 7, 2]) : rpick([1, 4, 5]), atk: rr(0.35, 0.8), dec: rr(0.8, 1), cut: rexp(350, 1000), env: rr(0.05, 0.25) });
-    con(pad, 'mix6.in6'); set('mix6', 'lvl6', rr(0.3, 0.45)); set('mix6', 'pan6', rr(-0.3, 0.3));
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: rr(0.6, 0.75), pan1: 0, lvl2: rr(0.45, 0.65), pan2: rr(-0.3, 0.3), lvl4: rr(0.25, 0.4), pan4: -0.7, lvl5: rr(0.25, 0.4), pan5: 0.7, master: 0.8 });
-    con('mix6.L', 'tape.inL'); con('mix6.R', 'tape.inR'); con('tape.L', 'verb.inL'); con('tape.R', 'verb.inR'); used.add('tape'); targets.push('tape.wow');
-    set('tape', 'wow', rr(0.2, 0.5)); set('tape', 'flutter', rr(0.08, 0.3)); set('tape', 'drive', rr(0.2, 0.45)); set('tape', 'age', rr(0.3, 0.6)); set('tape', 'hiss', rr(0.02, 0.1)); set('tape', 'dust', rr(0.05, 0.25));
+    con(pad, 'mix6.in6'); set('mix6', 'lvl6', rr(0.28, 0.36)); set('mix6', 'pan6', rr(-0.3, 0.3));
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: rr(0.62, 0.72), pan1: 0, lvl2: rr(0.55, 0.65), pan2: rr(-0.3, 0.3), lvl4: rr(0.35, 0.45), pan4: -0.7, lvl5: rr(0.35, 0.45), pan5: 0.7, master: 0.8 });
+    con('mix6.L', 'tape.inL'); con('mix6.R', 'tape.inR'); con('tape.L', 'verb.inL'); con('tape.R', 'verb.inR'); used.add('tape'); if (!CL) targets.push('tape.wow');
+    if (CL) { set('tape', 'wow', rr(0.06, 0.18)); set('tape', 'flutter', rr(0.03, 0.1)); set('tape', 'drive', rr(0.2, 0.4)); set('tape', 'age', rr(0.12, 0.3)); set('tape', 'hiss', rr(0.01, 0.05)); set('tape', 'dust', rr(0.02, 0.1)); }
+    else { set('tape', 'wow', rr(0.2, 0.5)); set('tape', 'flutter', rr(0.08, 0.3)); set('tape', 'drive', rr(0.2, 0.45)); set('tape', 'age', rr(0.3, 0.6)); set('tape', 'hiss', rr(0.02, 0.1)); set('tape', 'dust', rr(0.05, 0.25)); }
     set('verb', 'decay', rr(3, 7)); set('verb', 'mix', rr(0.25, 0.4)); set('verb', 'pre', 0.02);
     for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.02, 0.2)); set('lfo', 'shape' + c, ri(0, 3)); }
   } else {
     set('clock', 'tempo', ri(36, 84));
-    const kinds = [rpick(['subA', 'subA', 'macro']), rpick(['macro', 'subB', 'drone', 'wind', 'pluck'])];
-    if (chance(0.55 + wild * 0.3)) kinds.push(rpick(['pluck', 'drone', 'subB', 'wind', 'macro']));
+    // CLEAN: always a sustained bed (so it never starts in silence), one voice that moves, sometimes a third; wind is rare
+    const kinds = CL ? [rpick(['drone', 'drone', 'subB']), rpick(['macro', 'macro', 'subA', 'pluck'])] : [rpick(['subA', 'subA', 'macro']), rpick(['macro', 'subB', 'drone', 'wind', 'pluck'])];
+    if (CL ? chance(0.5) : chance(0.55 + wild * 0.3)) kinds.push(CL ? rpick(['pluck', 'pluck', 'macro', 'wind']) : rpick(['pluck', 'drone', 'subB', 'wind', 'macro']));
     const B = ['subB', 'drone', 'wind']; let seenB = false; const list = [];
     for (const k of kinds) { if (B.includes(k)) { if (seenB) continue; seenB = true; } if (list.includes(k)) continue; list.push(k); }
     for (const k of list) outs.push(voice[k](getPitch(), k === 'pluck' ? rpick(['clock.d2', 'clock.x1', getPitch().gate]) : null));
-    outs.slice(0, 4).forEach((o, i) => { con(o, 'mix.in' + (i + 1)); set('mix', 'lvl' + (i + 1), rr(0.45, 0.75)); });
+    outs.slice(0, 4).forEach((o, i) => { con(o, 'mix.in' + (i + 1)); set('mix', 'lvl' + (i + 1), list[i] === 'wind' ? rr(0.25, 0.35) : list[i] === 'pluck' ? rr(0.4, 0.55) : rr(0.5, 0.7)); });
     for (let i = outs.length; i < 4; i++) set('mix', 'lvl' + (i + 1), 0);
     if (chance(0.6)) con('mix.out', 'scope.in');
     let L = 'mix.out', R = 'mix.out';
-    if (chance(0.8)) { con('mix.out', 'delay.in'); L = 'delay.L'; R = 'delay.R'; set('delay', 'time', rexp(0.25, 1.8)); set('delay', 'fb', rr(0.3, 0.65)); set('delay', 'mix', rr(0.25, 0.5)); set('delay', 'tone', rexp(1500, 6000)); set('delay', 'mod', rr(0, 0.35)); targets.push('delay.time'); }
-    if (chance(0.3 + wild * 0.3)) { tapeOut = true; set('tape', 'wow', rr(0.15, 0.5)); set('tape', 'flutter', rr(0.05, 0.3)); set('tape', 'drive', rr(0.2, 0.5)); set('tape', 'age', rr(0.2, 0.6)); set('tape', 'hiss', rr(0.05, 0.25)); set('tape', 'dust', rr(0, 0.35)); }
+    if (chance(0.8)) { con('mix.out', 'delay.in'); L = 'delay.L'; R = 'delay.R'; set('delay', 'time', rexp(0.25, 1.8)); set('delay', 'fb', rr(0.3, 0.65)); set('delay', 'mix', rr(0.25, 0.5)); set('delay', 'tone', rexp(1500, 6000)); set('delay', 'mod', CL ? rr(0, 0.1) : rr(0, 0.35)); if (!CL) targets.push('delay.time'); }
+    if (chance(0.3 + wild * 0.3)) { tapeOut = true; set('tape', 'wow', CL ? rr(0.05, 0.18) : rr(0.15, 0.5)); set('tape', 'flutter', CL ? rr(0.02, 0.1) : rr(0.05, 0.3)); set('tape', 'drive', rr(0.2, 0.5)); set('tape', 'age', rr(0.2, 0.6)); set('tape', 'hiss', rr(0.05, 0.25)); set('tape', 'dust', rr(0, 0.35)); }
     con(L, 'verb.inL'); con(R, 'verb.inR'); set('verb', 'decay', rr(5, 15)); set('verb', 'mix', rr(0.4, 0.65)); set('verb', 'damp', rexp(2500, 9000));
     for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.008, 0.25 + wild)); set('lfo', 'shape' + c, ri(0, 3)); }
   }
@@ -2459,15 +2470,24 @@ function genPatch(style, wild) {
     set('echo', 'mix', style === 'dnb' ? rr(0.04, 0.1) : dance ? rr(0.06, 0.14) : rr(0.12, 0.26));
     set('pump', 'depth', style === 'lofi' ? rr(0.04, 0.1) : style === 'jazzy' ? rr(0.08, 0.18) : house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
     set('sub', 'xo', dance ? rr(100, 140) : rr(80, 120)); set('sub', 'sub', style === 'dnb' ? rr(0.15, 0.35) : house ? rr(0, 0.12) : 0); set('sub', 'tight', dance ? rr(26, 34) : rr(18, 26)); set('sub', 'low', 0); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
-    set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-3, -0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
+    set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-1.5, 0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
     if (dance) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(2, 3.2)); set('glue', 'atk', rexp(0.015, 0.035)); set('glue', 'rel', rr(0.12, 0.25)); set('glue', 'makeup', rr(1.5, 3)); set('glue', 'mix', rr(0.75, 1)); }
     else if (kil) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(1.8, 2.6)); set('glue', 'atk', rexp(0.02, 0.04)); set('glue', 'rel', rr(0.25, 0.5)); set('glue', 'makeup', rr(2, 3.5)); set('glue', 'mix', rr(0.6, 0.85)); }
     else { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(1.6, 2.2)); set('glue', 'atk', rexp(0.02, 0.05)); set('glue', 'rel', rr(0.3, 0.7)); set('glue', 'makeup', rr(0.5, 2)); set('glue', 'mix', rr(0.5, 0.8)); }
     set('wide', 'width', dance ? rr(1.1, 1.45) : rr(1.2, 1.6)); set('wide', 'mono', dance ? rr(90, 150) : rr(60, 120)); set('wide', 'chorus', kil ? rr(0.25, 0.4) : dance ? rr(0.1, 0.25) : rr(0.2, 0.4)); set('wide', 'depth', rr(0.3, 0.55)); set('wide', 'rate', rexp(0.3, 0.9));
-    set('limit', 'drive', dance ? rr(0.5, 2.5) : rr(0, 2)); set('limit', 'ceil', -1); set('limit', 'rel', rr(0.07, 0.16)); set('limit', 'air', kil || style === 'dnb' ? rr(0, 0.08) : rr(0.12, 0.3)); }
+    // gain staging: every new sound is levelled at the mixer, and the whole mix lands at a set loudness with headroom (no slamming)
+    set('mix6', 'auto', 1); set('mix', 'auto', style === 'ambient' ? 1 : 0);
+    set('limit', 'level', { house: -12, tinez: -12, dnb: -12, lofi: -13, jazzy: -13, kiln: -14, ambient: -16 }[style] ?? -14);
+    set('limit', 'drive', dance ? rr(0.5, 1.5) : rr(0, 1)); set('limit', 'ceil', -3); set('limit', 'rel', rr(0.07, 0.16)); set('limit', 'air', kil || style === 'dnb' ? rr(0, 0.08) : rr(0.12, 0.3)); }
   // modulation
   const srcs = ['lfo.bi1', 'lfo.bi2', 'lfo.uni1', 'lfo.uni2', 'rnd.smooth'], tset = [...new Set(targets)].filter(t => !C.some(c => c[1] === t)).sort(() => Math.random() - 0.5);
-  const nMod = Math.min(tset.length, ri(1, 3) + Math.round(wild * 3));
+  const nMod = CL ? 0 : Math.min(tset.length, ri(1, 3) + Math.round(wild * 3));
+  if (CL) { // gentle movement only: slow LFOs, and through ATTEN (small amounts) where an input has no depth knob of its own
+    let ach = 1; const safe = tset.filter(t => /^vcf[AB]\.cv1$|^bass\.cut$|^macro\.timbre$|^texture\.pos$/.test(t)).slice(0, ri(1, 2));
+    for (const t of safe) { const src = rpick(['lfo.bi1', 'lfo.bi2']);
+      if (/cv1$/.test(t)) { con(src, t); set(t.split('.')[0], 'cv1', rr(0.06, 0.16)); }
+      else if (ach <= 3) { con(src, 'atten.in' + ach); con('atten.out' + ach, t); set('atten', 'a' + ach, t === 'bass.cut' ? rr(0.05, 0.12) : rr(0.25, 0.5)); ach++; } }
+    for (const c of [1, 2]) if (K.lfo && K.lfo['rate' + c] > 0.15) set('lfo', 'rate' + c, rexp(0.03, 0.15)); }
   for (let i = 0; i < nMod; i++) {
     const t = tset[i], s = rpick(srcs); if (s === 'rnd.smooth' && !C.some(c => c[1] === 'rnd.trig')) con(rpick(['clock.d2', 'clock.d4', 'clock.d8']), 'rnd.trig');
     if (/fm$/.test(t)) set(t.split('.')[0], 'fm', rr(0.01, 0.06 + wild * 0.3));
@@ -2549,7 +2569,7 @@ function blendNext(given, back) { // build a fresh patch (same style, same key) 
   if (DECK.blending) { toast('A blend is already running', true); return; }
   if (ensureChain()) toast('Wired this patch through the mixing side first', true);
   if (!out1(modById.blend.ports.L)) { toast('This patch is not wired for blending: press a random style first', true); return; }
-  const from = DECK.live, to = from === 'A' ? 'B' : 'A', P = deckPatch(given || tastePick(() => genPatch(DECK.style || 'house', rr(0, 0.3))), to);
+  const from = DECK.live, to = from === 'A' ? 'B' : 'A', P = deckPatch(given || tastePick(() => genPatch(DECK.style || 'house', RND.mode === 'exp' ? rr(0.5, 1) : 0, RND.mode !== 'exp')), to);
   if (!back) { DECK.past.push(deckSnapshot(from)); if (DECK.past.length > 12) DECK.past.shift(); } COND.since = 0;
   const oq = modById[from === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
   P.knobs[qk] = { ...(P.knobs[qk] || {}), scale: oq.v('scale'), root: oq.v('root'), oct: oq.v('oct') };
@@ -2624,7 +2644,7 @@ function condMove(phrase) {
   const [name, , mid, ks, kind, label, vals] = mv, jz = st === 'jazzy' || st === 'lofi'; let say = label;
   if (kind === 'tune') { const kn = condKnob(mid, ks[0]); if (!kn) return; if (mid === 'band') { const t = SONGBOOK[kn.value], opts = bookPool(t ? t.feel : 'lofi').filter(i => i !== kn.value); if (!opts.length) return; setMany([[kn, kn.toNorm(rpick(opts))]], label); } else setMany([[kn, kn.toNorm((kn.value + 1 + Math.floor(Math.random() * 98)) % 100)]], label); }
   else if (kind === 'comp') { const m = modById[liveId('trig')], row = ks[0], pats = row === 5 ? JAZZ_COMP : JAZZ_BASS, P = new Set(rpick(pats)); setMany(Array.from({ length: 16 }, (_, k) => [m.knobs['b' + row + '_' + k], P.has(k) ? 1 : 0]), label); }
-  else { const kn = condKnob(mid, rpick(ks.filter(k => condKnob(mid, k)))); if (!kn) return;
+  else { const kn = condKnob(mid, rpick(ks.filter(k => condKnob(mid, k) && (RND.mode === 'exp' || !(mid === 'macro' && (k === 'morph' || k === 'harm')))))); if (!kn) return; // clean: no macro morph/harm sweeps (they can screech)
     const b = baseOf(kn), [lo, hi] = safeN(mid.split('|')[0], kn.def.id);
     if (kind === 'fade' || kind === 'jumpout') { if (b < 0.06) return; const out = Math.abs(kn.norm - b) < 0.05; say = label + (out ? ' FADE OUT' : ' BACK IN');
       glideTo(kn, out ? b * (jz ? 0.15 : 0.05) : b, kind === 'fade' ? (jz ? 6 : 4) : 0.02, label); }
@@ -2708,13 +2728,13 @@ setInterval(() => { try { blendTick(); condTick(); } catch (e) { console.warn(e)
 Object.assign(window, { COND, TASTE, condMove, condPress, condToggle, blendBack });
 
 function randomPatch(style) {
-  pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'lofi']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
+  pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'lofi']) : style, X = RND.mode === 'exp', wild = X ? rr(0.5, 1) : 0;
   setTimeout(() => { window.__nextTune = null; }, 0); DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy', 'swap'].map(k => [k, modById.cond.knobs[k].norm]);
-  loadPatch(tastePick(() => genPatch(s, wild), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); send({ t: 'barsync', reset: deckIds('A') }); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
-  toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy deep house patch', lofi: 'New lo-fi patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
+  loadPatch(tastePick(() => genPatch(s, wild, !X), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); send({ t: 'barsync', reset: deckIds('A') }); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
+  toast((X ? 'Experimental · ' : '') + (style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy deep house patch', lofi: 'New lo-fi patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
 }
 function undoRandom() { const P = RND.undo.pop(); if (!P) return; RND.tw = []; loadPatch(P); document.getElementById('rUndo').disabled = !RND.undo.length; toast('Undone', true); }
-Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom, blendNext, deckPatch, DECK });
+Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom, blendNext, deckPatch, DECK, serialize, loadPatch });
 document.getElementById('rBlend').onclick = () => blendNext();
 document.getElementById('cOn').onclick = () => condToggle('on'); document.getElementById('cHold').onclick = () => condToggle('hold');
 document.getElementById('cBack').onclick = () => condPress('back'); document.getElementById('cNext').onclick = () => blendNext(); document.getElementById('cLike').onclick = () => condPress('like'); document.getElementById('cNope').onclick = () => condPress('nope');
@@ -2725,6 +2745,8 @@ document.getElementById('rKiln').onclick = () => randomPatch('kiln');
 document.getElementById('rTinez').onclick = () => randomPatch('tinez');
 document.getElementById('rLofi').onclick = () => randomPatch('lofi');
 document.getElementById('rSurp').onclick = () => randomPatch('surprise');
+function setMode(m) { RND.mode = m; try { localStorage.setItem('nightrack.mode', m); } catch (e) { } document.querySelectorAll('#rMode button').forEach(b => b.classList.toggle('cur', b.dataset.m === m)); }
+window.setMode = setMode; document.querySelectorAll('#rMode button').forEach(b => b.onclick = () => { setMode(b.dataset.m); toast(b.dataset.m === 'exp' ? 'Experimental: wild modulation, folding and FM allowed' : 'Clean: each genre keeps its proper sound', true); }); setMode(RND.mode);
 document.getElementById('rShuf').onclick = () => shuffleKnobs(1);
 document.getElementById('rNudge').onclick = () => shuffleKnobs(0.12);
 document.getElementById('rUndo').onclick = undoRandom;
@@ -2994,9 +3016,20 @@ async function decodeSlot(sl) {
   let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i])); if (sl.data && pk > 0) for (let i = 0; i < n; i++) d[i] *= 0.9 / pk; // imported sounds are levelled
   if (key) SMP_CACHE.set(key, d); return d;
 }
+// Kit sounds come from many sources at very different levels (a shaker can be 30 dB quieter than a 909 kick). Each hit is
+// measured (loudness-weighted, first 150 ms) and levelled to its slot's place in a mix, so the SAMPLER's level knobs mean the same in every kit.
+const KIT_LOUD = [-10, -11, -10, -11, -11, -12]; // kick, clap, snare, hat, open hat, perc
+function hitLoud(d) { const sr = AC ? AC.sampleRate : 44100; let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v)); let i0 = 0; while (i0 < d.length && Math.abs(d[i0]) < pk * 0.1) i0++;
+  const ka = 1 - Math.exp(-6.2832 * 60 / sr), kl = 1 - Math.exp(-6.2832 * 1500 / sr); let h1 = 0, h2 = 0, lp = 0, ms = 0, n = 0;
+  for (let i = i0; i < Math.min(d.length, i0 + 0.15 * sr); i++) { let v = d[i]; h1 += ka * (v - h1); v -= h1; h2 += ka * (v - h2); v -= h2; lp += kl * (v - lp); v += 0.58 * (v - lp); ms += v * v; n++; }
+  return { L: 10 * Math.log10(ms / Math.max(1, n) + 1e-12), pk }; }
+const LEVELLED = new WeakMap();
+function levelHit(d, slot) { const M = LEVELLED.get(d) || new Map(); LEVELLED.set(d, M); if (M.has(slot)) return M.get(slot);
+  const { L, pk } = hitLoud(d); let g = Math.pow(10, (KIT_LOUD[slot] - L) / 20); g = Math.min(g, 16, 1.6 / Math.max(pk, 1e-6)); g = Math.max(g, 0.06);
+  const o = new Float32Array(d.length); for (let i = 0; i < d.length; i++) o[i] = d[i] * g; M.set(slot, o); return o; }
 async function loadKit(m) {
   if (!AC || !ENG) return; const k = m.v('kit'), slots = kitSlots(k), tok = {}; m.kitTok = tok; KIT_LOADING.add(m); m.screenDirty = true;
-  await Promise.all(slots.map(async (sl, i) => { if (!sl) return; try { const d = await decodeSlot(sl); if (m.kitTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d }); } catch (e) { console.warn('sample', sl.name, e); } }));
+  await Promise.all(slots.map(async (sl, i) => { if (!sl) return; try { const d = levelHit(await decodeSlot(sl), i); if (m.kitTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d }); } catch (e) { console.warn('sample', sl.name, e); } }));
   if (m.kitTok === tok) { KIT_LOADING.delete(m); m.screenDirty = true; }
 }
 async function loadSet(m) { // MBIRA notes or a FIELD recording
