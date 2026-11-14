@@ -1,0 +1,5 @@
+Violin, cello and clean electric guitar for SWELL.
+Source: tonejs-instruments by Nicholas Brosowsky, github.com/nbrosowsky/tonejs-instruments
+License: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Commercial use allowed with credit:
+  "Violin, cello and guitar samples: tonejs-instruments (N. Brosowsky), CC BY 3.0; originally from VSCO-2 (violin), Freesound user flcellogrl (cello), Karoryfer (guitar)."
+Processing: leading silence trimmed, cut to 4-7 s with a fade, mono, AAC 80k. File name = MIDI note.
