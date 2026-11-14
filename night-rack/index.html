@@ -2066,7 +2066,7 @@ function loadPatch(P) {
     const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
-  DECK.blending = null; deckRestore(); condRebase(); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
+  DECK.blending = null; ensureChain(); deckRestore(); condRebase(); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
   autosave();
 }
 function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
@@ -2356,6 +2356,25 @@ function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one 
   for (const m in P.knobs) if (base.has(m)) knobs[m + sfx] = P.knobs[m];
   return { cables, knobs };
 }
+const MIXSIDE = ['blend', 'keys', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit', 'out'];
+function ensureChain() { // older patches (and the first-visit patch) skip the mixing side: rewire the playing deck through all of it
+  if (out1(modById.blend.ports.L) && out1(modById.blend.ports.aL)) return false;
+  const M = new Set(MIXSIDE), feeds = cables.filter(c => c.connected && !M.has(c.out.module.id) && M.has(c.inp.module.id) && /^(inL|inR|L|R|aL|aR)$/.test(c.inp.id) && !c.out.module.id.endsWith('_b'));
+  const pickF = side => { for (const t of ['blend', 'keys', 'eq', 'out']) { const c = feeds.find(c => c.inp.module.id === t && c.inp.id.endsWith(side)); if (c) return c.out.module.id + '.' + c.out.id; } return null; };
+  const sL = pickF('L'), sR = pickF('R') || sL; if (!sL) return false;
+  const kk = cables.find(c => c.connected && c.inp.module.id === 'duck' && c.inp.id === 'trig'), kick = kk && kk.out.module.id + '.' + kk.out.id; loading = true;
+  try {
+    for (const c of [...cables]) if (c.connected && M.has(c.inp.module.id) && !(c.inp.module.id === 'blend' && c.inp.id[0] === 'b')) removeCable(c);
+    const r = mulberry32(5), P = (a, b) => { try { patchCable(a, b, undefined, r() < 0.4 ? 1 : 0); } catch (e) { } };
+    P(sL, 'blend.aL'); P(sR, 'blend.aR');
+    const ch = ['blend', 'keys', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
+    P('limit.L', 'out.L'); P('limit.R', 'out.R'); if (kick) P(kick, 'pump.trig');
+    const set = (m, k, v) => modById[m].knobs[k].set(modById[m].knobs[k].toNorm(v)); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('echo', 'mix', 0.08);
+    for (let i = 0; i < 200; i++) physics(1 / 120);
+  } finally { loading = false; }
+  autosave(); return true;
+}
+const out1 = p => p && p.cables.length;
 function deckSleep(d, on) { DECK['sleep' + d] = on; send({ t: 'sleep', ids: deckIds(d), on }); }
 function loadDeck(d, P) { // replace one deck's patch, leaving the other deck and the mixing side alone
   const ids = new Set(deckIds(d)), side = d === 'B' ? 'b' : 'a'; loading = true;
@@ -2369,6 +2388,8 @@ function loadDeck(d, P) { // replace one deck's patch, leaving the other deck an
 }
 function blendNext() { // build a fresh patch (same style, same key) on the resting deck, then fade over to it
   if (DECK.blending) { toast('A blend is already running', true); return; }
+  if (ensureChain()) toast('Wired this patch through the mixing side first', true);
+  if (!out1(modById.blend.ports.L)) { toast('This patch is not wired for blending: press a random style first', true); return; }
   const from = DECK.live, to = from === 'A' ? 'B' : 'A', P = deckPatch(tastePick(() => genPatch(DECK.style || 'house', rr(0, 0.3))), to);
   const oq = modById[from === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
   P.knobs[qk] = { ...(P.knobs[qk] || {}), scale: oq.v('scale'), root: oq.v('root'), oct: oq.v('oct') };
@@ -2379,7 +2400,7 @@ function blendNext() { // build a fresh patch (same style, same key) on the rest
 }
 function blendTick() { const B = DECK.blending; if (!B) return; const t = clamp((performance.now() / 1000 - B.t0) / B.sec, 0, 1), e = t * t * (3 - 2 * t);
   modById.blend.knobs.blend.set(B.x0 + (B.x1 - B.x0) * e);
-  if (t >= 1) { DECK.blending = null; DECK.live = B.to; deckSleep(B.from, true); blendBtn(); condRebase(); toast('Deck ' + B.to + ' is playing', true); } }
+  if (t >= 1) { DECK.blending = null; DECK.live = B.to; const ok = out1(modById.blend.ports.L) && out1(modById.blend.ports[B.to === 'B' ? 'bL' : 'aL']); if (ok) deckSleep(B.from, true); else deckSleep(B.from, false); blendBtn(); condRebase(); toast('Deck ' + B.to + ' is playing', true); } }
 function deckRestore() { const x = modById.blend.v('blend'), lv = x > 0.5 ? 'B' : 'A'; DECK.live = lv; modById.blend.knobs.blend.set(lv === 'B' ? 1 : 0); deckSleep(lv === 'A' ? 'B' : 'A', true); deckSleep(lv, false); blendBtn(); }
 function blendBtn() { const b = document.getElementById('rBlend'); if (b) b.textContent = DECK.blending ? 'BLENDING TO ' + DECK.blending.to + '…' : 'BLEND TO DECK ' + (DECK.live === 'A' ? 'B' : 'A'); }
 
