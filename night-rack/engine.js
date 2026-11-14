@@ -1152,13 +1152,132 @@ class Sub extends DSP { // low end: everything below the crossover in mono, a cl
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band };
+// ================================================================ KILN-ISH row: DETAIL, NATURE, SWELL
+// DETAIL: the soft electronic side of an organic beat. Little clicks, wooden ticks, bloops, leaf-crackles and ghost thumps on
+// syncopated 2-bar patterns that keep changing a step or two (VARIATION), with the odd ratchet. CRUNCH warms and crushes the drums
+// patched into DRUMS IN (sample-rate and bit reduction, then a soft low-pass so it never turns harsh). The beat stays dry.
+const DET_W = [0.05, 0.35, 0.25, 0.6, 0.15, 0.4, 0.55, 0.5, 0.1, 0.45, 0.3, 0.6, 0.2, 0.55, 0.5, 0.45];
+class Detail extends DSP {
+  static IN = ['clk', 'voct', 'in']; static OUT = ['L', 'R', 'trig'];
+  constructor(e) { super(e); this.cs = new Schmitt(); this.step = -1; this.per = e.sr * 0.12; this.since = 0; this.V = []; this.Q = [];
+    this.pat = new Float32Array(32); this.ku = new Float32Array(32); this.po = new Float32Array(32); this.pn = new Float32Array(32); this.rt = new Uint8Array(32);
+    for (let s = 0; s < 32; s++) this.mut(s); this.h = 0; this.hc = 0; this.c1 = 0; this.c2 = 0; this.sl = 0; this.sr2 = 0; this.tg = 0; }
+  mut(s) { this.pat[s] = Math.random() * DET_W[s % 16] * 1.7; this.ku[s] = Math.random(); this.po[s] = [0, 0, 0, 7, 12, 5, -5, 12][Math.random() * 8 | 0]; this.pn[s] = Math.random() * 1.3 - 0.65; this.rt[s] = Math.random() < 0.08 ? 2 + (Math.random() * 2 | 0) : 1; }
+  kindOf(u) { const c = this.p.color ?? 0.5, w = [(1 - c) * 1.1, 0.3 + (1 - c) * 0.6, c * 1.3, 0.45, 0.25]; let t = w.reduce((a, b) => a + b, 0) * u; for (let k = 0; k < 5; k++) { t -= w[k]; if (t <= 0) return k; } return 4; }
+  voice(k, s, delay) { const sr = this.sr, v0 = this.in.voct[0], g = 0.55 + Math.random() * 0.45;
+    const f0 = 523.25 * Math.pow(2, v0 + this.po[s] / 12) * (Math.random() < 0.3 ? 0.5 : 1);
+    const V = { k, t: -delay, pan: this.pn[s], g, ph: 0, y1: 0, y2: 0, lp: 0 };
+    if (k === 0) Object.assign(V, { dur: 0.04, tau: 0.002 + Math.random() * 0.005 });
+    else if (k === 1) { const f = 800 + Math.random() * 1700, r = Math.exp(-1 / (0.02 * sr)); Object.assign(V, { dur: 0.15, c1: 2 * r * Math.cos(TAU * f / sr), c2: -r * r }); }
+    else if (k === 2) Object.assign(V, { dur: 0.35, f: Math.min(f0, 2400), up: Math.random() < 0.35, dec: 0.07 + Math.random() * 0.12 });
+    else if (k === 3) { const f = 1800 + Math.random() * 2500, r = Math.exp(-1 / (0.0015 * sr)); Object.assign(V, { dur: 0.08 + Math.random() * 0.1, rate: 300 + Math.random() * 600, c1: 2 * r * Math.cos(TAU * f / sr), c2: -r * r }); }
+    else Object.assign(V, { dur: 0.25, f: 55 + Math.random() * 20, g: g * 0.8 });
+    if (this.V.length > 24) this.V.shift(); this.V.push(V); this.tg = Math.round(0.006 * sr); this.flash('led', 1); }
+  fire() { const s = this.step % 32, P = this.p;
+    if (s % 16 === 0) { const nm = Math.floor((P.vary ?? 0.35) * 4 + Math.random()); for (let j = 0; j < nm; j++) this.mut(Math.random() * 32 | 0); }
+    if (this.pat[s] > 1 - (P.dens ?? 0.45)) { const k = this.kindOf(this.ku[s]), r = this.rt[s] > 1 && Math.random() < 0.3 + (P.vary ?? 0.35) * 0.4 ? this.rt[s] : 1, gap = this.per / r / this.sr;
+      for (let j = 0; j < r; j++) this.voice(k, s, j * gap); } }
+  process(n) {
+    const P = this.p, sr = this.sr, C = this.in.clk, X = this.in.in, OL = this.out.L, OR = this.out.R, T = this.out.trig;
+    const cr = P.crunch ?? 0.3, hold = 1 + cr * 4.5, q = Math.pow(2, 11 - cr * 6) / 5, sat = 1 + cr * 2.2, kl = 1 - Math.exp(-TAU * (2600 + (1 - cr) * 9000) / sr);
+    const soft = P.soft ?? 0.6, ks = 1 - Math.exp(-TAU * (2200 + (1 - soft) * 12000) / sr), dl = (P.lvl ?? 0.6) * 4;
+    for (let i = 0; i < n; i++) {
+      this.since++; if (this.cs.step(C[i])) { this.per = this.since; this.since = 0; this.step = (this.step + 1) % 32; this.fire(); }
+      // CRUNCH on the drums: hold samples (lower rate), fewer bits, a little saturation, then a soft low-pass; blended with the dry drums
+      const x = X[i]; if (++this.hc >= hold) { this.hc -= hold; this.h = Math.round(x * q) / q; }
+      let w = Math.tanh(this.h * sat / 5) * 5 / Math.tanh(sat); this.c1 += kl * (w - this.c1); this.c2 += kl * (this.c1 - this.c2);
+      const drum = x * (1 - cr * 0.85) + this.c2 * cr * 0.85;
+      // details
+      let l = 0, r = 0;
+      for (let j = this.V.length - 1; j >= 0; j--) { const v = this.V[j]; v.t += 1 / sr; if (v.t < 0) continue; if (v.t > v.dur) { this.V.splice(j, 1); continue; } const t = v.t; let y = 0;
+        if (v.k === 0) { const nz = Math.random() * 2 - 1; v.lp += 0.5 * (nz - v.lp); y = (nz - v.lp) * Math.exp(-t / v.tau) * 0.9; }
+        else if (v.k === 1) { const ex = t < 1.5 / sr ? 1 : 0; const yy = v.c1 * v.y1 + v.c2 * v.y2 + ex; v.y2 = v.y1; v.y1 = yy; y = yy * 0.12; }
+        else if (v.k === 2) { const f = v.f * (v.up ? 1 + 0.5 * (1 - Math.exp(-t / 0.03)) : 1 + 0.8 * Math.exp(-t / 0.018)); v.ph += f / sr; y = Math.sin(TAU * v.ph) * Math.min(1, t / 0.003) * Math.exp(-t / v.dec) * 0.7; }
+        else if (v.k === 3) { const ex = Math.random() < v.rate / sr ? (Math.random() * 2 - 1) * Math.exp(-t / (v.dur * 0.4)) : 0; const yy = v.c1 * v.y1 + v.c2 * v.y2 + ex; v.y2 = v.y1; v.y1 = yy; y = yy * 0.35; }
+        else { const f = v.f * (1 + 1.2 * Math.exp(-t / 0.012)); v.ph += f / sr; y = Math.sin(TAU * v.ph) * Math.exp(-t / 0.07) * 0.9; }
+        y *= v.g; l += y * (1 - v.pan); r += y * (1 + v.pan); }
+      this.sl += ks * (l - this.sl); this.sr2 += ks * (r - this.sr2);
+      OL[i] = drum + this.sl * dl; OR[i] = drum + this.sr2 * dl; T[i] = this.tg > 0 ? 10 : 0; if (this.tg > 0) this.tg--;
+    }
+  }
+}
+// NATURE: a living outdoor bed, all synthesized so it never loops: crickets far off, leaves rustling in gusts, crunchy leaf steps
+// (a few footsteps now and then), water drops, and HUSH, breathy noise bands that sweep and swell slowly. BED IN mixes in a recording.
+class Nature extends DSP {
+  static IN = ['in']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); const R = () => Math.random();
+    this.cr = [0, 1].map(j => ({ f: 4100 + R() * 800, per: 0.55 + R() * 0.6, next: R(), pulse: 0, n: 0, ph: 0, pan: j ? 0.45 : -0.45 }));
+    this.lv = [{ s: 0, b1: 0, b2: 0, g: 0, gt: 0.3, k: 0 }, { s: 0, b1: 0, b2: 0, g: 0, gt: 0.3, k: 0 }]; this.fl = 0;
+    this.stp = { next: 2 + R() * 4, left: 0, gap: 0, t: 1, dur: 0, pan: 0, y1: 0, y2: 0 }; this.dr = []; this.dnext = R();
+    this.hu = [0, 1].map(j => ({ c: 0, ct: R(), cv: 0.5, a: 0, at: 0, an: 0, i1: 0, i2: 0, pan: j ? 0.5 : -0.5 }));
+    this.pk = new Float32Array(7); this.lpL = 0; this.lpR = 0; this.bd = new Float32Array(512); this.bi = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, dt = 1 / sr, OL = this.out.L, OR = this.out.R, X = this.in.in, act = 0.3 + (P.act ?? 0.5) * 1.4;
+    const ck = P.crick ?? 0.3, lv = P.leaves ?? 0.35, st = P.steps ?? 0.3, dp = P.drops ?? 0.25, hu = P.hush ?? 0.4, bed = P.bed ?? 0.5, k7 = 1 - Math.exp(-TAU * 7000 / sr);
+    for (let i = 0; i < n; i++) {
+      let l = 0, r = 0;
+      // crickets: 3-4 short pulses of a high tone make a chirp; each cricket keeps its own pace
+      if (ck > 0.01) for (const c of this.cr) { c.next -= dt / act; if (c.next <= 0 && c.n === 0) { c.n = 3 + (Math.random() < 0.5 ? 1 : 0); c.pulse = 0; c.next = c.per * (0.85 + Math.random() * 0.3); }
+        if (c.n > 0) { c.pulse += dt; const pl = 0.013, gp = 0.032; let a = 0; if (c.pulse < pl) a = Math.sin(Math.PI * c.pulse / pl); if (c.pulse >= gp) { c.pulse = 0; c.n--; }
+          c.ph += c.f * dt; const y = Math.sin(TAU * c.ph) * a * ck * 0.16; l += y * (1 - c.pan); r += y * (1 + c.pan); } }
+      // leaves: band-passed noise in gusts with a fast flutter
+      if (lv > 0.01) { this.fl += 0.002 * ((Math.random() * 2 - 1) - this.fl);
+        for (let j = 0; j < 2; j++) { const L = this.lv[j]; if (--L.k <= 0) { L.k = (0.3 + Math.random() * 1.2) * sr; L.gt = Math.pow(Math.random(), 1.6) * act; } L.g += (L.gt - L.g) * 0.00004;
+          const nz = Math.random() * 2 - 1; L.b1 += 0.35 * (nz - L.b1); L.b2 += 0.06 * (L.b1 - L.b2); const y = (L.b1 - L.b2) * L.g * (0.55 + 0.45 * Math.abs(this.fl) * 20) * lv * 0.7; if (j) r += y; else l += y; } }
+      // steps on dry leaves: a short walk now and then; each step is a dense, soft crackle
+      if (st > 0.01) { const S = this.stp; S.next -= dt * act; if (S.next <= 0 && S.left === 0) { S.left = 1 + (Math.random() * 4 | 0); S.gap = 0; S.pan = Math.random() * 1.2 - 0.6; S.next = 4 + Math.random() * 8; }
+        if (S.left > 0) { S.gap -= dt; if (S.gap <= 0) { S.t = 0; S.dur = 0.12 + Math.random() * 0.1; S.gap = 0.42 + Math.random() * 0.2; S.left--; const f = 2200 + Math.random() * 2000, rr = Math.exp(-1 / (0.0012 * sr)); S.c1 = 2 * rr * Math.cos(TAU * f / sr); S.c2 = -rr * rr; } }
+        if (S.t < S.dur) { S.t += dt; const env = Math.min(1, S.t / 0.01) * Math.exp(-S.t / (S.dur * 0.45)); const ex = Math.random() < 700 / sr ? (Math.random() * 2 - 1) * env : 0;
+          const yy = (S.c1 || 0) * S.y1 + (S.c2 || 0) * S.y2 + ex; S.y2 = S.y1; S.y1 = yy; const y = yy * st * 0.5; l += y * (1 - S.pan); r += y * (1 + S.pan); } }
+      // water drops: a quick upward 'plip'
+      if (dp > 0.01) { this.dnext -= dt * act; if (this.dnext <= 0) { this.dnext = -Math.log(1 - Math.random() * 0.999) * 1.4; if (this.dr.length < 6) this.dr.push({ t: 0, f: 550 + Math.random() * 1100, ph: 0, pan: Math.random() * 1.4 - 0.7, g: 0.4 + Math.random() * 0.6 }); }
+        for (let j = this.dr.length - 1; j >= 0; j--) { const d = this.dr[j]; d.t += dt; if (d.t > 0.12) { this.dr.splice(j, 1); continue; } d.ph += d.f * Math.pow(2, Math.min(d.t, 0.03) / 0.02) * dt; const y = Math.sin(TAU * d.ph) * Math.exp(-d.t / 0.03) * d.g * dp * 0.35; l += y * (1 - d.pan); r += y * (1 + d.pan); } }
+      // hush: two breathy bands whose centres drift between ~300 Hz and 2.5 kHz while they swell in and out
+      if (hu > 0.01) for (const H of this.hu) { if (--H.an <= 0) { H.an = (5 + Math.random() * 7) * sr; H.at = Math.pow(Math.random(), 1.5); H.ct = Math.random(); }
+        H.a += (H.at - H.a) * 0.000006; H.cv += (H.ct - H.cv) * 0.000004; const fc = 300 * Math.pow(8, H.cv), g = Math.tan(Math.PI * fc / sr), kq = 0.35, a1 = 1 / (1 + g * (g + kq));
+        const nz = Math.random() * 2 - 1, v3 = nz - H.i2, v1 = a1 * H.i1 + g * a1 * v3, v2 = H.i2 + g * v1; H.i1 = 2 * v1 - H.i1; H.i2 = 2 * v2 - H.i2;
+        const y = v1 * H.a * H.a * hu * 0.3; l += y * (1 - H.pan); r += y * (1 + H.pan); }
+      this.lpL += k7 * (l - this.lpL); this.lpR += k7 * (r - this.lpR);
+      const b = X[i] * bed * 0.6; this.bd[this.bi] = b; const bR = this.bd[(this.bi + 300) & 511]; this.bi = (this.bi + 1) & 511;
+      OL[i] = this.lpL * 5 + b; OR[i] = this.lpR * 5 + bR;
+    }
+    this.peak('led', OL, n);
+  }
+}
+// SWELL: now-and-then phrases on recorded violin, cello or clean electric guitar. ATTACK bows a note in slowly, LENGTH holds it,
+// CHANCE decides how many triggers it answers ("here and there"), TREMOLO is the post-rock shimmer, VIBRATO the string player's hand.
+class Swell extends DSP {
+  static IN = ['voct', 'trig']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.S = []; this.st = new Schmitt(); this.V = [0, 1, 2, 3].map(j => ({ b: null, pos: -1, rate: 1, a: 0, hold: 0, rel: false, t: 0, pan: [-0.35, 0.35, -0.15, 0.15][j] })); this.k = 0; this.tp = 0; this.vp = 0; this.lp = [0, 0, 0, 0]; }
+  setSample(i, data, root) { this.S = this.S.filter(x => x.i !== i); this.S.push({ i, data, root }); this.S.sort((a, b) => a.root - b.root); }
+  process(n) {
+    const P = this.p, sr = this.sr, Vi = this.in.voct, T = this.in.trig, OL = this.out.L, OR = this.out.R;
+    const att = 0.005 + Math.pow(P.att ?? 0.4, 2) * 3, len = 0.25 + Math.pow(P.len ?? 0.5, 2) * 6, kr = Math.exp(-1 / (0.9 * sr)), ch = P.chance ?? 0.5, trem = P.trem ?? 0, vib = (P.vib ?? 0.3) * 0.0035, lvl = (P.lvl ?? 0.7) * 5;
+    const kt = 1 - Math.exp(-TAU * (900 + Math.pow(P.tone ?? 0.6, 2) * 11000) / sr), tr = TAU * 4.2 / sr, vr = TAU * 5.1 / sr;
+    for (let i = 0; i < n; i++) {
+      if (this.st.step(T[i]) && this.S.length && Math.random() < ch) {
+        const note = 60 + (Vi[i] + (P.oct | 0)) * 12; let best = this.S[0]; for (const x of this.S) if (Math.abs(x.root - note) < Math.abs(best.root - note)) best = x;
+        const v = this.V[this.k = (this.k + 1) % 4]; Object.assign(v, { b: best.data, pos: 0, rate: Math.pow(2, (note - best.root) / 12), a: 0, hold: len * sr, rel: false, t: 0 }); this.flash('led', 1); }
+      this.tp += tr; this.vp += vr; const tm = 1 - trem * 0.5 * (1 + Math.sin(this.tp)), pm = Math.sin(this.vp);
+      let l = 0, r = 0;
+      for (const v of this.V) { if (v.pos < 0) continue; const i0 = v.pos | 0; if (i0 + 1 >= v.b.length) { v.pos = -1; continue; }
+        if (!v.rel) { v.a = Math.min(1, v.a + 1 / (att * sr)); if (--v.hold <= 0) v.rel = true; } else { v.a *= kr; if (v.a < 1e-4) { v.pos = -1; continue; } }
+        const f = v.pos - i0, y = (v.b[i0] * (1 - f) + v.b[i0 + 1] * f) * v.a; v.t++; v.pos += v.rate * (1 + vib * pm * Math.min(1, v.t / (0.5 * sr)));
+        l += y * (1 - v.pan); r += y * (1 + v.pan); }
+      const L = this.lp; L[0] += kt * (l - L[0]); L[1] += kt * (L[0] - L[1]); L[2] += kt * (r - L[2]); L[3] += kt * (L[2] - L[3]);
+      OL[i] = L[1] * tm * lvl; OR[i] = L[3] * tm * lvl;
+    }
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
   handle(m) {
     if (m.t === 'add') { const C = DSPS[m.type]; if (!C) return; const d = new C(this); d.id = m.id; Object.assign(d.p, m.p || {}); d.onParam(); this.mods.set(m.id, d); this.dirty = true; }
     else if (m.t === 'param') { const d = this.mods.get(m.id); if (d) { d.p[m.k] = m.v; d.onParam(m.k, m.v); } }
+    else if (m.t === 'smpclear') { const d = this.mods.get(m.id); if (d && d.S) d.S = []; }
     else if (m.t === 'smp') { const d = this.mods.get(m.id); if (d && d.setSample) d.setSample(m.slot, m.data, m.root); }
     else if (m.t === 'hit') { const d = this.mods.get(m.id); if (d && d.hit) d.hit(m.slot); }
     else if (m.t === 'note') { const d = this.mods.get(m.id); if (d && d.note) d.note(m.n, m.v); }

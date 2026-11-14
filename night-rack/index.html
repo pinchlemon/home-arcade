@@ -557,7 +557,9 @@ DEFS.sampler = lay('SAMPLER', 20, 'black',
    [kn('kit', 'KIT', 'S', { min: 0, max: NKIT - 1, step: 1, def: 0, fmt: v => kitName(v) }), ...SK.map((k, i) => kn(k + 'Lvl', 'LEVEL', 'T', { def: [0.9, 0.7, 0.6, 0.45, 0.4, 0.45][i], fmt: fPct }))]],
   [SK.map((k, i) => ji('t' + k, 'TRIG', 'trig')), [...SK.map(k => jo(k, 'OUT')), jo('mix', 'MIX')]]);
 const MBIRA_SETS = [['KALIMBA', [['MBira3_pluck_Main_G2_k15_50_100_rr2', 43], ['MBira3_pluck_Main_Cs3_k16_50_100_rr2', 49], ['MBira3_pluck_Main_F3_k17_50_100_rr2', 53], ['MBira3_pluck_Main_As3_k18_50_100_rr2', 58], ['MBira3_pluck_Main_Ds4_k20_50_100_rr2', 63], ['MBira3_pluck_Main_G4_k22_50_100_rr2', 67], ['MBira3_pluck_Main_Cs5_k24_50_100_rr2', 73]]],
-  ['MARIMBA', [['Marimba_hit_Outrigger_C2_med_01', 36], ['Marimba_hit_Outrigger_G2_med_01', 43], ['Marimba_hit_Outrigger_F3_med_01', 53], ['Marimba_hit_Outrigger_C4_med_01', 60], ['Marimba_hit_Outrigger_G4_med_01', 67], ['Marimba_hit_Outrigger_F5_med_01', 77], ['Marimba_hit_Outrigger_C6_med_01', 84]]]];
+  ['MARIMBA', [['Marimba_hit_Outrigger_C2_med_01', 36], ['Marimba_hit_Outrigger_G2_med_01', 43], ['Marimba_hit_Outrigger_F3_med_01', 53], ['Marimba_hit_Outrigger_C4_med_01', 60], ['Marimba_hit_Outrigger_G4_med_01', 67], ['Marimba_hit_Outrigger_F5_med_01', 77], ['Marimba_hit_Outrigger_C6_med_01', 84]]],
+  ['SOFT PIANO', [49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93].map(n => ['keys/piano/' + n, n])]];
+const SWELL_SETS = [['VIOLIN', [55, 60, 64, 69, 72, 76, 79, 84], 'violin'], ['CELLO', [36, 40, 43, 48, 52, 55, 60, 64], 'cello'], ['CLEAN GUITAR', [45, 48, 51, 54, 57, 60, 63, 66, 69, 72], 'guitar']];
 const FIELDS = [['BIRDS', 'birdschirping'], ['FOREST', 'forest'], ['RAIN', 'raindripping'], ['RIVER', 'riverlight'], ['STREAM', 'stream'], ['WAVES', 'wavelight'], ['CHIMES', 'windchimes']];
 DEFS.mbira = lay('MBIRA', 10, 'navy',
   [[kn('type', 'SOUND', 'S', { min: 0, max: MBIRA_SETS.length - 1, step: 1, def: 0, fmt: v => MBIRA_SETS[v][0] }), kn('oct', 'OCTAVE', 'S', { min: -2, max: 2, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v })],
@@ -595,6 +597,22 @@ DEFS.sub = lay('SUB', 12, 'black',
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const BLANK = (hp, theme) => { const k = 'blank_' + hp + theme; DEFS[k] = DEFS[k] || { title: '', hp, theme, knobs: [], jacks: [], logo: true }; return k; };
 let blankN = 0; const bl = (hp, theme) => ['bk' + blankN++, BLANK(hp, theme)];
+DEFS.detail = lay('DETAIL', 10, 'silver',
+  [[kn('dens', 'DENSITY', 'S', { def: 0.45, fmt: fPct }), kn('vary', 'VARIATION', 'S', { def: 0.35, fmt: fPct })],
+   [kn('color', 'CLICK/BLOOP', 'S', { def: 0.5, name: 'CLICKS OR BLOOPS', fmt: v => v < 0.35 ? 'MOSTLY CLICKS' : v > 0.65 ? 'MOSTLY BLOOPS' : 'MIXED' }), kn('soft', 'SOFT', 'S', { def: 0.6, fmt: fPct })],
+   [kn('crunch', 'CRUNCH', 'S', { def: 0.3, name: 'DRUM CRUNCH', fmt: fPct }), ld('led', 'amber'), kn('lvl', 'LEVEL', 'S', { def: 0.6, name: 'DETAIL LEVEL', fmt: fPct })]],
+  [[ji('clk', 'CLOCK', 'trig'), ji('voct', 'V/OCT', 'param'), ji('in', 'DRUMS', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R'), jo('trig', 'TRIG', 'cv')]]);
+DEFS.nature = lay('NATURE', 10, 'navy',
+  [[kn('crick', 'CRICKETS', 'S', { def: 0.3, fmt: fPct }), kn('leaves', 'LEAVES', 'S', { def: 0.35, fmt: fPct })],
+   [kn('steps', 'STEPS', 'S', { def: 0.3, name: 'LEAF STEPS', fmt: fPct }), kn('drops', 'DROPS', 'S', { def: 0.25, name: 'WATER DROPS', fmt: fPct })],
+   [kn('hush', 'HUSH', 'S', { def: 0.4, name: 'HUSHED SWEEPS', fmt: fPct }), kn('act', 'ACTIVITY', 'S', { def: 0.5, fmt: fPct }), kn('bed', 'BED', 'S', { def: 0.5, name: 'BED IN LEVEL', fmt: fPct })]],
+  [[ji('in', 'BED IN', 'audio'), ld('led', 'green')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.swell = lay('SWELL', 12, 'black',
+  [[kn('type', 'SOUND', 'M', { min: 0, max: SWELL_SETS.length - 1, step: 1, def: 0, fmt: v => SWELL_SETS[v][0] }), kn('oct', 'OCTAVE', 'S', { min: -2, max: 2, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v })],
+   [kn('att', 'ATTACK', 'S', { def: 0.4, fmt: v => fS(0.005 + v * v * 3) }), kn('len', 'LENGTH', 'S', { def: 0.5, fmt: v => fS(0.25 + v * v * 6) }), kn('chance', 'CHANCE', 'S', { def: 0.5, fmt: fPct })],
+   [kn('trem', 'TREMOLO', 'S', { def: 0, fmt: fPct }), kn('vib', 'VIBRATO', 'S', { def: 0.3, fmt: fPct }), kn('tone', 'TONE', 'S', { def: 0.6, fmt: fPct })],
+   [ld('led', 'amber'), kn('lvl', 'LEVEL', 'S', { def: 0.7, fmt: fPct })]],
+  [[ji('voct', 'V/OCT', 'param'), ji('trig', 'TRIG', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.harm = lay('HARMONY', 20, 'navy',
   [[sc(1.5)],
    [kn('key', 'KEY', 'S', { min: 0, max: 11, step: 1, def: 0, fmt: v => ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'][v] }), kn('mode', 'MODE', 'S', { min: 0, max: 2, step: 1, def: 0, fmt: v => ['MAJOR', 'MINOR', 'DORIAN'][v] }), kn('color', 'COLOUR', 'S', { def: 0.5, fmt: v => v < 0.3 ? 'PLAIN ' + fPct(v) : v > 0.7 ? 'RICH ' + fPct(v) : fPct(v) }), kn('move', 'MOVEMENT', 'S', { def: 0.3, fmt: fPct })],
@@ -679,7 +697,7 @@ DEFS.band = lay('BAND', 16, 'silver',
    [kn('comp', 'COMPING', 'S', { min: 0, max: 3, step: 1, def: 0, fmt: v => COMPS[v] }), kn('tone', 'TONE', 'S', { def: 0.55, fmt: fPct }), kn('level', 'LEVEL', 'S', { def: 0.8, fmt: fPct })],
    [kn('tune', 'TUNE', 'S', { min: 0, max: SONGBOOK.length - 1, step: 1, def: 0, fmt: v => SONGBOOK[v] ? SONGBOOK[v].name.toUpperCase() : '' }), ld('led', 'amber')]],
   [[ji('clk', 'CLOCK', 'trig'), ji('rst', 'RESET', 'trig'), jo('chg', 'CHANGE', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R'), jo('bass', 'BASS', 'param'), jo('bgate', 'B GATE', 'trig')]]);
-const ROWM = [['keys', 'keys'], ['sampler', 'sampler'], ['harm', 'harm'], ['band', 'band'], bl(12, 'black')];
+const ROWM = [['keys', 'keys'], ['sampler', 'sampler'], ['detail', 'detail'], ['nature', 'nature'], ['band', 'band'], ['swell', 'swell']];
 // side racks: real rows, top down. Right = mixing (its top two rows; the rows below stay painted until they get modules). Left = deck B, a mirror of the middle rack's sound makers.
 
 const ROWD = [['trig', 'trigseq'], ['drums', 'drums'], ['mix6', 'mix6'], ['duck', 'duck'], ['blank5', 'blank8c']];
@@ -717,7 +735,7 @@ let AC = null, ENG = null, TEL = {}, TELNEW = false, cableUid = 1;
 const G = { beat: null, step: -1, tick: 0, lastCount: -1 };
 class Pulse { constructor() { this.q = []; this.last = -1e9; } push(t) { this.q.push(t); if (this.q.length > 64) this.q.shift(); } level(now, decay = 0.08) { while (this.q.length && this.q[0] <= now) this.last = this.q.shift(); const d = now - this.last; return d < 0 ? 0 : Math.exp(-d / decay); } }
 G.beat = new Pulse();
-function send(m) { if (window.__cap) window.__cap(m); if (ENG) ENG.post([m]); } // __cap: test hook (records what the engine is told)
+function send(m) { if (ENG) { if (window.__cap) window.__cap(m); ENG.post([m]); } } // __cap: test hook (records what the engine is told)
 function tolerances(m) { // fixed per-module component spread, like real hardware units
   const r = mulberry32(hashStr('unit-' + m.id)), t = {};
   if (m.type === 'vcoA' || m.type === 'vcoB') Object.assign(t, { tol: (r() - 0.5) * 10, trk: 1 + (r() - 0.5) * 0.006, warm: 8 + r() * 12 });
@@ -851,6 +869,8 @@ class TrigSeqM extends Mod {
 }
 class DrumsM extends Mod { visual() { const L = this.T; for (const p of ['k', 'c', 'h', 'o']) this.leds['l' + p].vu(L[p] || 0); } }
 class Mix6M extends Mod { visual() { const L = this.T; this.leds.vuL.vu(clamp((L.vuL || 0) * 1.5, 0, 1)); this.leds.vuR.vu(clamp((L.vuR || 0) * 1.5, 0, 1)); } }
+class SwellM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
+class LedM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class MbiraM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
 class FieldM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'rec') loadSet(this); } visual() { this.leds.led.set(clamp((this.T.led || 0) * 2, 0, 1)); } }
 class SamplerM extends Mod {
@@ -934,7 +954,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -2266,7 +2286,7 @@ function genPatch(style, wild, clean) {
     subB: p => { vco('vcoB', p, [-1, 0, 0]); con(rpick(['vcoB.saw', 'vcoB.sqr', 'vcoB.tri']), 'vcfB.in'); filt('vcfB', rexp(400, 3000), rr(0.1, 0.55));
       con(p.gate, 'env.trig2'); con('env.env2', 'vca.cv2'); if (chance(0.6)) { con('env.env2', 'vcfB.cv2'); set('vcfB', 'cv2', rr(0.25, 0.6)); }
       set('env', 'atk2', rexp(0.003, 2)); set('env', 'rel2', rexp(0.5, 8)); set('vca', 'lvl2', 1.1); set('vca', 'bias2', 0); con(rpick(['vcfB.lp', 'vcfB.lp', 'vcfB.bp']), 'vca.in2'); return 'vca.out2'; },
-    drone: () => { used.add('vcoB'); set('vcoB', 'oct', rpick([-2, -1, -1])); set('vcoB', 'tune', rpick([0, 0, 7, -5])); set('vcoB', 'drift', rr(0.3, 0.7)); targets.push('vcoB.fm');
+    drone: () => { used.add('vcoB'); set('vcoB', 'oct', CL ? -1 : rpick([-2, -1, -1])); set('vcoB', 'tune', rpick([0, 0, 7, -5])); set('vcoB', 'drift', rr(0.3, 0.7)); targets.push('vcoB.fm');
       let o = rpick(['vcoB.sin', 'vcoB.tri', 'vcoB.saw']); if (!used.has('folder') && chance(CL ? 0.12 : 0.5)) { con(o, 'folder.in'); o = 'folder.out'; used.add('folder'); set('folder', 'fold', CL ? rr(0.1, 0.25) : rr(0.2, 0.6)); con(rpick(['lfo.uni1', 'lfo.uni2']), 'folder.cv'); }
       con(o, 'vcfB.in'); filt('vcfB', rexp(250, 1500), rr(0.1, 0.5)); con(CL ? rpick(['lfo.bi1', 'lfo.bi2']) : rpick(['lfo.bi1', 'lfo.bi2', 'lfo.uni2']), 'vcfB.cv1'); set('vcfB', 'cv1', CL ? rr(0.08, 0.18) : rr(0.3, 0.7)); return 'vcfB.lp'; },
     wind: () => { con(CL ? 'noise.pink' : rpick(['noise.pink', 'noise.white']), 'vcfB.in'); filt('vcfB', CL ? rexp(250, 900) : rexp(300, 2000), CL ? rr(0.3, 0.5) : rr(0.7, 0.92)); if (CL) set('vcfB', 'res', rr(0.35, 0.55)); con(rpick(['lfo.bi1', 'lfo.bi2', 'rnd.smooth']), 'vcfB.cv1'); set('vcfB', 'cv1', CL ? rr(0.1, 0.25) : rr(0.5, 1)); return 'vcfB.bp'; },
@@ -2278,8 +2298,11 @@ function genPatch(style, wild, clean) {
         set('texture', 'pos', rr(0.1, 0.8)); set('texture', 'size', rr(0.4, 0.85)); set('texture', 'pitch', CL ? rpick([0, 0, 12]) : rpick([0, 0, 12, -12, 7])); set('texture', 'dens', rr(0.4, 0.8)); set('texture', 'blend', CL ? rr(0.5, 0.85) : rr(0.6, 1)); set('texture', 'spread', rr(0.4, 1)); set('texture', 'fb', CL ? rr(0, 0.15) : rr(0, 0.4)); set('texture', 'tex', rr(0.2, 0.8));
         targets.push('texture.pos'); return 'texture.L'; }
       return 'macro.out'; },
-    pluck: (p, gate) => { const v = used.has('vcoA') ? 'vcoA' : used.has('vcoB') ? 'vcoB' : null; let src;
-      if (v) src = v + '.' + rpick(CL ? ['tri', 'sin'] : ['tri', 'sin', 'sqr']); else { vco('vcoA', p, [0, 1]); src = 'vcoA.tri'; }
+    pluck: (p, gate) => { let src;
+      if (CL) { // clean: never pluck in the bass register; take a free oscillator if the used ones sit low
+        const ok = o => used.has(o) && K[o] && K[o].oct >= 0, free = ['vcoA', 'vcoB'].find(o => !used.has(o));
+        if (ok('vcoA') || ok('vcoB')) src = (ok('vcoA') ? 'vcoA' : 'vcoB') + '.' + rpick(['tri', 'sin']); else if (free) { vco(free, p, [0, 1]); src = free + '.tri'; } else src = (used.has('vcoA') ? 'vcoA' : 'vcoB') + '.sin'; }
+      else { const v = used.has('vcoA') ? 'vcoA' : used.has('vcoB') ? 'vcoB' : null; if (v) src = v + '.' + rpick(['tri', 'sin', 'sqr']); else { vco('vcoA', p, [0, 1]); src = 'vcoA.tri'; } }
       con(src, 'lpg.in1'); con(gate || p.gate, 'lpg.cv1'); set('lpg', 'resp1', rr(0.2, 0.6)); set('lpg', 'mode1', ri(1, 2)); set('lpg', 'off1', 0); used.add('lpg'); return 'lpg.out1'; },
   };
   const outs = [];
@@ -2305,7 +2328,7 @@ function genPatch(style, wild, clean) {
     for (const [s, a, b] of [['s', 'Tune', [0.35, 0.75]], ['s', 'Dec', [0.25, 0.5]], ['r', 'Tune', [0.3, 0.7]], ['r', 'Dec', [0.2, 0.5]], ['sh', 'Tune', [0.3, 0.8]], ['sh', 'Dec', [0.2, 0.5]], ['t', 'Tune', [0.2, 0.6]], ['t', 'Dec', [0.3, 0.6]]]) set('perc', s + a, rr(...b));
     set('perc', 'sLvl', rr(0.6, 0.85) * (soft ? 0.6 : 1)); set('perc', 'rLvl', rr(0.4, 0.6)); set('perc', 'shLvl', rr(0.35, 0.55) * (soft ? 0.8 : 1)); set('perc', 'tLvl', rr(0.4, 0.6)); };
   let SMP = style === 'dnb' || style === 'kiln' || ((style === 'jazzy' || style === 'lofi') && chance(0.85)) || ((style === 'house' || style === 'tinez') && chance(0.65));
-  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([7, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'lofi' ? rpick([6, 6, 9, 7, 2]) : style === 'tinez' || style === 'jazzy' ? rpick(CL ? [0, 0, 3, 6, 5] : [0, 0, 3, 4, 6, 5]) : rpick(CL ? [0, 0, 1, 1, 2, 5] : [0, 0, 1, 1, 2, 4, 5]));
+  const useKit = () => { used.add('sampler'); set('sampler', 'kit', style === 'kiln' ? rpick([6, 6, 9, 7, 8]) : style === 'dnb' ? rpick([9, 9, 10, 11, 1]) : style === 'lofi' ? rpick([6, 6, 9, 7, 2]) : style === 'tinez' || style === 'jazzy' ? rpick(CL ? [0, 0, 3, 6, 5] : [0, 0, 3, 4, 6, 5]) : rpick(CL ? [0, 0, 1, 1, 2, 5] : [0, 0, 1, 1, 2, 4, 5]));
     for (const k of ['k', 'c', 's', 'h', 'o', 'p']) { set('sampler', k + 'Tune', chance(0.25) ? rr(-1.5, 1.5) : 0); set('sampler', k + 'Dec', k === 'o' ? rr(0.4, 0.7) : k === 'h' ? rr(0.5, 1) : 1); }
     Object.assign(K.sampler, { kLvl: 0.95, cLvl: rr(0.6, 0.8), sLvl: rr(0.55, 0.75), hLvl: rr(0.35, 0.55), oLvl: rr(0.3, 0.45), pLvl: rr(0.35, 0.55) }); };
   const backbeat = () => { const m = rpick(['clap', 'clap', 'clap', 'snare', 'rim']); return m === 'clap' ? { snare: null } : m === 'snare' ? { clap: false, snare: 'perc.ts' } : { snare: 'perc.tr' }; };
@@ -2415,28 +2438,42 @@ function genPatch(style, wild, clean) {
     if (!K.mix6.pan3) K.mix6.pan3 = 0;
     master(rr(2, 3.5), rr(0.1, 0.18)); set('verb', 'damp', rexp(2500, 5000));
   } else if (style === 'kiln') {
-    set('clock', 'tempo', ri(82, 96));
-    // organic: hand drums and shakers (real recordings), kalimba or marimba arps, a nature recording underneath
-    groove(rpick([7, 7, 1]), { swing: rr(0.15, 0.4), chaos: rr(0, 0.15), k: rr(0.4, 0.55), s: rr(0.4, 0.5), h: rr(0.3, 0.5), p: rr(0.45, 0.7), snare: 'perc.ts', perc: 'perc.tr', clap: chance(0.35) });
+    // Kiln-ish: a soft, syncopated beat of organic hits with electronic crunch and little clicks and bloops (kept dry), soft piano or
+    // kalimba, now-and-then strings or a post-rock guitar, crickets/leaves/water and hushed sweeps; only the melodic side gets reverb
+    set('clock', 'tempo', ri(84, 100)); const sw = rr(0.08, 0.3);
+    groove(rpick([7, 7, 5, 1]), { swing: sw, chaos: rr(0.04, 0.16), k: rr(0.42, 0.55), s: rr(0.4, 0.5), h: rr(0.45, 0.6), p: rr(0.4, 0.65), ...rpick([{ snare: 'perc.tr' }, { snare: 'perc.ts' }, { snare: 'perc.tr', clap: false }]), perc: 'perc.tsh' });
     drumKnobs(true); set('drums', 'kTune', rr(0.18, 0.35)); set('perc', 'sTune', rr(0.3, 0.5)); set('perc', 'sDec', rr(0.15, 0.3));
-    con(drumBus(), 'mix6.in1'); set('sampler', 'kLvl', rr(0.75, 0.9)); set('sampler', 'hLvl', rr(0.35, 0.5)); set('sampler', 'cLvl', rr(0.4, 0.6));
+    const bus = drumBus(); set('sampler', 'kLvl', rr(0.8, 0.92)); set('sampler', 'kDec', rr(0.4, 0.7)); set('sampler', 'hLvl', rr(0.32, 0.45)); set('sampler', 'cLvl', rr(0.35, 0.55)); set('sampler', 'sLvl', rr(0.4, 0.6));
+    // DETAIL: crunch on the drums, clicks and bloops on top; straight to the reverb's dry input (the beat stays dry)
+    con(bus, 'detail.in'); con('clock.x4', 'detail.clk'); used.add('detail');
+    set('detail', 'dens', rr(0.35, 0.6)); set('detail', 'vary', rr(0.25, 0.6)); set('detail', 'color', CL ? rr(0.3, 0.75) : rr(0, 1)); set('detail', 'soft', CL ? rr(0.55, 0.8) : rr(0.2, 0.8));
+    set('detail', 'crunch', CL ? rr(0.2, 0.5) : rr(0.4, 0.9)); set('detail', 'lvl', rr(0.45, 0.62));
+    con('detail.L', 'verb.dryL'); con('detail.R', 'verb.dryR');
+    // melody: soft piano, kalimba or marimba on a sparse pentatonic line
     const arp = pitch.seq = { cv: 'seq.cv', gate: 'seq.gate' }; con(rpick(['clock.x2', 'clock.x2', 'clock.x1']), 'seq.clk');
-    for (let s = 0; s < 8; s++) set('seq', 's' + s, note(PENT, 0, CL ? 17 : 24)); set('seq', 'len', rpick([5, 6, 7, 8])); set('seq', 'prob', rr(0.6, 0.9));
-    let m;
-    if (chance(0.7)) { con(arp.cv, 'mbira.voct'); con(arp.gate, 'mbira.trig'); used.add('mbira'); m = 'mbira.out'; set('mbira', 'type', chance(0.7) ? 0 : 1); set('mbira', 'oct', -1); set('mbira', 'dec', rr(0.6, 1)); set('mbira', 'lvl', rr(0.6, 0.85)); }
-    else { m = voice.macro(arp, null); set('macro', 'model', rpick(CL ? [7, 7, 6] : [7, 7, 4, 6, 2])); set('macro', 'decay', rr(0.45, 0.75)); set('macro', 'freq', CL ? rpick([0, 12]) : rpick([12, 12, 24])); if (CL) set('macro', 'timbre', rr(0.15, 0.35)); }
-    if (chance(0.8)) { con('field.L', 'mix.in3'); used.add('field'); set('field', 'rec', rpick([0, 0, 1, 2, 2, 3, 4, 6])); set('field', 'lvl', rr(0.3, 0.55)); set('field', 'tone', rexp(2500, 9000)); set('field', 'width', rr(0.6, 1)); set('mix', 'lvl3', rr(0.35, 0.55));
-      if (chance(0.4)) { con('lfo.bi2', 'field.cv'); set('lfo', 'rate2', rexp(0.02, 0.08)); } }
-    con(m, 'mix6.in2'); con(m, 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 0.5]), rr(0.35, 0.55));
-    if (chance(0.7)) { const pl = voice.pluck(getPitch(rpick(['tur', 'rnd'])), rpick(['clock.d2', 'clock.x1', 'groove.perc'])); con(pl, 'mix6.in3'); set('mix6', 'lvl3', rr(0.32, 0.42)); set('mix6', 'pan3', rr(-0.5, 0.5)); } else set('mix6', 'lvl3', 0);
-    const pad = stabV(rpick(['clock.d8', 'clock.d4']), null, { chord: maj ? rpick([3, 7, 2]) : rpick([1, 4, 5]), atk: rr(0.35, 0.8), dec: rr(0.8, 1), cut: rexp(350, 1000), env: rr(0.05, 0.25) });
-    con(pad, 'mix6.in6'); set('mix6', 'lvl6', rr(0.28, 0.36)); set('mix6', 'pan6', rr(-0.3, 0.3));
-    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: rr(0.62, 0.72), pan1: 0, lvl2: rr(0.55, 0.65), pan2: rr(-0.3, 0.3), lvl4: rr(0.35, 0.45), pan4: -0.7, lvl5: rr(0.35, 0.45), pan5: 0.7, master: 0.8 });
-    con('mix6.L', 'tape.inL'); con('mix6.R', 'tape.inR'); con('tape.L', 'verb.inL'); con('tape.R', 'verb.inR'); used.add('tape'); if (!CL) targets.push('tape.wow');
-    if (CL) { set('tape', 'wow', rr(0.06, 0.18)); set('tape', 'flutter', rr(0.03, 0.1)); set('tape', 'drive', rr(0.2, 0.4)); set('tape', 'age', rr(0.12, 0.3)); set('tape', 'hiss', rr(0.01, 0.05)); set('tape', 'dust', rr(0.02, 0.1)); }
-    else { set('tape', 'wow', rr(0.2, 0.5)); set('tape', 'flutter', rr(0.08, 0.3)); set('tape', 'drive', rr(0.2, 0.45)); set('tape', 'age', rr(0.3, 0.6)); set('tape', 'hiss', rr(0.02, 0.1)); set('tape', 'dust', rr(0.05, 0.25)); }
-    set('verb', 'decay', rr(3, 7)); set('verb', 'mix', rr(0.25, 0.4)); set('verb', 'pre', 0.02);
-    for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.02, 0.2)); set('lfo', 'shape' + c, ri(0, 3)); }
+    for (let s = 0; s < 8; s++) set('seq', 's' + s, note(PENT, 0, 17)); set('seq', 'len', rpick([5, 6, 7, 8])); set('seq', 'prob', rr(0.45, 0.75));
+    con(arp.cv, 'detail.voct');
+    // a soft round sub under it most of the time (dry, with the beat)
+    if (chance(0.7)) { const b = bassM({ cv: arp.cv, gate: rpick(['clock.d4', 'clock.d2']) }, { wave: 0, oct: -1, cut: rexp(160, 300), res: 0.05, env: rr(0.05, 0.15), dec: rr(0.6, 0.9), glide: rr(0.03, 0.1), drive: rr(0.05, 0.15) }); con(b, 'mix.in4'); set('mix', 'lvl4', rr(0.22, 0.32)); }
+    const inst = rpick([2, 2, 0, 1]); con(arp.cv, 'mbira.voct'); con(arp.gate, 'mbira.trig'); used.add('mbira');
+    set('mbira', 'type', inst); set('mbira', 'oct', -1); set('mbira', 'dec', inst === 2 ? rr(0.85, 1) : rr(0.6, 1)); set('mbira', 'lvl', 0.8);
+    con('mbira.out', 'mix6.in1'); con('mbira.out', 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(rpick([0.75, 1.5, 0.5]), rr(0.3, 0.5));
+    // SWELL: hints of violin or cello bowed in slowly, or a clean guitar with a tremolo shimmer, answering only some triggers
+    { const t = rpick([0, 0, 1, 2, 2]); con(arp.cv, 'swell.voct'); con(rpick(['clock.d4', 'clock.d8', 'clock.d8']), 'swell.trig'); used.add('swell');
+      set('swell', 'type', t); set('swell', 'oct', t === 1 ? -1 : 0); set('swell', 'chance', rr(0.3, 0.65));
+      if (t === 2) { set('swell', 'att', rr(0.02, 0.15)); set('swell', 'len', rr(0.5, 0.75)); set('swell', 'trem', rr(0.2, 0.5)); set('swell', 'vib', 0); set('swell', 'tone', rr(0.45, 0.65)); }
+      else { set('swell', 'att', rr(0.45, 0.75)); set('swell', 'len', rr(0.5, 0.8)); set('swell', 'trem', 0); set('swell', 'vib', rr(0.25, 0.55)); set('swell', 'tone', rr(0.5, 0.7)); }
+      set('swell', 'lvl', 0.7); con('swell.L', 'mix6.in2'); con('swell.R', 'mix6.in6'); }
+    // NATURE: the outdoor bed (a field recording through BED IN some of the time)
+    con('nature.L', 'mix6.in3'); used.add('nature');
+    if (chance(0.55)) { con('field.L', 'nature.in'); used.add('field'); set('field', 'rec', rpick([0, 1, 1, 2, 3, 4])); set('field', 'lvl', 0.6); set('field', 'tone', rexp(2500, 7000)); set('field', 'width', 0.8); set('nature', 'bed', rr(0.3, 0.6)); } else set('nature', 'bed', 0);
+    set('nature', 'crick', chance(0.5) ? rr(0.2, 0.45) : 0); set('nature', 'leaves', rr(0.15, 0.45)); set('nature', 'steps', chance(0.7) ? rr(0.25, 0.6) : 0); set('nature', 'drops', chance(0.45) ? rr(0.15, 0.4) : 0);
+    set('nature', 'hush', rr(0.3, 0.7)); set('nature', 'act', rr(0.3, 0.7));
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: rr(0.6, 0.7), pan1: rr(-0.15, 0.15), lvl2: rr(0.22, 0.3), pan2: -0.35, lvl6: rr(0.22, 0.3), pan6: 0.35, lvl3: rr(0.4, 0.52), pan3: 0, lvl4: rr(0.35, 0.45), pan4: -0.7, lvl5: rr(0.35, 0.45), pan5: 0.7, master: 0.8 });
+    con('mix6.L', 'tape.inL'); con('mix6.R', 'tape.inR'); con('tape.L', 'verb.inL'); con('tape.R', 'verb.inR'); used.add('tape');
+    set('tape', 'wow', CL ? rr(0.05, 0.14) : rr(0.15, 0.4)); set('tape', 'flutter', rr(0.03, 0.1)); set('tape', 'drive', rr(0.15, 0.35)); set('tape', 'age', rr(0.12, 0.28)); set('tape', 'hiss', rr(0.01, 0.04)); set('tape', 'dust', rr(0.02, 0.1));
+    set('verb', 'decay', rr(3, 6)); set('verb', 'mix', rr(0.3, 0.45)); set('verb', 'pre', 0.02); set('verb', 'damp', rexp(2500, 5000));
+    for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.02, 0.12)); set('lfo', 'shape' + c, 0); }
   } else {
     set('clock', 'tempo', ri(36, 84));
     // CLEAN: always a sustained bed (so it never starts in silence), one voice that moves, sometimes a third; wind is rare
@@ -2445,7 +2482,7 @@ function genPatch(style, wild, clean) {
     const B = ['subB', 'drone', 'wind']; let seenB = false; const list = [];
     for (const k of kinds) { if (B.includes(k)) { if (seenB) continue; seenB = true; } if (list.includes(k)) continue; list.push(k); }
     for (const k of list) outs.push(voice[k](getPitch(), k === 'pluck' ? rpick(['clock.d2', 'clock.x1', getPitch().gate]) : null));
-    outs.slice(0, 4).forEach((o, i) => { con(o, 'mix.in' + (i + 1)); set('mix', 'lvl' + (i + 1), list[i] === 'wind' ? rr(0.25, 0.35) : list[i] === 'pluck' ? rr(0.4, 0.55) : rr(0.5, 0.7)); });
+    outs.slice(0, 4).forEach((o, i) => { con(o, 'mix.in' + (i + 1)); set('mix', 'lvl' + (i + 1), list[i] === 'wind' ? rr(0.25, 0.35) : list[i] === 'pluck' ? rr(0.4, 0.55) : list[i] === 'drone' ? rr(0.4, 0.5) : rr(0.5, 0.7)); });
     for (let i = outs.length; i < 4; i++) set('mix', 'lvl' + (i + 1), 0);
     if (chance(0.6)) con('mix.out', 'scope.in');
     let L = 'mix.out', R = 'mix.out';
@@ -2626,7 +2663,10 @@ const MOVES = [
   ['filter', '*', 'vcfA', ['cutoff'], 'glide', 'FILTER'], ['filter2', 'ambient', 'vcfB', ['cutoff'], 'glide', 'SECOND FILTER'],
   ['timbre', '*', 'macro', ['timbre', 'morph', 'harm', 'color'], 'glide', 'TIMBRE'], ['texture', 'kiln ambient', 'texture', ['dens', 'pos', 'blend', 'size'], 'glide', 'TEXTURE'],
   ['voices', '*', 'mix', ['lvl1', 'lvl2', 'lvl3', 'lvl4'], 'fade', 'VOICE'], ['delay', '*', 'delay', ['mix', 'fb'], 'glide', 'DELAY'], ['space', '*', 'verb', ['mix', 'decay'], 'small', 'SPACE'],
-  ['field', 'kiln', 'field', ['lvl'], 'glide', 'FIELD RECORDING'], ['mbira', 'kiln', 'mbira', ['lvl'], 'fade', 'MBIRA'], ['wobble', 'kiln ambient', 'tape', ['wow', 'age'], 'small', 'TAPE WOBBLE'],
+  ['field', 'kiln', 'nature', ['bed'], 'glide', 'FIELD RECORDING'], ['mbira', 'kiln', 'mbira', ['lvl'], 'fade', 'MELODY'],
+  ['details', 'kiln', 'detail', ['dens', 'color', 'vary'], 'glide', 'DETAILS'], ['crunch', 'kiln', 'detail', ['crunch', 'soft'], 'small', 'CRUNCH'],
+  ['nature', 'kiln', 'nature', ['crick', 'leaves', 'steps', 'drops'], 'fade', 'NATURE'], ['hush', 'kiln', 'nature', ['hush'], 'glide', 'HUSH'],
+  ['strings', 'kiln', 'swell', ['chance'], 'glide', 'STRINGS'], ['shimmer', 'kiln', 'swell', ['trem', 'tone', 'vib'], 'small', 'STRING TONE'], ['wobble', 'kiln ambient', 'tape', ['wow', 'age'], 'small', 'TAPE WOBBLE'],
   // jazzy and lo-fi: the band moves (a new tune from your songbook, comping, the vibes line, feel, tone); drums only fade layers, never reshuffle
   ['tune', 'jazzy lofi', 'band', ['tune'], 'tune', 'NEXT TUNE AT THE END OF THIS ONE'], ['comp', 'jazzy lofi', 'band', ['comp'], 'step', 'NEW COMPING'],
   ['vibesline', 'jazzy lofi', 'band', ['lead'], 'small', 'VIBES LINE'], ['feel', 'jazzy lofi', 'band', ['human'], 'small', 'LOOSENESS'], ['keystone', 'jazzy lofi', 'band', ['tone'], 'small', 'KEYS TONE'],
@@ -2669,8 +2709,8 @@ function enterSection(name, len) {
   else if (name === 'BUILD') { secKnob('groove', 'kDen', home, 0.02); secKnob('groove', 'sDen', b => Math.min(1, b + 0.35), len); secKnob('sweep', 'pos', () => 0.6 + 0.1 * modById.cond.v('energy'), len); secKnob('echo', 'mix', b => Math.min(1, b + 0.12), len); secKnob('pump', 'depth', b => Math.min(1, b + 0.1), len); condSay('BUILD · rising'); }
   else if (name === 'LAY BACK') { secKnob('sampler|drums', 'kLvl', b => b * 0.25, 1); secKnob('sampler|drums', 'hLvl', b => b * 0.55, 4); secKnob('sweep', 'pos', () => 0.43, 6); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 6); condSay('LAYING BACK · kick drops away'); }
   else if (name === 'DROP' || name === 'GROOVE' || name === 'FLOW') { const was = COND.sectionKeys.size; sectionsHome(name === 'DROP' ? 0.02 : DECK.style === 'jazzy' || DECK.style === 'lofi' ? 1 : 2); if (name === 'DROP') condSay('DROP · everything back in'); else if (was && (DECK.style === 'jazzy' || DECK.style === 'lofi')) condSay('BACK IN THE GROOVE'); }
-  else if (name === 'THIN OUT') { secKnob('sweep', 'pos', () => 0.4, 8); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 8); secKnob('mix', 'lvl2', b => b * 0.5, 8); condSay('THINNING OUT'); }
-  else if (name === 'SWELL') { secKnob('sweep', 'pos', () => 0.5, len); secKnob('texture', 'dens', b => Math.min(1, b + 0.2), len); secKnob('verb', 'mix', home, len); secKnob('mix', 'lvl2', home, len); condSay('SWELLING'); }
+  else if (name === 'THIN OUT') { secKnob('sweep', 'pos', () => 0.4, 8); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 8); secKnob('mix', 'lvl2', b => b * 0.5, 8); if (DECK.style === 'kiln') { secKnob('groove', 'kDen', () => 0, 0.02); secKnob('detail', 'dens', b => b * 0.6, 8); secKnob('nature', 'act', b => Math.min(1, b + 0.25), 8); } condSay('THINNING OUT'); }
+  else if (name === 'SWELL') { secKnob('sweep', 'pos', () => 0.5, len); secKnob('texture', 'dens', b => Math.min(1, b + 0.2), len); secKnob('verb', 'mix', home, len); secKnob('mix', 'lvl2', home, len); if (DECK.style === 'kiln') { secKnob('groove', 'kDen', home, 0.02); secKnob('detail', 'dens', home, len); secKnob('nature', 'act', home, len); } condSay('SWELLING'); }
 }
 function condTick() {
   const now = AC ? AC.currentTime : 0, dt = clamp(now - COND.lastT, 0, 0.5); COND.lastT = now;
@@ -3032,10 +3072,14 @@ async function loadKit(m) {
   await Promise.all(slots.map(async (sl, i) => { if (!sl) return; try { const d = levelHit(await decodeSlot(sl), i); if (m.kitTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d }); } catch (e) { console.warn('sample', sl.name, e); } }));
   if (m.kitTok === tok) { KIT_LOADING.delete(m); m.screenDirty = true; }
 }
-async function loadSet(m) { // MBIRA notes or a FIELD recording
-  if (!AC || !ENG) return; const tok = {}; m.setTok = tok;
-  const list = m.type === 'mbira' ? MBIRA_SETS[m.v('type')][1].map(([f, root]) => ({ ref: 'vcsl/' + f + '.m4a', name: f, root })) : [{ ref: 'nature/' + FIELDS[m.v('rec')][1] + '.m4a', name: FIELDS[m.v('rec')][0] }];
-  await Promise.all(list.map(async (sl, i) => { try { const d = await decodeSlot(sl); if (m.setTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d, root: sl.root }); } catch (e) { console.warn('sample', sl.name, e); } }));
+const PEAKED = new WeakMap();
+function peakTo(d, to) { if (PEAKED.has(d)) return PEAKED.get(d); let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v)); const g = pk > 1e-5 ? to / pk : 1, o = new Float32Array(d.length); for (let i = 0; i < d.length; i++) o[i] = d[i] * g; PEAKED.set(d, o); return o; } // notes of a set are levelled alike
+async function loadSet(m) { // MBIRA or SWELL notes, or a FIELD recording
+  if (!AC || !ENG) return; const tok = {}; m.setTok = tok; if (m.type !== 'field') send({ t: 'smpclear', id: m.id });
+  const list = m.type === 'mbira' ? MBIRA_SETS[m.v('type')][1].map(([f, root]) => ({ ref: (f.includes('/') ? f : 'vcsl/' + f) + '.m4a', name: f, root }))
+    : m.type === 'swell' ? (S => S[1].map(n => ({ ref: 'strings/' + S[2] + '/' + n + '.m4a', name: S[0] + ' ' + n, root: n })))(SWELL_SETS[m.v('type')])
+    : [{ ref: 'nature/' + FIELDS[m.v('rec')][1] + '.m4a', name: FIELDS[m.v('rec')][0] }];
+  await Promise.all(list.map(async (sl, i) => { try { let d = await decodeSlot(sl); if (m.type !== 'field') d = peakTo(d, 0.8); if (m.setTok === tok) send({ t: 'smp', id: m.id, slot: i, data: d, root: sl.root }); } catch (e) { console.warn('sample', sl.name, e); } }));
 }
 function samplerMod() { return modules.find(m => m.type === 'sampler'); }
 function setKit(i) { const m = samplerMod(), kn = m.knobs.kit; kn.set(kn.toNorm(i)); }
@@ -3259,7 +3303,7 @@ async function startEngine() {
   }
   for (const m of modules) if (m.type in CLASSES) engineAdd(m);
   deckRestore(); for (const m of modules) if (m.type === 'band') sendTune(m, 'phrase'); loadKeys();
-  for (const m of modules) if (m.type === 'sampler') loadKit(m); else if (m.type === 'mbira' || m.type === 'field') loadSet(m);
+  for (const m of modules) if (m.type === 'sampler') loadKit(m); else if (m.type === 'mbira' || m.type === 'field' || m.type === 'swell') loadSet(m);
   for (const c of cables) if (c.connected) { c.uid = cableUid++; send({ t: 'con', c: c.uid, om: c.out.module.id, op: c.out.id, im: c.inp.module.id, ip: c.inp.id }); }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -6; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.25;
   ENG.node.connect(comp); comp.connect(AC.destination);
