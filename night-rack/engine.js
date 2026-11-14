@@ -622,6 +622,7 @@ class Stab extends DSP {
     const cut = P.cutoff ?? 1200, envAmt = (P.env ?? 0.5) * 5, res = (P.res ?? 0.2) * 1.8, gate = this.has.trig, T = I.trig, lvl = P.level ?? 0.8;
     const inc = []; for (let v = 0; v < notes.length; v++) { const f = base * Math.pow(2, notes[v] / 12); inc.push(f * (1 - det) / sr, f * (1 + det) / sr); }
     const z = this.z, ph = this.ph, nv = inc.length, norm = 1 / Math.sqrt(notes.length);
+    if ((P.sound | 0) === 1 && this.e.zones && this.e.zones.rhodes) { this.keys(n, notes, base, dec, cut, lvl); this.L.chord = ci; return; }
     for (let i = 0; i < n; i++) {
       if (gate) { if (this.ts.step(T[i])) { this.att = true; this.fenv = 1; this.flash('led', 1); } if (this.att) { this.env += (1.05 - this.env) * ka; if (this.env >= 1) { this.env = 1; this.att = false; } } else this.env *= kd; this.fenv *= kfd; }
       else { this.env = 1; this.fenv = 0.3; }
@@ -634,6 +635,29 @@ class Stab extends DSP {
       OL[i] = Math.tanh(yl * this.env * 0.9) * 5 * lvl; OR[i] = Math.tanh(yr * this.env * 0.9) * 5 * lvl;
     }
     this.L.chord = ci;
+  }
+  // RHODES: each trigger plays the voiced chord on recorded Rhodes notes (soft and bark layers mixed by ENV), rolled a little,
+  // held for DECAY then let go; CUTOFF still darkens it, TREM is the Suitcase stereo tremolo.
+  keys(n, notes, base, dec, cut, lvl) {
+    const P = this.p, sr = this.sr, I = this.in, OL = this.out.L, OR = this.out.R, V = (this.kv = this.kv || []), Z = this.e.zones.rhodes;
+    const bark = Math.min(1, Math.max(0, P.env ?? 0.45)), trem = P.trem ?? 0, tr = 6.2832 * 4.6 / sr;
+    const root = 48 + Math.round(12 * Math.log2(base / 130.81)), pick = (m, lay) => { let b = null; for (const z of Z) if (z.lay === lay && (!b || Math.abs(z.note - m) < Math.abs(b.note - m))) b = z; return b; };
+    const c = 1 - Math.exp(-6.2832 * Math.min(0.45 * sr, cut * 1.6) / sr), L = (this.kl = this.kl || [0, 0, 0, 0]);
+    for (let i = 0; i < n; i++) {
+      if (this.has.trig && this.ts.step(I.trig[i])) { this.flash('led', 1); if (V.length > 36) V.splice(0, V.length - 36);
+        for (const v of V) v.left = Math.min(v.left, Math.round(0.03 * sr)); // a new stab lets the last one go
+        const vel = 0.75 + Math.random() * 0.25, hard = Math.min(1, bark * vel * 1.15);
+        notes.forEach((o, k) => { const m = root + o; for (const [lay, g] of [['s', 1 - hard], ['h', hard]]) { if (g < 0.02) continue; const zz = pick(m, lay); if (!zz) continue;
+          V.push({ d: zz.data, pos: 0, inc: Math.pow(2, (m - zz.note) / 12) * zz.sr / sr, g: g * vel * (0.92 + Math.random() * 0.08), wait: Math.round((k * 0.006 + Math.random() * 0.004) * sr), left: Math.round(dec * sr), rel: 1, rk: 1 / (0.22 * sr), pan: (k / Math.max(1, notes.length - 1) - 0.5) * 0.3 }); } }); }
+      let l = 0, r = 0;
+      for (let k = V.length - 1; k >= 0; k--) { const v = V[k]; if (v.wait > 0) { v.wait--; continue; }
+        const p0 = v.pos | 0; if (p0 + 1 >= v.d.length || v.rel <= 0) { V.splice(k, 1); continue; }
+        const x = (v.d[p0] + (v.d[p0 + 1] - v.d[p0]) * (v.pos - p0)) * v.g * v.rel; v.pos += v.inc;
+        if (v.left > 0) v.left--; else v.rel -= v.rk; l += x * (1 - v.pan); r += x * (1 + v.pan); }
+      this.tph = ((this.tph || 0) + tr) % 6.2832; const t = Math.sin(this.tph) * trem;
+      L[0] += c * (l - L[0]); L[1] += c * (L[0] - L[1]); L[2] += c * (r - L[2]); L[3] += c * (L[2] - L[3]);
+      const g = lvl * 2.2 / Math.sqrt(notes.length); OL[i] = Math.tanh(L[1] * g * (1 - t) * 0.6) / 0.6; OR[i] = Math.tanh(L[3] * g * (1 + t) * 0.6) / 0.6;
+    }
   }
 }
 // BASS: mono bass voice. WAVE morphs sine-sub → saw → square → reese (two detuned saws).
@@ -967,12 +991,12 @@ class Band extends DSP {
   static IN = ['clk', 'rst']; static OUT = ['L', 'R', 'bass', 'bgate', 'chg'];
   constructor(e) { super(e); this.cs = new Schmitt(); this.rs = new Schmitt(); this.step = -1; this.v = []; this.tn = null; this.next = null; this.lp = [0, 0, 0, 0]; this.bv = 0; this.bg = 0; this.cg = 0; this.q = []; this.t = 0; }
   setTune(tn, when) { if (!this.tn) { this.tn = tn; return; } this.next = tn; this.nextWhen = when || 'phrase'; }
-  zone(inst, midi) { const Z = this.e.zones && this.e.zones[inst]; if (!Z || !Z.length) return null; let best = Z[0]; for (const z of Z) if (Math.abs(z.note - midi) < Math.abs(best.note - midi)) best = z; return best; }
+  zone(inst, midi) { const Z = this.e.zones && this.e.zones[inst]; if (!Z || !Z.length) return null; let best = null; for (const z of Z) if (z.lay !== 'h' && (!best || Math.abs(z.note - midi) < Math.abs(best.note - midi))) best = z; return best; }
   play(inst, midi, vel, durS, delayS, pan) { const z = this.zone(inst, midi); if (!z) return; if (this.v.length > 40) this.v.shift();
     this.v.push({ d: z.data, pos: 0, inc: Math.pow(2, (midi - z.note) / 12) * z.sr / this.sr, g: vel, wait: Math.max(0, Math.round(delayS * this.sr)), left: Math.round(durS * this.sr), rel: 1, rk: 1 / (0.25 * this.sr), pan: pan ?? 0 }); }
   hit(ev, isLead) { const P = this.p, hu = P.human ?? 0.5, T = this.tn, lofi = T && T.feel === 'lofi', per = 60 / ((this.e.mods.get('clock') || { p: {} }).p.tempo || 100) / 4;
     const lay = (lofi ? 0.012 : 0.004) + Math.random() * 0.012 * hu, roll = (lofi ? 0.018 : 0.01) * hu, notes = ev.notes || [ev.midi];
-    const inst = isLead ? ['piano', 'ep', 'vibes'][P.leadInst | 0] || 'vibes' : ['piano', 'ep', 'vibes'][P.inst | 0] || 'piano', dur = ev.len * per;
+    const inst = isLead ? ['piano', 'ep', 'vibes'][P.leadInst | 0] || 'vibes' : ['piano', 'ep', 'vibes', 'rhodes'][P.inst | 0] || 'piano', dur = ev.len * per;
     notes.forEach((m, i) => this.play(inst, m, (ev.vel ?? 0.8) * (1 - hu * 0.22 * Math.random()) * (isLead ? (P.lead ?? 0.3) * 1.6 : 1), dur + 0.05, lay + i * roll * (0.6 + Math.random() * 0.8), isLead ? 0.25 : (i / Math.max(1, notes.length - 1) - 0.5) * 0.5)); }
   process(n) {
     const C = this.in.clk, R = this.in.rst, OL = this.out.L, OR = this.out.R, P = this.p, B = this.out.bass, BG = this.out.bgate, CH = this.out.chg;
@@ -1102,7 +1126,7 @@ export class Engine {
     else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
     else if (m.t === 'con') { this.cables.set(m.c, m); this.dirty = true; }
     else if (m.t === 'dis') { this.cables.delete(m.c); this.dirty = true; }
-    else if (m.t === 'zone') { const Z = (this.zones = this.zones || {}); (Z[m.inst] = Z[m.inst] || []).push({ note: m.note, data: m.data, sr: m.sr || this.sr }); }
+    else if (m.t === 'zone') { const Z = (this.zones = this.zones || {}); (Z[m.inst] = Z[m.inst] || []).push({ note: m.note, lay: m.lay, data: m.data, sr: m.sr || this.sr }); }
     else if (m.t === 'tune') { const d = this.mods.get(m.id); if (d && d.setTune) d.setTune(m.tune, m.when); }
     else if (m.t === 'barsync') { const P = this.pend || (this.pend = { wake: new Set(), reset: new Set() }); for (const id of m.wake || []) P.wake.add(id); for (const id of m.reset || []) P.reset.add(id); } // on the next bar: wake a deck and start its sequencers on the downbeat
     else if (m.t === 'sleep') { for (const id of m.ids) { const d = this.mods.get(id); if (!d) continue; d.sleep = m.on; if (m.on) for (const k in d.out) d.out[k].fill(0); } } // a resting deck costs nothing
