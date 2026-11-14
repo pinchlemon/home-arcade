@@ -958,6 +958,52 @@ class Harmony extends DSP {
   }
 }
 
+
+// ---------------------------------------------------------------- BAND: plays a tune from the songbook on recorded instruments
+// The page compiles a tune (chords already voiced, comping rhythm, bass line, a sparse lead) into events on a 16th grid; BAND plays
+// them against the rack clock with a human touch: chords rolled low to high, velocities and timing that wander a little, laid back.
+// Sample zones (one per recorded note) are shared by both decks. A new tune takes over at the next bar (audition) or phrase.
+class Band extends DSP {
+  static IN = ['clk', 'rst']; static OUT = ['L', 'R', 'bass', 'bgate', 'chg'];
+  constructor(e) { super(e); this.cs = new Schmitt(); this.rs = new Schmitt(); this.step = -1; this.v = []; this.tn = null; this.next = null; this.lp = [0, 0, 0, 0]; this.bv = 0; this.bg = 0; this.cg = 0; this.q = []; this.t = 0; }
+  setTune(tn, when) { if (!this.tn) { this.tn = tn; return; } this.next = tn; this.nextWhen = when || 'phrase'; }
+  zone(inst, midi) { const Z = this.e.zones && this.e.zones[inst]; if (!Z || !Z.length) return null; let best = Z[0]; for (const z of Z) if (Math.abs(z.note - midi) < Math.abs(best.note - midi)) best = z; return best; }
+  play(inst, midi, vel, durS, delayS, pan) { const z = this.zone(inst, midi); if (!z) return; if (this.v.length > 40) this.v.shift();
+    this.v.push({ d: z.data, pos: 0, inc: Math.pow(2, (midi - z.note) / 12) * z.sr / this.sr, g: vel, wait: Math.max(0, Math.round(delayS * this.sr)), left: Math.round(durS * this.sr), rel: 1, rk: 1 / (0.25 * this.sr), pan: pan ?? 0 }); }
+  hit(ev, isLead) { const P = this.p, hu = P.human ?? 0.5, T = this.tn, lofi = T && T.feel === 'lofi', per = 60 / ((this.e.mods.get('clock') || { p: {} }).p.tempo || 100) / 4;
+    const lay = (lofi ? 0.012 : 0.004) + Math.random() * 0.012 * hu, roll = (lofi ? 0.018 : 0.01) * hu, notes = ev.notes || [ev.midi];
+    const inst = isLead ? ['piano', 'ep', 'vibes'][P.leadInst | 0] || 'vibes' : ['piano', 'ep', 'vibes'][P.inst | 0] || 'piano', dur = ev.len * per;
+    notes.forEach((m, i) => this.play(inst, m, (ev.vel ?? 0.8) * (1 - hu * 0.22 * Math.random()) * (isLead ? (P.lead ?? 0.3) * 1.6 : 1), dur + 0.05, lay + i * roll * (0.6 + Math.random() * 0.8), isLead ? 0.25 : (i / Math.max(1, notes.length - 1) - 0.5) * 0.5)); }
+  process(n) {
+    const C = this.in.clk, R = this.in.rst, OL = this.out.L, OR = this.out.R, P = this.p, B = this.out.bass, BG = this.out.bgate, CH = this.out.chg;
+    for (let i = 0; i < n; i++) {
+      if (this.rs.step(R[i])) this.step = -1;
+      if (this.cs.step(C[i]) && this.tn) {
+        let s = this.step + 1, len = this.tn.len;
+        if (this.next && (this.nextWhen === 'bar' ? s % 16 === 0 : s >= len)) { this.tn = this.next; this.next = null; s = this.nextWhen === 'bar' ? 0 : s; len = this.tn.len; if (s >= len) s = 0; }
+        if (s >= len) s = 0; this.step = s; const T = this.tn;
+        for (const ev of T.hits) if (ev.at === s) { this.hit(ev); }
+        if ((P.lead ?? 0.3) > 0.02) for (const ev of T.lead) if (ev.at === s && Math.random() < 0.35 + (P.lead ?? 0.3)) this.hit(ev, true);
+        for (const ev of T.bass) if (ev.at === s) { this.bv = ev.cv; this.bg = Math.round(Math.min(ev.len * 0.8, 3) * 0.25 * 60 / ((this.e.mods.get('clock') || { p: {} }).p.tempo || 100) * this.sr); }
+        for (let j = 0; j < T.chords.length; j++) if (T.chords[j].at === s) { this.cg = Math.round(0.008 * this.sr); this.cur = j; this.flash('chg', 1); }
+      }
+      // voices
+      let l = 0, r = 0;
+      for (let k = this.v.length - 1; k >= 0; k--) { const v = this.v[k]; if (v.wait > 0) { v.wait--; continue; }
+        const p0 = v.pos | 0; if (p0 + 1 >= v.d.length || v.rel <= 0) { this.v.splice(k, 1); continue; }
+        const fr = v.pos - p0, x = (v.d[p0] + (v.d[p0 + 1] - v.d[p0]) * fr) * v.g * v.rel; v.pos += v.inc;
+        if (v.left > 0) v.left--; else v.rel -= v.rk; l += x * (1 - v.pan); r += x * (1 + v.pan); }
+      // TONE: a soft low-pass (felt, worn), two poles per side
+      const c = 1 - Math.exp(-6.2832 * (600 + 9000 * Math.pow(P.tone ?? 0.55, 2)) / this.sr), Lz = this.lp;
+      Lz[0] += c * (l - Lz[0]); Lz[1] += c * (Lz[0] - Lz[1]); Lz[2] += c * (r - Lz[2]); Lz[3] += c * (Lz[2] - Lz[3]);
+      const g = (P.level ?? 0.8) * 3.2; OL[i] = Lz[1] * g; OR[i] = Lz[3] * g;
+      B[i] = this.bv; BG[i] = this.bg > 0 ? 10 : 0; if (this.bg > 0) this.bg--; CH[i] = this.cg > 0 ? 10 : 0; if (this.cg > 0) this.cg--;
+    }
+    if (this.tn) { const ch = this.tn.chords[this.cur ?? 0]; this.L.name = ch ? ch.name : ''; this.L.bar = Math.floor(Math.max(0, this.step) / 16) + 1; this.L.bars = this.tn.len / 16; this.L.tune = this.tn.name; this.L.sec = ch ? ch.sec : ''; }
+    this.peak('vu', OL, n);
+  }
+}
+
 // ---------------------------------------------------------------- mixing side (right rack): BLEND, SWEEP, ECHO, PUMP (= Duck), SUB
 class Blend extends DSP { // two stereo decks, equal-power crossfade, per-deck level, master; MATCH evens out the decks' loudness so a blend never jumps in volume
   static IN = ['aL', 'aR', 'bL', 'bR']; static OUT = ['L', 'R'];
@@ -1043,7 +1089,7 @@ class Sub extends DSP { // low end: everything below the crossover in mono, a cl
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony };
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
@@ -1056,6 +1102,8 @@ export class Engine {
     else if (m.t === 'cc') { const d = this.mods.get(m.id); if (d && d.cc) d.cc(m.c, m.v); }
     else if (m.t === 'con') { this.cables.set(m.c, m); this.dirty = true; }
     else if (m.t === 'dis') { this.cables.delete(m.c); this.dirty = true; }
+    else if (m.t === 'zone') { const Z = (this.zones = this.zones || {}); (Z[m.inst] = Z[m.inst] || []).push({ note: m.note, data: m.data, sr: m.sr || this.sr }); }
+    else if (m.t === 'tune') { const d = this.mods.get(m.id); if (d && d.setTune) d.setTune(m.tune, m.when); }
     else if (m.t === 'barsync') { const P = this.pend || (this.pend = { wake: new Set(), reset: new Set() }); for (const id of m.wake || []) P.wake.add(id); for (const id of m.reset || []) P.reset.add(id); } // on the next bar: wake a deck and start its sequencers on the downbeat
     else if (m.t === 'sleep') { for (const id of m.ids) { const d = this.mods.get(id); if (!d) continue; d.sleep = m.on; if (m.on) for (const k in d.out) d.out[k].fill(0); } } // a resting deck costs nothing
   }
