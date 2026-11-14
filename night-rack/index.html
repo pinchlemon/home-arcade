@@ -789,7 +789,7 @@ class CondM extends Mod { // the Conductor's panel: a screen, three knobs and fi
   visual() { if (!this.painted) { this.painted = true; this.paint(); } if (COND.dirty) { COND.dirty = false; this.screenDirty = true; } }
   drawScreen() { const s = this.scr, g = s.g, W = s.cw, H = s.ch, k = H / 84, F = (w, px) => w + ' ' + Math.round(px * k) + 'px "Space Grotesk", sans-serif'; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H); g.textBaseline = 'top'; g.textAlign = 'left';
     const sec = COND.sec, st = (DECK.style || '').toUpperCase();
-    g.fillStyle = '#57e8ff'; g.font = F(700, 26); g.fillText(!COND.on ? 'OFF' : COND.hold ? 'HOLDING' : (sec ? sec.name : 'WAITING'), 12 * k, 8 * k);
+    g.fillStyle = '#57e8ff'; g.font = F(700, 26); g.fillText(!COND.on ? 'OFF' : COND.hold ? 'HOLDING' : (sec ? sec.name : 'STARTS NEXT PHRASE'), 12 * k, 8 * k);
     g.textAlign = 'right'; g.fillStyle = '#3d86ff'; g.font = F(600, 15); g.fillText('DECK ' + DECK.live + ' · ' + st + (sec && COND.on ? ' · BAR ' + (Math.floor(COND.secBar) + 1) + ' OF ' + sec.len : ''), W - 12 * k, 14 * k);
     g.textAlign = 'left'; g.fillStyle = '#cfe6ff'; g.font = F(600, 18); g.fillText(COND.msg || '', 12 * k, 42 * k);
     g.fillStyle = '#5f7fae'; g.font = F(500, 14); g.fillText(DECK.blending ? 'blending to deck ' + DECK.blending.to : COND.on && !COND.hold ? 'next change in ' + Math.max(1, Math.ceil(COND.nextMove - COND.bar)) + ' bars' + (swapSec() ? ' · new patch in ' + fmtMin(Math.max(0, swapSec() - COND.since)) : '') : COND.on ? 'holding: no changes' : 'press ON to let it drift', 12 * k, 64 * k); s.tex.needsUpdate = true; } }
@@ -2435,7 +2435,7 @@ function blendNext(given, back) { // build a fresh patch (same style, same key) 
   const oq = modById[from === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
   P.knobs[qk] = { ...(P.knobs[qk] || {}), scale: oq.v('scale'), root: oq.v('root'), oct: oq.v('oct') };
   if (DECK.style === 'jazzy' && !given) { const os = modById[from === 'A' ? 'seq' : 'seq_b'], sk = to === 'B' ? 'seq_b' : 'seq', o = { len: os.v('len'), prob: 1 }; for (let i = 0; i < 8; i++) o['s' + i] = os.v('s' + i); P.knobs[sk] = { ...(P.knobs[sk] || {}), ...o }; }
-  loadDeck(to, P); deckSleep(to, false); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
+  loadDeck(to, P); DECK['sleep' + to] = false; send({ t: 'barsync', wake: deckIds(to), reset: [...deckIds(to), ...deckIds(from)] }); if (!AC || AC.state !== 'running') powerOn().catch(() => { }); // both decks' sequencers restart together on the next downbeat
   const bm = modById.blend, bars = [16, 32, 64][bm.v('bars')] || 32, sec = bars * 4 * 60 / (modById.clock.v('tempo') || 120);
   DECK.blending = { from, to, t0: performance.now() / 1000, sec, x0: bm.v('blend'), x1: to === 'B' ? 1 : 0 };
   toast((back ? 'Going back to the previous patch' : 'Blending to a new patch on deck ' + to) + ' over ' + bars + ' bars', true); blendBtn(); COND.dirty = true;
@@ -2457,80 +2457,110 @@ const DANCE_ST = new Set(['house', 'tinez', 'dnb', 'jazzy']);
 function condSay(m) { COND.msg = m; COND.dirty = true; }
 const liveId = id => DECK.live === 'B' && modById[id + '_b'] ? id + '_b' : id;
 const isPatched = id => { const m = modById[id]; return m && Object.values(m.ports).some(p => p.cables.length); };
-function condKnob(id, k) { const m = modById[liveId(id)]; return m && m.knobs[k] ? m.knobs[k] : null; }
+function condKnob(id, k) { for (const one of id.split('|')) { const m = modById[liveId(one)]; if (m && m.knobs[k] && isPatched(m.id)) return m.knobs[k]; } return null; }
 function baseOf(kn) { const key = kn.mod.id + '.' + kn.def.id; if (COND.base[key] == null) COND.base[key] = kn.norm; return COND.base[key]; }
-function glideTo(kn, to, bars, rec) { // glide a knob to a normalised value over some bars (step knobs jump on the next bar)
+function glideTo(kn, to, bars, rec) { // glide a knob to a normalised value over some bars (step knobs change on the bar line)
   if (!kn) return; to = clamp(to, 0, 1); baseOf(kn);
-  COND.glides.set(kn, { from: kn.norm, to, b0: COND.bar, bars: Math.max(0.05, bars), last: kn.norm });
-  if (rec) { COND.hist.push({ kn, from: kn.norm, to, label: rec }); if (COND.hist.length > 60) COND.hist.shift(); }
+  COND.glides.set(kn, { from: kn.norm, to, b0: COND.bar, bars: Math.max(0.02, bars), last: kn.norm });
+  if (rec) { COND.hist.push({ ks: [[kn, kn.norm]], label: rec }); if (COND.hist.length > 60) COND.hist.shift(); }
+}
+function setMany(list, label) { // several knobs at once, right on the bar line (patterns, progressions), kept as one step for BACK
+  const ks = []; for (const [kn, to] of list) { if (!kn) continue; baseOf(kn); ks.push([kn, kn.norm]); COND.glides.set(kn, { from: kn.norm, to: clamp(to, 0, 1), b0: COND.bar, bars: 0.02, last: kn.norm }); }
+  if (ks.length && label) { COND.hist.push({ ks, label }); if (COND.hist.length > 60) COND.hist.shift(); }
 }
 const safeN = (id, k) => { const r = safeRange({ id }, k) || [0.05, 0.95]; return r; };
-// small moves: [name, styles ('*' = all, 'd' = dance), module, knobs, kind, label]
+// ---- the jazzy song book: progressions (roots in semitones, one chord a bar) and comping / bass rhythms (16th steps)
+const JAZZ_PROGS = [[2, 7, 0, 9], [0, 5, 3, 10], [9, 2, 7, 0], [0, 9, 5, 7], [5, 4, 2, 0], [0, 3, 5, 3], [7, 5, 0, 0], [9, 5, 0, 7], [2, 2, 7, 7], [0, 0, 5, 5], [4, 9, 2, 7], [5, 7, 4, 9]];
+const JAZZ_COMP = [[0, 6, 10], [2, 6, 10, 14], [0, 3, 10], [6, 14], [0, 7, 10], [3, 11], [0, 10], [2, 10], [0, 3, 6, 10], [6, 11, 14]];
+const JAZZ_BASS = [[0, 7, 10], [0, 3, 8, 10], [0, 10, 14], [0, 6, 8, 14], [0, 7, 11, 14], [0, 8], [0, 3, 10, 13]];
+// small moves: [name, styles ('*' all but jazzy, 'd' house tinez dnb, or a list), module(s), knobs, kind, label, values]
+// kinds: fade (a level fades out or back in over 4 bars), jump (pattern settings change on a bar line), glide (a sound drifts over a few bars),
+// small (a smaller glide), step (a new value from a list, on a bar line), prog / comp (jazzy song book, on a phrase line)
 const MOVES = [
-  ['hats', 'd', 'groove', ['hDen'], 'layer', 'HATS'], ['perc', 'd', 'groove', ['pDen'], 'layer', 'PERCUSSION'], ['ghosts', 'd', 'groove', ['sDen'], 'glide', 'SNARE GHOSTS'],
-  ['variation', '*', 'groove', ['var'], 'glide', 'GROOVE VARIATION'], ['swing', 'house tinez jazzy', 'groove', ['swing'], 'small', 'SWING'], ['fills', 'd', 'groove', ['chaos'], 'small', 'FILLS'],
-  ['hatlen', 'd', 'sampler', ['hDec'], 'glide', 'HAT LENGTH'], ['openhats', 'd', 'sampler', ['oLvl'], 'layer', 'OPEN HATS'], ['clap', 'house tinez', 'sampler', ['cLvl'], 'small', 'CLAP LEVEL'],
-  ['perctone', '*', 'perc', ['sTune', 'rTune', 'shTune', 'tTune', 'sDec', 'rDec'], 'glide', 'PERC TONES'], ['perclayer', '*', 'perc', ['shLvl', 'tLvl', 'rLvl'], 'layer', 'PERC LAYER'],
-  ['stabfilter', '*', 'stab', ['cutoff'], 'glide', 'STAB FILTER'], ['stablen', '*', 'stab', ['decay', 'env'], 'glide', 'STAB SHAPE'], ['chord', 'house tinez kiln', 'stab', ['chord'], 'step', 'NEW CHORD'],
+  ['hats', 'd', 'groove', ['hDen'], 'jumpout', 'HATS'], ['perc', 'd', 'groove', ['pDen'], 'jumpout', 'PERCUSSION'], ['ghosts', 'd', 'groove', ['sDen'], 'jump', 'SNARE GHOSTS'],
+  ['variation', 'd', 'groove', ['var'], 'jump', 'GROOVE VARIATION'], ['swing', 'house tinez', 'groove', ['swing'], 'small', 'SWING'],
+  ['hatlen', 'd', 'sampler', ['hDec'], 'small', 'HAT LENGTH'], ['openhats', 'd', 'sampler|drums', ['oLvl'], 'fade', 'OPEN HATS'], ['clap', 'house tinez', 'sampler|drums', ['cLvl'], 'small', 'CLAP LEVEL'],
+  ['perclayer', 'd', 'perc', ['shLvl', 'tLvl', 'rLvl'], 'fade', 'PERC LAYER'], ['perctone', 'kiln ambient', 'perc', ['sTune', 'rTune', 'shTune', 'tTune'], 'small', 'PERC TONES'],
+  ['stabfilter', '*', 'stab', ['cutoff'], 'glide', 'STAB FILTER'], ['stablen', '*', 'stab', ['decay', 'env'], 'glide', 'STAB SHAPE'], ['chord', 'house tinez kiln', 'stab', ['chord'], 'step', 'NEW CHORD', [0, 1, 3, 4, 5]],
   ['bassfilter', '*', 'bass', ['cutoff'], 'glide', 'BASS FILTER'], ['bassenv', '*', 'bass', ['env', 'decay'], 'glide', 'BASS SNAP'], ['grit', 'dnb', 'bass', ['drive'], 'glide', 'BASS GRIT'],
   ['filter', '*', 'vcfA', ['cutoff'], 'glide', 'FILTER'], ['filter2', 'ambient', 'vcfB', ['cutoff'], 'glide', 'SECOND FILTER'],
   ['timbre', '*', 'macro', ['timbre', 'morph', 'harm', 'color'], 'glide', 'TIMBRE'], ['texture', 'kiln ambient', 'texture', ['dens', 'pos', 'blend', 'size'], 'glide', 'TEXTURE'],
-  ['voices', '*', 'mix', ['lvl1', 'lvl2', 'lvl3', 'lvl4'], 'layer', 'VOICE'], ['delay', '*', 'delay', ['mix', 'fb'], 'glide', 'DELAY'], ['space', '*', 'verb', ['mix', 'decay'], 'small', 'SPACE'],
-  ['field', 'kiln', 'field', ['lvl'], 'glide', 'FIELD RECORDING'], ['mbira', 'kiln', 'mbira', ['lvl'], 'layer', 'MBIRA'], ['wobble', 'kiln ambient', 'tape', ['wow', 'age'], 'small', 'TAPE WOBBLE']];
-const moveOk = (mv, st) => mv[1] === '*' || (mv[1] === 'd' ? DANCE_ST.has(st) : mv[1].split(' ').includes(st));
-function condMove() {
-  const st = DECK.style, depth = modById.cond.v('depth'), pool = MOVES.filter(mv => moveOk(mv, st) && isPatched(liveId(mv[2])));
+  ['voices', '*', 'mix', ['lvl1', 'lvl2', 'lvl3', 'lvl4'], 'fade', 'VOICE'], ['delay', '*', 'delay', ['mix', 'fb'], 'glide', 'DELAY'], ['space', '*', 'verb', ['mix', 'decay'], 'small', 'SPACE'],
+  ['field', 'kiln', 'field', ['lvl'], 'glide', 'FIELD RECORDING'], ['mbira', 'kiln', 'mbira', ['lvl'], 'fade', 'MBIRA'], ['wobble', 'kiln ambient', 'tape', ['wow', 'age'], 'small', 'TAPE WOBBLE'],
+  // jazzy: the music moves (progressions, rhythms, chord colour); the drums only fade layers in and out, never reshuffle
+  ['prog', 'jazzy', 'seq', [], 'prog', 'NEW PROGRESSION'], ['prog2', 'jazzy', 'seq', [], 'prog', 'NEW PROGRESSION'], ['comp', 'jazzy', 'trig', [5], 'comp', 'NEW CHORD RHYTHM'], ['bassline', 'jazzy', 'trig', [4], 'comp', 'NEW BASS LINE'],
+  ['color', 'jazzy', 'stab', ['chord'], 'step', 'CHORD COLOUR', [1, 3, 4]], ['hats', 'jazzy', 'sampler|drums', ['hLvl'], 'fade', 'HATS'], ['shaker', 'jazzy', 'perc', ['shLvl'], 'fade', 'SHAKER'],
+  ['openhats', 'jazzy', 'sampler|drums', ['oLvl'], 'fade', 'OPEN HATS'], ['rim', 'jazzy', 'perc', ['rLvl'], 'fade', 'RIM'], ['chordtone', 'jazzy', 'stab', ['cutoff'], 'small', 'CHORD TONE'], ['chordlen', 'jazzy', 'stab', ['decay'], 'small', 'CHORD LENGTH'],
+  ['bassfilter', 'jazzy', 'bass', ['cutoff'], 'small', 'BASS TONE'], ['delay', 'jazzy', 'delay', ['mix'], 'small', 'ECHOES'], ['space', 'jazzy', 'verb', ['mix'], 'small', 'SPACE'], ['wobble', 'jazzy', 'tape', ['wow'], 'small', 'TAPE WOBBLE'], ['swing', 'jazzy', 'groove', ['swing'], 'small', 'SWING']];
+const moveOk = (mv, st) => mv[1] === '*' ? st !== 'jazzy' : mv[1] === 'd' ? ['house', 'tinez', 'dnb'].includes(st) : mv[1].split(' ').includes(st);
+function condMove(phrase) {
+  const st = DECK.style, depth = modById.cond.v('depth'), pool = MOVES.filter(mv => moveOk(mv, st) && (mv[4] === 'prog' || mv[4] === 'comp' ? phrase && isPatched(liveId(mv[2])) : mv[3].some(k => condKnob(mv[2], k))));
   // now and then, bring something that has wandered back home instead
-  const away = [...COND.glides.keys()].length ? [] : Object.keys(COND.base).map(k => { const [m, kk] = k.split('.'); const kn = modById[m] && modById[m].knobs[kk]; return kn && Math.abs(kn.norm - COND.base[k]) > 0.04 && !COND.sectionKeys.has(k) ? kn : null; }).filter(Boolean);
+  const away = COND.glides.size ? [] : Object.keys(COND.base).map(k => { const [m, kk] = k.split('.'); const kn = modById[m] && modById[m].knobs[kk]; return kn && !kn.def.step && Math.abs(kn.norm - COND.base[k]) > 0.04 && !COND.sectionKeys.has(k) ? kn : null; }).filter(Boolean);
   if (away.length && Math.random() < 0.35) { const kn = rpick(away); glideTo(kn, COND.base[kn.mod.id + '.' + kn.def.id], 4, 'BACK HOME: ' + kn.name); condSay(kn.mod.def.title + ' · ' + kn.name + ' eases back'); COND.recent.unshift('home'); return; }
   if (!pool.length) return;
   const w = pool.map(mv => clamp(1 + 0.35 * (TASTE.m[mv[0]] || 0), 0.15, 3)); let r = Math.random() * w.reduce((a, b) => a + b, 0), mv = pool[0];
   for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) { mv = pool[i]; break; } }
-  const [name, , mid, ks, kind, label] = mv, kn = condKnob(mid, rpick(ks)); if (!kn) return;
-  const b = baseOf(kn), [lo, hi] = safeN(mid, kn.def.id); let to, say;
-  if (kind === 'layer') { const out = Math.abs(kn.norm - b) < 0.05; to = out ? Math.min(b * 0.08, lo) : b; say = label + (out ? ' FADE OUT' : ' FADE BACK IN'); if (b < 0.06) return; }
-  else if (kind === 'step') { const n = kn.def.max - kn.def.min; if (depth < 0.25) return; to = (Math.floor(Math.random() * (n + 1))) / n; say = label; }
-  else { const sp = (kind === 'small' ? 0.08 : 0.22) * (0.3 + depth * 1.2); to = clamp(b + (Math.random() * 2 - 1) * sp, Math.min(lo, b), Math.max(hi, b)); say = label + (to > kn.norm ? ' ↑' : ' ↓'); }
-  glideTo(kn, to, kind === 'step' ? 0.05 : 2 + Math.random() * 4 * depth, label); COND.recent.unshift(name); COND.recent.length = Math.min(COND.recent.length, 4); condSay(say);
+  const [name, , mid, ks, kind, label, vals] = mv, jz = st === 'jazzy'; let say = label;
+  if (kind === 'prog') { const m = modById[liveId('seq')], cur = [0, 1, 2, 3].map(i => m.v('s' + i)).join(), opts = JAZZ_PROGS.filter(p => p.join() !== cur), P = rpick(opts), two = Math.random() < 0.35, nk = k => m.knobs[k];
+    const list = [[nk('len'), nk('len').toNorm(two ? 8 : 4)]]; P.forEach((v, i) => { list.push([nk('s' + i), nk('s' + i).toNorm(v)]); list.push([nk('s' + (i + 4)), nk('s' + (i + 4)).toNorm(two && i === 3 ? P[1] : v)]); });
+    setMany(list, label); }
+  else if (kind === 'comp') { const m = modById[liveId('trig')], row = ks[0], pats = row === 5 ? JAZZ_COMP : JAZZ_BASS, P = new Set(rpick(pats)); setMany(Array.from({ length: 16 }, (_, k) => [m.knobs['b' + row + '_' + k], P.has(k) ? 1 : 0]), label); }
+  else { const kn = condKnob(mid, rpick(ks.filter(k => condKnob(mid, k)))); if (!kn) return;
+    const b = baseOf(kn), [lo, hi] = safeN(mid.split('|')[0], kn.def.id);
+    if (kind === 'fade' || kind === 'jumpout') { if (b < 0.06) return; const out = Math.abs(kn.norm - b) < 0.05; say = label + (out ? ' FADE OUT' : ' BACK IN');
+      glideTo(kn, out ? b * (jz ? 0.15 : 0.05) : b, kind === 'fade' ? (jz ? 6 : 4) : 0.02, label); }
+    else if (kind === 'step') { if (depth < 0.2) return; const n = kn.def.max - kn.def.min, opts = (vals || Array.from({ length: n + 1 }, (_, i) => kn.def.min + i)).filter(v => Math.abs(kn.toNorm(v) - kn.norm) > 1e-3); if (!opts.length) return; glideTo(kn, kn.toNorm(rpick(opts)), 0.02, label); }
+    else { const sp = (kind === 'small' ? 0.07 : kind === 'jump' ? 0.12 : 0.2) * (0.3 + depth * 1.2) * (jz ? 0.7 : 1), to = clamp(b + (Math.random() * 2 - 1) * sp, Math.min(lo, b), Math.max(hi, b));
+      say = label + (to > kn.norm ? ' ↑' : ' ↓'); glideTo(kn, to, kind === 'jump' ? 0.02 : (jz ? 6 : 3) + Math.random() * 4 * depth, label); } }
+  COND.recent.unshift(name); COND.recent.length = Math.min(COND.recent.length, 4); condSay(say);
 }
-// song shape. Lengths in bars; ENERGY lengthens drops or breakdowns.
+// song shape: lengths in bars, always whole phrases (multiples of 8). ENERGY lengthens drops or breakdowns.
 function sections(st, en) {
+  if (st === 'jazzy') return en < 0.35 ? [['GROOVE', 32], ['LAY BACK', 16], ['GROOVE', 24], ['LAY BACK', 16]] : [['GROOVE', 32], ['LAY BACK', en > 0.65 ? 8 : 16], ['GROOVE', 32], ['GROOVE', 16]];
   if (!DANCE_ST.has(st)) return [['FLOW', 32], ['THIN OUT', en > 0.65 ? 8 : 16], ['SWELL', 16], ['FLOW', 32]];
   if (en < 0.3) return [['GROOVE', 32], ['BREAKDOWN', 32], ['GROOVE', 32]];
   return [['GROOVE', 32], ['BREAKDOWN', en > 0.65 ? 8 : 16], ['BUILD', en > 0.65 ? 16 : 8], ['DROP', en > 0.65 ? 48 : 32], ['GROOVE', 32], ['BUILD', 8], ['DROP', 32]];
 }
 COND.sectionKeys = new Set();
-function secKnob(id, k, toFn, bars) { const kn = condKnob(id, k); if (!kn || !isPatched(kn.mod.id)) return; const b = baseOf(kn); COND.sectionKeys.add(kn.mod.id + '.' + k); glideTo(kn, toFn(b), bars); }
+function secKnob(id, k, toFn, bars) { const kn = condKnob(id, k); if (!kn) return; const b = baseOf(kn); COND.sectionKeys.add(kn.mod.id + '.' + k); glideTo(kn, toFn(b), bars); }
+function sectionsHome(bars) { for (const k of COND.sectionKeys) { const [m, kk] = k.split('.'); const kn = modById[m] && modById[m].knobs[kk]; if (kn) glideTo(kn, COND.base[k], bars); } COND.sectionKeys.clear(); }
 function enterSection(name, len) {
-  COND.sec = { name, len }; COND.secBar = 0; COND.dirty = true; const home = (b) => b;
-  if (name === 'BREAKDOWN') { secKnob('groove', 'kDen', () => 0, 0.05); secKnob('groove', 'sDen', b => b * 0.5, 2); secKnob('groove', 'hDen', b => b * 0.6, 2); secKnob('sweep', 'pos', () => 0.36, 4); secKnob('verb', 'mix', b => Math.min(1, b * 1.35), 4); condSay('BREAKDOWN · kick out, filter down'); }
-  else if (name === 'BUILD') { secKnob('groove', 'kDen', home, 0.05); secKnob('groove', 'sDen', b => Math.min(1, b + 0.35), len); secKnob('sweep', 'pos', () => 0.6 + 0.1 * modById.cond.v('energy'), len); secKnob('echo', 'mix', b => Math.min(1, b + 0.12), len); secKnob('pump', 'depth', b => Math.min(1, b + 0.1), len); condSay('BUILD · rising'); }
-  else if (name === 'DROP' || name === 'GROOVE' || name === 'FLOW') { for (const k of COND.sectionKeys) { const [m, kk] = k.split('.'); const kn = modById[m] && modById[m].knobs[kk]; if (kn) glideTo(kn, COND.base[k], name === 'DROP' ? 0.05 : 2); } COND.sectionKeys.clear(); if (name === 'DROP') condSay('DROP · everything back in'); }
+  COND.sec = { name, len }; COND.dirty = true; const home = b => b;
+  if (name === 'BREAKDOWN') { secKnob('groove', 'kDen', () => 0, 0.02); secKnob('groove', 'sDen', b => b * 0.5, 0.02); secKnob('groove', 'hDen', b => b * 0.6, 0.02); secKnob('sweep', 'pos', () => 0.36, 4); secKnob('verb', 'mix', b => Math.min(1, b * 1.35), 4); condSay('BREAKDOWN · kick out, filter down'); }
+  else if (name === 'BUILD') { secKnob('groove', 'kDen', home, 0.02); secKnob('groove', 'sDen', b => Math.min(1, b + 0.35), len); secKnob('sweep', 'pos', () => 0.6 + 0.1 * modById.cond.v('energy'), len); secKnob('echo', 'mix', b => Math.min(1, b + 0.12), len); secKnob('pump', 'depth', b => Math.min(1, b + 0.1), len); condSay('BUILD · rising'); }
+  else if (name === 'LAY BACK') { secKnob('sampler|drums', 'kLvl', b => b * 0.25, 1); secKnob('sampler|drums', 'hLvl', b => b * 0.55, 4); secKnob('sweep', 'pos', () => 0.43, 6); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 6); condSay('LAYING BACK · kick drops away'); }
+  else if (name === 'DROP' || name === 'GROOVE' || name === 'FLOW') { const was = COND.sectionKeys.size; sectionsHome(name === 'DROP' ? 0.02 : DECK.style === 'jazzy' ? 1 : 2); if (name === 'DROP') condSay('DROP · everything back in'); else if (was && DECK.style === 'jazzy') condSay('BACK IN THE GROOVE'); }
   else if (name === 'THIN OUT') { secKnob('sweep', 'pos', () => 0.4, 8); secKnob('verb', 'mix', b => Math.min(1, b * 1.3), 8); secKnob('mix', 'lvl2', b => b * 0.5, 8); condSay('THINNING OUT'); }
   else if (name === 'SWELL') { secKnob('sweep', 'pos', () => 0.5, len); secKnob('texture', 'dens', b => Math.min(1, b + 0.2), len); secKnob('verb', 'mix', home, len); secKnob('mix', 'lvl2', home, len); condSay('SWELLING'); }
 }
 function condTick() {
   const now = AC ? AC.currentTime : 0, dt = clamp(now - COND.lastT, 0, 0.5); COND.lastT = now;
-  const tempo = (modById.clock && modById.clock.v("tempo")) || 120, db = dt * tempo / 240 * (COND.speed || 1); // speed: tests only
+  // bars come from the rack's own clock, so every change lands on a bar line
+  const ck = TEL.clock && TEL.clock.count, tempo = (modById.clock && modById.clock.v('tempo')) || 120;
+  if (COND.speed) COND.bar += dt * tempo / 240 * COND.speed; // tests only
+  else if (ck != null) { const b = ck / 16; if (b < COND.bar - 4) { COND.secStart = null; COND.nextMove = 0; } COND.bar = b; }
   // glides (knobs a person turns are left alone from then on: that becomes the new home)
   for (const [kn, g] of COND.glides) {
     if (Math.abs(kn.norm - g.last) > 0.004) { COND.glides.delete(kn); COND.base[kn.mod.id + '.' + kn.def.id] = kn.norm; continue; }
     const t = clamp((COND.bar - g.b0) / g.bars, 0, 1), e = t * t * (3 - 2 * t), v = kn.def.step ? (t >= 1 || g.bars < 0.1 ? g.to : g.from) : g.from + (g.to - g.from) * e;
     kn.set(v); g.last = kn.norm; if (t >= 1) COND.glides.delete(kn);
   }
-  if (!COND.on || !AC || AC.state !== 'running' || DECK.blending) return;
-  const pb = Math.floor(COND.bar); COND.bar += db; if (COND.hold) { COND.nextMove += db; return; }
-  COND.secBar += db; if (Math.floor(COND.bar) !== pb) COND.dirty = true;
-  const S = sections(DECK.style, modById.cond.v('energy'));
+  if (!COND.on || !AC || AC.state !== 'running' || DECK.blending) { COND.secStart = null; return; }
+  if (COND.hold) return;
   COND.since += dt;
-  if (!COND.sec || COND.secBar >= COND.sec.len) { COND.si = COND.sec ? (COND.si + 1) % S.length : 0; const [n, l] = S[COND.si % S.length];
+  if (COND.secStart == null) { COND.secStart = Math.ceil(COND.bar / 8 - 1e-6) * 8; COND.sec = null; COND.si = -1; COND.nextMove = COND.secStart + 8; COND.dirty = true; } // start on the next phrase
+  if (COND.bar < COND.secStart) { COND.secBar = COND.bar - COND.secStart; return; }
+  const S = sections(DECK.style, modById.cond.v('energy')), pb = Math.floor(COND.secBar); COND.secBar = COND.bar - COND.secStart; if (Math.floor(COND.secBar) !== pb) COND.dirty = true;
+  if (!COND.sec || COND.secBar >= COND.sec.len) { if (COND.sec) { COND.secStart += COND.sec.len; COND.secBar = COND.bar - COND.secStart; } COND.si = (COND.si + 1) % S.length; const [n, l] = S[COND.si];
     if (swapSec() && COND.since >= swapSec() && (n === 'GROOVE' || n === 'FLOW')) { blendNext(); return; } // a new patch arrives where a new section would start
-    enterSection(n, l); }
-  if (COND.bar >= COND.nextMove) { const every = [4, 8, 16, 32][modById.cond.v('drift')] || 8; COND.nextMove = Math.ceil(COND.bar / every + 0.01) * every;
-    const quiet = COND.sec && (COND.sec.name === 'BUILD' || COND.sec.name === 'BREAKDOWN') && COND.secBar < 1; if (!quiet) { condMove(); if (Math.random() < modById.cond.v('depth') * 0.4) condMove(); } }
+    enterSection(n, l); return; }
+  if (COND.bar >= COND.nextMove) { const every = [4, 8, 16, 32][modById.cond.v('drift')] || 8; COND.nextMove = Math.floor(COND.bar / every + 1e-6) * every + every;
+    const quiet = COND.sec && COND.secBar < 1 && COND.sec.name !== 'GROOVE' && COND.sec.name !== 'FLOW', phrase = Math.round(COND.bar) % 8 === 0;
+    if (!quiet) { condMove(phrase); if (DECK.style !== 'jazzy' && Math.random() < modById.cond.v('depth') * 0.4) condMove(false); } }
 }
-function condRebase() { COND.base = {}; COND.glides.clear(); COND.sectionKeys.clear(); COND.hist = []; COND.sec = null; COND.si = 0; COND.secBar = 0; COND.dirty = true; }
-function condBack() { const h = COND.hist.pop(); if (!h) { if (!blendBack()) condSay('nothing to take back'); return; } glideTo(h.kn, h.from, 1); condSay('TAKEN BACK · ' + h.label); }
+function condRebase() { COND.base = {}; COND.glides.clear(); COND.sectionKeys.clear(); COND.hist = []; COND.sec = null; COND.si = -1; COND.secBar = 0; COND.secStart = null; COND.dirty = true; }
+function condBack() { const h = COND.hist.pop(); if (!h) { if (!blendBack()) condSay('nothing to take back'); return; } for (const [kn, from] of h.ks) glideTo(kn, from, kn.def.step ? 0.02 : 1); condSay('TAKEN BACK · ' + h.label); }
 function deckFeatures(get) { // what a patch is made of, for learning taste: style, kit, scale, groove family, chord, voice models
   const f = ['style:' + DECK.style], add = (id, k, n) => { const v = get(id, k); if (v != null) f.push(n + ':' + Math.round(v)); };
   add('sampler', 'kit', 'kit'); add('quant', 'scale', 'scale'); add('groove', 'style', 'groove'); add('stab', 'chord', 'chord'); add('macro', 'model', 'model'); add('field', 'rec', 'field'); add('bass', 'wave', 'bass'); add('mbira', 'type', 'mbira');
@@ -2561,8 +2591,8 @@ Object.assign(window, { COND, TASTE, condMove, condPress, condToggle, blendBack 
 
 function randomPatch(style) {
   pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'jazzy']) : style, wild = style === 'surprise' ? rr(0.6, 1) : rr(0, 0.35);
-  DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy'].map(k => [k, modById.cond.knobs[k].norm]);
-  loadPatch(tastePick(() => genPatch(s, wild), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
+  DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy', 'swap'].map(k => [k, modById.cond.knobs[k].norm]);
+  loadPatch(tastePick(() => genPatch(s, wild), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); send({ t: 'barsync', reset: deckIds('A') }); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
   toast((style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy, low-key patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
 }
 function undoRandom() { const P = RND.undo.pop(); if (!P) return; RND.tw = []; loadPatch(P); document.getElementById('rUndo').disabled = !RND.undo.length; toast('Undone', true); }
