@@ -115,10 +115,34 @@ class LFO extends DSP {
     }
   }
 }
+// AUTO LEVEL (both mixers): when a channel gets a new source, its first seconds are measured (loudness-weighted, silence ignored)
+// and the channel is trimmed toward one common level, up to ±12 dB. Then the trim holds, so faders and fades work as usual.
+// Echo and reverb returns are levelled 6 dB lower, so their fader sets how wet the mix is.
+class AutoTrim {
+  constructor(sr) { this.sr = sr; this.g = 1; this.gt = 1; this.sig = null; this.reset(); this.h1 = 0; this.h2 = 0; this.hx = 0; this.lp = 0;
+    this.ka = 1 - Math.exp(-TAU * 40 / sr); this.kl = 1 - Math.exp(-TAU * 1500 / sr); }
+  reset() { this.sum = 0; this.t = 0; this.age = 0; this.done = false; }
+  block(x, n, on, ref = AutoTrim.REF) { // -> gain for this block
+    if (!on) { this.g = 1; return 1; }
+    if (!this.done) { let ms = 0;
+      for (let i = 0; i < n; i++) { let v = x[i]; this.h1 += this.ka * (v - this.h1); v -= this.h1; this.h2 += this.ka * (v - this.h2); v -= this.h2; this.lp += this.kl * (v - this.lp); v += 0.6 * (v - this.lp); ms += v * v; }
+      ms /= n; this.age += n; if (ms > 1e-5) { this.sum += ms * n; this.t += n; }
+      if (this.t > 0.2 * this.sr) this.gt = Math.min(this.hi || 4, Math.max(this.lo || 0.25, Math.sqrt(ref / (this.sum / this.t))));
+      if (this.t > 8 * this.sr || this.age > 24 * this.sr) this.done = true; }
+    this.g += (this.gt - this.g) * Math.min(1, n / (0.35 * this.sr)); return this.g; }
+}
+AutoTrim.REF = 0.5;
+function trimSetup(d, chans) { // (re)start a channel's measurement when what feeds it changes; skip effect returns
+  if (!d.trims) d.trims = chans.map(() => new AutoTrim(d.sr));
+  if (d.ver === d.e.ver) return; d.ver = d.e.ver;
+  chans.forEach((ch, k) => { let sig = '', fx = false; for (const c of d.e.cables.values()) if (c.im === d.id && c.ip === ch) { sig = c.om + '.' + c.op; const s = d.e.mods.get(c.om); fx = s instanceof Delay || s instanceof Reverb || s instanceof Echo; }
+    const T = d.trims[k]; T.fx = fx; if (sig !== T.sig) { T.sig = sig; T.reset(); } });
+}
 class Mixer extends DSP {
   static IN = ['in1', 'in2', 'in3', 'in4']; static OUT = ['out'];
   process(n) {
-    const O = this.out.out, g = [1, 2, 3, 4].map(k => this.p['lvl' + k] ?? 0), I = [1, 2, 3, 4].map(k => this.in['in' + k]);
+    const au = (this.p.auto ?? 0) > 0.5; if (au) trimSetup(this, Mixer.IN);
+    const O = this.out.out, g = [1, 2, 3, 4].map(k => (this.p['lvl' + k] ?? 0) * (au ? this.trims[k - 1].block(this.in['in' + k], n, this.has['in' + k], this.trims[k - 1].fx ? AutoTrim.REF * 0.25 : AutoTrim.REF) : 1)), I = [1, 2, 3, 4].map(k => this.in['in' + k]);
     for (let i = 0; i < n; i++) O[i] = I[0][i] * g[0] + I[1][i] * g[1] + I[2][i] * g[2] + I[3][i] * g[3] + (Math.random() - 0.5) * 0.0012;
     this.peak('vu', O, n);
   }
@@ -264,7 +288,8 @@ class Output extends DSP {
   static IN = ['L', 'R']; static OUT = [];
   process(n) {
     const v = this.p.vol ?? 0.75, g = v * v * 2.6 * 0.2, L = this.in.L, R = this.has.R ? this.in.R : this.in.L, oL = this.e.oL, oR = this.e.oR, vL = this.e.oLv; let pl = 0, pr = 0;
-    for (let i = 0; i < n; i++) { const l = Math.tanh(L[i] * g), r = Math.tanh(R[i] * g); oL[i] = l; oR[i] = r; vL[i] = L[i]; const al = Math.abs(l), ar = Math.abs(r); if (al > pl) pl = al; if (ar > pr) pr = ar; }
+    const sk = x => { const a = x < 0 ? -x : x; return a <= 0.8 ? x : (x < 0 ? -1 : 1) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2)); };
+    for (let i = 0; i < n; i++) { const l = sk(L[i] * g), r = sk(R[i] * g); oL[i] = l; oR[i] = r; vL[i] = L[i]; const al = Math.abs(l), ar = Math.abs(r); if (al > pl) pl = al; if (ar > pr) pr = ar; }
     this.flash('vuL', pl); this.flash('vuR', pr);
   }
 }
@@ -494,14 +519,15 @@ class Drums extends DSP { // kick, clap, closed hat, open hat (closed chokes ope
         const x = m / 6 * 0.7 + (Math.random() * 2 - 1) * 0.45; this.hy = hpA * (this.hy + x - this.hx); this.hx = x;
         if (hon) { h = this.hy * Math.exp(-this.ht / hd); this.ht += dt; } if (oon) { o = this.hy * Math.exp(-this.ot / od); this.ot += dt; }
       }
-      K[i] = k * 5; C[i] = c * 5; H[i] = h * 5; OH[i] = o * 5; M[i] = (k * kl + c * cl + h * hl + o * ol) * 4.5;
+      K[i] = k * 5; C[i] = c * 5; H[i] = h * 5; OH[i] = o * 5; M[i] = (k * kl + c * cl + h * hl * 5 + o * ol * 3) * 4.5; // hats sit about 10 dB under the kick
     }
   }
 }
 class Mix6 extends DSP { // 6-channel stereo mixer with equal-power pan
   static IN = ['in1', 'in2', 'in3', 'in4', 'in5', 'in6']; static OUT = ['L', 'R'];
   process(n) {
-    const gl = [], gr = [], I = []; for (let k = 1; k <= 6; k++) { const lv = this.p['lvl' + k] ?? 0.7, a = ((this.p['pan' + k] ?? 0) + 1) * Math.PI / 4; gl.push(Math.cos(a) * 1.4142 * lv); gr.push(Math.sin(a) * 1.4142 * lv); I.push(this.in['in' + k]); }
+    const au = (this.p.auto ?? 0) > 0.5; if (au) trimSetup(this, Mix6.IN);
+    const gl = [], gr = [], I = []; for (let k = 1; k <= 6; k++) { const lv = (this.p['lvl' + k] ?? 0.7) * (au ? this.trims[k - 1].block(this.in['in' + k], n, this.has['in' + k], this.trims[k - 1].fx ? AutoTrim.REF * 0.25 : AutoTrim.REF) : 1), a = ((this.p['pan' + k] ?? 0) + 1) * Math.PI / 4; gl.push(Math.cos(a) * 1.4142 * lv); gr.push(Math.sin(a) * 1.4142 * lv); I.push(this.in['in' + k]); }
     const m = this.p.master ?? 0.8, OL = this.out.L, OR = this.out.R;
     for (let i = 0; i < n; i++) { let l = 0, r = 0; for (let k = 0; k < 6; k++) { const x = I[k][i]; l += x * gl[k]; r += x * gr[k]; } OL[i] = l * m + (Math.random() - 0.5) * 0.001; OR[i] = r * m + (Math.random() - 0.5) * 0.001; }
     this.peak('vuL', OL, n); this.peak('vuR', OR, n);
@@ -588,7 +614,7 @@ class Perc extends DSP {
       let sh = 0; if (T[2] < shD * 7) { const t = T[2], x = Math.random() * 2 - 1; f.h1 += g2 * (x - f.h1); const hp = x - f.h1; f.h2 += g2 * 0.6 * (hp - f.h2); sh = (hp - f.h2 * 0.5) * Math.min(1, t / 0.006) * Math.exp(-t / shD) * 1.3; T[2] += dt; }
       let to = 0; if (T[3] < tD * 7) { const t = T[3]; ph[3] += tF * (1 + 0.45 * Math.exp(-t * 22)) * dt; to = Math.tanh(Math.sin(TAU * ph[3]) * 1.3) * Math.exp(-t / tD); if (t < 0.002) to += (Math.random() * 2 - 1) * 0.2; T[3] += dt; }
       if (ph[0] > 1e6) ph[0] = ph[1] = ph[2] = 0;
-      S[i] = s * 5; R[i] = r * 3.2; SH[i] = sh * 5; TO[i] = to * 5; M[i] = (s * sL + r * rL * 0.65 + sh * shL + to * tL) * 4.2;
+      S[i] = s * 5; R[i] = r * 3.2; SH[i] = sh * 5; TO[i] = to * 5; M[i] = (s * sL + r * rL * 1.3 + sh * shL * 1.25 + to * tL) * 4.2;
     }
   }
 }
@@ -780,10 +806,16 @@ class Wide extends DSP { // ensemble chorus + mid/side width with the bass kept 
 }
 class Limit extends DSP { // drive + high-frequency exciter + look-ahead brick-wall limiter with a soft ceiling
   static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
-  constructor(e) { super(e); this.D = 40; this.dl = new DLine(64); this.dr = new DLine(64); this.g = 1; this.hl = 0; this.hr = 0; }
+  constructor(e) { super(e); this.D = 40; this.dl = new DLine(64); this.dr = new DLine(64); this.g = 1; this.hl = 0; this.hr = 0; this.rl = NaN; }
   process(n) {
     const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R;
-    const drv = Math.exp((P.drive ?? 3) * 0.11512925), c = 5 * Math.exp((P.ceil ?? -1) * 0.11512925), air = P.air ?? 0.2, ac = 1 - Math.exp(-1 / (0.00012 * sr)), rc = 1 - Math.exp(-1 / (Math.max(0.01, P.rel ?? 0.1) * sr)), lp = 1 - Math.exp(-TAU * 3500 / sr), D = this.D, c8 = 0.8 * c;
+    // LEVEL: like AUTO LEVEL on the mixers, but for the whole mix: the first seconds after a patch loads are measured
+    // (loudness-weighted) and the input is turned to land near LEVEL (LUFS, at the default volume), then held.
+    const tgt = P.level ?? -24, au = tgt > -23.5; if (au) { if (!this.at) this.at = [new AutoTrim(sr), new AutoTrim(sr)];
+      if (this.rl !== P.relearn) { this.rl = P.relearn; for (const T of this.at) T.reset(); } // the page asks for a fresh measurement when a patch loads
+      const ref = Math.pow(10, (tgt + 10.7 + 0.691 - 0.9) / 10) / 2; for (const T of this.at) { T.lo = 0.125; T.hi = 8; }
+      const gl = this.at[0].block(IL, n, true, ref), gr = this.at[1].block(IR, n, true, ref); this.ag = Math.sqrt(gl * gr) || 1; } else this.ag = 1;
+    const drv = this.ag * Math.exp((P.drive ?? 3) * 0.11512925), c = 5 * Math.exp((P.ceil ?? -1) * 0.11512925), air = P.air ?? 0.2, ac = 1 - Math.exp(-1 / (0.00012 * sr)), rc = 1 - Math.exp(-1 / (Math.max(0.01, P.rel ?? 0.1) * sr)), lp = 1 - Math.exp(-TAU * 3500 / sr), D = this.D, c8 = 0.8 * c;
     let minG = 1;
     for (let i = 0; i < n; i++) {
       let l = IL[i] * drv, r = IR[i] * drv;
@@ -1145,6 +1177,7 @@ export class Engine {
       const s = this.mods.get(c.om), d = this.mods.get(c.im); if (!s || !d || !s.out[c.op] || !(c.ip in d.in)) continue;
       d.in[c.ip] = s.out[c.op]; d.has[c.ip] = true; if (s !== d) deps.get(d).add(s);
     }
+    this.ver = (this.ver || 0) + 1;
     const order = [], done = new Set(), all = [...this.mods.values()]; let progress = true;
     while (order.length < all.length && progress) { progress = false; for (const d of all) if (!done.has(d) && [...deps.get(d)].every(s => done.has(s))) { order.push(d); done.add(d); progress = true; } }
     for (const d of all) if (!done.has(d)) order.push(d); // feedback loops: one block of delay
