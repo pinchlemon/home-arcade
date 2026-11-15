@@ -1,10 +1,11 @@
-// Lab shelf: Ball play. Sports-game passing and catching.
-//   Buttons: SPORTS gives the controller its own layout: X passes (and catches), Square shoots (and catches), Circle dives,
-//     R2 jumps. Square while holding the Solid fires a hard flat shot at the demon, from the ground or the air.
-//   Pass slider: how long you hold a pass sets how it flies, from a high floating lob (a tap) to a flat bullet (a full
-//     hold), anywhere in between. It goes to the teammate you roughly face, leading them; otherwise straight ahead.
-//   Perfect catch: press catch just as the Solid arrives for extra resonance. With Sports buttons, catching with Square
-//     on a perfect catch, once the Solid has enough resonance, shoots at once: a one-timer, scored as an alley-oop.
+// Lab shelf: Ball play. Sports-game throwing and catching.
+//   Buttons: SPORTS gives the controller its own layout: Square throws (and catches), holding L1 throws it higher and
+//     holding R1 lower; Circle dives, R2 runs, L2 tackles; X does nothing unless Jump is on (then it jumps).
+//   Hold to throw: how long you hold the throw sets only how fast it leaves your hand (so how far it goes); the arc is
+//     set apart from that: normal, higher with L1, lower with R1 (Sports buttons). A tap with R1 barely goes anywhere.
+//   Switch on throw: after a throw you take over whoever is nearest where it comes down (you stay if that's you).
+//   Perfect catch: press catch just as the Solid arrives for extra resonance. With Sports buttons, a perfect catch with
+//     R1 held, once the Solid has enough resonance, shoots at the demon at once: a one-timer, scored as an alley-oop.
 //   Catch ring: a ring on the ground where the Solid will come down, closing as it arrives (it flashes in the perfect window).
 //   Fire aura: the Solid burns brighter as resonance builds: light, orbiting sparks, a flame aura, embers at the top.
 // Nothing here runs or is made until one of these is switched on (new three.js objects use Math.random).
@@ -16,67 +17,66 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   // ---- buttons
   const prev = {};
-  const btn = (gp, i) => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.3));
+  const btn = (gp, i) => !!(gp && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.3));
   const sports = () => get('buttons', 0) === 1 && !game.DUEL;
-  function press(W, k) { const C = W.ctl; if (C.castHeld) return; W.labBtn = k; C.castHeld = true; C.castPressed = true; }
-  function release(W, k) { if (W.labBtn === k) W.ctl.castHeld = false; }
-  function readButtons() {
+  const modOf = (W) => { const hi = btn(W.gp, 4), lo = btn(W.gp, 5); return hi === lo ? 0 : hi ? 1 : -1; };   // L1 higher, R1 lower
+  function readButtons() {   // Square: the game's throw-and-catch button, pressed and let go
     for (const W of game.ALL) {
       const gp = W.human && W.gp; if (!gp) continue;
-      const now = [btn(gp, 0), btn(gp, 2), btn(gp, 7)], was = prev[gp.index] || [false, false, false];
-      prev[gp.index] = now;
-      if (game.blockPad) { if (W.labBtn) W.ctl.castHeld = false; W.jumpHeld = false; continue; }
-      if (now[0] && !was[0]) press(W, 'pass'); if (!now[0] && was[0]) release(W, 'pass');
-      if (now[1] && !was[1]) press(W, 'shot'); if (!now[1] && was[1]) release(W, 'shot');
-      if (now[2] && !was[2]) { W.jumpHeld = true; W.jumpQ = true; } if (!now[2] && was[2]) W.jumpHeld = false;
+      const now = btn(gp, 2), was = !!prev[gp.index]; prev[gp.index] = now;
+      const C = W.ctl;
+      if (game.blockPad) { if (W.labBtn) { C.castHeld = false; W.labBtn = null; } continue; }
+      if (now && !was && !C.castHeld) { W.labBtn = 'throw'; C.castHeld = true; C.castPressed = true; }
+      if (!now && was && W.labBtn) { C.castHeld = false; W.labBtn = null; }
     }
   }
   let hintWas = null;
   function hint(v) {   // the controller help line under the game says what the buttons do now
     const h = document.getElementById('hint'); if (!h || !/^Stick move/.test(h.textContent)) return;
-    if (v) { if (hintWas == null) hintWas = h.textContent;
-      h.textContent = hintWas.replace('Cross jump', 'R2 jump').replace('Square catch / hold to throw', 'Cross pass (tap lob, hold bullet) · Square shoot (both catch)'); }
-    else if (hintWas != null) { h.textContent = hintWas; hintWas = null; }
+    if (hintWas != null) { h.textContent = hintWas; hintWas = null; }
+    if (!v) return;
+    hintWas = h.textContent;
+    let t = hintWas.replace('R1 run', 'R2 run').replace('L1 tackle', 'L2 tackle')
+      .replace('Square catch / hold to throw', 'Square catch / throw (hold: farther; with L1: higher, R1: lower)');
+    if (!get('jump', 0)) t = t.replace('Cross jump · ', '');
+    h.textContent = t;
   }
-  function buttons(v) {
-    LAB.skip('ball', v ? [0, 2, 7] : null);   // the game stops seeing X, Square and R2; this shelf reads them instead
+  function buttons() {
+    const v = sports();
+    // the game stops seeing Square (this shelf reads it), L2 and R2; its tackle is read from L2 and its run from R2,
+    // which leaves L1 and R1 free to shape the throw. X only jumps when Jump is on.
+    LAB.skip('ball', v ? (get('jump', 0) ? [2, 6, 7] : [0, 2, 6, 7]) : null);
+    game.padAlias = v ? { 4: 6, 5: 7 } : null;
     hint(v);
     if (!v) for (const W of game.ALL) { if (W.labBtn) { W.ctl.castHeld = false; W.labBtn = null; } }
   }
 
-  // ---- the pass slider (and the shoot button), as the game's throw
-  function mateAhead(W, dx, dz) {
-    let m = null, ms = -9; const S = game.solid;
-    for (const x of game.ALL) {
-      if (x === W || x.downT > 0 || x.capT > 0) continue;
-      const mx = x.pos.x - W.pos.x, mz = x.pos.z - W.pos.z, md = Math.hypot(mx, mz) || 1, dot = (mx * dx + mz * dz) / md;
-      if (dot > 0.75 && md < game.LOB_MAX * S.range + 4 && dot - md * 0.01 > ms) { ms = dot - md * 0.01; m = x; }
-    }
-    return m;
-  }
-  function sliderPass(W) {
+  // ---- hold to throw: speed from the hold, arc from the shoulder buttons
+  function holdThrow(W) {
     const c = W.charge, S = game.solid, dx = Math.sin(W.yaw), dz = Math.cos(W.yaw);
-    const lobK = get('lob', 1.5), bul = get('bullet', 24) * S.speed;
-    const classic = (d) => (0.6 + d * 0.036) * S.hang;
-    const flight = (d) => { const tl = classic(d) * lobK, tb = Math.min(d / bul, tl); return tl + (tb - tl) * c; };
-    const m = mateAhead(W, dx, dz);
-    let tx, tz;
-    if (m) { tx = m.pos.x; tz = m.pos.z;
-      for (let i = 0; i < 3; i++) { const t = flight(Math.hypot(tx - o.p.x, tz - o.p.z)); tx = m.pos.x + m.vel.x * t; tz = m.pos.z + m.vel.z * t; } }
-    else { const d = game.LOB_MAX * S.range * (W.stThrow || 1) * (0.55 + 0.45 * c); tx = W.pos.x + dx * d; tz = W.pos.z + dz * d; }
-    const d = Math.max(0.5, Math.hypot(tx - o.p.x, tz - o.p.z));
-    game.lobTo(W, c, tx, tz, classic(d) / flight(d));
-    if (m) FX.emit('pass', W, m);
+    const mod = sports() ? modOf(W) : 0;
+    const deg = mod > 0 ? get('high', 62) : mod < 0 ? get('low', 14) : get('arc', 38), a = deg * Math.PI / 180;
+    const tap = get('tap', 12), sp = (tap + (get('full', 22) - tap) * c) * (W.stThrow || 1) * Math.sqrt(S.grav * S.range);   // every solid goes about as far
+    game.throwOrb(W, c, dx, dz, sp * Math.cos(a), sp * Math.sin(a), true);
+    if (mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
   }
   function throwHook(W) {
-    if (game.DUEL || W.crouchK > 0.5) return false;   // crouched throws still bowl
-    if (sports() && W.labBtn === 'shot') { game.playerThrow(W, true); return true; }
-    const t = game.time, air = !W.grounded || (t - (W.airCatchT || -9) < 1.4 && t - (W.landT || -9) < 0.22);   // as the game decides a jump throw
-    const asPass = sports() ? W.labBtn === 'pass' : !air;   // classic buttons: a throw in the air stays a fastball
-    if (get('slider', 0) && asPass) { sliderPass(W); return true; }
-    return false;
+    if (game.DUEL || W.crouchK > 0.5 || !get('slider', 0)) return false;   // crouched throws still bowl
+    holdThrow(W); return true;
   }
-  const hook = () => { game.throwHook = sports() || get('slider', 0) ? throwHook : null; };
+  const hook = () => { game.throwHook = get('slider', 0) ? throwHook : null; };
+
+  // ---- switch on throw: take over whoever is nearest where it will come down
+  let switchFrom = null;
+  FX.on('throw', (W) => { if (get('switch', 0) && W.human && !game.DUEL) switchFrom = W; }, 'lab');
+  function doSwitch() {
+    const W = switchFrom; switchFrom = null;
+    if (o.state !== 'air' || o.last !== W || W !== game.you) return;
+    const p = predict(2, true); if (!p) return;
+    let best = null, bd = 1e9;
+    for (const x of game.ALL) { if (x.downT > 0 || x.capT > 0) continue; const d = Math.hypot(x.pos.x - p[1], x.pos.z - p[2]); if (d < bd) { bd = d; best = x; } }
+    if (best && best !== W) game.swapTo(best);
+  }
 
   // ---- perfect catches and one-timers
   let oneTimer = null, perfectFlash = 0;
@@ -86,7 +86,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (0.2 - C.catchT > get('window', 0.12) + 1 / 60) return;
     o.res = Math.min(5, o.res + get('bonus', 1)); perfectFlash = 1;
     game.popup('PERFECT!', W.pos, '#ffffff', true); game.sparkBurst(o.p, 18, 3.2, 0.7); game.rumble(W, 0.2, 0.7, 90); game.shake(0.08);
-    if (sports() && W.labBtn === 'shot' && o.res >= get('oop', 3)) oneTimer = W;
+    if (sports() && modOf(W) < 0 && o.res >= get('oop', 3)) oneTimer = W;
   }, 'lab');
   function fireOneTimer() {
     const W = oneTimer; oneTimer = null;
@@ -107,14 +107,14 @@ LAB.shelf('ball', 'Ball play', (game) => {
     ring = { g, inner, outer };
   }
   const sim = new T.Vector3(), simV = new T.Vector3();
-  function predict(mode) {   // where and when the Solid comes down: [time, x, z] or null
+  function predict(mode, land) {   // where and when the Solid comes down: [time, x, z] or null (land: ignore who's in the way)
     if (o.state !== 'air' || o.touched || !o.last) return null;
     const g = game.G * game.solid.grav, h = 1 / 60; sim.copy(o.p); simV.copy(o.v);
     for (let i = 1; i <= 240; i++) {
       simV.y -= g * h; sim.addScaledVector(simV, h);
-      for (const W of game.ALL) if (W !== o.last && (mode === 2 || W.human) && W.downT <= 0 && hd(sim, W.pos) < 0.9 && Math.abs(sim.y - (W.y + 0.55)) < 1) return [i * h, sim.x, sim.z];
+      if (!land) for (const W of game.ALL) if (W !== o.last && (mode === 2 || W.human) && W.downT <= 0 && hd(sim, W.pos) < 0.9 && Math.abs(sim.y - (W.y + 0.55)) < 1) return [i * h, sim.x, sim.z];
       if (simV.y < 0 && sim.y < 0.9) {
-        if (mode === 1 && !game.ALL.some((W) => W.human && W !== o.last && hd(sim, W.pos) < 3.5)) return null;
+        if (!land && mode === 1 && !game.ALL.some((W) => W.human && W !== o.last && hd(sim, W.pos) < 3.5)) return null;
         return [i * h, sim.x, sim.z];
       }
     }
@@ -198,6 +198,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
+    if (switchFrom) doSwitch();
     if (oneTimer) fireOneTimer();
     const r = get('ring', 0); if (r || ring) showRing(r, dt);
     const f = get('fire', 0); if (f || fire) burn(dt, f);
@@ -206,16 +207,21 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   const OFFON = (x) => (x ? 'ON' : 'OFF');
   return [
-    { id: 'buttons', label: 'Buttons', help: (x) => x ? 'X passes, Square shoots, Circle dives, R2 jumps (both catch)' : 'Cross jumps, Square catches and throws, Circle dives',
-      min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (x) => (x ? 'SPORTS' : 'CLASSIC'), apply: (x) => { buttons(x); hook(); } },
-    { id: 'slider', label: 'Pass slider', help: 'Tap for a high lob, hold longer for flatter and faster, all the way to a bullet. Goes to the teammate you face, leading them',
+    { id: 'buttons', label: 'Buttons', help: (x) => x ? 'Square throws and catches (hold L1: higher, R1: lower), Circle dives, R2 runs, L2 tackles' : 'Cross jumps, Square catches and throws, Circle dives, R1 runs, L1 tackles',
+      min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (x) => (x ? 'SPORTS' : 'CLASSIC'), apply: buttons },
+    { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
+    { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
-    { id: 'lob', label: 'Lob height', help: 'How high a tapped pass floats', min: 0.6, max: 3, step: 0.1, value: 1.5, dice: false },
-    { id: 'bullet', label: 'Bullet speed', help: 'How fast a fully held pass flies', min: 10, max: 44, step: 1, value: 24, dice: false },
+    { id: 'arc', label: 'Normal arc', help: 'The angle a plain throw leaves at', min: 10, max: 70, step: 2, value: 38, dice: false, fmt: (x) => x + '°' },
+    { id: 'high', label: 'High arc (L1)', help: 'The angle with L1 held', min: 30, max: 85, step: 2, value: 62, dice: false, fmt: (x) => x + '°' },
+    { id: 'low', label: 'Low arc (R1)', help: 'The angle with R1 held', min: 0, max: 30, step: 2, value: 14, dice: false, fmt: (x) => x + '°' },
+    { id: 'tap', label: 'Tap speed', help: 'How fast a quick tap throws it', min: 4, max: 20, step: 1, value: 12, dice: false },
+    { id: 'full', label: 'Full speed', help: 'How fast a full hold throws it', min: 14, max: 44, step: 1, value: 22, dice: false },
+    { id: 'switch', label: 'Switch on throw', help: 'You take over whoever is nearest where it comes down (you stay if that is you)', kind: 'onoff', value: 0, dice: false },
     { id: 'perfect', label: 'Perfect catch', help: 'Press catch just as the Solid arrives for extra resonance', kind: 'onoff', value: 0, dice: false },
     { id: 'window', label: 'Perfect timing', help: 'How exact it has to be (seconds); bigger is easier', min: 0.04, max: 0.3, step: 0.02, value: 0.12, dice: false, fmt: (x) => x.toFixed(2) + ' S' },
     { id: 'bonus', label: 'Perfect bonus', help: 'Extra resonance from a perfect catch', min: 0, max: 2, step: 1, value: 1, dice: false },
-    { id: 'oop', label: 'One-timer from', help: 'With Sports buttons, a perfect catch with Square shoots at once (an alley-oop) when the Solid has this much resonance',
+    { id: 'oop', label: 'One-timer from', help: 'With Sports buttons, a perfect catch with R1 held shoots at the demon at once (an alley-oop) when the Solid has this much resonance',
       min: 0, max: 5, step: 1, value: 3, dice: false, fmt: (x) => 'RES ' + x },
     { id: 'ring', label: 'Catch ring', help: 'A ring where the Solid comes down, closing as it arrives; white in the perfect window', min: 0, max: 2, step: 1, value: 0, dice: false,
       fmt: (x) => ['OFF', 'PASSES TO YOU', 'EVERY THROW'][x] },

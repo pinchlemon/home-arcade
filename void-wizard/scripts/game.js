@@ -729,7 +729,8 @@ const padPrev={};let padOn=false, padToP2=false, padBlock=false, post=null, padS
 addEventListener('gamepadconnected',()=>{padOn=true;document.getElementById('hint').textContent=PAD_HINT;});
 addEventListener('keydown',e=>{if(e.code==='Digit2'&&!e.repeat){padToP2=!padToP2;popup(padToP2?'CONTROLLER → PLAYER 2':'CONTROLLER → PLAYER 1',player.pos,'#ffd36a');}});
 function padRead(gp,W){
-  const b=i=>!(padSkip&&padSkip.has(i))&&(gp.buttons[i]?(gp.buttons[i].pressed||gp.buttons[i].value>0.3):false); // padSkip: buttons a feature has taken over
+  const raw=i=>gp.buttons[i]?(gp.buttons[i].pressed||gp.buttons[i].value>0.3):false;
+  const b=i=>!(padSkip&&padSkip.has(i))&&raw(padAlias&&padAlias[i]!=null?padAlias[i]:i); // padSkip: buttons a feature has taken over; padAlias: a job read from another button
   const now=[b(0),b(5)||b(10),b(2)||b(7),b(3),b(9),b(1)||b(6),b(4),b(8),b(12)];
   // the Lab (or another feature) can take the controller for a while: the game sees nothing pressed
   if(padBlock){padPrev[gp.index]=now;W.ctl.castHeld=false;W.jumpHeld=false;return {x:0,y:0,run:false,crouch:false,rx:0,ry:0};}
@@ -1574,7 +1575,7 @@ for(let i=0;i<9;i++){
   const puddle=glowDisc(0xff4a1a,1.1,0);
   venoms.push({g,v:new THREE.Vector3(),alive:false,acc:0,puddle});
 }
-let venomNext=0,spitHook=null,throwHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
+let venomNext=0,spitHook=null,throwHook=null,padAlias=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
 const vLook=new THREE.Vector3();
 function spitVenom(T){
   headCenter(lO);lO.y+=0.05;
@@ -2016,7 +2017,7 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
   lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
-  G,playerThrow,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;}};
+  G,playerThrow,throwOrb,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;},get padAlias(){return padAlias;},set padAlias(v){padAlias=v||null;}};
 requestAnimationFrame(frame);
 })();
 
