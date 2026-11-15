@@ -41,6 +41,9 @@ button.on{color:#021018;background:var(--acc);border-color:var(--acc)}
 #toast.ok{background:rgba(6,26,40,.9);border-color:rgba(79,216,255,.45)}
 #patches{top:58px;right:14px;width:290px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #patches.hide,#rand.hide,#kits.hide,#book.hide{display:none}
+#parts{top:58px;right:14px;width:340px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#parts .grp{margin:10px 0 4px;color:#7fa7ff;font-weight:700;letter-spacing:.08em;font-size:11px}#parts .chips{margin-bottom:5px}#parts .chips button.use::after{content:' •';color:#35e0ff}#pCam button.cur{background:#2a7bff;color:#fff;border-color:#2a7bff}
+#parts .ptitle{font-size:15px;font-weight:700;margin:8px 0 6px}#parts .pk{display:grid;grid-template-columns:92px 1fr 86px;gap:8px;align-items:center;margin:7px 0}#parts .pk label{font-size:11px;opacity:.85;line-height:1.1}#parts .pk span{font-size:11px;text-align:right;color:#cfe6ff;line-height:1.1;overflow-wrap:anywhere}#parts input[type=range]{width:100%;accent-color:#2a7bff;height:26px}#parts canvas{width:100%;height:120px;background:#020611;border-radius:8px;touch-action:none;display:block;margin:6px 0}
 #book{top:58px;right:14px;width:300px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 #book .sec{font-size:10px;letter-spacing:.2em;color:var(--dim);margin:0 0 7px}#book .muted{color:var(--dim);margin-bottom:8px;line-height:1.4}#book .t{display:flex;align-items:center;gap:6px;margin:3px 0;padding:3px 4px;border-radius:6px}#book .t.on{background:rgba(255,211,107,.12)}#book .t span{flex:1;color:#e8eef8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#book .t small{color:var(--dim);font-size:10px;margin-left:4px}#book .t button{padding:4px 8px;font-size:12px;min-width:30px}#book .t button.kept{color:#ffd36b;border-color:#ffd36b}#book .t.skip span{opacity:.4;text-decoration:line-through}#book .chips{display:flex;flex-wrap:wrap;gap:5px}#book .chips button{padding:5px 9px;font-size:11px}
 #kits{top:58px;right:14px;width:300px;max-height:calc(100vh - 76px);overflow:auto;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
@@ -122,11 +125,15 @@ body.cam #cambar{display:flex}
   #kb .keys{height:84px}
   body.menuopen #bar{flex-direction:column;align-items:stretch;width:160px;max-height:calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;flex-wrap:nowrap}
   #brand p{display:none}#brand{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left))}#brand h1{font-size:12px}
-  #patches,#rand,#scene,#kits,#book{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));right:calc(10px + env(safe-area-inset-right));left:calc(10px + env(safe-area-inset-left));width:auto;max-height:calc(100vh - 72px);max-height:calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  #patches,#rand,#scene,#kits,#book,#parts{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));right:calc(10px + env(safe-area-inset-right));left:calc(10px + env(safe-area-inset-left));width:auto;max-height:calc(100vh - 72px);max-height:calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  #parts{max-height:56vh;max-height:56dvh}
   #rand .muted{display:none}#rand .sec{margin:9px 0 6px}
   .hud.more{-webkit-mask-image:linear-gradient(#000 calc(100% - 34px),transparent);mask-image:linear-gradient(#000 calc(100% - 34px),transparent)}
   #help{left:10px;right:10px;bottom:10px;max-width:none;max-height:55vh;overflow:auto}
   #padhint{left:10px;right:10px;max-width:none}
+}
+@media (max-height:500px) and (orientation:landscape){
+  #parts{left:auto;width:48vw;top:calc(10px + env(safe-area-inset-top));max-height:calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
 }
 @media (max-height:500px){
   body.menuopen #bar{display:grid;grid-template-columns:repeat(3,minmax(118px,1fr));width:auto;max-width:min(470px,calc(100vw - 40px))}
@@ -148,6 +155,7 @@ body.cam #cambar{display:flex}
   <button id="bView">RESET VIEW</button>
   <button id="bPatches">PATCHES</button>
   <button id="bRand" title="Random patch (R)">RANDOM</button>
+  <button id="bParts" title="Every part, with sliders (P)">PARTS</button>
   <button id="bBook">SONGBOOK</button>
   <button id="bKeys" title="Play notes (K)">KEYS</button>
   <button id="bCam" title="Free camera (C)">CAMERA</button>
@@ -183,6 +191,11 @@ body.cam #cambar{display:flex}
   <div class="muted" style="margin-top:6px">Turns the knobs on patched modules. Shuffle goes anywhere sensible; nudge makes small moves.</div>
   <div class="sec">UNDO</div>
   <div class="chips"><button id="rUndo" disabled>UNDO (Z)</button></div>
+</div>
+<div id="parts" class="hud hide">
+  <div class="sec">PARTS</div>
+  <div class="chips" id="pCam"><button data-c="1">CAMERA FOLLOWS</button><button data-c="0">CAMERA STAYS</button></div>
+  <div id="pBody"></div>
 </div>
 <div id="book" class="hud hide">
   <div class="sec">SONGBOOK</div>
@@ -271,7 +284,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SCALES, MODELS, GROOVES, grooveWeight, STAB_NAMES, KEY_SOUNDS } from './engine.js';
+import { SCALES, MODELS, GROOVES, grooveWeight, STAB_NAMES, KEY_SOUNDS, WARP_SHAPES, warpWave } from './engine.js';
 
 window.addEventListener('error', e => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = 'Error: ' + (e.message || e); });
 
@@ -711,13 +724,28 @@ DEFS.cond = lay('CONDUCTOR', 36, 'black',
    [kn('drift', 'DRIFT', 'M', { min: 0, max: 3, step: 1, def: 1, fmt: v => 'A CHANGE EVERY ' + [4, 8, 16, 32][v] + ' BARS' }), kn('depth', 'DEPTH', 'M', { def: 0.5, fmt: v => v < 0.3 ? 'SUBTLE ' + fPct(v) : v > 0.7 ? 'BOLD ' + fPct(v) : fPct(v) }), kn('energy', 'ENERGY', 'M', { def: 0.5, fmt: v => v < 0.35 ? 'CALMING' : v > 0.65 ? 'BUILDING' : 'STEADY' }), kn('swap', 'NEW PATCH', 'M', { min: 0, max: 4, step: 1, def: 2, fmt: v => v ? 'EVERY ' + [0, 2, 4, 8, 16][v] + ' MIN' : 'NEVER' })],
    [BTN('on', 'ON'), BTN('hold', 'HOLD'), BTN('back', 'BACK'), BTN('next', 'NEXT'), BTN('like', 'LIKE'), BTN('nope', 'DISLIKE')],
    [tx('ON'), tx('HOLD'), tx('BACK'), tx('NEXT'), tx('LIKE'), tx('DISLIKE')]], []);
+DEFS.warp = lay('WARP', 20, 'navy',
+  [[sc(1.15)],
+   [kn('wave', 'WAVE', 'M', { def: 0, name: 'WAVE SHAPE', fmt: v => { const s = Math.min(6.99, v * 7), k = Math.floor(s), f = s - k; return f < 0.15 ? WARP_SHAPES[k] : f > 0.85 ? WARP_SHAPES[k + 1] : WARP_SHAPES[k] + ' > ' + WARP_SHAPES[k + 1]; } }), kn('warp', 'WARP', 'S', { def: 0.5, name: 'PHASE WARP', fmt: fPct }), kn('sync', 'SYNC', 'S', { def: 0, name: 'HARD SYNC', fmt: v => 'x' + (1 + v * 7).toFixed(2) }), kn('fold', 'FOLD', 'S', { def: 0, fmt: fPct })],
+   [kn('crush', 'CRUSH', 'S', { def: 0, fmt: fPct }), kn('fb', 'FEEDBACK', 'S', { def: 0, fmt: fPct }), kn('chaos', 'CHAOS', 'S', { def: 0, name: 'PITCH CHAOS', fmt: fPct }), kn('spread', 'SPREAD', 'S', { def: 0, name: 'UNISON SPREAD', fmt: v => (1 + Math.round(v * 4)) + ' VOICES' })],
+   [kn('pitch', 'PITCH', 'S', { min: -24, max: 24, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v + ' ST' }), kn('att', 'ATTACK', 'S', { def: 0.05, fmt: v => fS(Math.max(0.002, v * v * 3)) }), kn('rel', 'RELEASE', 'S', { def: 0.3, fmt: v => fS(Math.max(0.01, v * v * 5)) }), kn('hold', 'DRONE', 'S', { min: 0, max: 1, step: 1, def: 0, name: 'DRONE (PLAY WITHOUT A GATE)', fmt: v => v ? 'ON' : 'OFF' }), kn('lvl', 'LEVEL', 'S', { def: 0, fmt: fPct })]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio'), ji('voct', 'V/OCT', 'param'), ji('gate', 'GATE', 'trig'), ji('fm', 'FM', 'param'), ji('cv', 'WARP CV', 'param')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.mangle = lay('MANGLE', 16, 'silver',
+  [[kn('stut', 'STUTTER', 'S', { def: 0, fmt: fPct }), kn('size', 'SIZE', 'S', { def: 0.4, name: 'STUTTER SIZE', fmt: v => ['1/32', '1/16', '1/8', '1/4', '1/2'][Math.round(v * 4)] }), kn('rev', 'REVERSE', 'S', { def: 0.3, fmt: fPct })],
+   [kn('pitch', 'PITCH', 'S', { min: -12, max: 12, step: 1, def: 0, name: 'PITCH SHIFT', fmt: v => (v > 0 ? '+' : '') + v + ' ST' }), kn('ring', 'RING', 'S', { def: 0, name: 'RING MOD', fmt: v => v <= 0.02 ? 'OFF' : Math.round(30 * Math.pow(2, v * 6.5)) + ' HZ' }), kn('smear', 'SMEAR', 'S', { def: 0, fmt: fPct })],
+   [kn('comb', 'COMB', 'S', { def: 0, fmt: fPct }), kn('tune', 'TUNE', 'S', { def: 0.4, name: 'COMB TUNE', fmt: v => Math.round(40 * Math.pow(25, v)) + ' HZ' }), kn('mix', 'MIX', 'S', { def: 0, fmt: fPct })]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio'), ji('clk', 'CLOCK', 'trig')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.chaos = lay('CHAOS', 12, 'black',
+  [[kn('rate', 'RATE', 'M', { def: 0.3, fmt: v => v > 0.75 ? 'AUDIO ' + fPct(v) : fPct(v) }), kn('shape', 'SHAPE', 'S', { def: 0.6, name: 'CALM TO WILD', fmt: fPct })],
+   [kn('amt', 'AMOUNT', 'S', { def: 0.8, fmt: fPct }), ld('led', 'red')]],
+  [[ji('reset', 'RESET', 'trig'), jo('trig', 'TRIG', 'cv')], [jo('x', 'X'), jo('y', 'Y'), jo('z', 'Z')]]);
 const DECK_SHARED = new Set(['clock', 'scope', 'out', 'keys']);
 const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^blank/.test(type) ? bl(DEFS[type].hp, DEFS[type].theme === 'silver' ? 'navy' : DEFS[type].theme) : [id + '_b', type]);
 const WROWS = {
   L: [ROWX, ROWT, ROW0, ROW1, ROWD, ROWM].map(mirrorRow),
   R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], bl(10, 'navy'), bl(8, 'silver')],
       [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], bl(20, 'navy'), bl(16, 'black')],
-      [['cond', 'cond'], bl(16, 'navy'), bl(20, 'silver'), bl(12, 'black')]] };
+      [['cond', 'cond'], ['mangle', 'mangle'], ['warp', 'warp'], ['chaos', 'chaos']]] };
 const DEFAULT_PATCH = [
   ['clock.d2', 'rnd.trig', '#35e0ff'], ['rnd.step', 'quant.in', '#3b6cff'], ['quant.out', 'vcoA.voct', '#e8eef8'], ['quant.trig', 'env.trig1', '#ff7a2e'],
   ['vcoA.saw', 'vcfA.in', '#5aa9ff'], ['vcfA.lp', 'vca.in1', '#2c3f7a'], ['env.env1', 'vca.cv1', '#ffcf3a'], ['env.env1', 'vcfA.cv2', '#ffcf3a'],
@@ -870,6 +898,12 @@ class TrigSeqM extends Mod {
 class DrumsM extends Mod { visual() { const L = this.T; for (const p of ['k', 'c', 'h', 'o']) this.leds['l' + p].vu(L[p] || 0); } }
 class Mix6M extends Mod { visual() { const L = this.T; this.leds.vuL.vu(clamp((L.vuL || 0) * 1.5, 0, 1)); this.leds.vuR.vu(clamp((L.vuR || 0) * 1.5, 0, 1)); } }
 class SwellM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
+const WAVE = { D: (() => { try { const a = JSON.parse(localStorage.getItem('nightrack.wave')); if (Array.isArray(a) && a.length === 32) return Float32Array.from(a); } catch (e) { } return new Float32Array(32).map((_, i) => Math.sin(Math.PI * 2 * i / 32)); })() };
+function sendWave() { send({ t: 'wave', id: 'warp', data: WAVE.D }); try { localStorage.setItem('nightrack.wave', JSON.stringify([...WAVE.D])); } catch (e) { } if (modById.warp) modById.warp.screenDirty = true; }
+function drawWave(g, W, H, m, col = '#7df0ff') { // WARP's current wave, as the engine makes it
+  const P = {}; for (const k in m.knobs) P[k] = m.v(k); g.strokeStyle = 'rgba(80,120,200,.25)'; g.lineWidth = Math.max(1, H / 90); g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+  g.strokeStyle = col; g.lineWidth = Math.max(1.5, H / 40); g.beginPath(); for (let x = 0; x <= W; x++) { const y = warpWave(P, x / W, WAVE.D); x ? g.lineTo(x, H / 2 - y * H * 0.42) : g.moveTo(x, H / 2 - y * H * 0.42); } g.stroke(); }
+class WarpM extends Mod { drawScreen() { const s = this.scr; if (!s) return; const g = s.g; g.fillStyle = '#020611'; g.fillRect(0, 0, s.cw, s.ch); drawWave(g, s.cw, s.ch, this); s.tex.needsUpdate = true; } }
 class LedM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class MbiraM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
 class FieldM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'rec') loadSet(this); } visual() { this.leds.led.set(clamp((this.T.led || 0) * 2, 0, 1)); } }
@@ -954,7 +988,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -2169,7 +2203,7 @@ for (const id in UI) {
 { const box = document.getElementById('presets'); for (const name in PRESETS) { const b = document.createElement('button'); b.textContent = name.toUpperCase(); b.onclick = () => { Object.assign(SET, PRESETS[name]); applySettings(); }; box.appendChild(b); } }
 document.getElementById('lookPS2').onclick = () => { Object.assign(SET, LOOKS.ps2); applySettings(); };
 document.getElementById('lookClean').onclick = () => { Object.assign(SET, LOOKS.clean); applySettings(); };
-document.getElementById('bScene').onclick = () => { document.getElementById('rand').classList.add('hide'); document.getElementById('scene').classList.toggle('hide'); document.getElementById('help').classList.add('hide'); document.getElementById('patches').classList.add('hide'); };
+document.getElementById('bScene').onclick = () => { document.getElementById('parts').classList.add('hide'); document.getElementById('rand').classList.add('hide'); document.getElementById('scene').classList.toggle('hide'); document.getElementById('help').classList.add('hide'); document.getElementById('patches').classList.add('hide'); };
 
 
 // ================================================================ patches: save / load / share
@@ -2210,7 +2244,7 @@ function loadPatch(P) {
     const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
-  DECK.blending = null; ensureChain(); deckRestore(); condRebase(); send({ t: 'param', id: 'limit', k: 'relearn', v: Math.random() }); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
+  DECK.blending = null; ensureChain(); ensureFX(); deckRestore(); condRebase(); send({ t: 'param', id: 'limit', k: 'relearn', v: Math.random() }); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
   autosave();
 }
 function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
@@ -2234,7 +2268,7 @@ function renderPatchUI() {
 document.getElementById('pSave').onclick = () => { const el = document.getElementById('pName'), name = el.value.trim() || ('Patch ' + new Date().toLocaleString()); const o = slots(); o[name] = serialize(); if (setSlots(o)) { el.value = ''; renderPatchUI(); toast('Saved “' + name + '”', true); } };
 document.getElementById('pCopy').onclick = async () => { const code = encode(serialize()), ta = document.getElementById('pCode'); ta.value = code; try { await navigator.clipboard.writeText(code); toast('Patch code copied', true); } catch (e) { ta.select(); toast('Select the code in the box and copy it', true); } };
 document.getElementById('pLoadCode').onclick = () => { try { loadPatch(decode(document.getElementById('pCode').value)); toast('Patch loaded from code', true); } catch (e) { toast('That doesn’t look like a Night Rack patch code.'); } };
-document.getElementById('bPatches').onclick = () => { renderPatchUI(); document.getElementById('rand').classList.add('hide'); document.getElementById('patches').classList.toggle('hide'); document.getElementById('scene').classList.add('hide'); document.getElementById('help').classList.add('hide'); };
+document.getElementById('bPatches').onclick = () => { document.getElementById('parts').classList.add('hide'); renderPatchUI(); document.getElementById('rand').classList.add('hide'); document.getElementById('patches').classList.toggle('hide'); document.getElementById('scene').classList.add('hide'); document.getElementById('help').classList.add('hide'); };
 
 // ================================================================ randomizer
 const RND = { undo: [], style: 'ambient', tw: [], mode: (() => { try { return localStorage.getItem('nightrack.mode') === 'exp' ? 'exp' : 'clean'; } catch (e) { return 'clean'; } })() };
@@ -2498,10 +2532,13 @@ function genPatch(style, wild, clean) {
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
   { const dance = style === 'house' || style === 'dnb' || style === 'tinez' || style === 'jazzy' || style === 'lofi', kil = style === 'kiln';
     // mixing side: deck -> BLEND -> KEYS (played live, always heard) -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
-    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'keys.inL'); con('blend.R', 'keys.inR'); con('keys.L', 'sweep.inL'); con('keys.R', 'sweep.inR'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
+    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'keys.inL'); con('blend.R', 'keys.inR'); con('keys.L', 'warp.inL'); con('keys.R', 'warp.inR'); con('warp.L', 'mangle.inL'); con('warp.R', 'mangle.inR'); con('mangle.L', 'sweep.inL'); con('mangle.R', 'sweep.inR');
+    con('keys.voct', 'warp.voct'); con('keys.gate', 'warp.gate'); con('clock.x4', 'mangle.clk'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
     con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
     { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
     set('blend', 'blend', 0); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('sweep', 'pos', 0); set('sweep', 'res', rr(0.2, 0.4));
+    // MANGLE: off in clean; experimental patches often get some stutter, pitch, ring or smear
+    if (!CL && chance(0.55)) { set('mangle', 'mix', rr(0.3, 0.8)); set('mangle', 'stut', rr(0.2, 0.9)); set('mangle', 'size', Math.random()); set('mangle', 'rev', Math.random()); set('mangle', 'pitch', chance(0.4) ? rpick([-12, -5, 7, 12]) : 0); set('mangle', 'ring', chance(0.3) ? Math.random() : 0); set('mangle', 'smear', chance(0.4) ? rr(0.2, 0.8) : 0); set('mangle', 'comb', chance(0.3) ? rr(0.3, 0.8) : 0); set('mangle', 'tune', Math.random()); } else set('mangle', 'mix', 0);
     const house = style === 'house' || style === 'tinez' || style === 'jazzy' || style === 'lofi';
     set('echo', 'div', style === 'dnb' ? rpick([1, 2, 5]) : house ? rpick([2, 2, 3, 4]) : rpick([2, 3, 4, 5])); set('echo', 'fb', dance ? rr(0.25, 0.45) : rr(0.4, 0.62)); set('echo', 'tone', rr(0.35, 0.6)); set('echo', 'wow', rr(0.15, 0.4)); set('echo', 'spread', rr(0.5, 0.9));
     set('echo', 'mix', style === 'dnb' ? rr(0.04, 0.1) : dance ? rr(0.06, 0.14) : rr(0.12, 0.26));
@@ -2517,8 +2554,9 @@ function genPatch(style, wild, clean) {
     set('limit', 'level', { house: -12, tinez: -12, dnb: -12, lofi: -13, jazzy: -13, kiln: -14, ambient: -16 }[style] ?? -14);
     set('limit', 'drive', dance ? rr(0.5, 1.5) : rr(0, 1)); set('limit', 'ceil', -3); set('limit', 'rel', rr(0.07, 0.16)); set('limit', 'air', kil || style === 'dnb' ? rr(0, 0.08) : rr(0.12, 0.3)); }
   // modulation
-  const srcs = ['lfo.bi1', 'lfo.bi2', 'lfo.uni1', 'lfo.uni2', 'rnd.smooth'], tset = [...new Set(targets)].filter(t => !C.some(c => c[1] === t)).sort(() => Math.random() - 0.5);
+  const srcs = ['lfo.bi1', 'lfo.bi2', 'lfo.uni1', 'lfo.uni2', 'rnd.smooth', ...(CL ? [] : ['chaos.x', 'chaos.y', 'chaos.z'])], tset = [...new Set(targets)].filter(t => !C.some(c => c[1] === t)).sort(() => Math.random() - 0.5);
   const nMod = CL ? 0 : Math.min(tset.length, ri(1, 3) + Math.round(wild * 3));
+  if (!CL) { set('chaos', 'rate', rr(0.05, 0.55)); set('chaos', 'shape', Math.random()); set('chaos', 'amt', rr(0.3, 0.8)); }
   if (CL) { // gentle movement only: slow LFOs, and through ATTEN (small amounts) where an input has no depth knob of its own
     let ach = 1; const safe = tset.filter(t => /^vcf[AB]\.cv1$|^bass\.cut$|^macro\.timbre$|^texture\.pos$/.test(t)).slice(0, ri(1, 2));
     for (const t of safe) { const src = rpick(['lfo.bi1', 'lfo.bi2']);
@@ -2560,7 +2598,14 @@ function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one 
   for (const m in P.knobs) if (base.has(m)) knobs[m + sfx] = P.knobs[m];
   return { cables, knobs };
 }
-const MIXSIDE = ['blend', 'keys', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit', 'out'];
+const MIXSIDE = ['blend', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit', 'out'];
+function ensureFX() { // patches from before WARP and MANGLE: put them between KEYS and SWEEP, and let KEYS play WARP
+  const find = (o, i) => cables.find(c => c.connected && c.out.module.id + '.' + c.out.id === o && c.inp.module.id + '.' + c.inp.id === i), P = (a, b) => { try { patchCable(a, b); } catch (e) { } };
+  const kl = find('keys.L', 'sweep.inL'), kr = find('keys.R', 'sweep.inR'); const was = loading; loading = true;
+  try { if (kl) { removeCable(kl); if (kr) removeCable(kr); P('keys.L', 'warp.inL'); P('keys.R', 'warp.inR'); P('warp.L', 'mangle.inL'); P('warp.R', 'mangle.inR'); P('mangle.L', 'sweep.inL'); P('mangle.R', 'sweep.inR'); }
+    if (find('warp.L', 'mangle.inL')) { if (!modById.warp.patched('voct')) P('keys.voct', 'warp.voct'); if (!modById.warp.patched('gate')) P('keys.gate', 'warp.gate'); if (!modById.mangle.patched('clk')) P('clock.x4', 'mangle.clk'); } }
+  finally { loading = was; }
+}
 function ensureChain() { // older patches (and the first-visit patch) skip the mixing side: rewire the playing deck through all of it
   if (out1(modById.blend.ports.L) && out1(modById.blend.ports.aL)) return false;
   const M = new Set(MIXSIDE), feeds = cables.filter(c => c.connected && !M.has(c.out.module.id) && M.has(c.inp.module.id) && /^(inL|inR|L|R|aL|aR)$/.test(c.inp.id) && !c.out.module.id.endsWith('_b'));
@@ -2571,7 +2616,7 @@ function ensureChain() { // older patches (and the first-visit patch) skip the m
     for (const c of [...cables]) if (c.connected && M.has(c.inp.module.id) && !(c.inp.module.id === 'blend' && c.inp.id[0] === 'b')) removeCable(c);
     const r = mulberry32(5), P = (a, b) => { try { patchCable(a, b, undefined, r() < 0.4 ? 1 : 0); } catch (e) { } };
     P(sL, 'blend.aL'); P(sR, 'blend.aR');
-    const ch = ['blend', 'keys', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
+    const ch = ['blend', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
     P('limit.L', 'out.L'); P('limit.R', 'out.R'); if (kick) P(kick, 'pump.trig');
     const set = (m, k, v) => modById[m].knobs[k].set(modById[m].knobs[k].toNorm(v)); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('echo', 'mix', 0.08);
     for (let i = 0; i < 200; i++) physics(1 / 120);
@@ -2791,7 +2836,7 @@ document.getElementById('rShuf').onclick = () => shuffleKnobs(1);
 document.getElementById('rNudge').onclick = () => shuffleKnobs(0.12);
 document.getElementById('rUndo').onclick = undoRandom;
 const moreHint = el => { const f = () => el.classList.toggle('more', el.scrollHeight - el.clientHeight - el.scrollTop > 4); el.addEventListener('scroll', f, { passive: true }); new ResizeObserver(f).observe(el); addEventListener('resize', f); f(); };
-['patches', 'rand', 'scene', 'kits', 'book'].forEach(id => { const el = document.getElementById(id); if (el) moreHint(el); });
+['patches', 'rand', 'scene', 'kits', 'book', 'parts'].forEach(id => { const el = document.getElementById(id); if (el) moreHint(el); });
 function renderBook() { const el = document.getElementById('bookList'); if (!el) return; const cur = modById.band ? SONGBOOK[modById[liveId('band')].v('tune')] : null, live = DECK.style === 'jazzy' || DECK.style === 'lofi';
   el.innerHTML = ['lofi'].map(f => '<div class="sec" style="margin-top:10px">' + (f === 'lofi' ? 'LO-FI' : 'JAZZY DEEP HOUSE') + '</div>' + SONGBOOK.map((t, i) => t.feel !== f ? '' : `<div class="t${live && cur === t ? ' on' : ''}${BOOK.skipped[t.id] ? ' skip' : ''}"><button data-p="${i}" title="Play">▶</button><span>${t.name}<small>${t.A.split('|')[0].trim()}</small></span><button data-k="${i}" class="${BOOK.kept[t.id] ? 'kept' : ''}" title="Keep">★</button><button data-s="${i}" title="Skip">✕</button></div>`).join('')).join(''); }
 function auditionTune(i) { const t = SONGBOOK[i], st = t.feel === 'lofi' ? 'lofi' : 'jazzy', m = modById[liveId('band')];
@@ -2805,8 +2850,8 @@ document.getElementById('bookImp').onclick = () => { const f = document.createEl
 document.getElementById('bookClr').onclick = () => { BOOK.kept = {}; saveBook(); renderBook(); };
 Object.assign(window, { auditionTune, renderBook, BOOK });
 setTimeout(() => Object.assign(window, { noteOn, noteOff }));
-document.getElementById('bBook').onclick = () => { const el = document.getElementById('book'); el.classList.toggle('hide'); if (!el.classList.contains('hide')) renderBook(); ['patches', 'scene', 'help', 'rand', 'kits'].forEach(id => { const x = document.getElementById(id); if (x) x.classList.add('hide'); }); };
-document.getElementById('bRand').onclick = () => { document.getElementById('rand').classList.toggle('hide'); ['patches', 'scene', 'help'].forEach(id => document.getElementById(id).classList.add('hide')); };
+document.getElementById('bBook').onclick = () => { const el = document.getElementById('book'); el.classList.toggle('hide'); if (!el.classList.contains('hide')) renderBook(); ['parts', 'patches', 'scene', 'help', 'rand', 'kits'].forEach(id => { const x = document.getElementById(id); if (x) x.classList.add('hide'); }); };
+document.getElementById('bRand').onclick = () => { document.getElementById('rand').classList.toggle('hide'); ['patches', 'scene', 'help', 'parts', 'book'].forEach(id => document.getElementById(id).classList.add('hide')); };
 addEventListener('keydown', e => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey) return; if (e.key === 'r' || e.key === 'R') randomPatch(RND.style); if ((e.key === 'z' || e.key === 'Z')) undoRandom(); });
 
 // ================================================================ interaction
@@ -3264,11 +3309,71 @@ canvas.addEventListener('pointerup', e => {
   if (tLast && now - tLast.t < 350 && Math.hypot(e.clientX - tLast.x, e.clientY - tLast.y) < 30 && h && h.module) { const m = h.module, c = modPt(m, m.w / 2, U3 / 2, 0); flyTo(c.clone().add(new THREE.Vector3(0, 0.5, Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1)).applyQuaternion(m.sec ? m.sec.q : QI)), c); tLast = null; return; }
   tLast = { t: now, x: e.clientX, y: e.clientY };
 }, true);
-const PANELS = ['patches', 'rand', 'scene', 'help', 'kits', 'book'];
+// ================================================================ PARTS: every module in a list; tap one to fly there and get sliders for all its knobs
+const PARTS = { sel: null, cam: (() => { try { return localStorage.getItem('nightrack.partsCam') !== '0'; } catch (e) { return true; } })(), drag: null };
+const realMod = m => !/^bk/.test(m.id) && m.def && ((m.def.knobs || []).length || (m.def.jacks || []).length);
+function partRows() { // [{k, name, rows: [[mod, ...], ...]}] in rack order, top row first, left to right
+  const G = [['M', 'DECK A · MIDDLE RACK'], ['R', 'MIXING + PLAY · RIGHT RACK'], ['L', 'DECK B · LEFT RACK']].map(([k, name]) => ({ k, name, rows: new Map() }));
+  for (const m of modules) { if (!realMod(m)) continue; const g = G.find(g => g.k === (m.sec ? m.sec.k : 'M')); if (!g) continue; const y = Math.round(m.y0 * 10); if (!g.rows.has(y)) g.rows.set(y, []); g.rows.get(y).push(m); }
+  return G.map(g => ({ ...g, rows: [...g.rows.entries()].sort((a, b) => b[0] - a[0]).map(([, r]) => r.sort((a, b) => a.x0 - b.x0)) }));
+}
+function partOrder() { return partRows().flatMap(g => g.rows.flat()); }
+function flyToMod(m) { // frame the module in the part of the screen the PARTS panel leaves free (left of it on wide screens, above it on phones)
+  const el = document.getElementById('parts'), open = el && !el.classList.contains('hide'), q = m.sec ? m.sec.q : QI;
+  const dist = Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1), vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
+  let dx = 0, dy = 0; if (open) { if (el.offsetWidth < innerWidth * 0.7) dx = vw * (el.offsetWidth + 20) / innerWidth / 2; else dy = -vh * (el.offsetHeight + 10) / innerHeight / 2; }
+  const c = modPt(m, m.w / 2, U3 / 2, 0), off = new THREE.Vector3(dx, dy, 0).applyQuaternion(q), t = c.clone().add(off);
+  flyTo(t.clone().add(new THREE.Vector3(0, 0.5, dist).applyQuaternion(q)), t); }
+function partsCam(on) { PARTS.cam = on; try { localStorage.setItem('nightrack.partsCam', on ? '1' : '0'); } catch (e) { } document.querySelectorAll('#pCam button').forEach(b => b.classList.toggle('cur', (b.dataset.c === '1') === on)); }
+function openPart(id) { PARTS.sel = id; const m = modById[id]; if (m && PARTS.cam) flyToMod(m); renderParts(); document.getElementById('parts').scrollTop = 0; }
+const NO_SHUFFLE = /^(master|vol|level|lvl|ceil|on|hold|back|next|like|nope|auto|relearn)$/;
+function renderParts() {
+  const body = document.getElementById('pBody'), m = PARTS.sel && modById[PARTS.sel]; body.innerHTML = '';
+  const chip = (txt, fn, cls) => { const b = document.createElement('button'); b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; return b; }, row = (...bs) => { const d = document.createElement('div'); d.className = 'chips'; bs.forEach(b => d.append(b)); return d; };
+  if (!m) {
+    const note = document.createElement('div'); note.className = 'muted'; note.textContent = 'Tap a part to go to it and get a slider for every knob. A dot means it is patched in.'; body.append(note);
+    for (const g of partRows()) { const h = document.createElement('div'); h.className = 'grp'; h.textContent = g.name; body.append(h);
+      for (const r of g.rows) body.append(row(...r.map(x => chip(x.def.title, () => openPart(x.id), Object.values(x.ports).some(p => p.cables.some(c => c.connected)) ? 'use' : '')))); }
+    return; }
+  const ord = partOrder(), i = ord.indexOf(m), deck = m.sec && m.sec.k === 'L' ? ' · DECK B' : m.sec && m.sec.k === 'R' ? '' : ' · DECK A';
+  body.append(row(chip('◀ ALL PARTS', () => { PARTS.sel = null; renderParts(); }), chip('‹ PREV', () => openPart(ord[(i - 1 + ord.length) % ord.length].id)), chip('NEXT ›', () => openPart(ord[(i + 1) % ord.length].id))));
+  const t = document.createElement('div'); t.className = 'ptitle'; t.textContent = m.def.title + deck; body.append(t);
+  const ks = Object.values(m.knobs);
+  body.append(row(chip('SHUFFLE THIS PART', () => { pushUndo(); for (const k of ks) if (!k.def.btn && !NO_SHUFFLE.test(k.def.id)) k.set(Math.random()); toast('Shuffled ' + m.def.title + ' (Z undoes)', true); }),
+    chip('RESET', () => { pushUndo(); for (const k of ks) if (!k.def.btn) k.set(k.defNorm); toast(m.def.title + ' reset', true); }), chip('GO THERE', () => flyToMod(m))));
+  if (m.type === 'warp') { // the wave, and a pad to draw the DRAWN shape with a finger
+    const cv = document.createElement('canvas'); cv.width = 600; cv.height = 200; body.append(cv); PARTS.cv = cv;
+    const hint = document.createElement('div'); hint.className = 'muted'; hint.textContent = 'Draw on the wave to make your own shape (WAVE turns all the way up to DRAWN).'; body.append(hint);
+    const drawAt = e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = 1 - 2 * (e.clientY - r.top) / r.height, k = Math.max(0, Math.min(31, Math.floor(x * 32)));
+      const prev = PARTS.drag == null ? k : PARTS.drag; for (let j = Math.min(prev, k); j <= Math.max(prev, k); j++) WAVE.D[j] = Math.max(-1, Math.min(1, y)); PARTS.drag = k;
+      if (m.knobs.wave.value < 0.99) m.knobs.wave.set(1); sendWave(); paintWave(); };
+    cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); PARTS.drag = null; drawAt(e); }; cv.onpointermove = e => { if (e.buttons) drawAt(e); }; cv.onpointerup = () => { PARTS.drag = null; };
+    body.append(row(chip('ROLL A WAVE', () => { let v = 0; for (let j = 0; j < 32; j++) { v = Math.max(-1, Math.min(1, v * 0.6 + (Math.random() * 2 - 1) * 0.9)); WAVE.D[j] = v; } m.knobs.wave.set(1); sendWave(); paintWave(); }),
+      chip('SMOOTH', () => { const o = Float32Array.from(WAVE.D); for (let j = 0; j < 32; j++) WAVE.D[j] = (o[(j + 31) & 31] + 2 * o[j] + o[(j + 1) & 31]) / 4; sendWave(); paintWave(); }),
+      chip('SINE', () => { for (let j = 0; j < 32; j++) WAVE.D[j] = Math.sin(Math.PI * 2 * j / 32); sendWave(); paintWave(); }),
+      chip(m.v('hold') ? 'DRONE OFF' : 'DRONE ON', function () { const on = !m.v('hold'); m.knobs.hold.set(on ? 1 : 0); if (on && m.v('lvl') < 0.05) m.knobs.lvl.set(0.5); this.textContent = on ? 'DRONE OFF' : 'DRONE ON'; refreshParts(true); })));
+    paintWave(); }
+  PARTS.rows = [];
+  for (const k of ks) { const d = document.createElement('div'); d.className = 'pk'; const lab = document.createElement('label'); lab.textContent = k.name; const val = document.createElement('span');
+    if (k.def.btn) { const b = chip(k.def.label, () => { k.set(k.value ? 0 : 1); }); d.append(lab, b, val); PARTS.rows.push({ k, val }); body.append(d); continue; }
+    const sl = document.createElement('input'); sl.type = 'range'; sl.min = 0; sl.max = 1; sl.step = k.def.step ? 1 / Math.max(1, k.def.max - k.def.min) : 0.001; sl.value = k.visNorm(); val.textContent = k.text();
+    sl.oninput = () => { k.set(+sl.value); val.textContent = k.text(); if (m.type === 'warp') paintWave(); };
+    d.append(lab, sl, val); body.append(d); PARTS.rows.push({ k, sl, val }); }
+}
+function paintWave() { const cv = PARTS.cv, m = modById.warp; if (!cv || !cv.isConnected || !m) return; const g = cv.getContext('2d'); g.fillStyle = '#020611'; g.fillRect(0, 0, cv.width, cv.height); drawWave(g, cv.width, cv.height, m); }
+function refreshParts(force) { if (document.getElementById('parts').classList.contains('hide') || !PARTS.rows) return; let ch = false;
+  for (const r of PARTS.rows) { const t = r.k.text(); if (r.sl && document.activeElement !== r.sl && Math.abs(+r.sl.value - r.k.visNorm()) > 0.002) { r.sl.value = r.k.visNorm(); ch = true; } if (r.val.textContent !== t) { r.val.textContent = t; ch = true; } }
+  if ((ch || force) && PARTS.sel === 'warp') paintWave(); }
+setInterval(refreshParts, 250);
+document.querySelectorAll('#pCam button').forEach(b => b.onclick = () => partsCam(b.dataset.c === '1')); partsCam(PARTS.cam);
+function toggleParts() { const el = document.getElementById('parts'), open = el.classList.contains('hide'); PANELS.forEach(id => { if (id !== 'parts') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderParts(); }
+document.getElementById('bParts').onclick = toggleParts;
+addEventListener('keydown', e => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey || KB.on || CAM.on) return; if (e.key === 'p' || e.key === 'P') toggleParts(); });
+const PANELS = ['patches', 'rand', 'scene', 'help', 'kits', 'book', 'parts'];
 function panelsOpen() { return PANELS.some(id => !document.getElementById(id).classList.contains('hide')); }
 function closePanels() { PANELS.forEach(id => document.getElementById(id).classList.add('hide')); document.body.classList.remove('menuopen'); }
 PANELS.forEach(id => { const el = document.getElementById(id), b = document.createElement('button'); b.className = 'xclose'; b.textContent = '✕ CLOSE'; b.onclick = closePanels; el.prepend(b); });
-document.getElementById('bMenu').onclick = () => { if (document.body.classList.contains('menuopen') || ['patches', 'rand', 'scene', 'kits'].some(id => !document.getElementById(id).classList.contains('hide'))) closePanels(); else document.body.classList.add('menuopen'); };
+document.getElementById('bMenu').onclick = () => { if (document.body.classList.contains('menuopen') || ['patches', 'rand', 'scene', 'kits', 'parts', 'book'].some(id => !document.getElementById(id).classList.contains('hide'))) closePanels(); else document.body.classList.add('menuopen'); };
 document.getElementById('bar').addEventListener('click', e => { if (e.target.tagName === 'BUTTON' && e.target.id !== 'bMenu') document.body.classList.remove('menuopen'); });
 try { if (sessionStorage.getItem('ha.pad') === '1') { const s = document.querySelector('#start p'); if (s) s.innerHTML += '<br><br>Controller: press <b>A</b> (or tap) to power on.'; } } catch (e) { }
 
@@ -3302,7 +3407,7 @@ async function startEngine() {
     ENG = { post: ms => ms.forEach(m => e.handle(m)), node, kind: 'fallback' };
   }
   for (const m of modules) if (m.type in CLASSES) engineAdd(m);
-  deckRestore(); for (const m of modules) if (m.type === 'band') sendTune(m, 'phrase'); loadKeys();
+  deckRestore(); for (const m of modules) if (m.type === 'band') sendTune(m, 'phrase'); loadKeys(); sendWave();
   for (const m of modules) if (m.type === 'sampler') loadKit(m); else if (m.type === 'mbira' || m.type === 'field' || m.type === 'swell') loadSet(m);
   for (const c of cables) if (c.connected) { c.uid = cableUid++; send({ t: 'con', c: c.uid, om: c.out.module.id, op: c.out.id, im: c.inp.module.id, ip: c.inp.id }); }
   const comp = AC.createDynamicsCompressor(); comp.threshold.value = -6; comp.knee.value = 6; comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.25;
