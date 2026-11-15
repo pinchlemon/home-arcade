@@ -559,11 +559,12 @@ function tackle(W){
   rv.set(W.pos.x,0,W.pos.z);spawnPuffs(5,1.2,rv,0.7);
   FX.emit('tackle',W);
 }
-function playerThrow(W){
-  W=W||player;const c=W.charge;
+function playerThrow(W,shot){ // shot: a hard flat throw at the demon, as if jumping (a feature's shoot button)
+  W=W||player;if(!shot&&throwHook&&throwHook(W))return; // throwHook: a feature's own throw (returns true when it threw)
+  const c=W.charge;
   let dx=Math.sin(W.yaw),dz=Math.cos(W.yaw);
   const h0=orb.p.y;
-  const airborne=!W.grounded||(time-(W.airCatchT||-9)<1.4&&time-(W.landT||-9)<0.22);
+  const airborne=shot||!W.grounded||(time-(W.airCatchT||-9)<1.4&&time-(W.landT||-9)<0.22);
   if(airborne){
     // jump throw: a hard, flat fastball. If any part of the demon is within about 30 degrees of where
     // you're facing, it bends onto that part (leading it as it moves); otherwise it flies straight.
@@ -576,7 +577,7 @@ function playerThrow(W){
       dx=bx/bd;dz=bz/bd;fy=(tgt.pos.y-h0+0.5*gg*T*T)/T;
     }else{const T=12/fv;fy=(0.3-h0+0.5*gg*T*T)/T;} // flat, coming down about 12 steps out
     throwOrb(W,c,dx,dz,fv,fy,true);orb.fast=true;
-    W.vy=Math.max(W.vy,3);W.hatS.v.y-=1;shake=Math.max(shake,0.1);
+    if(!shot||!W.grounded)W.vy=Math.max(W.vy,3);W.hatS.v.y-=1;shake=Math.max(shake,0.1);
     return;
   }
   if(W.crouchK>0.5){ // crouched: bowl it low so it skips and tumbles along the ground
@@ -1573,7 +1574,7 @@ for(let i=0;i<9;i++){
   const puddle=glowDisc(0xff4a1a,1.1,0);
   venoms.push({g,v:new THREE.Vector3(),alive:false,acc:0,puddle});
 }
-let venomNext=0,spitHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
+let venomNext=0,spitHook=null,throwHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
 const vLook=new THREE.Vector3();
 function spitVenom(T){
   headCenter(lO);lO.y+=0.05;
@@ -2014,7 +2015,8 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   shake(k){shake=Math.max(shake,k);},
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
-  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;}};
+  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
+  G,playerThrow,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;}};
 requestAnimationFrame(frame);
 })();
 

@@ -17,15 +17,36 @@ LAB.shelf('camera', 'Camera', (game) => {
     if (gp.buttons[11] && gp.buttons[11].pressed) { yaw = 0; zoom = 1; }
     game.MOD.turn = yaw;
   }, 'lab');
+  // Ball lean: after everything else, slide the view toward the Solid and back off to keep you both in it.
+  // It only moves the camera, never turns it, so tilt, orbit and the right stick all stay as they are.
+  let lx = 0, lz = 0, lp = 0, lt = 0;
+  const fw = new T.Vector3();
+  function lean(cam, look) {
+    const v = LAB.get('camera.lean') || 0, now = performance.now() / 1000;
+    if (!v || game.DUEL) { lx = lz = lp = 0; lt = 0; return; }
+    const dt = lt ? Math.min(0.1, now - lt) : 0; lt = now;
+    const p = game.orb.p, dx = p.x - look.x, dz = p.z - look.z, dist = Math.hypot(dx, dz);
+    let ox = dx * 0.5 * v, oz = dz * 0.5 * v; const m = Math.hypot(ox, oz); if (m > 7) { ox *= 7 / m; oz *= 7 / m; }
+    const pull = Math.min(8, Math.max(0, dist - 5) * 0.4 * v), k = 1 - Math.exp(-3 * dt);
+    lx += (ox - lx) * k; lz += (oz - lz) * k; lp += (pull - lp) * k;
+    cam.getWorldDirection(fw); cam.position.x += lx; cam.position.z += lz; cam.position.addScaledVector(fw, -lp);
+  }
   window.FEATURES.on('camera', (cam, look) => {
-    if (!yaw && zoom === 1) return;
+    if (!yaw && zoom === 1) return lean(cam, look);
     off.subVectors(cam.position, look).applyAxisAngle(UP, yaw).divideScalar(zoom); cam.position.copy(look).add(off);
     cam.lookAt(look);
     cam.rotateZ((LAB.get('camera.tilt') || 0) * Math.PI / 180 + (LAB.get('camera.spin') ? spin : 0));   // Tilt and Spin (applied before) again
+    lean(cam, look);
   }, 'lab');
   return [
     { id: 'stick', label: 'Right stick', help: 'Turns the camera (and your controls); up and down zoom; click it to reset', kind: 'onoff', value: 1, dice: false },
     { id: 'stickSpeed', label: 'Stick speed', help: 'How fast the right stick turns the camera', min: 0.2, max: 3, step: 0.1, value: 1, dice: false },
+    { id: 'height', label: 'Height', help: 'Lower brings the camera down toward the ground', min: 0.2, max: 1.8, step: 0.05, value: 1, dice: false,
+      fmt: (v) => Math.round(v * 100) + '%',
+      camera: (cam, look, v) => { off.subVectors(cam.position, look); const L = off.length(), h = Math.hypot(off.x, off.z) || 1e-6, e = Math.min(1.5, Math.atan2(off.y, h) * v);
+        off.set(off.x / h * Math.cos(e) * L, Math.sin(e) * L, off.z / h * Math.cos(e) * L); cam.position.copy(look).add(off); cam.lookAt(look); } },
+    { id: 'lean', label: 'Ball lean', help: 'Leans toward the Solid when it is away from you, and pulls back to keep you both in view', min: 0, max: 1, step: 0.1, value: 0, dice: false,
+      fmt: (v) => Math.round(v * 100) + '%' },
     { id: 'orbit', label: 'Orbit', help: 'Swing the camera around', min: -180, max: 180, step: 15, value: 0, dice: false, fmt: (v) => v + '°',
       camera: (cam, look, v) => { off.subVectors(cam.position, look).applyAxisAngle(UP, v * Math.PI / 180); cam.position.copy(look).add(off); cam.lookAt(look); } },
     { id: 'zoom', label: 'Zoom', help: 'Closer or farther', min: 0.4, max: 2.5, step: 0.1, value: 1, dice: false,

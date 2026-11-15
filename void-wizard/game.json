@@ -158,6 +158,7 @@
       "world",
       "throws",
       "party",
+      "ballplay",
       "bodies",
       "demon",
       "attacks",
@@ -328,7 +329,13 @@
         "ps1.fog": 0.1,
         "rules.when1": 9,
         "rules.then1": 1,
-        "rules.for1": 0.5
+        "rules.for1": 0.5,
+        "ball.buttons": 1,
+        "ball.slider": 1,
+        "ball.perfect": 1,
+        "ball.ring": 1,
+        "ball.fire": 1,
+        "camera.lean": 0.5
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -371,7 +378,13 @@
         "ps1.fog": "PS1 · Fog 0.10",
         "rules.when1": "Rules 1 and 2 · Rule 1: when DEMON HIT",
         "rules.then1": "Rules 1 and 2 · Rule 1: then SLOW-MO",
-        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S"
+        "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S",
+        "ball.buttons": "Ball play · Buttons SPORTS",
+        "ball.slider": "Ball play · Pass slider ON",
+        "ball.perfect": "Ball play · Perfect catch ON",
+        "ball.ring": "Ball play · Catch ring PASSES TO YOU",
+        "ball.fire": "Ball play · Fire aura 1.0",
+        "camera.lean": "Camera · Ball lean 50%"
       },
       "made": 1794356977080
     },
