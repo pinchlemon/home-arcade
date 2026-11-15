@@ -58,7 +58,7 @@ LAB.shelf('party', 'Party', (game) => {
   }
   function orders(x) {
     LAB.dpad = x ? give : null;
-    game.padSkip = x ? new Set([8, 12]) : null;   // the game's own uses of Select (rumble test) and D-pad up (the duel link)
+    LAB.skip('orders', x ? [8, 12] : null);   // the game's own uses of Select (rumble test) and D-pad up (the duel link)
     if (!x) { order = null; grab = null; }
   }
 

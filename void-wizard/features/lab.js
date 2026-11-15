@@ -15,6 +15,8 @@ feature('lab', ({ game, on }) => {
     ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
     ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.shoot party.shotRange party.accuracy party.think party.toYou']]],
+    ['ball', 'Ball play', [['Buttons', 'ball.buttons'], ['Passing', 'ball.slider ball.lob ball.bullet'],
+      ['Catching', 'ball.perfect ball.window ball.bonus ball.oop ball.ring ball.ringTime'], ['On fire', 'ball.fire']]],
     ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
       ...['Blue', 'Red', 'Green', 'Purple', 'Gold'].map(n => [n + ' wizard', ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + n.toLowerCase() + '.' + s).join(' ')])]],
     ['solids', 'Solids', [['Flight', 'throws.spiral bodies.solid world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'],
@@ -28,7 +30,7 @@ feature('lab', ({ game, on }) => {
       ['Solids', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
       ['Centipede', 'colours.shell colours.rim colours.bone colours.legs colours.spots colours.eyes'],
       ['Stars', 'stars.bright stars.amount stars.size stars.colours stars.twinkle']]],
-    ['camera', 'Camera', [['Camera', 'camera.stick camera.stickSpeed camera.orbit camera.zoom camera.fov camera.tilt camera.spin'], ['On screen', 'hud.text hud.bars hud.badge']]],
+    ['camera', 'Camera', [['Camera', 'camera.height camera.lean camera.stick camera.stickSpeed camera.orbit camera.zoom camera.fov camera.tilt camera.spin'], ['On screen', 'hud.text hud.bars hud.badge']]],
     ['distort', 'Distort', [['Bend', 'look.warp look.warpSpeed look.swirl look.bulge look.mirror look.kaleido look.pixelate'],
       ['Echo', 'look.trails echo.zoom echo.spin echo.hue look.split echo.glitch echo.pulse']]],
     ['grade', 'Colour grade', [['Colour', 'colour.levels colour.dither colour.ditherSize colour.tint colour.hue colour.invert'],
@@ -84,9 +86,13 @@ feature('lab', ({ game, on }) => {
   //     apply(v) when it changes, frame(dt, v, now) every frame while it isn't normal,
   //     camera(camera, lookAt, v, now) after the game places the camera, while it isn't normal,
   //     dice: false to leave it out of Dice, fmt(v) to show the value its own way, help(v) for help that follows the value }
+  const skips = {};
   const made = [];   // the shelves the files made, in order (the panel regroups them)
   window.LAB = {
     game, get, set, boost, base: (id) => values[id],   // base: the knob itself, without a rule's boost
+    // skip(owner, buttons): controller buttons a shelf takes from the game (null gives them back); every shelf's together
+    skip(owner, list) { if (list && list.length) skips[owner] = list; else delete skips[owner];
+      const all = new Set(); for (const k in skips) for (const b of skips[k]) all.add(b); game.padSkip = all.size ? all : null; },
     shelf(id, name, make) {
       let list = [];
       try { list = make(game) || []; } catch (e) { console.error('Lab shelf ' + id, e); }
