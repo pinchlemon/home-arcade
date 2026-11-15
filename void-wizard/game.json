@@ -335,7 +335,8 @@
         "ball.perfect": 1,
         "ball.ring": 1,
         "ball.fire": 1,
-        "camera.lean": 0.5
+        "camera.lean": 0.5,
+        "ball.switch": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -380,11 +381,12 @@
         "rules.then1": "Rules 1 and 2 · Rule 1: then SLOW-MO",
         "rules.for1": "Rules 1 and 2 · Rule 1: for 0.5 S",
         "ball.buttons": "Ball play · Buttons SPORTS",
-        "ball.slider": "Ball play · Pass slider ON",
+        "ball.slider": "Ball play · Hold to throw ON",
         "ball.perfect": "Ball play · Perfect catch ON",
         "ball.ring": "Ball play · Catch ring PASSES TO YOU",
         "ball.fire": "Ball play · Fire aura 1.0",
-        "camera.lean": "Camera · Ball lean 50%"
+        "camera.lean": "Camera · Ball lean 50%",
+        "ball.switch": "Ball play · Switch on throw ON"
       },
       "made": 1794356977080
     },
