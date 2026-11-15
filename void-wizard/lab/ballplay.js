@@ -136,22 +136,25 @@ LAB.shelf('ball', 'Ball play', (game) => {
   let fire = null, spin = 0, emberAcc = 0, heat = 0;
   function makeFire() {
     const mat = new T.ShaderMaterial({ transparent: true, depthWrite: false, blending: T.AdditiveBlending,
-      uniforms: { t: { value: 0 }, col: { value: new T.Color() }, k: { value: 0 } },
+      uniforms: { t: { value: 0 }, col: { value: new T.Color() }, k: { value: 0 }, rs: { value: 0.26 } },
       vertexShader: 'varying vec2 vU; void main(){ vU = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: `varying vec2 vU; uniform float t; uniform vec3 col; uniform float k;
+      fragmentShader: `varying vec2 vU; uniform float t; uniform vec3 col; uniform float k; uniform float rs;
         float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
         void main(){
-          vec2 p = vU; float r = length(p), a = atan(p.y, p.x);
-          // tongues of flame around the Solid, licking upward, taller and wilder as k grows; the middle stays clear
-          float f = n(vec2(a * 3.0, r * 3.5 - t * 3.2)) * 0.65 + n(vec2(a * 7.0 + 5.0, r * 7.0 - t * 5.3)) * 0.35;
-          float reach = 0.34 + 0.22 * k + max(p.y, 0.0) * (0.25 + 0.45 * k) + (f - 0.45) * (0.25 + 0.35 * k);
-          float body = smoothstep(reach, reach - 0.2, r) * smoothstep(0.16, 0.36, r);
+          // p is in world units from the Solid's middle (the square is 3.2 across); rs is the Solid's size
+          vec2 p = vU * 1.6; float r = length(p), a = atan(p.y, p.x);
+          // tongues of flame around the Solid, licking upward, taller and wilder as k grows; the Solid itself stays clear
+          float f = n(vec2(a * 3.0, r * 6.0 - t * 3.2)) * 0.65 + n(vec2(a * 7.0 + 5.0, r * 12.0 - t * 5.3)) * 0.35;
+          float reach = rs * 1.25 + 0.06 + 0.16 * k + max(p.y, 0.0) * (0.15 + 0.3 * k) + (f - 0.45) * (0.12 + 0.22 * k);
+          float clear = smoothstep(rs * 0.9, rs * 1.4, r);
+          float body = smoothstep(reach, reach - 0.12, r) * clear;
           float lick = smoothstep(0.35, 0.85, f);
-          vec3 c = mix(col, vec3(1.0), 0.15 + 0.35 * lick * k);
-          float glow = smoothstep(0.55, 0.15, r) * 0.18;
-          gl_FragColor = vec4(c * (body * (0.25 + 0.75 * lick) * (0.45 + 0.55 * k) + col * glow) * min(1.0, 0.35 + k), 1.0);
+          vec3 c = mix(col, vec3(1.0), 0.1 + 0.25 * lick * k);
+          float glow = smoothstep(rs * 3.0, rs, r) * clear * 0.12;
+          float edge = smoothstep(1.6, 1.25, max(abs(p.x), abs(p.y)));   // never reaches the square's edge
+          gl_FragColor = vec4(c * (body * (0.25 + 0.75 * lick) * (0.4 + 0.5 * k) + col * glow) * min(1.0, 0.35 + k) * edge, 1.0);
         }` });
     const m = new T.Mesh(new T.PlaneGeometry(1, 1), mat); m.frustumCulled = false; m.renderOrder = 5; game.scene.add(m);
     const sats = [];
@@ -169,9 +172,15 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (!on) return;
     const S = game.solid; game.orbMesh.getWorldPosition(at);
     // brighter: light and colour
-    game.orbLight.intensity += k * 2.5; if (S.coreMat) S.coreMat.color.lerp(WHITE, Math.min(1, k * 0.5));
-    // the aura faces the camera
-    fire.m.position.copy(at); fire.m.quaternion.copy(game.camera.quaternion); fire.m.scale.setScalar(1.0 + k * 0.9);
+    // the Solid itself burns brighter than its aura: white-hot core and edges, a fuller body, more light
+    game.orbLight.intensity += k * 2.5;
+    if (S.coreMat) S.coreMat.color.lerp(WHITE, Math.min(1, k * 0.8));
+    if (S.lineMat) S.lineMat.color.lerp(WHITE, Math.min(1, k * 0.6));
+    if (S.fillMat) S.fillMat.opacity = Math.min(0.85, S.fillMat.opacity + k * 0.3);
+    // the aura faces the camera, set just behind the Solid
+    game.orbMesh.getWorldScale(v2); fire.mat.uniforms.rs.value = 0.26 * v2.x;
+    fire.m.quaternion.copy(game.camera.quaternion); game.camera.getWorldDirection(v1);
+    fire.m.position.copy(at).addScaledVector(v1, 0.35 * v2.x); fire.m.scale.setScalar(3.2);
     fire.mat.uniforms.t.value += dt; fire.mat.uniforms.k.value = Math.min(1, k); fire.mat.uniforms.col.value.copy(S.color);
     // sparks orbiting, more and faster as it builds
     const n = Math.min(10, Math.round(o.res * 2 * Math.min(1, v))); spin += dt * (1.6 + o.res * 1.5) * Math.max(0.5, v);
