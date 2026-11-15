@@ -1270,13 +1270,110 @@ class Swell extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell };
+// ================================================================ PLAY row (right wing): WARP, MANGLE, CHAOS
+// WARP: a waveform playground. WAVE morphs through eight shapes (the last one you draw yourself in the PARTS menu), WARP bends the
+// phase, SYNC hard-syncs a faster copy, FOLD folds it back on itself, CRUSH steps it into bits, FEEDBACK lets it modulate its own
+// phase, CHAOS jitters pitch, SPREAD stacks detuned voices. Plays from GATE (or HOLD for a drone) and adds itself to IN L/R.
+export const WARP_SHAPES = ['SINE', 'TRIANGLE', 'SAW', 'SQUARE', 'STAIRS', 'FORMANT', 'COMB', 'DRAWN'];
+function wshape(k, p, D) {
+  switch (k) {
+    case 0: return Math.sin(TAU * p);
+    case 1: return p < 0.5 ? 4 * p - 1 : 3 - 4 * p;
+    case 2: return 2 * p - 1;
+    case 3: return p < 0.5 ? 0.9 : -0.9;
+    case 4: return (Math.floor(p * 4) / 1.5 - 1);
+    case 5: { const s = Math.sin(Math.PI * p); return Math.sin(TAU * p * 5) * s * s * 1.3; }
+    case 6: return (Math.sin(TAU * p) + Math.sin(3 * TAU * p) * 0.6 + Math.sin(7 * TAU * p) * 0.45 + Math.sin(12 * TAU * p) * 0.3) * 0.5;
+    default: { const x = p * 32, i = Math.floor(x) & 31, f = x - Math.floor(x); return D[i] * (1 - f) + D[(i + 1) & 31] * f; }
+  }
+}
+export function warpWave(P, p, D) { // one sample of WARP's wave at phase p (0..1): used by the engine and to draw the wave
+  const w = Math.min(0.98, Math.max(0.02, P.warp ?? 0.5)), m = w; p = p - Math.floor(p);
+  let q = p < m ? 0.5 * p / m : 0.5 + 0.5 * (p - m) / (1 - m); // phase distortion: the kink moves with WARP
+  q *= 1 + (P.sync ?? 0) * 7; q -= Math.floor(q);
+  const s = Math.min(6.999, Math.max(0, (P.wave ?? 0) * 7)), k = Math.floor(s), f = s - k;
+  let y = wshape(k, q, D) * (1 - f) + wshape(k + 1, q, D) * f;
+  const fo = P.fold ?? 0; if (fo > 0.001) { const t = (y * (1 + fo * 6) + 1) / 4, d = t - Math.floor(t); y = d < 0.5 ? 4 * d - 1 : 3 - 4 * d; }
+  const cr = P.crush ?? 0; if (cr > 0.001) { const lv = Math.pow(2, 8 - cr * 6.5); y = Math.round(y * lv) / lv; }
+  return y;
+}
+class Warp extends DSP {
+  static IN = ['inL', 'inR', 'voct', 'gate', 'fm', 'cv']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.D = new Float32Array(32).map((_, i) => Math.sin(TAU * i / 32)); this.ph = new Float64Array(5); this.y = 0; this.env = 0; this.cx = 0.4; this.cj = 0; this.cc = 0; this.hc = 0; this.hl = 0; this.hr = 0; this.Q = {}; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.in.inR, OL = this.out.L, OR = this.out.R, lvl = (P.lvl ?? 0) * 3;
+    if (lvl < 1e-4 && this.env < 1e-4) { OL.set(IL); OR.set(this.has.inR ? IR : IL); return; }
+    const V = this.in.voct, G = this.in.gate, FM = this.in.fm, CV = this.in.cv, hold = (P.hold ?? 0) > 0.5, ka = 1 / (Math.max(0.002, Math.pow(P.att ?? 0.05, 2) * 3) * sr), kr = Math.exp(-1 / (Math.max(0.01, Math.pow(P.rel ?? 0.3, 2) * 5) * sr));
+    const nv = 1 + Math.round((P.spread ?? 0) * 4), det = (P.spread ?? 0) * 0.6, fb = (P.fb ?? 0) * 0.6, ch = P.chaos ?? 0, hold2 = 1 + Math.round((P.crush ?? 0) * 24), Q = this.Q;
+    Q.wave = P.wave; Q.sync = P.sync; Q.fold = P.fold; Q.crush = P.crush;
+    for (let i = 0; i < n; i++) {
+      const on = hold || G[i] > 1; if (on) this.env = Math.min(1, this.env + ka); else this.env *= kr;
+      if (++this.cc > sr / (30 + ch * 400)) { this.cc = 0; this.cx = (3.57 + ch * 0.43) * this.cx * (1 - this.cx); this.cj = (this.cx - 0.5) * ch * 1.5; }
+      Q.warp = Math.min(1, Math.max(0, (P.warp ?? 0.5) + CV[i] * 0.1));
+      const f = 261.63 * Math.pow(2, V[i] + (P.pitch ?? 0) / 12 + FM[i] * 0.2 + this.cj / 12) / sr;
+      if (++this.hc >= hold2) { this.hc = 0; let l = 0, r = 0;
+        for (let v = 0; v < nv; v++) { const d = nv > 1 ? (v / (nv - 1) - 0.5) : 0; this.ph[v] += f * hold2 * Math.pow(2, d * det / 12) + fb * this.y * 0.05; this.ph[v] -= Math.floor(this.ph[v]);
+          const y = warpWave(Q, this.ph[v], this.D); l += y * (1 - d); r += y * (1 + d); if (v === 0) this.y = y; }
+        const g = this.env * lvl / nv; this.hl = l * g; this.hr = r * g; }
+      OL[i] = IL[i] + this.hl; OR[i] = (this.has.inR ? IR[i] : IL[i]) + this.hr;
+    }
+  }
+}
+// MANGLE: an effect for wrecking things nicely. STUTTER grabs the last slice (SIZE) on the clock and repeats it, sometimes backwards
+// (REVERSE); PITCH shifts up or down; RING multiplies by a tone; COMB rings at TUNE; SMEAR blurs it into a wash. MIX 0 = untouched.
+class Mangle extends DSP {
+  static IN = ['inL', 'inR', 'clk']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); const N = 1 << 18; this.N = N; this.bL = new Float32Array(N); this.bR = new Float32Array(N); this.w = 0; this.cs = new Schmitt(); this.per = e.sr * 0.125; this.since = 0; this.it = 0;
+    this.loop = null; this.ps = [new Float32Array(4096), new Float32Array(4096)]; this.pw = 0; this.pd = 0; this.rp = 0;
+    this.cb = [new Float32Array(4096), new Float32Array(4096)]; this.cw = 0; this.ap = [113, 337, 509, 787].map(d => [new Float32Array(d), new Float32Array(d), 0]); this.sm = [0, 0]; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R, mix = P.mix ?? 0;
+    if (mix < 1e-3) { OL.set(IL); OR.set(IR); for (let i = 0; i < n; i++) { this.bL[this.w] = IL[i]; this.bR[this.w] = IR[i]; this.w = (this.w + 1) & (this.N - 1); } this.loop = null; return; }
+    const stut = P.stut ?? 0, rev = P.rev ?? 0, ratio = Math.pow(2, (P.pitch ?? 0) / 12), ring = P.ring ?? 0, rf = 30 * Math.pow(2, ring * 6.5), cfb = (P.comb ?? 0) * 0.95, cd = Math.min(4000, Math.max(2, Math.round(sr / (40 * Math.pow(25, P.tune ?? 0.4))))), sm = P.smear ?? 0;
+    const M = this.N - 1, C = this.in.clk, hasC = this.has.clk;
+    for (let i = 0; i < n; i++) {
+      this.since++; let tick = false; if (hasC) { if (this.cs.step(C[i])) { this.per = this.since; this.since = 0; tick = true; } } else if (++this.it >= this.per) { this.it = 0; tick = true; }
+      this.bL[this.w] = IL[i]; this.bR[this.w] = IR[i];
+      if (tick && !this.loop && Math.random() < stut * 0.3) { const L = Math.max(64, Math.round(this.per * [0.5, 1, 2, 4, 8][Math.round((P.size ?? 0.4) * 4)])); this.loop = { st: (this.w - L + this.N) & M, L, k: 0, left: L * (2 + (Math.random() * 6 | 0)), rv: Math.random() < rev }; }
+      let a, b; if (this.loop) { const lp = this.loop, j = lp.k % lp.L, idx = (lp.st + (lp.rv ? lp.L - 1 - j : j)) & M, fe = Math.min(1, j / 64, (lp.L - j) / 64); a = this.bL[idx] * fe; b = this.bR[idx] * fe; lp.k++; if (--lp.left <= 0) this.loop = null; } else { a = IL[i]; b = IR[i]; }
+      this.w = (this.w + 1) & M;
+      if (ratio !== 1) { const W = 2048, p0 = this.pw; this.ps[0][p0] = a; this.ps[1][p0] = b; this.pd = (this.pd + 1 - ratio + W) % W; const d2 = (this.pd + W / 2) % W, g1 = 1 - Math.abs(this.pd / W * 2 - 1), g2 = 1 - g1;
+        const r1 = (p0 - this.pd - 1 + 8192) & 4095, r2 = (p0 - d2 - 1 + 8192) & 4095, i1 = r1 | 0, i2 = r2 | 0; a = this.ps[0][i1] * g1 + this.ps[0][i2] * g2; b = this.ps[1][i1] * g1 + this.ps[1][i2] * g2; this.pw = (p0 + 1) & 4095; }
+      if (ring > 0.02) { this.rp += rf / sr; this.rp -= Math.floor(this.rp); const s = Math.sin(TAU * this.rp); a *= s; b *= s; }
+      if (cfb > 0.01) { const j = (this.cw - cd + 4096) & 4095; a += cfb * this.cb[0][j]; b += cfb * this.cb[1][j]; a = Math.tanh(a / 6) * 6; b = Math.tanh(b / 6) * 6; this.cb[0][this.cw] = a; this.cb[1][this.cw] = b; this.cw = (this.cw + 1) & 4095; a *= 1 - cfb * 0.6; b *= 1 - cfb * 0.6; }
+      if (sm > 0.01) { let x = a + this.sm[0] * sm * 0.55, y = b + this.sm[1] * sm * 0.55; // four all-passes with a little feedback around them
+        for (const A of this.ap) { const L = A[0].length, k = A[2], ox = A[0][k] - 0.6 * x, oy = A[1][k] - 0.6 * y; A[0][k] = x + 0.6 * ox; A[1][k] = y + 0.6 * oy; A[2] = (k + 1) % L; x = ox; y = oy; }
+        this.sm[0] = Math.tanh(x / 8) * 8; this.sm[1] = Math.tanh(y / 8) * 8; a = a * (1 - sm) + x * sm; b = b * (1 - sm) + y * sm; }
+      OL[i] = IL[i] * (1 - mix) + a * mix; OR[i] = IR[i] * (1 - mix) + b * mix;
+    }
+  }
+}
+// CHAOS: a Lorenz attractor as a modulation source. It never repeats: X and Y swing between two lobes, Z breathes. RATE runs from
+// a slow drift (seconds) up to audio rate (patch it into a pitch input and listen), SHAPE goes from nearly periodic to wild.
+class Chaos extends DSP {
+  static IN = ['reset']; static OUT = ['x', 'y', 'z', 'trig'];
+  constructor(e) { super(e); this.x = 0.1; this.y = 0; this.z = 0; this.tg = 0; this.rs = new Schmitt(); }
+  process(n) {
+    const P = this.p, sr = this.sr, tu = 0.1 * Math.pow(2, (P.rate ?? 0.3) * 11.5) / sr, rho = 14 + (P.shape ?? 0.6) * 26, a = (P.amt ?? 0.8) * 5, st = Math.max(1, Math.ceil(tu / 0.004)), dt = tu / st;
+    const X = this.out.x, Y = this.out.y, Z = this.out.z, T = this.out.trig, R = this.in.reset;
+    for (let i = 0; i < n; i++) {
+      if (this.rs.step(R[i])) { this.x = 0.1; this.y = 0; this.z = 0; }
+      const px = this.x; for (let s = 0; s < st; s++) { const dx = 10 * (this.y - this.x), dy = this.x * (rho - this.z) - this.y, dz = this.x * this.y - 2.6667 * this.z; this.x += dx * dt; this.y += dy * dt; this.z += dz * dt; }
+      if (!isFinite(this.x)) { this.x = 0.1; this.y = 0; this.z = 0; }
+      if ((px < 0) !== (this.x < 0)) { this.tg = Math.round(0.005 * sr); this.flash('led', 1); }
+      X[i] = Math.max(-1, Math.min(1, this.x / 20)) * a; Y[i] = Math.max(-1, Math.min(1, this.y / 27)) * a; Z[i] = Math.max(-1, Math.min(1, (this.z - rho * 0.9) / 25)) * a; T[i] = this.tg > 0 ? 10 : 0; if (this.tg > 0) this.tg--;
+    }
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
   handle(m) {
     if (m.t === 'add') { const C = DSPS[m.type]; if (!C) return; const d = new C(this); d.id = m.id; Object.assign(d.p, m.p || {}); d.onParam(); this.mods.set(m.id, d); this.dirty = true; }
     else if (m.t === 'param') { const d = this.mods.get(m.id); if (d) { d.p[m.k] = m.v; d.onParam(m.k, m.v); } }
+    else if (m.t === 'wave') { const d = this.mods.get(m.id); if (d && d.D) d.D.set(m.data); }
     else if (m.t === 'smpclear') { const d = this.mods.get(m.id); if (d && d.S) d.S = []; }
     else if (m.t === 'smp') { const d = this.mods.get(m.id); if (d && d.setSample) d.setSample(m.slot, m.data, m.root); }
     else if (m.t === 'hit') { const d = this.mods.get(m.id); if (d && d.hit) d.hit(m.slot); }
