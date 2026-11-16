@@ -1391,7 +1391,7 @@ class Focus extends DSP {
 // talk shows arrive at very different levels), with TONE (low-pass) and WIDTH. When the page can only play a station directly
 // (the station doesn't allow processing), LIVE is off here and the sound bypasses the rack.
 class Radio extends DSP {
-  static IN = ['inL', 'inR']; static OUT = ['L', 'R', 'sigL', 'sigR', 'env', 'trig'];
+  static IN = []; static OUT = ['L', 'R', 'env', 'trig']; // the station, ready for the radio's cords (to RADIO IN on the rack, or anywhere)
   constructor(e) { super(e); const sr = e.sr; this.g = 1; this.ms = 0; this.lp = [0, 0, 0, 0]; this.rk = 1; this.ef = 0; this.es = 0; this.tg = 0;
     this.RN = Math.round(sr * 6); this.rb = [new Float32Array(this.RN), new Float32Array(this.RN)]; this.rw = 0; this.gv = -1;          // the last 6 s, for GRAB
     this.FR = 512; this.fa = 0; this.fc = 0; this.pe = 0; this.nov = new Float32Array(700); this.ni = 0; this.nf = 0; this.bpm = 0; this.conf = 0; this.next = -1; this.per = 0; // beat tracking
@@ -1405,14 +1405,12 @@ class Radio extends DSP {
     let bp = 0, bs = -1; for (let ph = 0; ph < bl; ph += 0.5) { let s2 = 0; for (let k = ph; k < N; k += bl) s2 += nv(Math.round(k)); if (s2 > bs) { bs = s2; bp = ph; } }
     this.next = Math.round((bl - (bp % bl) - 1.5) * this.FR) - this.fc; while (this.next < 0) this.next += this.per; } // 1.5 frames early: the onset curve lags the actual hit
   process(n) {
-    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, O = this.out, X = this.e.ext, lvl = P.lvl ?? 0.7, route = (P.route ?? 0) | 0;
+    const P = this.p, sr = this.sr, O = this.out, X = this.e.ext, lvl = P.lvl ?? 0.7;
     const rkT = P.playing ? ((P.solo ?? 1) > 0.5 && !P.jam ? 0 : P.jam ? 0.7 : 1) : 1, kr = 1 / (1.5 * sr), on = X && X[0] && P.live;
     const xl = on ? X[0] : null, xr = on ? (X[1] || X[0]) : null, kt = 1 - Math.exp(-TAU * Math.min(0.45 * sr, 700 + Math.pow(P.tone ?? 1, 2) * 19000) / sr), w = P.width ?? 1, L = this.lp;
     const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.12 * sr)), ks = 1 - Math.exp(-1 / (0.6 * sr)), S = this.st, stat = P.static ?? 0; let pk = 0, onset = 0;
-    // FX off (the default): the station skips the rack's effects (echo, mangle, granular...) and joins the mix at LIMIT, so it sounds like itself
-    const fx = (P.fx ?? 0) > 0.5, E = this.e; if (!E.radL || E.radL.length < n) { E.radL = new Float32Array(Math.max(n, 128)); E.radR = new Float32Array(Math.max(n, 128)); } const DL = E.radL, DR = E.radR;
     for (let i = 0; i < n; i++) {
-      this.rk += Math.sign(rkT - this.rk) * Math.min(kr, Math.abs(rkT - this.rk)); const rg = this.rk * this.rk;
+      this.rk += Math.sign(rkT - this.rk) * Math.min(kr, Math.abs(rkT - this.rk)); // how loud the rack may be (RADIO IN applies it)
       let a = 0, b = 0;
       if (on) { let l = xl[i] * 5, r = xr[i] * 5; const m = (l + r) / 2, s = (l - r) / 2 * w; l = m + s; r = m - s;
         this.ms += 0.00004 * ((l * l + r * r) / 2 - this.ms); if (this.ms > 1e-5) { const gt = Math.min(6, Math.max(0.25, Math.sqrt(2.5 / this.ms))); this.g += (gt - this.g) * 0.00003; }
@@ -1427,8 +1425,7 @@ class Radio extends DSP {
       // STATIC between stations: hiss and a whistle sliding past as if turning a dial
       if (stat > 0.001 || S.a > 0.001) { S.a += ((stat > 0.5 ? 1 : 0) - S.a) * 0.0006; S.sw += 0.00002; const nz = Math.random() * 2 - 1; S.n1 += 0.3 * (nz - S.n1); S.n2 += 0.05 * (S.n1 - S.n2);
         S.ph += (900 + 1400 * Math.sin(S.sw * 3)) / sr; const st = ((S.n1 - S.n2) * 1.4 + Math.sin(TAU * S.ph) * 0.08 * (0.5 + 0.5 * Math.sin(S.sw * 11))) * S.a * 1.6; a += st; b += st; }
-      O.sigL[i] = a; O.sigR[i] = b; O.env[i] = Math.min(10, this.ef * 3); O.trig[i] = this.tg > 0 ? 10 : 0;
-      const g2 = route === 1 ? 0 : lvl, wet = fx ? g2 : 0; O.L[i] = IL[i] * rg + a * wet; O.R[i] = IR[i] * rg + b * wet; pk = Math.max(pk, Math.abs(a * g2)); DL[i] = fx ? 0 : a * g2; DR[i] = fx ? 0 : b * g2;
+      O.env[i] = Math.min(10, this.ef * 3); O.trig[i] = this.tg > 0 ? 10 : 0; O.L[i] = a * lvl; O.R[i] = b * lvl; pk = Math.max(pk, Math.abs(a * lvl));
     }
     if (P.grab != null && P.grab !== this.gv) { if (this.gv !== -1 || P.grab > 0) { const k = Math.round(sr * Math.min(6, P.grabLen || 2)), o2 = new Float32Array(k); for (let j = 0; j < k; j++) { const q = (this.rw - k + j + this.RN) % this.RN; o2[j] = (this.rb[0][q] + this.rb[1][q]) * 0.5; } this.L.grab = o2; this.L.sr = sr; } this.gv = P.grab; }
     this.L.led = Math.min(1, pk / 4); if (on) { this.L.env = Math.min(1, this.ef / 2); this.L.on = Math.max(0, Math.min(1, onset)); this.L.bpm = this.bpm; this.L.conf = this.conf; }
@@ -1502,7 +1499,15 @@ class Euclid extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder, granular: Granular, euclid: Euclid };
+// RADIO IN (on the rack): the radio's cords land here. The rack passes through, faded while a station plays if the radio says so (its RACK key),
+// and the station joins it: through the rack's effects when the radio's FX key is down, otherwise clean, straight into LIMIT.
+class Rx extends DSP {
+  static IN = ['inL', 'inR', 'radL', 'radR']; static OUT = ['L', 'R'];
+  process(n) { const E = this.e, R = E.mods.get('radio'), rg = R ? R.rk * R.rk : 1, fx = !!R && (R.p.fx ?? 0) > 0.5, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, SL = this.in.radL, SR = this.has.radR ? this.in.radR : this.in.radL, O = this.out;
+    if (!E.radL || E.radL.length < n) { E.radL = new Float32Array(Math.max(n, 128)); E.radR = new Float32Array(Math.max(n, 128)); } const DL = E.radL, DR = E.radR; let pk = 0;
+    for (let i = 0; i < n; i++) { const a = SL[i], b = SR[i]; O.L[i] = IL[i] * rg + (fx ? a : 0); O.R[i] = IR[i] * rg + (fx ? b : 0); DL[i] = fx ? 0 : a; DR[i] = fx ? 0 : b; if (Math.abs(a) > pk) pk = Math.abs(a); }
+    this.L.led = Math.min(1, pk / 4); } }
+const DSPS = { rx: Rx,  clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder, granular: Granular, euclid: Euclid };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
