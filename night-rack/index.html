@@ -219,8 +219,8 @@ body.cam #cambar{display:flex}
   <div class="sec" style="margin-top:8px">SPIN THE DIAL</div>
   <div class="chips" id="rDial"><button data-m="0">OFF</button><button data-m="2">EVERY 2 MIN</button><button data-m="5">5 MIN</button><button data-m="15">15 MIN</button><button data-any="1" id="rAny">ANY KIND</button></div>
   <div id="rList"></div>
-  <div class="sec" style="margin-top:10px">TV · OLD FILMS <span id="tvCh" class="muted">OFF</span></div>
-  <div class="muted" id="tvStatus">The top TV on the right plays public-domain films from the Internet Archive. Press POWER on it, or here.</div>
+  <div class="sec" style="margin-top:10px">TV <span id="tvCh" class="muted">OFF</span></div>
+  <div class="muted" id="tvStatus">The top TV on the right plays public-domain videos from Wikimedia Commons: noir, mystery, cartoons, deep sea, nature, sports. Press POWER on it, or here.</div>
   <div class="chips"><button id="tvPow">TV POWER</button><button id="tvPrev">◀ CH</button><button id="tvNext">CH ▶</button><button id="tvTest">TEST STREAMING</button><button id="tvShow">SHOW ME THE TV</button></div>
   <pre id="tvDiag" class="muted" style="white-space:pre-wrap;font:11px/1.45 ui-monospace,monospace;margin:4px 0 0"></pre>
   <div class="muted" style="margin-top:8px">For listening and ideas at home. Don't rebroadcast stations on a stream.</div>
@@ -2604,63 +2604,69 @@ function collideBoxes(P, O, ix) { for (const B of OBST) { if (!B.on()) continue;
     if (_ob.x < a.x - m || _ob.x > b.x + m || _ob.y < a.y - m || _ob.y > b.y + m || _ob.z < a.z - m || _ob.z > b.z + m) continue;
     const d = [[_ob.x - (a.x - m), 'x', a.x - m], [(b.x + m) - _ob.x, 'x', b.x + m], [(b.y + m) - _ob.y, 'y', b.y + m], [(b.z + m) - _ob.z, 'z', b.z + m], [_ob.z - (a.z - m), 'z', a.z - m]].sort((u, v) => u[0] - v[0])[0];
     _ob[d[1]] = d[2]; _ob.applyMatrix4(B.mw); P[ix] = _ob.x; P[ix + 1] = _ob.y; P[ix + 2] = _ob.z; O[ix] = lerp(O[ix], _ob.x, 0.3); O[ix + 1] = lerp(O[ix + 1], _ob.y, 0.3); O[ix + 2] = lerp(O[ix + 2], _ob.z, 0.3); } }
-// ---------------------------------------------------------------- THE TV: the top set on the right cabinet plays old films streamed from the Internet Archive.
-// Channels come from the Archive's public-domain Feature Films and Classic TV collections (noir, mystery, detective). Each plays as if broadcast:
-// it starts wherever "now" falls in the film. The set is the TV module: CHANNEL, VOLUME, PREV, NEXT, POWER, and jacks (sound, ENV, LIGHT).
-const TVS = { set: null, scr: null, el: null, tex: null, inNode: null, list: [], i: 0, mode: 'off', diag: [], lumaCv: null, lt: 0, chT: 0, tok: 0, found: false };
-const TV_QUERIES = [['NOIR', 'collection:(feature_films) AND subject:("film noir" OR noir)'], ['MYSTERY', 'collection:(feature_films) AND subject:(mystery OR detective OR "private eye")'], ['TV CRIME', 'collection:(classic_tv) AND subject:(detective OR crime OR police OR mystery)']];
+// ---------------------------------------------------------------- THE TV: the top set on the right cabinet plays public-domain videos streamed from Wikimedia Commons (the Internet Archive blocks this).
+// Six channels (noir, mystery, cartoons, deep sea, nature, sports), each played back to back as if broadcast: you join wherever "now" falls. The set is the TV module: CHANNEL, VOLUME, PREV, NEXT, POWER, and jacks (sound, ENV, LIGHT).
+const TVS = { set: null, scr: null, el: null, tex: null, inNode: null, chans: {}, k: 0, i: 0, mode: 'off', diag: [], lumaCv: null, lt: 0, chT: 0, tok: 0, found: false };
+// Channels: each is a kind of programme, searched on Wikimedia Commons (public-domain and CC0 videos only), played back to back like a station.
+const TV_CH = [['NOIR', 'filetype:video "film noir"', 1], ['MYSTERY', 'filetype:video (detective OR mystery OR crime) film', 1], ['CARTOONS', 'filetype:video (cartoon OR "animated short" OR "animated film")', 0],
+  ['DEEP SEA', 'filetype:video (ocean OR undersea OR "deep sea" OR underwater OR reef)', 0], ['NATURE', 'filetype:video (wildlife OR nature OR animals) documentary', 0], ['SPORTS', 'filetype:video (newsreel OR baseball OR boxing OR football OR olympics) sports', 1]];
 const TV_MOMENTARY = new Set(['power', 'prev', 'next']);
 function tvStatus(t) { TVS.status = t; const el = document.getElementById('tvStatus'); if (el) el.textContent = t; }
-async function tvFind() { // the channel list, most-watched first, interleaved across the three kinds
-  const lists = await Promise.all(TV_QUERIES.map(async ([kind, q]) => { try { const u = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent('mediatype:(movies) AND ' + q) + '&fl[]=identifier&fl[]=title&fl[]=year&sort[]=downloads+desc&rows=30&output=json';
-    const r = await fetch(u); if (!r.ok) throw new Error('HTTP ' + r.status); const j = await r.json(); return (j.response && j.response.docs || []).map(d => ({ id: d.identifier, title: String(d.title || d.identifier), year: d.year ? String(d.year).slice(0, 4) : '', kind })); } catch (e) { TVS.err = e.message || String(e); return null; } }));
-  if (lists.every(l => l === null)) return false; const seen = new Set(), out = [];
-  for (let k = 0; k < 30; k++) for (const l of lists) if (l && l[k] && !seen.has(l[k].id)) { seen.add(l[k].id); out.push(l[k]); }
-  TVS.list = out.slice(0, 40); TVS.found = true; return true; }
-async function tvSource(item) { // the smallest MP4 of the film, straight from its storage server
-  if (item.url) return item.url; const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(item.id)); if (!r.ok) throw new Error('metadata HTTP ' + r.status); const j = await r.json();
-  const mp4 = (j.files || []).filter(f => /\.mp4$/i.test(f.name) && !/trailer/i.test(f.name)).sort((a, b) => (+a.size || 9e12) - (+b.size || 9e12)); if (!mp4.length) throw new Error('no MP4 file');
-  const pick = mp4.find(f => +f.size > 30e6) || mp4[mp4.length - 1]; item.url = j.server && j.dir ? 'https://' + j.server + j.dir + '/' + pick.name.split('/').map(encodeURIComponent).join('/') : 'https://archive.org/download/' + encodeURIComponent(item.id) + '/' + pick.name.split('/').map(encodeURIComponent).join('/'); return item.url; }
-function tvScreen(on) { const u = TVS.scr && TVS.scr.material.uniforms; if (!u) return; if (on && TVS.tex) { u.uMap.value = TVS.tex; u.uZoom.value.set(1, 1, 0, 0); u.uMode.value = 1; u.uGray.value = 1; } else { u.uMode.value = 0; u.uGray.value = 0; } }
+const tvPD = m => { const l = ((m && m.LicenseShortName && m.LicenseShortName.value) || '').toLowerCase(); return /public domain|^pd|cc0|cc-zero/.test(l); };
+function tvPick(info) { // the best version this phone can play: a small transcode, MP4 first
+  const v = document.createElement('video'), can = t => t && v.canPlayType(t) !== ''; const ds = (info.derivatives || []).filter(d => d.src && (d.height || 999) <= 480 && can(d.type)).sort((a, b) => (/mp4/.test(b.type) - /mp4/.test(a.type)) || ((b.height || 0) - (a.height || 0)));
+  if (ds.length) return ds[0].src; if (can(info.mime) && (info.size || 0) < 400e6) return info.url; return null; }
+async function tvFind(ch) { // the channel's programmes, from Commons
+  const C = TVS.chans[ch] || (TVS.chans[ch] = { list: null, err: '' }); if (C.list) return C.list;
+  const u = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch=' + encodeURIComponent(TV_CH[ch][1]) + '&prop=videoinfo&viprop=url|size|mime|derivatives|extmetadata&viextmetadatafilter=LicenseShortName|ObjectName';
+  const r = await fetch(u); if (!r.ok) throw new Error('search HTTP ' + r.status); const j = await r.json(), pages = Object.values((j.query && j.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+  const out = []; let pd = 0; for (const p of pages) { const vi = p.videoinfo && p.videoinfo[0]; if (!vi || !tvPD(vi.extmetadata)) continue; pd++; if (vi.duration && vi.duration < 45) continue; const src = tvPick(vi); if (!src) continue;
+    const name = (vi.extmetadata && vi.extmetadata.ObjectName && vi.extmetadata.ObjectName.value) || p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''); out.push({ title: name.replace(/<[^>]+>/g, '').replace(/_/g, ' ').slice(0, 80), url: src, dur: vi.duration || 600, page: p.title }); }
+  C.found = pages.length; C.pd = pd; C.list = out.slice(0, 30); return C.list; }
+function tvScreen(on) { const u = TVS.scr && TVS.scr.material.uniforms; if (!u) return; if (on && TVS.tex) { u.uMap.value = TVS.tex; u.uZoom.value.set(1, 1, 0, 0); u.uMode.value = 1; u.uGray.value = TV_CH[TVS.i] ? TV_CH[TVS.i][2] : 0; } else { u.uMode.value = 0; u.uGray.value = 0; } }
 function tvKill() { if (TVS.el) { try { TVS.el.pause(); TVS.el.removeAttribute('src'); TVS.el.load(); } catch (e) { } } }
 function tvOff() { TVS.tok++; tvKill(); TVS.mode = 'off'; tvScreen(false); send({ t: 'param', id: 'tv', k: 'live', v: 0 }); tvStatus('TV off.'); tvDraw(); }
-async function tvPlay(i) { // tune to channel i: static while it connects, then the film from "now"
-  const tok = ++TVS.tok; TVS.mode = 'loading'; tvScreen(false); tvDraw();
+function tvElement() { if (TVS.el) return TVS.el; const v = document.createElement('video'); v.crossOrigin = 'anonymous'; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; TVS.el = v;
+  TVS.tex = new THREE.VideoTexture(v); TVS.tex.colorSpace = THREE.SRGBColorSpace; TVS.tex.generateMipmaps = false; TVS.tex.minFilter = THREE.LinearFilter;
+  if (AC && ENG && ENG.kind === 'worklet') { try { TVS.inNode = AC.createGain(); TVS.inNode.connect(ENG.node, 0, 1); AC.createMediaElementSource(v).connect(TVS.inNode); TVS.audio = true; } catch (e) { TVS.audio = false; } }
+  v.addEventListener('ended', () => { if (TVS.mode === 'on') tvProg(TVS.tok, TVS.k + 1, 0); }); return v; }
+async function tvPlay(ch) { // tune to a channel: static while it connects, then whatever it is "broadcasting" right now
+  const tok = ++TVS.tok, n = TV_CH.length; TVS.i = ((ch % n) + n) % n; TVS.mode = 'loading'; tvScreen(false); tvQuiet('chan', TVS.i); tvDraw();
   if (!AC || AC.state !== 'running') { try { await powerOn(); } catch (e) { } }
-  if (!TVS.found) { tvStatus('Looking up channels on the Internet Archive…'); if (!(await tvFind())) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('Could not reach the Internet Archive\'s film list (' + (TVS.err || 'blocked') + '). Press TEST STREAMING for details.'); tvDraw(); return; } }
-  const L = TVS.list; if (!L.length) { TVS.mode = 'blocked'; tvStatus('The Archive returned no films.'); tvDraw(); return; } TVS.i = ((i % L.length) + L.length) % L.length; tvQuiet('chan', L.length > 1 ? TVS.i / (L.length - 1) : 0);
-  const it = L[TVS.i]; tvStatus('Tuning to CH ' + (TVS.i + 2) + ': ' + it.title + '…'); tvDraw();
-  let url; try { url = await tvSource(it); } catch (e) { if (tok !== TVS.tok) return; tvStatus('CH ' + (TVS.i + 2) + ' has no playable file (' + e.message + '). Trying the next…'); setTimeout(() => tok === TVS.tok && tvPlay(TVS.i + 1), 900); return; }
-  if (tok !== TVS.tok) return; tvKill();
-  if (!TVS.el) { const v = document.createElement('video'); v.crossOrigin = 'anonymous'; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; TVS.el = v;
-    TVS.tex = new THREE.VideoTexture(v); TVS.tex.colorSpace = THREE.SRGBColorSpace; TVS.tex.generateMipmaps = false; TVS.tex.minFilter = THREE.LinearFilter;
-    if (AC && ENG && ENG.kind === 'worklet') { try { TVS.inNode = AC.createGain(); TVS.inNode.connect(ENG.node, 0, 1); AC.createMediaElementSource(v).connect(TVS.inNode); TVS.audio = true; } catch (e) { TVS.audio = false; } } }
-  const v = TVS.el; v.src = url;
+  tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': finding programmes…'); let L;
+  try { L = await tvFind(TVS.i); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('Could not reach Wikimedia Commons (' + e.message + ').'); tvDraw(); return; }
+  if (tok !== TVS.tok) return; if (!L.length) { TVS.mode = 'blocked'; tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': nothing this phone can play. Try another channel.'); tvDraw(); return; }
+  const tot = L.reduce((s, x) => s + x.dur, 0); let t = (Date.now() / 1000) % tot, k = 0; while (t > L[k].dur) { t -= L[k].dur; k++; } // like a broadcast: you join it in progress
+  tvProg(tok, k, Math.max(0, t - 5), 0); }
+async function tvProg(tok, k, at, tries = 0) { const L = TVS.chans[TVS.i] && TVS.chans[TVS.i].list; if (!L || !L.length || tok !== TVS.tok) return; k = ((k % L.length) + L.length) % L.length; const it = L[k]; TVS.k = k;
+  TVS.mode = 'loading'; tvScreen(false); tvDraw(); tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': tuning to ' + it.title + '…');
+  const v = tvElement(); tvKill(); v.src = it.url;
   const ok = await new Promise(res => { const t = setTimeout(() => res('timeout'), 20000); v.onloadedmetadata = () => { clearTimeout(t); res('ok'); }; v.onerror = () => { clearTimeout(t); res('error'); }; });
   if (tok !== TVS.tok) return;
-  if (ok !== 'ok') { TVS.mode = 'blocked'; tvStatus('CH ' + (TVS.i + 2) + ' would not load (' + ok + '). The Archive may not allow the picture to be shared with this page. Press TEST STREAMING.'); tvDraw(); return; }
-  if (isFinite(v.duration) && v.duration > 60) { try { v.currentTime = (Date.now() / 1000) % (v.duration - 30); } catch (e) { } } // like a broadcast: you join it in progress
-  try { await v.play(); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('The film loaded but would not play (' + e.message + '). Tap POWER again.'); tvDraw(); return; }
+  if (ok !== 'ok') { if (tries < 3) { tvProg(tok, k + 1, 0, tries + 1); return; } TVS.mode = 'blocked'; tvStatus('CH ' + (TVS.i + 2) + ': programmes would not load (' + ok + '). Press TEST STREAMING.'); tvDraw(); return; }
+  if (at && isFinite(v.duration) && at < v.duration - 10) { try { v.currentTime = at; } catch (e) { } }
+  try { await v.play(); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('It loaded but would not play (' + e.message + '). Tap POWER again.'); tvDraw(); return; }
   if (tok !== TVS.tok) return; TVS.mode = 'on'; tvScreen(true); send({ t: 'param', id: 'tv', k: 'live', v: TVS.audio ? 1 : 0 });
-  tvStatus('CH ' + (TVS.i + 2) + ': ' + it.title + (it.year ? ' (' + it.year + ')' : '') + ' · from the Internet Archive.' + (TVS.audio ? '' : ' (Sound plays without the rack here.)')); tvDraw(); }
-function tvQuiet(id, n) { const kn = modById.tv && modById.tv.knobs[id]; if (!kn) return; TVS.quiet = true; try { kn.set(n); } finally { TVS.quiet = false; } }
-function tvDraw() { const el = document.getElementById('tvCh'); if (!el) return; el.textContent = TVS.mode === 'off' ? 'OFF' : TVS.list[TVS.i] ? 'CH ' + (TVS.i + 2) + ' · ' + TVS.list[TVS.i].kind : '…'; }
+  tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': ' + it.title + ' · from Wikimedia Commons (public domain).'); tvDraw(); }
+function tvQuiet(id, n) { const kn = modById.tv && modById.tv.knobs[id]; if (!kn) return; TVS.quiet = true; try { kn.set(kn.toNorm(n)); } finally { TVS.quiet = false; } }
+function tvDraw() { const el = document.getElementById('tvCh'); if (!el) return; el.textContent = TVS.mode === 'off' ? 'OFF' : 'CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0]; }
 async function tvTest() { // a step-by-step check that she can read out on the phone
-  const out = [], put = (ok, t) => { out.push((ok ? '✓ ' : '✗ ') + t); const el = document.getElementById('tvDiag'); if (el) el.textContent = out.join('\n'); }; put(true, 'Testing… (takes up to 30 s)'); out.length = 0;
-  let L = null; try { const ok = await tvFind(); put(ok, ok ? 'Film list: ' + TVS.list.length + ' films found' : 'Film list blocked: ' + (TVS.err || '?')); L = ok ? TVS.list : null; } catch (e) { put(false, 'Film list: ' + e.message); }
-  if (!L || !L.length) return; const it = L[0]; let url = null;
-  try { url = await tvSource(it); put(true, 'Film file found: ' + it.title); } catch (e) { put(false, 'Film file: ' + e.message); return; }
-  const probe = cors => new Promise(res => { const v = document.createElement('video'); if (cors) v.crossOrigin = 'anonymous'; v.muted = true; v.playsInline = true; v.preload = 'auto'; const t = setTimeout(() => res([false, v]), 20000); v.onloadeddata = () => { clearTimeout(t); res([true, v]); }; v.onerror = () => { clearTimeout(t); res([false, v]); }; v.src = url; v.play().catch(() => { }); });
+  const out = [], put = (ok, t) => { out.push((ok ? '✓ ' : '✗ ') + t); const el = document.getElementById('tvDiag'); if (el) el.textContent = out.join('\n'); }; const el = document.getElementById('tvDiag'); if (el) el.textContent = 'Testing… (up to 30 s)';
+  const ch = TVS.mode === 'off' ? 0 : TVS.i; TVS.chans[ch] = null; let L;
+  try { L = await tvFind(ch); const C = TVS.chans[ch]; put(true, 'Commons search (' + TV_CH[ch][0] + '): ' + C.found + ' videos, ' + C.pd + ' public domain'); put(L.length > 0, L.length + ' in a format this phone can play'); } catch (e) { put(false, 'Commons search: ' + e.message); return; }
+  if (!L.length) { const v = document.createElement('video'); put(false, 'This phone: WebM ' + (v.canPlayType('video/webm; codecs="vp9"') || 'no') + ', MP4 ' + (v.canPlayType('video/mp4') || 'no')); return; }
+  const it = L[0]; put(true, 'Trying: ' + it.title + ' (' + (it.url.match(/\.(\w+)$/) || ['', '?'])[1] + ')');
+  const probe = cors => new Promise(res => { const v = document.createElement('video'); if (cors) v.crossOrigin = 'anonymous'; v.muted = true; v.playsInline = true; v.preload = 'auto'; const t = setTimeout(() => res([false, v]), 20000); v.onloadeddata = () => { clearTimeout(t); res([true, v]); }; v.onerror = () => { clearTimeout(t); res([false, v]); }; v.src = it.url; v.play().catch(() => { }); });
   const [okC, vC] = await probe(true); put(okC, okC ? 'Video loads with sharing allowed (good: picture + sound through the rack)' : 'Video will not load with sharing (CORS) on');
   if (okC) { try { const c = document.createElement('canvas'); c.width = 8; c.height = 6; const g = c.getContext('2d'); g.drawImage(vC, 0, 0, 8, 6); g.getImageData(0, 0, 1, 1); put(true, 'Picture can be drawn on the 3D TV'); } catch (e) { put(false, 'Picture is locked: ' + e.name); } }
-  else { const [okP] = await probe(false); put(okP, okP ? 'Video plays without sharing (so the Archive is reachable, but it does not allow the picture/sound to be used here)' : 'Video does not load at all (network or format)'); }
+  else { const [okP] = await probe(false); put(okP, okP ? 'Video plays without sharing (Commons does not allow it to be used here)' : 'Video does not load at all (network or format)'); }
   try { vC.pause(); vC.removeAttribute('src'); vC.load(); } catch (e) { } }
 setInterval(() => { // LIGHT: how bright the picture is, for the rack
   if (TVS.mode !== 'on' || !TVS.el) return; if (!TVS.lumaCv) { TVS.lumaCv = document.createElement('canvas'); TVS.lumaCv.width = 16; TVS.lumaCv.height = 12; }
   try { const g = TVS.lumaCv.getContext('2d', { willReadFrequently: true }); g.drawImage(TVS.el, 0, 0, 16, 12); const d = g.getImageData(0, 0, 16, 12).data; let s = 0; for (let k = 0; k < d.length; k += 4) s += d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11; send({ t: 'param', id: 'tv', k: 'luma', v: s / (d.length / 4) / 255 }); } catch (e) { } }, 100);
 class TVM extends Mod {
   knobChanged(id, v) { super.knobChanged(id, v); tvSaveKnobs(); if (loading || TVS.quiet) return;
-    if (id === 'chan') { const n = TVS.list.length; tvScreen(false); clearTimeout(TVS.chT); TVS.chT = setTimeout(() => { const i = n > 1 ? Math.round(this.knobs.chan.norm * (n - 1)) : 0; if (TVS.mode === 'off' || i !== TVS.i || !n) tvPlay(i); else if (TVS.mode === 'on') tvScreen(true); }, 350); }
+    if (id === 'chan') { tvScreen(false); clearTimeout(TVS.chT); TVS.chT = setTimeout(() => { const i = this.v('chan'); if (TVS.mode === 'off' || i !== TVS.i) tvPlay(i); else if (TVS.mode === 'on') tvScreen(true); }, 350); }
     else if (v && TV_MOMENTARY.has(id)) { if (id === 'power') { if (TVS.mode === 'off') tvPlay(TVS.i); else tvOff(); } else if (id === 'next') tvPlay(TVS.i + 1); else if (id === 'prev') tvPlay(TVS.i - 1); setTimeout(() => this.knobs[id].set(0), 160); } }
   visual() { tvVisual(); } idle() { tvVisual(); } }
 function tvVisual() { if (!TVS.set) return; const on = TVS.mode === 'on' || TVS.mode === 'loading'; if (TVS.led) TVS.led.material.color.setHex(TVS.mode === 'off' ? 0x330808 : TVS.mode === 'blocked' ? 0xffa020 : 0xff2a2a);
@@ -2670,7 +2676,7 @@ function tvModule() { // turn the top set's control strip into the TV module
   const T = TVS.set; if (!T || !T.ctl) return; const face = T.g, U = U3, sh = T.h / 2 - U / 2; const at = (x, y) => ({ x: x + 12, y: U + sh - y, lx: x, ly: y });
   const c = Object.fromEntries(T.ctl.map(o => [o.label, o])), key = (id, label, o) => K(id, 0, 0, label, { ...at(c[label].X, c[label].cy), btn: true, min: 0, max: 1, step: 1, def: 0, ...o });
   DEFS.tv = { title: 'TV', hp: 30, theme: 'navy', leds: [], labels: [], knobs: [
-    K('chan', 0, 0, 'CHANNEL', { ...at(c.CHANNEL.X, c.CHANNEL.cy), size: 'S', def: 0, px: 700, fmt: v => { const n = TVS.list.length; if (!n) return 'press POWER'; const i = Math.round(v * (n - 1)); return 'CH ' + (i + 2) + ' · ' + TVS.list[i].title; } }),
+    K('chan', 0, 0, 'CHANNEL', { ...at(c.CHANNEL.X, c.CHANNEL.cy), size: 'S', min: 0, max: TV_CH.length - 1, step: 1, def: 0, px: 500, fmt: v => 'CH ' + (v + 2) + ' · ' + TV_CH[v][0] }),
     K('lvl', 0, 0, 'VOLUME', { ...at(c.VOLUME.X, c.VOLUME.cy), size: 'S', def: 0.7, fmt: fPct }),
     key('prev', 'PREV', { name: 'PREVIOUS CHANNEL', fmt: () => '' }), key('next', 'NEXT', { name: 'NEXT CHANNEL', fmt: () => '' }), key('power', 'POWER', { name: 'POWER', fmt: () => TVS.mode === 'off' ? 'OFF' : 'ON' })],
     jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(c['OUT L'].X, c['OUT L'].cy)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(c['OUT R'].X, c['OUT R'].cy)), J('env', 0, 0, 'ENV', 'out', 'cv', at(c.ENV.X, c.ENV.cy)), J('light', 0, 0, 'LIGHT', 'out', 'cv', at(c.LIGHT.X, c.LIGHT.cy))] };
@@ -4072,7 +4078,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // ================================================================ module descriptions, guide, hide UI
 const DESC = {
-  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO + TV IN: the radio\'s and the TV\'s cords land here. Unplug them and the rack can\'t hear them.', tv: 'The TV: old public-domain films streamed from the Internet Archive. POWER, CHANNEL (or PREV/NEXT), VOLUME. Its sound and picture brightness come out of its jacks.',
+  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO + TV IN: the radio\'s and the TV\'s cords land here. Unplug them and the rack can\'t hear them.', tv: 'The TV: public-domain videos streamed from Wikimedia Commons, six channels (noir, mystery, cartoons, deep sea, nature, sports). POWER, CHANNEL (or PREV/NEXT), VOLUME. Its sound and picture brightness come out of its jacks.',
   groove: 'Drum pattern generator. Pick a STYLE (house, deep, tech, garage, disco, breaks, DnB, dusty), then turn the density knobs to add or remove hits. Feed it CLOCK ×4.',
   perc: 'Snare, rim, shaker and tom. Trigger them from GROOVE or TRIG SEQ.', stab: 'Chord synth for deep-house stabs and pads: each trigger plays a whole chord through its own filter. V/OCT sets the root.',
   bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', mbira: 'Real kalimba or marimba notes (recorded, public domain). Plays the note at V/OCT each time TRIG fires; four notes can ring at once. OCTAVE shifts, DECAY shortens.', field: 'Field recording: a looping nature sound (birds, forest, rain, river, stream, waves, wind chimes). TONE darkens it, WIDTH spreads it, LEVEL CV can swell it with an LFO.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
