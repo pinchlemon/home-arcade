@@ -1504,9 +1504,10 @@ class Euclid extends DSP {
 // Outputs: the sound (L/R), ENV (how loud), LIGHT (how bright the picture is: the page measures it and sends it as 'luma').
 class TV extends DSP {
   static IN = []; static OUT = ['L', 'R', 'env', 'light'];
-  constructor(e) { super(e); this.g = 1; this.ms = 0; this.ef = 0; this.lu = 0; }
+  constructor(e) { super(e); this.g = 1; this.ms = 0; this.ef = 0; this.lu = 0; this.rk = 1; }
   process(n) { const P = this.p, X = this.e.ext2, on = X && X[0] && P.live, xl = on ? X[0] : null, xr = on ? (X[1] || X[0]) : null, lvl = P.lvl ?? 0.7, O = this.out, sr = this.sr;
     const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.15 * sr)), kl = 1 - Math.exp(-1 / (0.08 * sr)), lt = Math.max(0, Math.min(1, P.luma ?? 0)) * 10; let pk = 0;
+    const rkT = P.playing && (P.fade ?? 1) > 0.5 ? 0 : 1; this.rk += Math.sign(rkT - this.rk) * Math.min(n / (1.5 * sr), Math.abs(rkT - this.rk)); // FADE: the rack goes quiet while the TV plays (RADIO + TV IN applies it)
     for (let i = 0; i < n; i++) { let a = 0, b = 0;
       if (on) { const l = xl[i] * 5, r = xr[i] * 5; this.ms += 0.00004 * ((l * l + r * r) / 2 - this.ms); if (this.ms > 1e-5) { const gt = Math.min(6, Math.max(0.25, Math.sqrt(2.0 / this.ms))); this.g += (gt - this.g) * 0.00003; } a = l * this.g; b = r * this.g; }
       const x = Math.abs(a + b) / 2; this.ef += (x > this.ef ? ka : kd) * (x - this.ef); this.lu += kl * (lt - this.lu);
@@ -1517,7 +1518,7 @@ class TV extends DSP {
 // and the station joins it: through the rack's effects when the radio's FX key is down, otherwise clean, straight into LIMIT.
 class Rx extends DSP {
   static IN = ['inL', 'inR', 'radL', 'radR', 'tvL', 'tvR']; static OUT = ['L', 'R'];
-  process(n) { const E = this.e, R = E.mods.get('radio'), rg = R ? R.rk * R.rk : 1, fx = !!R && (R.p.fx ?? 0) > 0.5, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, SL = this.in.radL, SR = this.has.radR ? this.in.radR : this.in.radL, TL = this.in.tvL, TR = this.has.tvR ? this.in.tvR : this.in.tvL, O = this.out;
+  process(n) { const E = this.e, R = E.mods.get('radio'), V = E.mods.get('tv'), rg = (R ? R.rk * R.rk : 1) * (V ? V.rk * V.rk : 1), fx = !!R && (R.p.fx ?? 0) > 0.5, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, SL = this.in.radL, SR = this.has.radR ? this.in.radR : this.in.radL, TL = this.in.tvL, TR = this.has.tvR ? this.in.tvR : this.in.tvL, O = this.out;
     if (!E.radL || E.radL.length < n) { E.radL = new Float32Array(Math.max(n, 128)); E.radR = new Float32Array(Math.max(n, 128)); } const DL = E.radL, DR = E.radR; let pk = 0;
     for (let i = 0; i < n; i++) { const a = SL[i], b = SR[i]; O.L[i] = IL[i] * rg + (fx ? a : 0); O.R[i] = IR[i] * rg + (fx ? b : 0); DL[i] = (fx ? 0 : a) + TL[i]; DR[i] = (fx ? 0 : b) + TR[i]; if (Math.abs(a) > pk) pk = Math.abs(a); }
     this.L.led = Math.min(1, pk / 4); } }
