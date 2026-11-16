@@ -1435,7 +1435,45 @@ class Recorder extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder };
+// GRANULAR: keeps the last 4 s of what passes through and plays it back as a cloud of short grains: SIZE, DENSITY, PITCH,
+// SPRAY (how scattered in time), SCAN (how far back), REVERSE. FREEZE stops recording so the cloud holds still. MIX 0 = untouched.
+class Granular extends DSP {
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.N = Math.round(e.sr * 4); this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); this.w = 0; this.G = []; this.next = 0; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R, N = this.N, mix = P.mix ?? 0, frz = (P.freeze ?? 0) > 0.5;
+    if (mix < 1e-3) { OL.set(IL); OR.set(IR); if (!frz) for (let i = 0; i < n; i++) { this.bL[this.w] = IL[i]; this.bR[this.w] = IR[i]; this.w = (this.w + 1) % N; } this.G.length = 0; return; }
+    const size = 0.02 * Math.pow(25, P.size ?? 0.4), dens = 2 * Math.pow(50, P.dens ?? 0.5), ratio = Math.pow(2, (P.pitch ?? 0) / 12), spray = P.spray ?? 0.2, scan = P.scan ?? 0.2, rev = P.rev ?? 0;
+    const norm = 1 / Math.sqrt(Math.max(1, dens * size));
+    for (let i = 0; i < n; i++) {
+      if (!frz) { this.bL[this.w] = IL[i]; this.bR[this.w] = IR[i]; this.w = (this.w + 1) % N; }
+      if (--this.next <= 0) { this.next = sr / dens * (0.5 + Math.random()); if (this.G.length < 32) { const len = size * sr, back = scan * 3.4 * sr + Math.random() * spray * sr + (ratio > 1 ? len * (ratio - 1) : 0) + 64;
+          this.G.push({ p: this.w - Math.min(N - len * 2, back), len, k: 0, inc: ratio * (Math.random() < rev ? -1 : 1), pan: (Math.random() * 2 - 1) * 0.8 }); } }
+      let l = 0, r = 0;
+      for (let j = this.G.length - 1; j >= 0; j--) { const g = this.G[j]; if (g.k >= g.len) { this.G.splice(j, 1); continue; } const s = Math.sin(Math.PI * g.k / g.len), env = s * s;
+        let x = g.p + (g.inc > 0 ? g.k * g.inc : (g.len - g.k) * -g.inc); x = ((x % N) + N) % N; const i0 = x | 0, f = x - i0, i1 = (i0 + 1) % N;
+        const a = (this.bL[i0] * (1 - f) + this.bL[i1] * f) * env, b = (this.bR[i0] * (1 - f) + this.bR[i1] * f) * env; l += a * (1 - g.pan); r += b * (1 + g.pan); g.k++; }
+      OL[i] = IL[i] * (1 - mix) + l * norm * mix; OR[i] = IR[i] * (1 - mix) + r * norm * mix;
+    }
+  }
+}
+// EUCLID: spreads HITS as evenly as possible over STEPS (the rhythms of many traditions fall out of this), turned by ROTATE,
+// each hit kept with CHANCE. TRIG fires on hits, ACCENT on the first hit of each cycle.
+class Euclid extends DSP {
+  static IN = ['clk', 'reset']; static OUT = ['trig', 'acc'];
+  constructor(e) { super(e); this.cs = new Schmitt(); this.rs = new Schmitt(); this.i = -1; this.tg = 0; this.ta = 0; }
+  process(n) {
+    const P = this.p, C = this.in.clk, Rs = this.in.reset, T = this.out.trig, A = this.out.acc, steps = Math.max(1, P.steps ?? 16) | 0, hits = Math.min(steps, Math.max(0, P.hits ?? 5) | 0), rot = (P.rot ?? 0) | 0, ch = P.chance ?? 1, w = Math.round(0.005 * this.sr);
+    for (let i = 0; i < n; i++) {
+      if (this.rs.step(Rs[i])) this.i = -1;
+      if (this.cs.step(C[i])) { this.i = (this.i + 1) % steps; const k = ((this.i - rot) % steps + steps) % steps;
+        if ((k * hits) % steps < hits && Math.random() < ch) { this.tg = w; this.flash('led', 1); if (k === 0) this.ta = w; } this.L.step = this.i; }
+      T[i] = this.tg > 0 ? 10 : 0; A[i] = this.ta > 0 ? 10 : 0; if (this.tg > 0) this.tg--; if (this.ta > 0) this.ta--;
+    }
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder, granular: Granular, euclid: Euclid };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
