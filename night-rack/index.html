@@ -220,7 +220,7 @@ body.cam #cambar{display:flex}
   <div class="chips" id="rDial"><button data-m="0">OFF</button><button data-m="2">EVERY 2 MIN</button><button data-m="5">5 MIN</button><button data-m="15">15 MIN</button><button data-any="1" id="rAny">ANY KIND</button></div>
   <div id="rList"></div>
   <div class="sec" style="margin-top:10px">TV <span id="tvCh" class="muted">OFF</span></div>
-  <div class="muted" id="tvStatus">The top TV on the right plays public-domain videos from Wikimedia Commons: noir, mystery, cartoons, deep sea, nature, sports. Press POWER on it, or here.</div>
+  <div class="muted" id="tvStatus">The top TV on the right plays free videos from Wikimedia Commons and NASA: film noir, space, timelapses. Press POWER on it, or here.</div>
   <div class="chips"><button id="tvPow">TV POWER</button><button id="tvPrev">◀ CH</button><button id="tvNext">CH ▶</button><button id="tvTest">TEST STREAMING</button><button id="tvShow">SHOW ME THE TV</button></div>
   <div class="chips" id="tvFade"><button data-v="1">RACK FADES WHILE TV PLAYS</button><button data-v="0">RACK KEEPS PLAYING</button></div>
   <pre id="tvDiag" class="muted" style="white-space:pre-wrap;font:11px/1.45 ui-monospace,monospace;margin:4px 0 0"></pre>
@@ -2606,11 +2606,13 @@ function collideBoxes(P, O, ix) { for (const B of OBST) { if (!B.on()) continue;
     const d = [[_ob.x - (a.x - m), 'x', a.x - m], [(b.x + m) - _ob.x, 'x', b.x + m], [(b.y + m) - _ob.y, 'y', b.y + m], [(b.z + m) - _ob.z, 'z', b.z + m], [_ob.z - (a.z - m), 'z', a.z - m]].sort((u, v) => u[0] - v[0])[0];
     _ob[d[1]] = d[2]; _ob.applyMatrix4(B.mw); P[ix] = _ob.x; P[ix + 1] = _ob.y; P[ix + 2] = _ob.z; O[ix] = lerp(O[ix], _ob.x, 0.3); O[ix + 1] = lerp(O[ix + 1], _ob.y, 0.3); O[ix + 2] = lerp(O[ix + 2], _ob.z, 0.3); } }
 // ---------------------------------------------------------------- THE TV: the top set on the right cabinet plays public-domain videos streamed from Wikimedia Commons (the Internet Archive blocks this).
-// Six channels (noir, mystery, cartoons, deep sea, nature, sports), each played back to back as if broadcast: you join wherever "now" falls. The set is the TV module: CHANNEL, VOLUME, PREV, NEXT, POWER, and jacks (sound, ENV, LIGHT).
+// Three channels (film noir, space, timelapse), each played back to back as if broadcast: you join wherever "now" falls. The set is the TV module: CHANNEL, VOLUME, PREV, NEXT, POWER, and jacks (sound, ENV, LIGHT).
 const TVS = { set: null, scr: null, el: null, tex: null, inNode: null, chans: {}, k: 0, i: 0, mode: 'off', diag: [], lumaCv: null, lt: 0, chT: 0, tok: 0, found: false };
 const TV_MOMENTARY = new Set(['power', 'prev', 'next']);
 function tvStatus(t) { TVS.status = t; const el = document.getElementById('tvStatus'); if (el) el.textContent = t; }
-const tvPD = m => { const l = ((m && m.LicenseShortName && m.LicenseShortName.value) || '').toLowerCase(); return /public domain|^pd|cc0|cc-zero/.test(l); };
+const tvLic = m => ((m && m.LicenseShortName && m.LicenseShortName.value) || '').replace(/<[^>]+>/g, '').trim();
+const tvPD = m => { const l = tvLic(m).toLowerCase(); return /public domain|^pd|cc0|cc-zero/.test(l) || (/^cc[ -]by/.test(l) && !/nc/.test(l)); }; // free to show: public domain, CC0, or CC BY / BY-SA with the maker credited (no non-commercial ones)
+const tvCredit = m => { const l = tvLic(m), a = ((m && m.Artist && m.Artist.value) || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 50); return /^cc[ -]by/i.test(l) ? (a ? a + ' · ' : '') + l : ''; };
 function tvPick(info) { // the best version this phone can play: a small transcode, MP4 first
   const v = document.createElement('video'), can = t => t && v.canPlayType(t) !== ''; const ds = (info.derivatives || []).filter(d => d.src && (d.height || 999) <= 480 && can(d.type)).sort((a, b) => (/mp4/.test(b.type) - /mp4/.test(a.type)) || ((b.height || 0) - (a.height || 0)));
   if (ds.length) return ds[0].src; if (can(info.mime) && (info.size || 0) < 400e6) return info.url; return null; }
@@ -2619,14 +2621,12 @@ function tvPick(info) { // the best version this phone can play: a small transco
 //   cat: a Commons category (files volunteers filed there)    q: a Commons search, often limited to a category; used last, to top up
 // Only public-domain / CC0 videos the phone can play are kept.
 const PREL = 'incategory:"Media_from_the_Prelinger_Archives"';
-const TV_CH = [
-  ['NOIR', [{ wd: ['Q185867'] }, { q: 'filetype:video "film noir"' }], 1],
-  ['MYSTERY', [{ wd: ['Q1200678', 'Q2484376', 'Q959790', 'Q2297927'] }, { q: 'filetype:video (detective OR mystery) film' }], 1],
-  ['CARTOONS', [{ cat: 'Black and white videos of cartoons' }, { cat: 'Animated films' }, { q: 'filetype:video incategory:"Animated_films"' }], 0],
-  ['DEEP SEA', [{ q: 'filetype:video ' + PREL + ' (ocean OR sea OR fish OR underwater OR whale OR coral)' }, { cat: 'Underwater videos' }, { cat: 'Videos of fish' }, { q: 'filetype:video (underwater OR "deep sea" OR "coral reef")' }], 0],
-  ['NATURE', [{ q: 'filetype:video ' + PREL + ' (animals OR wildlife OR birds OR insects OR nature OR forest)' }, { cat: 'Videos of animals' }, { q: 'filetype:video wildlife documentary' }], 0],
-  ['SPORTS', [{ q: 'filetype:video ' + PREL + ' (sports OR baseball OR football OR boxing OR racing OR olympic)' }, { q: 'filetype:video newsreel (sports OR baseball OR boxing OR football)' }], 1]];
-const CAPI = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=videoinfo&viprop=url|size|mime|derivatives|extmetadata&viextmetadatafilter=LicenseShortName|ObjectName';
+const TV_CH = [ // [name, sources, black & white]
+  ['NOIR', [{ wd: ['Q185867'] }, { q: 'filetype:video "film noir"' }, { wd: ['Q959790', 'Q2484376'] }], 1],
+  ['SPACE', [{ cat: 'Videos of rocket launches' }, { cat: 'Videos of the International Space Station' }, { q: 'filetype:video NASA (launch OR "space station" OR Apollo OR "Earth from" OR Mars OR moon OR galaxy OR astronaut)' },
+    { nasa: 'earth from space station' }, { nasa: 'rocket launch' }, { nasa: 'apollo' }, { nasa: 'hubble galaxy' }], 0],
+  ['TIMELAPSE', [{ cat: 'Time-lapse videos' }, { q: 'filetype:video (timelapse OR time-lapse) (night OR stars OR clouds OR city OR aurora OR sunset OR "milky way")' }, { q: 'filetype:video timelapse' }], 0]];
+const CAPI = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=videoinfo&viprop=url|size|mime|derivatives|extmetadata&viextmetadatafilter=LicenseShortName|ObjectName|Artist';
 async function capi(params) { const r = await fetch(CAPI + params); if (!r.ok) throw new Error('Commons HTTP ' + r.status); const j = await r.json(); return Object.values((j.query && j.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0)); }
 async function tvSourcePages(src) { // one source's pages, each with its video info
   if (src.q) return capi('&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch=' + encodeURIComponent(src.q));
@@ -2635,13 +2635,19 @@ async function tvSourcePages(src) { // one source's pages, each with its video i
     const r = await fetch('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q)); if (!r.ok) throw new Error('Wikidata HTTP ' + r.status); const j = await r.json();
     const titles = j.results.bindings.map(b => 'File:' + decodeURIComponent(b.v.value.split('/Special:FilePath/')[1] || '').replace(/_/g, ' ')).filter(t => t.length > 5); const out = [];
     for (let k = 0; k < titles.length; k += 50) out.push(...await capi('&titles=' + encodeURIComponent(titles.slice(k, k + 50).join('|')))); return out; }
+  if (src.nasa) { // NASA's own video library (public domain): search, then each video's file list
+    const r = await fetch('https://images-api.nasa.gov/search?media_type=video&page_size=30&q=' + encodeURIComponent(src.nasa)); if (!r.ok) throw new Error('NASA HTTP ' + r.status); const j = await r.json(), out = [];
+    for (const it of ((j.collection && j.collection.items) || []).slice(0, 12)) { const d = it.data && it.data[0]; if (!d) continue; try { const a = await (await fetch('https://images-api.nasa.gov/asset/' + encodeURIComponent(d.nasa_id))).json();
+      const hrefs = ((a.collection && a.collection.items) || []).map(x => x.href.replace(/^http:/, 'https:')), mp4 = hrefs.find(h => /~mobile\.mp4$/i.test(h)) || hrefs.find(h => /~small\.mp4$/i.test(h)) || hrefs.find(h => /~medium\.mp4$/i.test(h)) || hrefs.find(h => /\.mp4$/i.test(h));
+      if (mp4) out.push({ title: 'NASA: ' + d.title, videoinfo: [{ mime: 'video/mp4', url: mp4, size: 1, derivatives: [], extmetadata: { LicenseShortName: { value: 'Public domain (NASA)' }, ObjectName: { value: d.title } } }] }); } catch (e) { } }
+    return out; }
   return []; }
 async function tvFind(ch) { // the channel's programmes
   const C = TVS.chans[ch] || (TVS.chans[ch] = { list: null }); if (C.list) return C.list; const out = [], seen = new Set(); C.found = 0; C.pd = 0; C.src = [];
-  for (const src of TV_CH[ch][1]) { if (out.length >= 30) break; let pages; try { pages = await tvSourcePages(src); } catch (e) { C.src.push((src.wd ? 'Wikidata' : src.cat ? src.cat : 'search') + ': ' + e.message); continue; }
-    let got = 0; for (const p of pages) { if (seen.has(p.title)) continue; seen.add(p.title); const vi = p.videoinfo && p.videoinfo[0]; if (!vi || !/^video\//.test(vi.mime || '')) continue; C.found++; if (!tvPD(vi.extmetadata)) continue; C.pd++; if (vi.duration && vi.duration < 45) continue; const url = tvPick(vi); if (!url) continue;
-      const name = (vi.extmetadata && vi.extmetadata.ObjectName && vi.extmetadata.ObjectName.value) || p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''); out.push({ title: name.replace(/<[^>]+>/g, '').replace(/_/g, ' ').slice(0, 80), url, dur: vi.duration || 600, page: p.title }); got++; if (out.length >= 30) break; }
-    C.src.push((src.wd ? 'Wikidata genre' : src.cat ? 'category "' + src.cat + '"' : 'search') + ': ' + got); }
+  for (const src of TV_CH[ch][1]) { if (out.length >= 30) break; let pages; try { pages = await tvSourcePages(src); } catch (e) { C.src.push((src.wd ? 'Wikidata' : src.nasa ? 'NASA' : src.cat ? src.cat : 'search') + ': ' + e.message); continue; }
+    let got = 0; for (const p of pages) { if (seen.has(p.title)) continue; seen.add(p.title); const vi = p.videoinfo && p.videoinfo[0]; if (!vi || !/^video\//.test(vi.mime || '')) continue; C.found++; if (!tvPD(vi.extmetadata)) continue; C.pd++; if (vi.duration && vi.duration < 45) continue; const url = tvPick(vi) || (/^video\/mp4/.test(vi.mime) && vi.url); if (!url) continue;
+      const name = (vi.extmetadata && vi.extmetadata.ObjectName && vi.extmetadata.ObjectName.value) || p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''); out.push({ title: name.replace(/<[^>]+>/g, '').replace(/_/g, ' ').slice(0, 80), url, dur: vi.duration || 600, page: p.title, credit: tvCredit(vi.extmetadata) }); got++; if (out.length >= 30) break; }
+    C.src.push((src.wd ? 'Wikidata genre' : src.nasa ? 'NASA "' + src.nasa + '"' : src.cat ? 'category "' + src.cat + '"' : 'search') + ': ' + got); }
   if (!out.length && C.src.every(x => /HTTP|fetch|Failed|Load/i.test(x))) throw new Error(C.src.join('; '));
   C.list = out; return out; }
 function tvScreen(on) { const u = TVS.scr && TVS.scr.material.uniforms; if (!u) return; if (on && TVS.tex) { u.uMap.value = TVS.tex; u.uZoom.value.set(1, 1, 0, 0); u.uMode.value = 1; u.uGray.value = TV_CH[TVS.i] ? TV_CH[TVS.i][2] : 0; } else { u.uMode.value = 0; u.uGray.value = 0; } }
@@ -2667,15 +2673,16 @@ async function tvProg(tok, k, at, tries = 0) { const L = TVS.chans[TVS.i] && TVS
   if (ok !== 'ok') { if (tries < 3) { tvProg(tok, k + 1, 0, tries + 1); return; } TVS.mode = 'blocked'; tvStatus('CH ' + (TVS.i + 2) + ': programmes would not load (' + ok + '). Press TEST STREAMING.'); tvDraw(); return; }
   if (at && isFinite(v.duration) && at < v.duration - 10) { try { v.currentTime = at; } catch (e) { } }
   try { await v.play(); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('It loaded but would not play (' + e.message + '). Tap POWER again.'); tvDraw(); return; }
-  if (tok !== TVS.tok) return; TVS.mode = 'on'; tvScreen(true); send({ t: 'param', id: 'tv', k: 'live', v: TVS.audio ? 1 : 0 }); send({ t: 'param', id: 'tv', k: 'playing', v: 1 }); tvOSD(it.title);
-  tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': ' + it.title + ' · from Wikimedia Commons (public domain).'); tvDraw(); }
-function tvOSD(sub) { // the on-screen channel banner: shows on a change, then fades away
+  if (tok !== TVS.tok) return; TVS.mode = 'on'; tvScreen(true); send({ t: 'param', id: 'tv', k: 'live', v: TVS.audio ? 1 : 0 }); send({ t: 'param', id: 'tv', k: 'playing', v: 1 }); tvOSD(it.title, it.credit);
+  tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': ' + it.title + (it.credit ? ' · by ' + it.credit : '') + (/images-assets\.nasa/.test(it.url) ? ' · from NASA' : ' · from Wikimedia Commons') + '.'); tvDraw(); }
+function tvOSD(sub, credit) { // the on-screen channel banner: shows on a change, then fades away
   const sc = TVS.scr; if (!sc) return; if (!TVS.osd) { const c = document.createElement('canvas'); c.width = 512; c.height = 384; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const p = sc.geometry.parameters;
     TVS.osd = new THREE.Mesh(new THREE.PlaneGeometry(p.width * 0.94, p.height * 0.94), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0, depthWrite: false, toneMapped: false })); TVS.osd.position.z = Math.min(p.width, p.height) * 0.04 + 0.25; TVS.osd.renderOrder = 3; sc.add(TVS.osd); TVS.osdCv = c; }
   const c = TVS.osdCv, g = c.getContext('2d'); g.clearRect(0, 0, 512, 384); if (sub == null) { TVS.osdT = 0; return; }
   g.font = '700 54px ui-monospace, "Courier New", monospace'; g.textBaseline = 'top'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.75)'; g.fillStyle = '#7dff9a';
   const ch = 'CH ' + String(TVS.i + 2).padStart(2, '0'); g.strokeText(ch, 30, 26); g.fillText(ch, 30, 26); g.font = '700 30px ui-monospace, "Courier New", monospace'; g.strokeText(TV_CH[TVS.i][0], 32, 88); g.fillText(TV_CH[TVS.i][0], 32, 88);
-  let t = String(sub).toUpperCase(), fs = 24; g.font = `600 ${fs}px ui-monospace, "Courier New", monospace`; while (g.measureText(t).width > 450 && t.length > 4) t = t.slice(0, -2) + '…'; g.fillStyle = '#e8ffe8'; g.strokeText(t, 32, 318); g.fillText(t, 32, 318);
+  let t = String(sub).toUpperCase(), fs = 24; g.font = `600 ${fs}px ui-monospace, "Courier New", monospace`; while (g.measureText(t).width > 450 && t.length > 4) t = t.slice(0, -2) + '…'; g.fillStyle = '#e8ffe8'; g.strokeText(t, 32, credit ? 290 : 318); g.fillText(t, 32, credit ? 290 : 318);
+  if (credit) { let c2 = String(credit).toUpperCase(); g.font = '600 18px ui-monospace, "Courier New", monospace'; while (g.measureText(c2).width > 450 && c2.length > 4) c2 = c2.slice(0, -2) + '…'; g.fillStyle = '#b8e8c0'; g.strokeText(c2, 32, 330); g.fillText(c2, 32, 330); }
   TVS.osd.material.map.needsUpdate = true; TVS.osdT = performance.now(); }
 function tvFadeChips() { const v = modById.tv ? modById.tv.v('fade') : 1; document.querySelectorAll('#tvFade button').forEach(b => b.classList.toggle('cur', +b.dataset.v === v)); }
 function tvQuiet(id, n) { const kn = modById.tv && modById.tv.knobs[id]; if (!kn) return; TVS.quiet = true; try { kn.set(kn.toNorm(n)); } finally { TVS.quiet = false; } }
@@ -4110,7 +4117,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // ================================================================ module descriptions, guide, hide UI
 const DESC = {
-  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO + TV IN: the radio\'s and the TV\'s cords land here. Unplug them and the rack can\'t hear them.', tv: 'The TV: public-domain videos streamed from Wikimedia Commons, six channels (noir, mystery, cartoons, deep sea, nature, sports). POWER, CHANNEL (or PREV/NEXT), VOLUME. Its sound and picture brightness come out of its jacks.',
+  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO + TV IN: the radio\'s and the TV\'s cords land here. Unplug them and the rack can\'t hear them.', tv: 'The TV: free videos streamed from Wikimedia Commons and NASA, three channels (noir, space, timelapse). POWER, CHANNEL (or PREV/NEXT), VOLUME. Its sound and picture brightness come out of its jacks.',
   groove: 'Drum pattern generator. Pick a STYLE (house, deep, tech, garage, disco, breaks, DnB, dusty), then turn the density knobs to add or remove hits. Feed it CLOCK ×4.',
   perc: 'Snare, rim, shaker and tom. Trigger them from GROOVE or TRIG SEQ.', stab: 'Chord synth for deep-house stabs and pads: each trigger plays a whole chord through its own filter. V/OCT sets the root.',
   bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', mbira: 'Real kalimba or marimba notes (recorded, public domain). Plays the note at V/OCT each time TRIG fires; four notes can ring at once. OCTAVE shifts, DECAY shortens.', field: 'Field recording: a looping nature sound (birds, forest, rain, river, stream, waves, wind chimes). TONE darkens it, WIDTH spreads it, LEVEL CV can swell it with an LFO.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
