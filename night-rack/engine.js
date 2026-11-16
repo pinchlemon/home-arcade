@@ -1408,7 +1408,7 @@ class Radio extends DSP {
     const P = this.p, sr = this.sr, O = this.out, X = this.e.ext, lvl = P.lvl ?? 0.7;
     const rkT = P.playing ? ((P.solo ?? 1) > 0.5 && !P.jam ? 0 : P.jam ? 0.7 : 1) : 1, kr = 1 / (1.5 * sr), on = X && X[0] && P.live;
     const xl = on ? X[0] : null, xr = on ? (X[1] || X[0]) : null, kt = 1 - Math.exp(-TAU * Math.min(0.45 * sr, 700 + Math.pow(P.tone ?? 1, 2) * 19000) / sr), w = P.width ?? 1, L = this.lp;
-    const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.12 * sr)), ks = 1 - Math.exp(-1 / (0.6 * sr)), S = this.st, stat = P.static ?? 0; let pk = 0, onset = 0;
+    const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.12 * sr)), ks = 1 - Math.exp(-1 / (0.6 * sr)), S = this.st, stat = Math.min(1, P.static ?? 0), sigT = P.sig ?? 1, kg = 1 - Math.exp(-1 / (0.05 * sr)); if (this.sg == null) this.sg = 1; let pk = 0, onset = 0;
     for (let i = 0; i < n; i++) {
       this.rk += Math.sign(rkT - this.rk) * Math.min(kr, Math.abs(rkT - this.rk)); // how loud the rack may be (RADIO IN applies it)
       let a = 0, b = 0;
@@ -1423,8 +1423,9 @@ class Radio extends DSP {
       if (this.next >= 0 && --this.next <= 0) { this.next = this.per > 0 ? this.per : -1; this.L.beat = (this.L.beat || 0) + 1;
         if (P.jam && this.conf > 0.25) { const C = this.e.mods.get('clock'); if (C) { const pos = (C.c % 4) + C.ph, err = pos < 2 ? -pos : 4 - pos, adj = err * 0.35; C.ph += adj; while (C.ph < 0) { C.ph += 1; C.c = Math.max(0, C.c - 1); } while (C.ph >= 1) { C.ph -= 1; C.c++; } } } }
       // STATIC between stations: hiss and a whistle sliding past as if turning a dial
-      if (stat > 0.001 || S.a > 0.001) { S.a += ((stat > 0.5 ? 1 : 0) - S.a) * 0.0006; S.sw += 0.00002; const nz = Math.random() * 2 - 1; S.n1 += 0.3 * (nz - S.n1); S.n2 += 0.05 * (S.n1 - S.n2);
-        S.ph += (900 + 1400 * Math.sin(S.sw * 3)) / sr; const st = ((S.n1 - S.n2) * 1.4 + Math.sin(TAU * S.ph) * 0.08 * (0.5 + 0.5 * Math.sin(S.sw * 11))) * S.a * 1.6; a += st; b += st; }
+      this.sg += kg * (sigT - this.sg); a *= this.sg; b *= this.sg; // SIG: how well tuned in the dial is (1 = on the station)
+      if (stat > 0.001 || S.a > 0.001) { S.a += (stat - S.a) * kg; S.sw += 0.00002; const nz = Math.random() * 2 - 1; S.n1 += 0.3 * (nz - S.n1); S.n2 += 0.05 * (S.n1 - S.n2);
+        S.ph += (900 + 1400 * Math.sin(S.sw * 3)) / sr; const st = ((S.n1 - S.n2) * 1.4 + Math.sin(TAU * S.ph) * 0.08 * (0.5 + 0.5 * Math.sin(S.sw * 11))) * S.a * 0.6; a += st; b += st; }
       O.env[i] = Math.min(10, this.ef * 3); O.trig[i] = this.tg > 0 ? 10 : 0; O.L[i] = a * lvl; O.R[i] = b * lvl; pk = Math.max(pk, Math.abs(a * lvl));
     }
     if (P.grab != null && P.grab !== this.gv) { if (this.gv !== -1 || P.grab > 0) { const k = Math.round(sr * Math.min(6, P.grabLen || 2)), o2 = new Float32Array(k); for (let j = 0; j < k; j++) { const q = (this.rw - k + j + this.RN) % this.RN; o2[j] = (this.rb[0][q] + this.rb[1][q]) * 0.5; } this.L.grab = o2; this.L.sr = sr; } this.gv = P.grab; }
