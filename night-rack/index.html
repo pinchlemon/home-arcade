@@ -197,7 +197,7 @@ body.cam #cambar{display:flex}
 </div>
 <div id="radio" class="hud hide">
   <div class="sec">RADIO</div>
-  <div class="muted" id="rStatus">Pick a kind of station. Stations come from the free Radio Browser directory.</div>
+  <div class="muted" id="rStatus">Pick a kind of station. They are live internet streams, listed by the free Radio Browser directory.</div>
   <div class="chips" id="rGen"></div>
   <div class="chips"><button id="rSurprise">SURPRISE ME</button><button id="rFavs">★ FAVOURITES</button><button id="rStop">STOP</button></div>
   <div id="rList"></div>
@@ -756,7 +756,7 @@ DEFS.focus = lay('FOCUS', 16, 'black',
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 DEFS.radio = lay('RADIO', 20, 'navy',
   [[sc(1.0)],
-   [kn('lvl', 'LEVEL', 'M', { def: 0.7, fmt: fPct }), kn('tone', 'TONE', 'S', { def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }), kn('width', 'WIDTH', 'S', { def: 1, fmt: v => v < 0.05 ? 'MONO' : fPct(v) })],
+   [kn('lvl', 'LEVEL', 'M', { def: 0.7, fmt: fPct }), kn('tone', 'TONE', 'S', { def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }), kn('width', 'WIDTH', 'S', { def: 1, fmt: v => v < 0.05 ? 'MONO' : fPct(v) }), kn('solo', 'RACK', 'S', { min: 0, max: 1, step: 1, def: 1, name: 'THE RACK WHILE THE RADIO PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' })],
    [BTN('prev', 'PREV'), BTN('stop', 'STOP'), BTN('next', 'NEXT')], [tx('PREV'), tx('STOP'), tx('NEXT')]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const METER_T = [['YOUTUBE', -14], ['SPOTIFY', -14], ['APPLE', -16], ['OFF', null]];
@@ -965,11 +965,15 @@ async function radioGenre(gi) { const [name, tags] = RGENRES[gi]; RADIO.genre = 
     const res = await Promise.allSettled(tags.map(t => rbGet('/json/stations/bytag/' + encodeURIComponent(t) + '?hidebroken=true&order=clickcount&reverse=true&limit=60')));
     if (!res.some(r => r.status === 'fulfilled')) { radioStatus('Could not reach the station directory. Check the internet connection.'); return; }
     for (const r of res) if (r.status === 'fulfilled') for (const st of r.value) { const url = st.url_resolved || st.url || '', key = (st.name || '').trim().toLowerCase();
-      if (!/^https:/i.test(url) || st.hls === 1 || !key || seen.has(key) || (st.codec && !/mp3|aac|ogg|opus/i.test(st.codec))) continue; seen.add(key); out.push({ id: st.stationuuid, name: st.name.trim(), url, cc: st.countrycode || '', country: st.country || '', codec: (st.codec || '').toUpperCase(), kbps: st.bitrate || 0, clicks: st.clickcount || 0, genre: name }); }
+      if (!/^https:/i.test(url) || st.hls === 1 || !key || seen.has(key) || (st.codec && !/mp3|aac|ogg|opus/i.test(st.codec))) continue; seen.add(key); out.push({ id: st.stationuuid, name: st.name.trim(), url, cc: st.countrycode || '', country: st.country || '', state: (st.state || '').trim(), lat: st.geo_lat, lon: st.geo_long, codec: (st.codec || '').toUpperCase(), kbps: st.bitrate || 0, clicks: st.clickcount || 0, genre: name }); }
     out.sort((a, b) => b.clicks - a.clicks); RADIO.cache[gi] = out.slice(0, 80); }
   RADIO.list = RADIO.cache[gi]; radioStatus(RADIO.list.length + ' ' + name.toLowerCase() + ' stations. Tap one to play.'); renderRadio(); }
+const placeOf = st => [st.state, st.country || st.cc].filter(Boolean).join(', ') || 'somewhere unlisted';
+const hasGeo = st => st.lat != null && st.lon != null && (st.lat !== 0 || st.lon !== 0);
+const geoTxt = st => Math.abs(st.lat).toFixed(2) + '°' + (st.lat >= 0 ? 'N' : 'S') + ' ' + Math.abs(st.lon).toFixed(2) + '°' + (st.lon >= 0 ? 'E' : 'W');
+function whereFrom(st) { return 'From ' + placeOf(st) + (hasGeo(st) ? ' (' + geoTxt(st) + ')' : '') + '.'; }
 function radioStatus(t) { const e = document.getElementById('rStatus'); if (e) e.textContent = t; if (modById.radio) modById.radio.screenDirty = true; }
-function radioStop() { if (RADIO.el) { try { RADIO.el.pause(); RADIO.el.removeAttribute('src'); RADIO.el.load(); } catch (e) { } } RADIO.el = null; RADIO.mode = 'off'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); if (modById.radio) modById.radio.screenDirty = true; renderRadio(); }
+function radioStop() { if (RADIO.el) { try { RADIO.el.pause(); RADIO.el.removeAttribute('src'); RADIO.el.load(); } catch (e) { } } RADIO.el = null; RADIO.mode = 'off'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 0 }); if (modById.radio) modById.radio.screenDirty = true; renderRadio(); }
 async function radioPlay(st) {
   radioStop(); RADIO.st = st; radioStatus('Tuning in to ' + st.name + '…'); renderRadio();
   if (RADIO.server) fetch(RADIO.server + '/json/url/' + st.id).catch(() => { }); // counts the listen, as the directory asks
@@ -978,10 +982,10 @@ async function radioPlay(st) {
   if (AC && ENG && ENG.kind === 'worklet') { // through the rack: needs the station to allow it (CORS)
     const a = new Audio(); a.crossOrigin = 'anonymous'; a.src = st.url;
     try { if (!RADIO.inNode) { RADIO.inNode = AC.createGain(); RADIO.inNode.connect(ENG.node); } AC.createMediaElementSource(a).connect(RADIO.inNode); await a.play(); RADIO.el = a; RADIO.mode = 'rack';
-      send({ t: 'param', id: 'radio', k: 'live', v: 1 }); radioStatus('Playing ' + st.name + ' through the rack.'); renderRadio(); return; }
+      send({ t: 'param', id: 'radio', k: 'live', v: 1 }); send({ t: 'param', id: 'radio', k: 'playing', v: 1 }); radioStatus('Playing ' + st.name + ' through the rack. ' + whereFrom(st)); renderRadio(); return; }
     catch (e) { try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e2) { } } }
   const b = new Audio(); b.src = st.url; b.volume = Math.min(1, lvl);
-  try { await b.play(); RADIO.el = b; RADIO.mode = 'direct'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); radioStatus('Playing ' + st.name + ' straight to the speakers (this station does not let the rack process it).'); }
+  try { await b.play(); RADIO.el = b; RADIO.mode = 'direct'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 1 }); radioStatus('Playing ' + st.name + ' straight to the speakers (this station does not let the rack process or react to it). ' + whereFrom(st)); }
   catch (e) { RADIO.st = null; radioStatus('Could not play ' + st.name + '. Try another station.'); }
   renderRadio();
 }
@@ -992,9 +996,11 @@ function renderRadio() { const g = document.getElementById('rGen'), L = document
   [...g.children].forEach((b, i) => b.classList.toggle('cur', RADIO.genre === i)); L.innerHTML = '';
   const list = RADIO.genre === 'fav' ? RADIO.favs : RADIO.list;
   for (const st of list) { const d = document.createElement('div'); d.className = 'st' + (RADIO.st && RADIO.st.id === st.id && RADIO.mode !== 'off' ? ' on' : '');
-    const t = document.createElement('span'); t.innerHTML = '<b></b><small></small>'; t.querySelector('b').textContent = st.name; t.querySelector('small').textContent = [st.cc, st.genre, st.codec, st.kbps ? st.kbps + 'k' : ''].filter(Boolean).join(' · ');
+    const t = document.createElement('span'); t.innerHTML = '<b></b><small></small>'; t.querySelector('b').textContent = st.name; t.querySelector('small').textContent = '📍 ' + placeOf(st) + (hasGeo(st) ? ' · ' + geoTxt(st) : '') + ' · ' + [st.genre, st.codec, st.kbps ? st.kbps + 'k' : ''].filter(Boolean).join(' · ');
     const f = document.createElement('button'); const fav = RADIO.favs.some(x => x.id === st.id); f.textContent = fav ? '★' : '☆'; if (fav) f.className = 'fav'; f.onclick = e => { e.stopPropagation(); radioFav(st); };
-    d.onclick = () => radioPlay(st); d.append(t, f); L.append(d); } }
+    d.onclick = () => radioPlay(st); d.append(t);
+    if (hasGeo(st)) { const mp = document.createElement('button'); mp.textContent = 'MAP'; mp.title = 'Show where it broadcasts from'; mp.onclick = e => { e.stopPropagation(); window.open('https://www.openstreetmap.org/?mlat=' + st.lat + '&mlon=' + st.lon + '#map=9/' + st.lat + '/' + st.lon, '_blank'); }; d.append(mp); }
+    d.append(f); L.append(d); } }
 class RadioM extends Mod {
   knobChanged(id, v) { super.knobChanged(id, v); if (id === 'lvl' && RADIO.mode === 'direct' && RADIO.el) RADIO.el.volume = Math.min(1, v);
     if (v && !loading) { if (id === 'next') radioStep(1); else if (id === 'prev') radioStep(-1); else if (id === 'stop') { if (RADIO.mode === 'off' && RADIO.st) radioPlay(RADIO.st); else radioStop(); } }
@@ -1003,7 +1009,7 @@ class RadioM extends Mod {
   drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = H / 84; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
     g.fillStyle = RADIO.mode === 'rack' ? '#7df0ff' : RADIO.mode === 'direct' ? '#ffd36b' : '#5f7fae'; g.font = '700 ' + Math.round(13 * k) + 'px Saira, system-ui'; g.fillText(RADIO.mode === 'rack' ? 'ON AIR · THROUGH THE RACK' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT' : 'RADIO OFF', 10 * k, 22 * k);
     g.fillStyle = '#e8eef8'; g.font = '600 ' + Math.round(17 * k) + 'px Saira, system-ui'; const nm = RADIO.st ? RADIO.st.name : 'press RADIO in the menu'; g.fillText(nm.length > 30 ? nm.slice(0, 29) + '…' : nm, 10 * k, 48 * k);
-    g.fillStyle = '#5f7fae'; g.font = '500 ' + Math.round(12 * k) + 'px Saira, system-ui'; if (RADIO.st) g.fillText([RADIO.st.country, RADIO.st.genre, RADIO.st.kbps ? RADIO.st.kbps + ' kbps' : ''].filter(Boolean).join(' · '), 10 * k, 70 * k); s.tex.needsUpdate = true; } }
+    g.fillStyle = '#5f7fae'; g.font = '500 ' + Math.round(12 * k) + 'px Saira, system-ui'; if (RADIO.st) g.fillText([placeOf(RADIO.st), RADIO.st.genre].filter(Boolean).join(' · '), 10 * k, 70 * k); s.tex.needsUpdate = true; } }
 // ================================================================ METER, RECORDER, SCENES
 class MeterM extends Mod {
   knobChanged(id, v) { super.knobChanged(id, v); if (id === 'reset' && v && !loading) { send({ t: 'param', id: 'meter', k: 'reset', v: Math.random() }); setTimeout(() => this.knobs.reset.set(0), 150); } }
@@ -3780,6 +3786,7 @@ function frame(ts) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016); lastTs = ts; pollPad(dt);
   DANCE.v = SET.dance && AC && AC.state === 'running' ? G.beat.level(ts / 1000, 0.13) : DANCE.v * 0.9;
+  if (RADIO.mode === 'rack' && TEL.radio && TEL.radio.on != null) DANCE.v = Math.max(DANCE.v * 0.86, Math.min(1, TEL.radio.on * 0.9 + TEL.radio.env * 0.25)); // the cables move with the station: every word, every kick
   if (window.__noRender) return; if (BACKQ.length && ts > 1500) { const t0 = performance.now(); while (BACKQ.length && performance.now() - t0 < 12) BACKQ.shift()(); if (!BACKQ.length || SCOPES.length > 60) buildScopes(hallGroup); } acc += dt; let n = 0; stepTweens(dt);
   while (acc >= 1 / 120 && n < 5) { physics(1 / 120); acc -= 1 / 120; n++; } if (n === 5) acc = 0;
   for (const c of cables) c.tube.update(c.rope.P);
