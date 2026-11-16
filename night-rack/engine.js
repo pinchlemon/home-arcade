@@ -816,9 +816,9 @@ class Limit extends DSP { // drive + high-frequency exciter + look-ahead brick-w
       const ref = Math.pow(10, (tgt + 10.7 + 0.691 - 0.9) / 10) / 2; for (const T of this.at) { T.lo = 0.125; T.hi = 8; }
       const gl = this.at[0].block(IL, n, true, ref), gr = this.at[1].block(IR, n, true, ref); this.ag = Math.sqrt(gl * gr) || 1; } else this.ag = 1;
     const drv = this.ag * Math.exp((P.drive ?? 3) * 0.11512925), c = 5 * Math.exp((P.ceil ?? -1) * 0.11512925), air = P.air ?? 0.2, ac = 1 - Math.exp(-1 / (0.00012 * sr)), rc = 1 - Math.exp(-1 / (Math.max(0.01, P.rel ?? 0.1) * sr)), lp = 1 - Math.exp(-TAU * 3500 / sr), D = this.D, c8 = 0.8 * c;
-    let minG = 1;
+    let minG = 1; const RL = this.e.radL, RR = this.e.radR;
     for (let i = 0; i < n; i++) {
-      let l = IL[i] * drv, r = IR[i] * drv;
+      let l = IL[i] * drv, r = IR[i] * drv; if (RL) { l += RL[i] * drv / this.ag; r += RR[i] * drv / this.ag; RL[i] = 0; RR[i] = 0; } // the dry radio: limited, but not counted by LEVEL
       this.hl += lp * (l - this.hl); this.hr += lp * (r - this.hr);
       l += air * 0.6 * Math.tanh((l - this.hl) * 0.8); r += air * 0.6 * Math.tanh((r - this.hr) * 0.8);
       const pk = Math.max(Math.abs(l), Math.abs(r)), need = pk > c8 ? c8 / pk : 1;
@@ -1409,6 +1409,8 @@ class Radio extends DSP {
     const rkT = P.playing ? ((P.solo ?? 1) > 0.5 && !P.jam ? 0 : P.jam ? 0.7 : 1) : 1, kr = 1 / (1.5 * sr), on = X && X[0] && P.live;
     const xl = on ? X[0] : null, xr = on ? (X[1] || X[0]) : null, kt = 1 - Math.exp(-TAU * Math.min(0.45 * sr, 700 + Math.pow(P.tone ?? 1, 2) * 19000) / sr), w = P.width ?? 1, L = this.lp;
     const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.12 * sr)), ks = 1 - Math.exp(-1 / (0.6 * sr)), S = this.st, stat = P.static ?? 0; let pk = 0, onset = 0;
+    // FX off (the default): the station skips the rack's effects (echo, mangle, granular...) and joins the mix at LIMIT, so it sounds like itself
+    const fx = (P.fx ?? 0) > 0.5, E = this.e; if (!E.radL || E.radL.length < n) { E.radL = new Float32Array(Math.max(n, 128)); E.radR = new Float32Array(Math.max(n, 128)); } const DL = E.radL, DR = E.radR;
     for (let i = 0; i < n; i++) {
       this.rk += Math.sign(rkT - this.rk) * Math.min(kr, Math.abs(rkT - this.rk)); const rg = this.rk * this.rk;
       let a = 0, b = 0;
@@ -1420,13 +1422,13 @@ class Radio extends DSP {
         this.rb[0][this.rw] = a; this.rb[1][this.rw] = b; this.rw = (this.rw + 1) % this.RN;
         this.fa += m * m; if (++this.fc >= this.FR) { const en = Math.log(this.ef * this.ef + 1e-6); this.nov[this.ni] = Math.max(0, en - this.pe); this.pe = en; this.ni = (this.ni + 1) % this.nov.length; this.fa = 0; this.fc = 0; if (++this.nf % 172 === 0) this.track(); } }
       // JAM: on each beat the station gives, pull the rack's clock toward it (a gentle phase lock)
-      if (this.next >= 0 && --this.next <= 0) { this.next = this.per > 0 ? this.per : -1; this.L.beat = 1;
+      if (this.next >= 0 && --this.next <= 0) { this.next = this.per > 0 ? this.per : -1; this.L.beat = (this.L.beat || 0) + 1;
         if (P.jam && this.conf > 0.25) { const C = this.e.mods.get('clock'); if (C) { const pos = (C.c % 4) + C.ph, err = pos < 2 ? -pos : 4 - pos, adj = err * 0.35; C.ph += adj; while (C.ph < 0) { C.ph += 1; C.c = Math.max(0, C.c - 1); } while (C.ph >= 1) { C.ph -= 1; C.c++; } } } }
       // STATIC between stations: hiss and a whistle sliding past as if turning a dial
       if (stat > 0.001 || S.a > 0.001) { S.a += ((stat > 0.5 ? 1 : 0) - S.a) * 0.0006; S.sw += 0.00002; const nz = Math.random() * 2 - 1; S.n1 += 0.3 * (nz - S.n1); S.n2 += 0.05 * (S.n1 - S.n2);
         S.ph += (900 + 1400 * Math.sin(S.sw * 3)) / sr; const st = ((S.n1 - S.n2) * 1.4 + Math.sin(TAU * S.ph) * 0.08 * (0.5 + 0.5 * Math.sin(S.sw * 11))) * S.a * 1.6; a += st; b += st; }
       O.sigL[i] = a; O.sigR[i] = b; O.env[i] = Math.min(10, this.ef * 3); O.trig[i] = this.tg > 0 ? 10 : 0;
-      const g2 = route === 1 ? 0 : lvl; O.L[i] = IL[i] * rg + a * g2; O.R[i] = IR[i] * rg + b * g2; pk = Math.max(pk, Math.abs(a * g2));
+      const g2 = route === 1 ? 0 : lvl, wet = fx ? g2 : 0; O.L[i] = IL[i] * rg + a * wet; O.R[i] = IR[i] * rg + b * wet; pk = Math.max(pk, Math.abs(a * g2)); DL[i] = fx ? 0 : a * g2; DR[i] = fx ? 0 : b * g2;
     }
     if (P.grab != null && P.grab !== this.gv) { if (this.gv !== -1 || P.grab > 0) { const k = Math.round(sr * Math.min(6, P.grabLen || 2)), o2 = new Float32Array(k); for (let j = 0; j < k; j++) { const q = (this.rw - k + j + this.RN) % this.RN; o2[j] = (this.rb[0][q] + this.rb[1][q]) * 0.5; } this.L.grab = o2; this.L.sr = sr; } this.gv = P.grab; }
     this.L.led = Math.min(1, pk / 4); if (on) { this.L.env = Math.min(1, this.ef / 2); this.L.on = Math.max(0, Math.min(1, onset)); this.L.bpm = this.bpm; this.L.conf = this.conf; }
