@@ -8,7 +8,7 @@ class RackEngine extends AudioWorkletProcessor {
     this.port.onmessage = ev => { for (const m of ev.data) this.e.handle(m); };
   }
   process(inputs, outputs) {
-    const o = outputs[0], x = inputs[0]; this.e.ext = x && x.length ? x : null; // RADIO's station, when the page feeds one in
+    const o = outputs[0], x = inputs[0], y = inputs[1]; this.e.ext = x && x.length ? x : null; this.e.ext2 = y && y.length ? y : null; // RADIO's station and the TV's sound, when the page feeds them in
     this.e.process(128);
     o[0].set(this.e.oL);
     if (o[1]) o[1].set(this.e.oR);

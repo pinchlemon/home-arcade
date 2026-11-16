@@ -219,6 +219,10 @@ body.cam #cambar{display:flex}
   <div class="sec" style="margin-top:8px">SPIN THE DIAL</div>
   <div class="chips" id="rDial"><button data-m="0">OFF</button><button data-m="2">EVERY 2 MIN</button><button data-m="5">5 MIN</button><button data-m="15">15 MIN</button><button data-any="1" id="rAny">ANY KIND</button></div>
   <div id="rList"></div>
+  <div class="sec" style="margin-top:10px">TV · OLD FILMS <span id="tvCh" class="muted">OFF</span></div>
+  <div class="muted" id="tvStatus">The top TV on the right plays public-domain films from the Internet Archive. Press POWER on it, or here.</div>
+  <div class="chips"><button id="tvPow">TV POWER</button><button id="tvPrev">◀ CH</button><button id="tvNext">CH ▶</button><button id="tvTest">TEST STREAMING</button><button id="tvShow">SHOW ME THE TV</button></div>
+  <pre id="tvDiag" class="muted" style="white-space:pre-wrap;font:11px/1.45 ui-monospace,monospace;margin:4px 0 0"></pre>
   <div class="muted" style="margin-top:8px">For listening and ideas at home. Don't rebroadcast stations on a stream.</div>
 </div>
 <div id="parts" class="hud hide">
@@ -784,8 +788,8 @@ DEFS.radio = (() => { // the radio by the TV: x/y here are only for the controll
     key('jam', 'JAM', { name: 'JAM ALONG', fmt: () => JAM.on ? 'ON' : 'OFF' }), key('grab', 'GRAB', { name: 'GRAB → GRANULAR', fmt: () => 'grabs the last 4 s' }),
     key('fx', 'FX', { name: 'THE RACK\'S EFFECTS ON THE STATION', fmt: v => v ? 'ON (ECHO, MANGLE...)' : 'OFF, CLEAN' }), key('solo', 'FADE', { def: 1, name: 'THE RACK WHILE THE RADIO PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' })],
     jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(2.3, 13.2)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(2.3, 11.0)), J('env', 0, 0, 'ENV', 'out', 'cv', at(2.3, 8.8)), J('trig', 0, 0, 'TRIG', 'out', 'cv', at(2.3, 6.6))] }; })();
-DEFS.rx = lay('RADIO IN', 20, 'navy', [[sc(1.3)], [tx('CORDS FROM THE RADIO')], [ld('led', 'amber')]],
-  [[ji('inL', 'RACK L', 'audio'), ji('inR', 'RACK R', 'audio')], [ji('radL', 'RADIO L', 'audio'), ji('radR', 'RADIO R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.rx = lay('RADIO + TV IN', 20, 'navy', [[sc(1.3)], [ld('led', 'amber')]],
+  [[ji('inL', 'RACK L', 'audio'), ji('inR', 'RACK R', 'audio'), ji('tvL', 'TV L', 'audio'), ji('tvR', 'TV R', 'audio')], [ji('radL', 'RADIO L', 'audio'), ji('radR', 'RADIO R', 'audio'), jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const METER_T = [['YOUTUBE', -14], ['SPOTIFY', -14], ['APPLE', -16], ['OFF', null]];
 DEFS.meter = lay('METER', 8, 'silver',
   [[sc(1.6)], [kn('target', 'TARGET', 'S', { min: 0, max: 3, step: 1, def: 0, name: 'LOUDNESS TARGET', fmt: v => METER_T[v][1] == null ? 'OFF' : METER_T[v][0] + ' ' + METER_T[v][1] + ' LUFS' }), BTN('reset', 'RESET')]], []);
@@ -1166,7 +1170,7 @@ class RecorderM extends Mod {
     g.fillStyle = '#9fb6dd'; g.font = '500 ' + Math.round(13 * k) + 'px Saira, system-ui'; g.fillText('SAVE keeps the last ' + [30, 60, 120][this.v('len')] + ' s', 10 * k, 56 * k); s.tex.needsUpdate = true; } }
 // SCENES: two snapshots of the knobs (A and B) and one MORPH knob between them. Smooth knobs glide, switch-like ones change at halfway.
 const SCN = (() => { try { return JSON.parse(localStorage.getItem('nightrack.scenes')) || {}; } catch (e) { return {}; } })();
-const SCENE_SKIP = new Set(['scenes', 'recorder', 'meter', 'radio', 'rx', 'out', 'cond', 'keys', 'limit']);
+const SCENE_SKIP = new Set(['scenes', 'recorder', 'meter', 'radio', 'rx', 'tv', 'out', 'cond', 'keys', 'limit']);
 function sceneMods(what) { const live = new Set(deckIds(DECK.live || 'A')), side = new Set(MIXSIDE);
   return modules.filter(m => realMod(m) && !SCENE_SKIP.has(m.id) && (what === 0 || (what === 1 ? live.has(m.id) : side.has(m.id)))); }
 function sceneSnap(which) { const m = modById.scenes, o = {}; for (const md of sceneMods(m.v('what'))) { const k = {}; for (const id in md.knobs) { const kn = md.knobs[id]; if (kn.def.btn || id === 'auto') continue; k[id] = kn.norm; } o[md.id] = k; }
@@ -1319,7 +1323,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { chord: ChordM, looper: LooperM, granular: GranM, euclid: LedM, meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, rx: RxM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { chord: ChordM, looper: LooperM, granular: GranM, euclid: LedM, meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, rx: RxM, tv: Mod, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -2210,12 +2214,12 @@ function washiLamp() { // tall paper floor lamp in a dark wood lattice, as tall 
   return g;
 }
 // ---------------------------------------------------------------- CRT corner: monitors fed live by the rack, a speaker, a media cabinet with a console
-const SCREEN_FS = `uniform float uTime, uSeed, uMode, uBright; uniform sampler2D uMap; uniform vec4 uZoom; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
+const SCREEN_FS = `uniform float uTime, uSeed, uMode, uBright, uGray; uniform sampler2D uMap; uniform vec4 uZoom; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }
   void main(){ vec2 cc = vUv - 0.5; vec2 uv = 0.5 + cc * (1.0 + 0.09 * dot(cc, cc)); vec3 c = vec3(0.0); float t = uTime;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
     if (uMode < 0.5) { vec2 g = floor(uv * vec2(220.0, 160.0)); float tf = floor(t * 30.0); float n = h(vec2(g.x * 1.31 + tf * 37.0, g.y * 1.73 - tf * 91.0)); n = fract(n * 7.0 + h(g.yx + tf)); float roll = smoothstep(0.0, 0.08, abs(fract(uv.y - t * 0.17) - 0.5)); c = vec3(n * (0.6 + 0.4 * roll)); }
     else { float o = 0.0016; vec2 su = uZoom.zw + uv * uZoom.xy; c = vec3(texture2D(uMap, su + vec2(o, 0.0)).r, texture2D(uMap, su).g, texture2D(uMap, su - vec2(o, 0.0)).b); c *= 1.0 + 0.04 * sin(t * 50.0 + uSeed); c += (h(floor(uv * vec2(320.0, 240.0)) + floor(t * 24.0)) - 0.5) * 0.035; }
-    c *= 0.78 + 0.22 * sin(uv.y * 240.0 * 3.14159); c *= 1.0 - dot(cc, cc) * 1.3; gl_FragColor = vec4(c * 1.15 * uBright, 1.0); }`;
+    c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), uGray); c *= 0.78 + 0.22 * sin(uv.y * 240.0 * 3.14159); c *= 1.0 - dot(cc, cc) * 1.3; gl_FragColor = vec4(c * 1.15 * uBright, 1.0); }`;
 const SCREENS = window.__screens = [];
 // ---- what the screens show: live from the rack
 const FEED = { cv: {}, tex: {}, t: 0, rt: null, cam: null, n: 0, used: new Set() };
@@ -2264,7 +2268,7 @@ function renderFeed(now) { // a slow security-camera sweep across the rack, rend
 function crtScreen(w, h, mode) {
   const geo = new THREE.PlaneGeometry(w, h, 14, 10), bulge = Math.min(w, h) * 0.04, pa = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pa.count; i++) { const u = uv.getX(i) * 2 - 1, v = uv.getY(i) * 2 - 1; pa.setZ(i, bulge * (1 - u * u) * (1 - v * v)); } geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uBright: CRT_U.uBright, uSeed: { value: Math.random() * 100 }, uMode: { value: mode === 'static' ? 0 : 1 }, uZoom: { value: new THREE.Vector4(1, 1, 0, 0) }, uMap: { value: mode === 'static' ? null : feedTex(mode) } }, toneMapped: false,
+  const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms: { uTime: CRT_U.uTime, uBright: CRT_U.uBright, uSeed: { value: Math.random() * 100 }, uMode: { value: mode === 'static' ? 0 : 1 }, uGray: { value: 0 }, uZoom: { value: new THREE.Vector4(1, 1, 0, 0) }, uMap: { value: mode === 'static' ? null : feedTex(mode) } }, toneMapped: false,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: SCREEN_FS }));
   const glass = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0x0a0c10, transparent: true, opacity: 0.16, roughness: 0.06, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.4, depthWrite: false })); glass.position.z = 0.12; m.add(glass);
   if (mode === 'game') m.userData.game = true; SCREENS.push(m); return m;
@@ -2272,7 +2276,7 @@ function crtScreen(w, h, mode) {
 function rrShape(w, h, r, ox = 0, oy = 0, hole = false) { const s = hole ? new THREE.Path() : new THREE.Shape(), x = -w / 2 + ox, y = -h / 2 + oy; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
 function rrBox(w, h, d, r, bev = 0.5) { const g = new THREE.ExtrudeGeometry(rrShape(w - 2 * bev, h - 2 * bev, Math.max(0.1, r - bev)), { depth: d - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 8 }); g.translate(0, 0, -(d - 2 * bev) - bev); return g; } // front face at z = 0
 function labelTex(w, h, draw) { const c = document.createElement('canvas'), S = 24; c.width = Math.round(w * S); c.height = Math.round(h * S); const g = c.getContext('2d'); draw(g, c.width, c.height, S); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
-function tvSet(kind, w, h, mode) { // pvm: grey pro monitor with a control strip; jvc: small boxy monitor; home: rounded black consumer set. Returns rear jack positions for cords.
+function tvSet(kind, w, h, mode, film) { // pvm: grey pro monitor with a control strip; jvc: small boxy monitor; home: rounded black consumer set. Returns rear jack positions for cords.
   const g = new THREE.Group(), home = kind === 'home', d = home ? w * 0.9 : w * 0.98, fd = d * 0.32, col = home ? 0x121216 : kind === 'pvm' ? 0x2c2e34 : 0x3b3d43;
   const plast = new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.48, metalness: 0.05, clearcoat: 0.25, clearcoatRoughness: 0.5 }), dark = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.55 });
   const strip = home ? h * 0.13 : h * 0.19, sw = w * (kind === 'pvm' ? 0.76 : 0.78), sh = (h - strip) * 0.8, sy = strip + (h - strip) * 0.52, R = home ? Math.min(w, h) * 0.12 : Math.min(w, h) * 0.05;
@@ -2287,22 +2291,22 @@ function tvSet(kind, w, h, mode) { // pvm: grey pro monitor with a control strip
   const fr = new THREE.Mesh(new THREE.ExtrudeGeometry(frame, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.25, bevelSegments: 2, curveSegments: 8 }), dark); fr.position.set(0, sy, -2.3); g.add(fr);
   const scr = crtScreen(sw, sh, mode); scr.position.set(0, sy, -1.9); g.add(scr);
   // control strip: one layout drives both the printed labels and the real buttons/knobs, so they line up
-  const pw = w * 0.92, ph = strip * 0.86, cy = strip * 0.36, CTRL = home ? [[0.07, 'b', 'MENU'], [0.16, 'b', 'TV/AV'], [0.25, 'b', 'VOL'], [0.34, 'b', 'CH'], [0.89, 'p', 'POWER']]
+  const pw = w * 0.92, ph = strip * 0.86, cy = strip * 0.36, CTRL = film ? [[0.06, 'k', 'CHANNEL'], [0.16, 'k', 'VOLUME'], [0.25, 'b', 'PREV'], [0.33, 'b', 'NEXT'], [0.46, 'j', 'OUT L'], [0.55, 'j', 'OUT R'], [0.64, 'j', 'ENV'], [0.73, 'j', 'LIGHT'], [0.89, 'p', 'POWER']] : home ? [[0.07, 'b', 'MENU'], [0.16, 'b', 'TV/AV'], [0.25, 'b', 'VOL'], [0.34, 'b', 'CH'], [0.89, 'p', 'POWER']]
     : kind === 'pvm' ? [[0.06, 'b', 'LINE A'], [0.15, 'b', 'LINE B'], [0.24, 'b', 'RGB'], [0.33, 'b', 'UNDER'], [0.42, 'b', 'H/V'], [0.51, 'b', 'BLUE'], [0.65, 'k', 'CHROMA'], [0.78, 'k', 'BRIGHT'], [0.91, 'p', 'POWER']]
     : [[0.08, 'b', 'A'], [0.17, 'b', 'B'], [0.26, 'b', 'MENU'], [0.5, 'k', 'CONTR'], [0.66, 'k', 'BRIGHT'], [0.88, 'p', 'POWER']];
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ roughness: 0.6, map: labelTex(pw, ph, (c, W, H) => {
     c.fillStyle = home ? '#141418' : kind === 'pvm' ? '#25272c' : '#33353b'; c.fillRect(0, 0, W, H);
     const fs = Math.max(7, Math.round(Math.min(H * 0.17, W * 0.024))), ty = H * 0.08, by = (ph / 2 + strip * 0.5 - cy) / ph * H; c.font = `600 ${fs}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top';
-    for (const [x, t, l] of CTRL) { c.fillStyle = home ? '#7a7a84' : '#c3c8d2'; c.fillText(l, x * W, ty); c.fillStyle = 'rgba(0,0,0,.45)'; const bw = (t === 'b' ? w * 0.05 : t === 'k' ? strip * 0.42 : strip * 0.36) / pw * W; c.fillRect(x * W - bw / 2 - 2, by - bw * 0.42 - 2, bw + 4, bw * 0.84 + 4); }
-    if (home) { c.fillStyle = '#08080a'; for (let k = 0; k < 16; k++) c.fillRect(W * (0.46 + k * 0.022), H * 0.3, W * 0.01, H * 0.55); }
+    for (const [x, t, l] of CTRL) { c.fillStyle = home ? '#7a7a84' : '#c3c8d2'; c.fillText(l, x * W, ty); c.fillStyle = 'rgba(0,0,0,.45)'; const bw = (t === 'b' ? w * 0.05 : t === 'k' ? strip * 0.42 : t === 'j' ? strip * 0.34 : strip * 0.36) / pw * W; c.fillRect(x * W - bw / 2 - 2, by - bw * 0.42 - 2, bw + 4, bw * 0.84 + 4); }
+    if (home && !film) { c.fillStyle = '#08080a'; for (let k = 0; k < 16; k++) c.fillRect(W * (0.46 + k * 0.022), H * 0.3, W * 0.01, H * 0.55); }
     c.fillStyle = home ? '#2a2a30' : '#5c6068'; c.fillRect(W * 0.02, H * 0.96, W * 0.96, 1.5); }) }));
   panel.position.set(0, strip * 0.5, 0.02); g.add(panel);
   const parts = [], bm = new THREE.MeshStandardMaterial({ color: home ? 0x26262c : 0x9ca2ac, roughness: 0.45, metalness: 0.35 }), km = new THREE.MeshStandardMaterial({ color: 0x1a1b1f, roughness: 0.4 }), kparts = [];
-  for (const [x, t] of CTRL) { const X = -pw / 2 + x * pw;
+  const ctl = []; for (const [x, t, l] of CTRL) { const X = -pw / 2 + x * pw; if (film) { ctl.push({ X, cy, type: t, label: l }); continue; }
     if (t === 'b') { const b = new THREE.BoxGeometry(w * 0.05, strip * 0.2, 0.45); b.translate(X, cy, 0.24); parts.push(b.toNonIndexed()); }
     else if (t === 'k') { const k = new THREE.CylinderGeometry(strip * 0.15, strip * 0.17, 0.8, 24); k.rotateX(Math.PI / 2); k.translate(X, cy, 0.42); kparts.push(k.toNonIndexed()); const d2 = new THREE.BoxGeometry(strip * 0.03, strip * 0.12, 0.2); d2.translate(X, cy + strip * 0.07, 0.85); parts.push(d2.toNonIndexed()); }
     else { const p2 = new THREE.CylinderGeometry(strip * 0.14, strip * 0.14, 0.55, 24); p2.rotateX(Math.PI / 2); p2.translate(X, cy, 0.3); parts.push(p2.toNonIndexed()); } }
-  g.add(new THREE.Mesh(mergeGeometries(parts), bm)); if (kparts.length) g.add(new THREE.Mesh(mergeGeometries(kparts), km));
+  if (parts.length) g.add(new THREE.Mesh(mergeGeometries(parts), bm)); if (kparts.length) g.add(new THREE.Mesh(mergeGeometries(kparts), km));
   const led = new THREE.Mesh(new THREE.CircleGeometry(strip * 0.045, 12), new THREE.MeshBasicMaterial({ color: home ? 0xff2a2a : 0x40ff70, toneMapped: false })); led.position.set(-pw / 2 + (CTRL[CTRL.length - 1][0] - 0.05) * pw, cy, 0.05); g.add(led);
   // vents on top, rubber feet, rear jacks
   const vents = []; for (let r = 0; r < 3; r++) for (let k = 0; k < 9; k++) { const v = new THREE.BoxGeometry(w * 0.05, 0.12, 0.6); v.translate(-w * 0.3 + k * w * 0.075, h * (home ? 0.78 : 0.92) + 0.05, -fd - (d - fd) * (0.25 + r * 0.18)); vents.push(v.toNonIndexed()); }
@@ -2311,7 +2315,7 @@ function tvSet(kind, w, h, mode) { // pvm: grey pro monitor with a control strip
   const rz = -d + 0.2, ry = h * 0.42, jacks = [], jm = { y: new THREE.MeshStandardMaterial({ color: 0xe0b020, metalness: 0.5, roughness: 0.35 }), w: new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.4, roughness: 0.35 }), r: new THREE.MeshStandardMaterial({ color: 0xc02020, metalness: 0.4, roughness: 0.35 }) };
   [['y', 0xd8a818], ['w', 0xdedede], ['r', 0xb81c1c]].forEach(([k, c], q) => { const j = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1, 14), jm[k]); j.rotation.x = Math.PI / 2; const x = (q - 1) * 1.6; j.position.set(x, ry, rz - 0.4); g.add(j); jacks.push({ p: new THREE.Vector3(x, ry, rz - 0.9), col: c }); });
   beam(new THREE.Vector3(0, sy, 1), new THREE.Vector3(0, -0.12, 1), Math.min(sw, sh) * 0.45, Math.min(sw, sh) * 1.5, 55, '#cfe0ff', sw / sh, () => (0.5 + CRT_U.uLevel.value * 0.5) * SET.crtB, false, 0.3, g);
-  return { g, w, h, d, jacks };
+  return { g, w, h, d, jacks, ctl: film ? ctl : null, scr, strip, led };
 }
 function speaker() { // two-way studio monitor: rounded cabinet, woofer with surround, waveguide tweeter, flared port, binding posts on the back
   const g = new THREE.Group(), W = 22, H = 36, D = 27, cab = new THREE.MeshPhysicalMaterial({ color: 0x15171d, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.4 }), black = new THREE.MeshStandardMaterial({ color: 0x07070a, roughness: 0.7 });
@@ -2600,12 +2604,96 @@ function collideBoxes(P, O, ix) { for (const B of OBST) { if (!B.on()) continue;
     if (_ob.x < a.x - m || _ob.x > b.x + m || _ob.y < a.y - m || _ob.y > b.y + m || _ob.z < a.z - m || _ob.z > b.z + m) continue;
     const d = [[_ob.x - (a.x - m), 'x', a.x - m], [(b.x + m) - _ob.x, 'x', b.x + m], [(b.y + m) - _ob.y, 'y', b.y + m], [(b.z + m) - _ob.z, 'z', b.z + m], [_ob.z - (a.z - m), 'z', a.z - m]].sort((u, v) => u[0] - v[0])[0];
     _ob[d[1]] = d[2]; _ob.applyMatrix4(B.mw); P[ix] = _ob.x; P[ix + 1] = _ob.y; P[ix + 2] = _ob.z; O[ix] = lerp(O[ix], _ob.x, 0.3); O[ix + 1] = lerp(O[ix + 1], _ob.y, 0.3); O[ix + 2] = lerp(O[ix + 2], _ob.z, 0.3); } }
+// ---------------------------------------------------------------- THE TV: the top set on the right cabinet plays old films streamed from the Internet Archive.
+// Channels come from the Archive's public-domain Feature Films and Classic TV collections (noir, mystery, detective). Each plays as if broadcast:
+// it starts wherever "now" falls in the film. The set is the TV module: CHANNEL, VOLUME, PREV, NEXT, POWER, and jacks (sound, ENV, LIGHT).
+const TVS = { set: null, scr: null, el: null, tex: null, inNode: null, list: [], i: 0, mode: 'off', diag: [], lumaCv: null, lt: 0, chT: 0, tok: 0, found: false };
+const TV_QUERIES = [['NOIR', 'collection:(feature_films) AND subject:("film noir" OR noir)'], ['MYSTERY', 'collection:(feature_films) AND subject:(mystery OR detective OR "private eye")'], ['TV CRIME', 'collection:(classic_tv) AND subject:(detective OR crime OR police OR mystery)']];
+const TV_MOMENTARY = new Set(['power', 'prev', 'next']);
+function tvStatus(t) { TVS.status = t; const el = document.getElementById('tvStatus'); if (el) el.textContent = t; }
+async function tvFind() { // the channel list, most-watched first, interleaved across the three kinds
+  const lists = await Promise.all(TV_QUERIES.map(async ([kind, q]) => { try { const u = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent('mediatype:(movies) AND ' + q) + '&fl[]=identifier&fl[]=title&fl[]=year&sort[]=downloads+desc&rows=30&output=json';
+    const r = await fetch(u); if (!r.ok) throw new Error('HTTP ' + r.status); const j = await r.json(); return (j.response && j.response.docs || []).map(d => ({ id: d.identifier, title: String(d.title || d.identifier), year: d.year ? String(d.year).slice(0, 4) : '', kind })); } catch (e) { TVS.err = e.message || String(e); return null; } }));
+  if (lists.every(l => l === null)) return false; const seen = new Set(), out = [];
+  for (let k = 0; k < 30; k++) for (const l of lists) if (l && l[k] && !seen.has(l[k].id)) { seen.add(l[k].id); out.push(l[k]); }
+  TVS.list = out.slice(0, 40); TVS.found = true; return true; }
+async function tvSource(item) { // the smallest MP4 of the film, straight from its storage server
+  if (item.url) return item.url; const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(item.id)); if (!r.ok) throw new Error('metadata HTTP ' + r.status); const j = await r.json();
+  const mp4 = (j.files || []).filter(f => /\.mp4$/i.test(f.name) && !/trailer/i.test(f.name)).sort((a, b) => (+a.size || 9e12) - (+b.size || 9e12)); if (!mp4.length) throw new Error('no MP4 file');
+  const pick = mp4.find(f => +f.size > 30e6) || mp4[mp4.length - 1]; item.url = j.server && j.dir ? 'https://' + j.server + j.dir + '/' + pick.name.split('/').map(encodeURIComponent).join('/') : 'https://archive.org/download/' + encodeURIComponent(item.id) + '/' + pick.name.split('/').map(encodeURIComponent).join('/'); return item.url; }
+function tvScreen(on) { const u = TVS.scr && TVS.scr.material.uniforms; if (!u) return; if (on && TVS.tex) { u.uMap.value = TVS.tex; u.uZoom.value.set(1, 1, 0, 0); u.uMode.value = 1; u.uGray.value = 1; } else { u.uMode.value = 0; u.uGray.value = 0; } }
+function tvKill() { if (TVS.el) { try { TVS.el.pause(); TVS.el.removeAttribute('src'); TVS.el.load(); } catch (e) { } } }
+function tvOff() { TVS.tok++; tvKill(); TVS.mode = 'off'; tvScreen(false); send({ t: 'param', id: 'tv', k: 'live', v: 0 }); tvStatus('TV off.'); tvDraw(); }
+async function tvPlay(i) { // tune to channel i: static while it connects, then the film from "now"
+  const tok = ++TVS.tok; TVS.mode = 'loading'; tvScreen(false); tvDraw();
+  if (!AC || AC.state !== 'running') { try { await powerOn(); } catch (e) { } }
+  if (!TVS.found) { tvStatus('Looking up channels on the Internet Archive…'); if (!(await tvFind())) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('Could not reach the Internet Archive\'s film list (' + (TVS.err || 'blocked') + '). Press TEST STREAMING for details.'); tvDraw(); return; } }
+  const L = TVS.list; if (!L.length) { TVS.mode = 'blocked'; tvStatus('The Archive returned no films.'); tvDraw(); return; } TVS.i = ((i % L.length) + L.length) % L.length; tvQuiet('chan', L.length > 1 ? TVS.i / (L.length - 1) : 0);
+  const it = L[TVS.i]; tvStatus('Tuning to CH ' + (TVS.i + 2) + ': ' + it.title + '…'); tvDraw();
+  let url; try { url = await tvSource(it); } catch (e) { if (tok !== TVS.tok) return; tvStatus('CH ' + (TVS.i + 2) + ' has no playable file (' + e.message + '). Trying the next…'); setTimeout(() => tok === TVS.tok && tvPlay(TVS.i + 1), 900); return; }
+  if (tok !== TVS.tok) return; tvKill();
+  if (!TVS.el) { const v = document.createElement('video'); v.crossOrigin = 'anonymous'; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; TVS.el = v;
+    TVS.tex = new THREE.VideoTexture(v); TVS.tex.colorSpace = THREE.SRGBColorSpace; TVS.tex.generateMipmaps = false; TVS.tex.minFilter = THREE.LinearFilter;
+    if (AC && ENG && ENG.kind === 'worklet') { try { TVS.inNode = AC.createGain(); TVS.inNode.connect(ENG.node, 0, 1); AC.createMediaElementSource(v).connect(TVS.inNode); TVS.audio = true; } catch (e) { TVS.audio = false; } } }
+  const v = TVS.el; v.src = url;
+  const ok = await new Promise(res => { const t = setTimeout(() => res('timeout'), 20000); v.onloadedmetadata = () => { clearTimeout(t); res('ok'); }; v.onerror = () => { clearTimeout(t); res('error'); }; });
+  if (tok !== TVS.tok) return;
+  if (ok !== 'ok') { TVS.mode = 'blocked'; tvStatus('CH ' + (TVS.i + 2) + ' would not load (' + ok + '). The Archive may not allow the picture to be shared with this page. Press TEST STREAMING.'); tvDraw(); return; }
+  if (isFinite(v.duration) && v.duration > 60) { try { v.currentTime = (Date.now() / 1000) % (v.duration - 30); } catch (e) { } } // like a broadcast: you join it in progress
+  try { await v.play(); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('The film loaded but would not play (' + e.message + '). Tap POWER again.'); tvDraw(); return; }
+  if (tok !== TVS.tok) return; TVS.mode = 'on'; tvScreen(true); send({ t: 'param', id: 'tv', k: 'live', v: TVS.audio ? 1 : 0 });
+  tvStatus('CH ' + (TVS.i + 2) + ': ' + it.title + (it.year ? ' (' + it.year + ')' : '') + ' · from the Internet Archive.' + (TVS.audio ? '' : ' (Sound plays without the rack here.)')); tvDraw(); }
+function tvQuiet(id, n) { const kn = modById.tv && modById.tv.knobs[id]; if (!kn) return; TVS.quiet = true; try { kn.set(n); } finally { TVS.quiet = false; } }
+function tvDraw() { const el = document.getElementById('tvCh'); if (!el) return; el.textContent = TVS.mode === 'off' ? 'OFF' : TVS.list[TVS.i] ? 'CH ' + (TVS.i + 2) + ' · ' + TVS.list[TVS.i].kind : '…'; }
+async function tvTest() { // a step-by-step check that she can read out on the phone
+  const out = [], put = (ok, t) => { out.push((ok ? '✓ ' : '✗ ') + t); const el = document.getElementById('tvDiag'); if (el) el.textContent = out.join('\n'); }; put(true, 'Testing… (takes up to 30 s)'); out.length = 0;
+  let L = null; try { const ok = await tvFind(); put(ok, ok ? 'Film list: ' + TVS.list.length + ' films found' : 'Film list blocked: ' + (TVS.err || '?')); L = ok ? TVS.list : null; } catch (e) { put(false, 'Film list: ' + e.message); }
+  if (!L || !L.length) return; const it = L[0]; let url = null;
+  try { url = await tvSource(it); put(true, 'Film file found: ' + it.title); } catch (e) { put(false, 'Film file: ' + e.message); return; }
+  const probe = cors => new Promise(res => { const v = document.createElement('video'); if (cors) v.crossOrigin = 'anonymous'; v.muted = true; v.playsInline = true; v.preload = 'auto'; const t = setTimeout(() => res([false, v]), 20000); v.onloadeddata = () => { clearTimeout(t); res([true, v]); }; v.onerror = () => { clearTimeout(t); res([false, v]); }; v.src = url; v.play().catch(() => { }); });
+  const [okC, vC] = await probe(true); put(okC, okC ? 'Video loads with sharing allowed (good: picture + sound through the rack)' : 'Video will not load with sharing (CORS) on');
+  if (okC) { try { const c = document.createElement('canvas'); c.width = 8; c.height = 6; const g = c.getContext('2d'); g.drawImage(vC, 0, 0, 8, 6); g.getImageData(0, 0, 1, 1); put(true, 'Picture can be drawn on the 3D TV'); } catch (e) { put(false, 'Picture is locked: ' + e.name); } }
+  else { const [okP] = await probe(false); put(okP, okP ? 'Video plays without sharing (so the Archive is reachable, but it does not allow the picture/sound to be used here)' : 'Video does not load at all (network or format)'); }
+  try { vC.pause(); vC.removeAttribute('src'); vC.load(); } catch (e) { } }
+setInterval(() => { // LIGHT: how bright the picture is, for the rack
+  if (TVS.mode !== 'on' || !TVS.el) return; if (!TVS.lumaCv) { TVS.lumaCv = document.createElement('canvas'); TVS.lumaCv.width = 16; TVS.lumaCv.height = 12; }
+  try { const g = TVS.lumaCv.getContext('2d', { willReadFrequently: true }); g.drawImage(TVS.el, 0, 0, 16, 12); const d = g.getImageData(0, 0, 16, 12).data; let s = 0; for (let k = 0; k < d.length; k += 4) s += d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11; send({ t: 'param', id: 'tv', k: 'luma', v: s / (d.length / 4) / 255 }); } catch (e) { } }, 100);
+class TVM extends Mod {
+  knobChanged(id, v) { super.knobChanged(id, v); tvSaveKnobs(); if (loading || TVS.quiet) return;
+    if (id === 'chan') { const n = TVS.list.length; tvScreen(false); clearTimeout(TVS.chT); TVS.chT = setTimeout(() => { const i = n > 1 ? Math.round(this.knobs.chan.norm * (n - 1)) : 0; if (TVS.mode === 'off' || i !== TVS.i || !n) tvPlay(i); else if (TVS.mode === 'on') tvScreen(true); }, 350); }
+    else if (v && TV_MOMENTARY.has(id)) { if (id === 'power') { if (TVS.mode === 'off') tvPlay(TVS.i); else tvOff(); } else if (id === 'next') tvPlay(TVS.i + 1); else if (id === 'prev') tvPlay(TVS.i - 1); setTimeout(() => this.knobs[id].set(0), 160); } }
+  visual() { tvVisual(); } idle() { tvVisual(); } }
+function tvVisual() { if (!TVS.set) return; const on = TVS.mode === 'on' || TVS.mode === 'loading'; if (TVS.led) TVS.led.material.color.setHex(TVS.mode === 'off' ? 0x330808 : TVS.mode === 'blocked' ? 0xffa020 : 0xff2a2a);
+  for (const id in TVS.keys) { const k = TVS.keys[id], kn = modById.tv && modById.tv.knobs[id], down = kn && kn.norm > 0.5, z = down ? -0.15 : 0; k.position.z += (z - k.position.z) * 0.4; } }
+function tvSaveKnobs() { const m = modById.tv; if (!m) return; const o = {}; for (const k in m.knobs) if (!TV_MOMENTARY.has(k)) o[k] = m.knobs[k].norm; try { localStorage.setItem('nightrack.tvKnobs', JSON.stringify(o)); } catch (e) { } }
+function tvModule() { // turn the top set's control strip into the TV module
+  const T = TVS.set; if (!T || !T.ctl) return; const face = T.g, U = U3, sh = T.h / 2 - U / 2; const at = (x, y) => ({ x: x + 12, y: U + sh - y, lx: x, ly: y });
+  const c = Object.fromEntries(T.ctl.map(o => [o.label, o])), key = (id, label, o) => K(id, 0, 0, label, { ...at(c[label].X, c[label].cy), btn: true, min: 0, max: 1, step: 1, def: 0, ...o });
+  DEFS.tv = { title: 'TV', hp: 30, theme: 'navy', leds: [], labels: [], knobs: [
+    K('chan', 0, 0, 'CHANNEL', { ...at(c.CHANNEL.X, c.CHANNEL.cy), size: 'S', def: 0, px: 700, fmt: v => { const n = TVS.list.length; if (!n) return 'press POWER'; const i = Math.round(v * (n - 1)); return 'CH ' + (i + 2) + ' · ' + TVS.list[i].title; } }),
+    K('lvl', 0, 0, 'VOLUME', { ...at(c.VOLUME.X, c.VOLUME.cy), size: 'S', def: 0.7, fmt: fPct }),
+    key('prev', 'PREV', { name: 'PREVIOUS CHANNEL', fmt: () => '' }), key('next', 'NEXT', { name: 'NEXT CHANNEL', fmt: () => '' }), key('power', 'POWER', { name: 'POWER', fmt: () => TVS.mode === 'off' ? 'OFF' : 'ON' })],
+    jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(c['OUT L'].X, c['OUT L'].cy)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(c['OUT R'].X, c['OUT R'].cy)), J('env', 0, 0, 'ENV', 'out', 'cv', at(c.ENV.X, c.ENV.cy)), J('light', 0, 0, 'LIGHT', 'out', 'cv', at(c.LIGHT.X, c.LIGHT.cy))] };
+  const m = new TVM('tv', 'tv'); modules.push(m); modById.tv = m; m.group = face; m.w = 24; m.x0 = -12; m.y0 = sh; m.prop = true;
+  const sec = TVS.sec = { k: 'TV', inner: face, knobGrid: new Map(), plugGrid: new Map(), mw: new THREE.Matrix4(), inv: new THREE.Matrix4(), q: new THREE.Quaternion(), n: new THREE.Vector3() }; m.sec = sec;
+  const knobM = new THREE.MeshPhysicalMaterial({ color: 0x1a1a1e, roughness: 0.35, clearcoat: 0.6 }), chrome = new THREE.MeshStandardMaterial({ color: 0xc8ccd2, metalness: 0.9, roughness: 0.25 }); TVS.keys = {};
+  for (const o of T.ctl) { if (o.type === 'k') { const id = o.label === 'CHANNEL' ? 'chan' : 'lvl', kb = radioKnob(T.strip * 0.2, T.strip * 0.2, 16, knobM, chrome); kb.holder.position.set(o.X, o.cy, 0.05); face.add(kb.holder); const kn = m.knobs[id]; kn.rot = kb.rot; kn.updateMesh(); for (const p of kb.picks) { p.userData.knob = kn; pickKnobs.push(p); } }
+    else if (o.type === 'b' || o.type === 'p') { const id = o.label.toLowerCase(), g = o.type === 'b' ? new THREE.BoxGeometry(T.w * 0.05, T.strip * 0.22, 0.45) : new THREE.CylinderGeometry(T.strip * 0.15, T.strip * 0.15, 0.5, 24).rotateX(Math.PI / 2); g.translate(0, 0, 0.25);
+      const b = new THREE.Mesh(g, o.type === 'b' ? chrome : knobM); b.position.set(o.X, o.cy, 0); face.add(b); b.userData.knob = m.knobs[id]; pickKnobs.push(b); TVS.keys[id] = b; }
+    else if (o.type === 'j') { const id = { 'OUT L': 'L', 'OUT R': 'R', ENV: 'env', LIGHT: 'light' }[o.label], port = m.ports[id], jg = new THREE.Group(); jg.position.set(o.X, o.cy, 0.04); jg.scale.setScalar(0.85); face.add(jg);
+      const mm = new THREE.Mesh(GEO.jack, MAT.metal), hole = new THREE.Mesh(GEO.hole, MAT.hole), pk = new THREE.Mesh(GEO.pick, MAT.hole); pk.visible = false; pk.userData.port = port; const ring = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, transparent: true, opacity: 0.9 })); ring.visible = false; jg.add(mm, hole, pk, ring); pickJacks.push(pk); port.ring = ring; port.sec = sec; port.tvXY = [o.X, o.cy]; } }
+  try { const S = JSON.parse(localStorage.getItem('nightrack.tvKnobs') || 'null'); if (S) for (const k in S) if (m.knobs[k]) { m.knobs[k].norm = S[k]; m.knobs[k].updateMesh(); } } catch (e) { }
+  tvPlace(); }
+function tvPlace() { const m = modById.tv; if (!m || !TVS.set) return; const face = TVS.set.g; face.updateWorldMatrix(true, false); const S = TVS.sec; S.mw.copy(face.matrixWorld); S.inv.copy(S.mw).invert(); face.getWorldQuaternion(S.q); S.n.set(0, 0, 1).applyQuaternion(S.q);
+  for (const id in m.ports) { const p = m.ports[id]; if (!p.tvXY) continue; p.world.set(p.tvXY[0], p.tvXY[1], 0.5).applyMatrix4(S.mw); p.n = S.n; p.lx = p.tvXY[0]; p.ly = p.tvXY[1]; }
+  for (const c of cables) if (c.connected && c.ends.some(e => e.port && e.port.module === m)) c.length = Math.max(c.length, stdLen(c.ends[0].port.world.distanceTo(c.ends[1].port.world))); }
+function tvCords() { if (!modById.tv || !modById.rx || modById.rx.patched('tvL') || modById.tv.ports.L.cables.length) return; try { patchCable('tv.L', 'rx.tvL', '#d9d9d9', 1); patchCable('tv.R', 'rx.tvR', '#9a9a9a', 1); } catch (e) { } }
 const SIDE_CABLES = {};
 function crtSetup(side) { // monitors on a media cabinet, a speaker, a console with two controllers on the floor; every cord runs back into the rack
   const root = new THREE.Group(), cab = mediaCabinet(); root.add(cab.g); const top = cab.H, ports = [];
   const put = (t, x, y, z = -4, ry = 0) => { t.g.position.set(x, y, z); t.g.rotation.y = ry; root.add(t.g); for (const j of t.jacks.slice(0, 1)) ports.push({ obj: t.g, p: j.p, col: j.col }); return t; };
   if (side === 'L') { const a = put(tvSet('pvm', 31, 27, 'game'), -13, top, -2); put(tvSet('pvm', 23, 20, 'scope'), 15, top, -3, -0.06); put(tvSet('jvc', 18, 16, 'info'), -7.5, top + 27, -4, 0.05); put(tvSet('pvm', 25, 22, 'seq'), 16, top + 20, -5, -0.06); }
-  else { put(tvSet('home', 31, 26, 'vu'), -12, top, -2); put(tvSet('home', 29, 24, 'scope'), -11.5, top + 26, -3, 0.03); put(tvSet('home', 27, 22, 'static'), -12.5, top + 50, -4, -0.04); } // the radio sits to their right
+  else { put(tvSet('home', 31, 26, 'vu'), -12, top, -2); put(tvSet('home', 29, 24, 'scope'), -11.5, top + 26, -3, 0.03); TVS.set = put(tvSet('home', 27, 22, 'static', true), -12.5, top + 50, -4, -0.04); TVS.scr = TVS.set.scr; TVS.led = TVS.set.led; } // the radio sits to their right
   const spk = speaker(); spk.g.position.set(side === 'L' ? -44 : 44, 0, -8); spk.g.rotation.y = side === 'L' ? 0.3 : -0.3; root.add(spk.g); for (const j of spk.jacks) ports.push({ obj: spk.g, p: j.p, col: j.col });
   // controllers on the floor, corded to the console
   const loc = [], cg = []; const cons = cab.cons;
@@ -2631,12 +2719,12 @@ function sideCables(k) { // every monitor and speaker cord runs down to the floo
     (byCol[pt.col] = byCol[pt.col] || []).push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 120, 0.3, 6, false)); });
   for (const c in byCol) { const m = new THREE.Mesh(mergeGeometries(byCol[c]), new THREE.MeshStandardMaterial({ color: +c, roughness: 0.45 })); m.castShadow = true; grp.add(m); }
 }
-let cablesQueued = false; function queueSideCables() { if (cablesQueued) return; cablesQueued = true; requestAnimationFrame(() => { cablesQueued = false; for (const k in SIDES) sideCables(k); radioPlace(); rebuildPlugGrid(); }); }
+let cablesQueued = false; function queueSideCables() { if (cablesQueued) return; cablesQueued = true; requestAnimationFrame(() => { cablesQueued = false; for (const k in SIDES) sideCables(k); radioPlace(); tvPlace(); rebuildPlugGrid(); }); }
 function buildSides() {
   for (const [k, x, ry] of [['L', -88, 0.62], ['R', 88, -0.62]]) { const root = new THREE.Group(); root.position.set(x, FLOOR_Y, 30); root.rotation.y = ry; scene.add(root);
     const lamp = washiLamp(), crt = crtSetup(k); root.add(lamp, crt); SIDES[k] = { lamp, crt, root }; regProp('side.' + k, root); }
   RDO.table = radioTable(SIDES.R.root); RDO.table.position.set(17.5, 0, -2); RDO.table.rotation.y = -0.12; RDO.table.visible = SET.sideR !== 'crt';
-  const rg = buildRadio(SIDES.R.root); rg.position.set(17.5, 22, -2); rg.rotation.y = -0.12; radioModule();
+  const rg = buildRadio(SIDES.R.root); rg.position.set(17.5, 22, -2); rg.rotation.y = -0.12; radioModule(); tvModule();
   queueSideCables();
 }
 
@@ -2723,14 +2811,14 @@ function loadPatch(P) {
   loading = true;
   try {
     for (const c of [...cables]) removeCable(c);
-    for (const m of modules) { if (m.id === 'radio') continue; for (const k in m.knobs) { const kn = m.knobs[k], v = P.knobs && P.knobs[m.id] && P.knobs[m.id][k]; kn.set(v == null ? kn.defNorm : kn.toNorm(v)); } } // the radio keeps its own settings
+    for (const m of modules) { if (m.id === 'radio' || m.id === 'tv') continue; for (const k in m.knobs) { const kn = m.knobs[k], v = P.knobs && P.knobs[m.id] && P.knobs[m.id][k]; kn.set(v == null ? kn.defNorm : kn.toNorm(v)); } } // the radio keeps its own settings
     const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
   DECK.blending = null; ensureChain(); ensureFX(); deckRestore(); condRebase(); send({ t: 'param', id: 'limit', k: 'relearn', v: Math.random() }); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
   autosave();
 }
-function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) if (m.id !== 'radio') for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
+function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) if (m.id !== 'radio' && m.id !== 'tv') for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
 function autosave() { if (loading) return; clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('nightrack.current.v1', JSON.stringify(serialize())); } catch (e) { } }, 700); }
 function slots() { try { return JSON.parse(localStorage.getItem('nightrack.patches.v1') || '{}'); } catch (e) { return {}; } }
 function setSlots(o) { try { localStorage.setItem('nightrack.patches.v1', JSON.stringify(o)); return true; } catch (e) { toast('This browser won’t let the page save patches.'); return false; } }
@@ -3137,7 +3225,8 @@ function ensureChain() { // older patches (and the first-visit patch) skip the m
   autosave(); return true;
 }
 const out1 = p => p && p.cables.length;
-function radioCords() { // the radio's two cords into RADIO IN (put back on a patch load if they're missing)
+function radioCords() { // the radio's two cords into RADIO IN (put back on a patch load if they're missing); the TV's too
+  tvCords();
   if (!modById.radio || !modById.rx || modById.rx.patched('radL') || modById.radio.ports.L.cables.length) return; try { patchCable('radio.L', 'rx.radL', '#e6d6ae', 1); patchCable('radio.R', 'rx.radR', '#c9a46a', 1); } catch (e) { } }
 function fillIdle() { // keep the resting deck patched too (asleep, so it costs no sound processing): the next blend goes to it
   if (DECK.blending || !out1(modById.blend.ports.L)) return; const live = DECK.live, to = live === 'A' ? 'B' : 'A';
@@ -3842,7 +3931,7 @@ canvas.addEventListener('pointerup', e => {
 const PARTS = { sel: null, cam: (() => { try { return localStorage.getItem('nightrack.partsCam') !== '0'; } catch (e) { return true; } })(), drag: null };
 const realMod = m => !/^bk/.test(m.id) && m.def && ((m.def.knobs || []).length || (m.def.jacks || []).length);
 function partRows() { // [{k, name, rows: [[mod, ...], ...]}] in rack order, top row first, left to right
-  const G = [['M', 'DECK A · MIDDLE RACK'], ['R', 'MIXING + PLAY · RIGHT RACK'], ['L', 'DECK B · LEFT RACK'], ['RADIO', 'THE RADIO · BY THE TV']].map(([k, name]) => ({ k, name, rows: new Map() }));
+  const G = [['M', 'DECK A · MIDDLE RACK'], ['R', 'MIXING + PLAY · RIGHT RACK'], ['L', 'DECK B · LEFT RACK'], ['RADIO', 'THE RADIO · BY THE TV'], ['TV', 'THE TV · OLD FILMS']].map(([k, name]) => ({ k, name, rows: new Map() }));
   for (const m of modules) { if (!realMod(m)) continue; const g = G.find(g => g.k === (m.sec ? m.sec.k : 'M')); if (!g) continue; const y = Math.round(m.y0 * 10); if (!g.rows.has(y)) g.rows.set(y, []); g.rows.get(y).push(m); }
   return G.map(g => ({ ...g, rows: [...g.rows.entries()].sort((a, b) => b[0] - a[0]).map(([, r]) => r.sort((a, b) => a.x0 - b.x0)) }));
 }
@@ -3897,9 +3986,11 @@ setInterval(refreshParts, 250);
 document.querySelectorAll('#pCam button').forEach(b => b.onclick = () => partsCam(b.dataset.c === '1')); partsCam(PARTS.cam);
 function toggleRadio() { const el = document.getElementById('radio'), open = el.classList.contains('hide'); if (open) fxChips(); PANELS.forEach(id => { if (id !== 'radio') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderRadio(); }
 document.getElementById('bRadio').onclick = toggleRadio;
-Object.assign(window, { TUNE, radioDial, RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
+Object.assign(window, { TVS, tvPlay, tvOff, tvTest, TUNE, radioDial, RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
 document.getElementById('rStop').onclick = () => radioStop();
 document.getElementById('rJam').onclick = () => jamToggle(); document.getElementById('rGrab').onclick = () => grabIt('gran'); document.getElementById('rGrabD').onclick = () => grabIt('drum');
+document.getElementById('tvPow').onclick = () => { if (TVS.mode === 'off') tvPlay(TVS.i); else tvOff(); }; document.getElementById('tvPrev').onclick = () => tvPlay(TVS.i - 1); document.getElementById('tvNext').onclick = () => tvPlay(TVS.i + 1); document.getElementById('tvTest').onclick = tvTest;
+document.getElementById('tvShow').onclick = () => { document.getElementById('radio').classList.add('hide'); flyToMod(modById.tv); };
 document.getElementById('rRemix').onclick = radioRemix; document.getElementById('rUnmix').onclick = radioClean;
 document.getElementById('rHelp').onclick = () => document.getElementById('rHelpTxt').classList.toggle('hide');
 document.querySelectorAll('#rFx button').forEach(b => b.onclick = () => radioFx(+b.dataset.v));
@@ -3932,13 +4023,13 @@ async function startEngine() {
     const code = eng.replace(/^export\s+/gm, '') + '\n' + wk.replace(/^import .*$/m, '');
     const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
     await AC.audioWorklet.addModule(url);
-    const node = new AudioWorkletNode(AC, 'rack-engine', { numberOfInputs: 1, channelCount: 2, channelCountMode: 'explicit', numberOfOutputs: 1, outputChannelCount: [2] });
+    const node = new AudioWorkletNode(AC, 'rack-engine', { numberOfInputs: 2, channelCount: 2, channelCountMode: 'explicit', numberOfOutputs: 1, outputChannelCount: [2] });
     node.port.onmessage = e => onTel(e.data); ENG = { post: m => node.port.postMessage(m), node, kind: 'worklet' }; made = true;
   } catch (err) { AUDIO_ERR = 'worklet: ' + (err && err.message); console.warn('AudioWorklet blob failed:', err); }
   // 2) AudioWorklet from file URL
   if (!made) try {
     await AC.audioWorklet.addModule('worklet.js');
-    const node = new AudioWorkletNode(AC, 'rack-engine', { numberOfInputs: 1, channelCount: 2, channelCountMode: 'explicit', numberOfOutputs: 1, outputChannelCount: [2] });
+    const node = new AudioWorkletNode(AC, 'rack-engine', { numberOfInputs: 2, channelCount: 2, channelCountMode: 'explicit', numberOfOutputs: 1, outputChannelCount: [2] });
     node.port.onmessage = e => onTel(e.data); ENG = { post: m => node.port.postMessage(m), node, kind: 'worklet' }; made = true;
   } catch (err) { AUDIO_ERR += ' | file: ' + (err && err.message); }
   // 3) main-thread ScriptProcessor fallback
@@ -3981,7 +4072,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // ================================================================ module descriptions, guide, hide UI
 const DESC = {
-  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO IN: the radio\'s cords land here. Unplug them and the rack can\'t hear the station.',
+  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO + TV IN: the radio\'s and the TV\'s cords land here. Unplug them and the rack can\'t hear them.', tv: 'The TV: old public-domain films streamed from the Internet Archive. POWER, CHANNEL (or PREV/NEXT), VOLUME. Its sound and picture brightness come out of its jacks.',
   groove: 'Drum pattern generator. Pick a STYLE (house, deep, tech, garage, disco, breaks, DnB, dusty), then turn the density knobs to add or remove hits. Feed it CLOCK ×4.',
   perc: 'Snare, rim, shaker and tom. Trigger them from GROOVE or TRIG SEQ.', stab: 'Chord synth for deep-house stabs and pads: each trigger plays a whole chord through its own filter. V/OCT sets the root.',
   bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', mbira: 'Real kalimba or marimba notes (recorded, public domain). Plays the note at V/OCT each time TRIG fires; four notes can ring at once. OCTAVE shifts, DECAY shortens.', field: 'Field recording: a looping nature sound (birds, forest, rain, river, stream, waves, wind chimes). TONE darkens it, WIDTH spreads it, LEVEL CV can swell it with an LFO.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
