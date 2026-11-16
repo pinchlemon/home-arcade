@@ -779,7 +779,7 @@ DEFS.radio = (() => { // the radio by the TV: x/y here are only for the controll
     K('lvl', 0, 0, 'VOLUME', { ...at(5.0, 3.05), size: 'M', def: 0.7, fmt: fPct }),
     K('tone', 0, 0, 'TONE', { ...at(9.2, 3.05), size: 'S', def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }),
     K('band', 0, 0, 'BAND', { ...at(14.2, 3.05), size: 'M', min: 0, max: 6, step: 1, def: 0, fmt: v => RAD_BANDS()[v] }),
-    K('tune', 0, 0, 'TUNING', { ...at(20.2, 3.05), size: 'L', def: 0, fmt: v => radioTuneText(v) }),
+    K('tune', 0, 0, 'TUNING', { ...at(20.2, 3.05), size: 'L', def: 0, px: 900, fmt: v => radioTuneText(v) }),
     key('power', 'POWER', { name: 'POWER: PLAY / STOP', fmt: () => RADIO.mode === 'off' ? 'OFF' : 'ON' }), key('seek', 'SEEK', { name: 'SEEK: NEXT STATION', fmt: () => 'searches the band' }),
     key('jam', 'JAM', { name: 'JAM ALONG', fmt: () => JAM.on ? 'ON' : 'OFF' }), key('grab', 'GRAB', { name: 'GRAB → GRANULAR', fmt: () => 'grabs the last 4 s' }),
     key('fx', 'FX', { name: 'THE RACK\'S EFFECTS ON THE STATION', fmt: v => v ? 'ON (ECHO, MANGLE...)' : 'OFF, CLEAN' }), key('solo', 'FADE', { def: 1, name: 'THE RACK WHILE THE RADIO PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' })],
@@ -1000,22 +1000,23 @@ const hasGeo = st => st.lat != null && st.lon != null && (st.lat !== 0 || st.lon
 const geoTxt = st => Math.abs(st.lat).toFixed(2) + '°' + (st.lat >= 0 ? 'N' : 'S') + ' ' + Math.abs(st.lon).toFixed(2) + '°' + (st.lon >= 0 ? 'E' : 'W');
 function whereFrom(st) { return 'From ' + placeOf(st) + (hasGeo(st) ? ' (' + geoTxt(st) + ')' : '') + '.'; }
 function radioStatus(t) { const e = document.getElementById('rStatus'); if (e) e.textContent = t; if (modById.radio) modById.radio.screenDirty = true; }
-function radioStop() { if (RADIO.el) { try { RADIO.el.pause(); RADIO.el.removeAttribute('src'); RADIO.el.load(); } catch (e) { } } RADIO.el = null; RADIO.mode = 'off'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 0 }); if (modById.radio) modById.radio.screenDirty = true; renderRadio(); }
-async function radioPlay(st) { radioSync(st);
-  radioStop(); RADIO.st = st; radioStatus('Tuning in to ' + st.name + '…'); renderRadio();
+function radioStop(inPlay) { if (!inPlay) { RADIO.tok = (RADIO.tok || 0) + 1; radioStatic(0); } if (RADIO.pending) radioKill(RADIO.pending); if (RADIO.el) radioKill(RADIO.el); RADIO.el = null; RADIO.mode = 'off'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 0 }); if (modById.radio) modById.radio.screenDirty = true; renderRadio(); }
+async function radioPlay(st, fromDial) { const tok = RADIO.tok = (RADIO.tok || 0) + 1; radioSync(st); if (!fromDial) { radioSig(1); radioStatic(0); }
+  radioStop(true); RADIO.st = st; radioStatus('Tuning in to ' + st.name + '…'); renderRadio();
   if (RADIO.server) fetch(RADIO.server + '/json/url/' + st.id).catch(() => { }); // counts the listen, as the directory asks
   if (!AC || AC.state !== 'running') { try { await powerOn(); } catch (e) { } }
   const lvl = modById.radio ? modById.radio.v('lvl') : 0.7;
   if (AC && ENG && ENG.kind === 'worklet') { // through the rack: needs the station to allow it (CORS)
-    const a = new Audio(); a.crossOrigin = 'anonymous'; a.src = st.url;
-    try { if (!RADIO.inNode) { RADIO.inNode = AC.createGain(); RADIO.inNode.connect(ENG.node); } const src = AC.createMediaElementSource(a); src.connect(RADIO.inNode); await a.play(); RADIO.el = a; RADIO.mode = 'rack'; radioAnalyse(src);
-      send({ t: 'param', id: 'radio', k: 'live', v: 1 }); send({ t: 'param', id: 'radio', k: 'playing', v: 1 }); radioStatus('Playing ' + st.name + ' through the rack. ' + whereFrom(st)); renderRadio(); return; }
-    catch (e) { try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e2) { } } }
-  const b = new Audio(); b.src = st.url; b.volume = Math.min(1, lvl); radioAnalyse(null);
-  try { await b.play(); RADIO.el = b; RADIO.mode = 'direct'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 1 }); radioStatus('Playing ' + st.name + ' straight to the speakers (this station does not let the rack process or react to it). ' + whereFrom(st)); }
-  catch (e) { RADIO.st = null; radioStatus('Could not play ' + st.name + '. Try another station.'); }
-  renderRadio();
+    const a = new Audio(); a.crossOrigin = 'anonymous'; a.src = st.url; RADIO.pending = a;
+    try { if (!RADIO.inNode) { RADIO.inNode = AC.createGain(); RADIO.inNode.connect(ENG.node); } const src = AC.createMediaElementSource(a); src.connect(RADIO.inNode); await a.play(); if (tok !== RADIO.tok) { radioKill(a); return; } RADIO.pending = null; RADIO.el = a; RADIO.mode = 'rack'; radioAnalyse(src);
+      send({ t: 'param', id: 'radio', k: 'live', v: 1 }); send({ t: 'param', id: 'radio', k: 'playing', v: 1 }); radioStatus('Playing ' + st.name + ' through the rack. ' + whereFrom(st)); renderRadio(); if (fromDial) tuneUpdate(); return; }
+    catch (e) { radioKill(a); if (tok !== RADIO.tok) return; } }
+  const b = new Audio(); b.src = st.url; b.volume = Math.min(1, lvl); RADIO.pending = b; radioAnalyse(null);
+  try { await b.play(); if (tok !== RADIO.tok) { radioKill(b); return; } RADIO.pending = null; RADIO.el = b; RADIO.mode = 'direct'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 1 }); radioStatus('Playing ' + st.name + ' straight to the speakers (this station does not let the rack process or react to it). ' + whereFrom(st)); }
+  catch (e) { radioKill(b); if (tok !== RADIO.tok) return; RADIO.pending = null; radioStatus('Could not play ' + st.name + '. Try another station.'); toast('That station is not answering. Try the next one.', true); }
+  renderRadio(); if (fromDial) tuneUpdate();
 }
+function radioKill(a) { try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) { } if (RADIO.pending === a) RADIO.pending = null; }
 // ---- PLAY WITH IT: jam along (tempo, beat and key from the station), grab, remix; and spin the dial
 const KK_MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], KK_MIN = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]; // Krumhansl-Kessler key profiles
 const JAM = { on: false, chroma: new Float64Array(12), an: null, buf: null, key: null };
@@ -1051,7 +1052,7 @@ function radioRemix() { if (!REMIX0) REMIX0 = { m: Object.fromEntries(Object.ent
 function radioClean() { radioFx(0, true); if (!REMIX0) { modById.mangle.knobs.mix.set(0); toast('The station is clean again', true); return; } for (const k in REMIX0.m) modById.mangle.knobs[k].set(REMIX0.m[k]); modById.echo.knobs.mix.set(REMIX0.e); REMIX0 = null; toast('Effects back to how they were', true); }
 const DIAL = { min: 0, any: false, t: null };
 function dialSet(min) { DIAL.min = min; clearInterval(DIAL.t); DIAL.t = min ? setInterval(spinDial, min * 60000) : null; document.querySelectorAll('#rDial button[data-m]').forEach(b => b.classList.toggle('cur', +b.dataset.m === min)); if (min) toast('Spinning the dial every ' + min + ' minutes', true); }
-async function spinDial() { send({ t: 'param', id: 'radio', k: 'static', v: 1 });
+async function spinDial() { send({ t: 'param', id: 'radio', k: 'static', v: 0.45 });
   try { if (DIAL.any || RADIO.genre == null || RADIO.genre === 'fav') await radioGenre(Math.floor(Math.random() * RGENRES.length)); const L = RADIO.list.filter(x => !RADIO.st || (x.id !== RADIO.st.id && x.country !== RADIO.st.country)); const pool = L.length ? L : RADIO.list;
     await new Promise(r => setTimeout(r, 900)); if (pool.length) await radioPlay(pool[Math.floor(Math.random() * Math.min(pool.length, 60))]); } finally { setTimeout(() => send({ t: 'param', id: 'radio', k: 'static', v: 0 }), 500); } }
 function radioFx(v, quiet) { const k = modById.radio && modById.radio.knobs.fx; if (k && k.value !== v) k.set(v); fxChips(); if (!quiet) toast(v ? 'The station now goes through the rack\'s effects' : 'The station is clean: no echo or effects from the rack', true); }
@@ -1086,30 +1087,43 @@ class RxM extends Mod { // RADIO IN: where the radio's cords land on the rack
 function radioSaveKnobs() { const m = modById.radio; if (!m) return; const o = {}; for (const k in m.knobs) if (!RAD_MOMENTARY.has(k)) o[k] = m.knobs[k].norm; try { localStorage.setItem('nightrack.radioKnobs', JSON.stringify(o)); } catch (e) { } }
 function radioQuiet(id, n) { const kn = modById.radio && modById.radio.knobs[id]; if (!kn) return; RDO.quiet = true; try { kn.set(n); } finally { RDO.quiet = false; } }
 function radioList() { return RADIO.genre === 'fav' ? RADIO.favs : RADIO.list || []; }
-function radioTuneText(v) { const L = radioList(), kc = Math.round(540 + v * 1060) + ' KC'; if (!L.length) return kc; return kc + ' · ' + L[Math.round(v * (L.length - 1))].name; }
+const DIAL_N = 24; // stations on the dial per band (the band's most-listened): far enough apart to find by hand
+function radioDial() { return radioList().slice(0, DIAL_N); }
+function radioTuneText(v) { const L = radioDial(), kc = Math.round(540 + v * 1060) + ' KC'; if (!L.length) return kc; const p = v * (L.length - 1), i = Math.round(p); return kc + (Math.abs(p - i) < 0.2 ? ' · ' + L[i].name : ' · between stations'); }
 async function radioBandLoad(b) { if (b >= RGENRES.length) { RADIO.genre = 'fav'; RADIO.list = RADIO.favs.slice(); renderRadio(); radioStatus(RADIO.favs.length ? RADIO.favs.length + ' favourite stations.' : 'No favourites yet: star stations in the RADIO menu.'); return; } if (RADIO.genre !== b || !RADIO.list.length) await radioGenre(b); }
 const radioStatic = v => send({ t: 'param', id: 'radio', k: 'static', v });
-let bandT = 0, tuneT = 0;
-function radioBand(b) { clearTimeout(bandT); bandT = setTimeout(async () => { await radioBandLoad(b); if (RADIO.mode !== 'off') radioTuneTo(0); else radioQuiet('tune', 0); }, 350); }
-function radioTuneMove() { radioStatic(1); RDO.sweep = null; clearTimeout(tuneT); tuneT = setTimeout(async () => { const b = modById.radio.v('band'); if (!radioList().length || (b < RGENRES.length && RADIO.genre !== b)) await radioBandLoad(b);
-  const L = radioList(); if (!L.length) { radioStatic(0); return; } const i = Math.round(modById.radio.knobs.tune.norm * (L.length - 1));
-  try { if (!RADIO.st || RADIO.st.id !== L[i].id || RADIO.mode === 'off') await radioPlay(L[i]); } finally { setTimeout(() => radioStatic(0), 400); } }, 450); }
-function radioTuneTo(i) { // the needle sweeps to station i of the band through static, then it plays (SEEK and BAND use this)
-  const L = radioList(); if (!L.length) return; i = ((i % L.length) + L.length) % L.length; const n = L.length > 1 ? i / (L.length - 1) : 0.5;
-  radioStatic(1); RDO.sweep = { from: RDO.nx, to: n, t0: performance.now(), dur: 800 };
-  setTimeout(async () => { radioQuiet('tune', n); try { await radioPlay(L[i]); } finally { setTimeout(() => radioStatic(0), 400); } }, 800); }
+const radioSig = v => { send({ t: 'param', id: 'radio', k: 'sig', v }); if (RADIO.mode === 'direct' && RADIO.el) RADIO.el.volume = Math.min(1, (modById.radio ? modById.radio.v('lvl') : 0.7) * v); };
+// TUNING, like a real dial: each station sits at its own mark. Near a mark you hear it through static; on the mark it's clean.
+// Pause near a mark and it starts connecting; let go of the knob and it settles onto the nearest mark by itself.
+const TUNE = { last: 0, want: -1, dwellT: 0, glide: null, s: 0, i: -1, active: false };
+let bandT = 0;
+function radioBand(b) { clearTimeout(bandT); bandT = setTimeout(async () => { await radioBandLoad(b); if (RADIO.mode !== 'off' || RADIO.pending) radioTuneTo(0); else radioQuiet('tune', 0); }, 350); }
+async function radioTuneMove() { TUNE.last = performance.now(); TUNE.glide = null; TUNE.active = true; const b = modById.radio.v('band');
+  if (!radioList().length || (b < RGENRES.length && RADIO.genre !== b)) { radioStatic(0.5); await radioBandLoad(b); } tuneUpdate(); }
+function tuneUpdate() { const L = radioDial(), n = L.length; if (!n || !modById.radio) return; const p = modById.radio.knobs.tune.norm * (n - 1), i = Math.round(p), off = Math.abs(p - i);
+  const s = Math.max(0, Math.min(1, 1 - (off - 0.06) / 0.3)); TUNE.s = s; TUNE.i = i; // signal strength: 1 on the mark, gone a third of the way to the next
+  const st = L[i], here = RADIO.st && RADIO.st.id === st.id && (RADIO.mode !== 'off' || RADIO.pending);
+  radioSig(here ? s : 0); radioStatic(TUNE.active ? 0.55 * (1 - (here ? s : 0)) : 0);
+  if (s > 0.4 && !here && TUNE.want !== i) { TUNE.want = i; clearTimeout(TUNE.dwellT); TUNE.dwellT = setTimeout(() => { if (TUNE.i === i && TUNE.s > 0.4) radioPlay(st, true); }, 220); }
+  if (s <= 0.4) { TUNE.want = -1; clearTimeout(TUNE.dwellT); } }
+setInterval(() => { // glides (SEEK, BAND) and settling onto the nearest mark after you let go
+  const m = modById.radio; if (!m) return; const kn = m.knobs.tune, L = radioDial(), n = L.length; if (n < 2) return;
+  if (TUNE.glide) { const d = TUNE.glide.to - kn.norm, step = Math.sign(d) * Math.min(Math.abs(d), 0.025); radioQuiet('tune', kn.norm + step); tuneUpdate(); if (Math.abs(d) < 1e-4) { TUNE.glide = null; TUNE.active = false; tuneUpdate(); } return; }
+  if (!TUNE.active || performance.now() - TUNE.last < 500 || (drag && drag.knob === kn)) return;
+  const tgt = TUNE.i / (n - 1), d = tgt - kn.norm; if (Math.abs(d) > 1e-4) { radioQuiet('tune', kn.norm + d * 0.35); tuneUpdate(); } else { TUNE.active = false; tuneUpdate(); } }, 40);
+function radioTuneTo(i) { const L = radioDial(); if (!L.length) return; i = ((i % L.length) + L.length) % L.length; TUNE.active = true; TUNE.glide = { to: L.length > 1 ? i / (L.length - 1) : 0.5 }; }
 function radioSeek(d) { (async () => { const b = modById.radio.v('band'); if (!radioList().length || (b < RGENRES.length && RADIO.genre !== b)) await radioBandLoad(b);
-  const L = radioList(); if (!L.length) { toast('No stations on this band yet', true); return; } const i = RADIO.st ? L.findIndex(x => x.id === RADIO.st.id) : -1; radioTuneTo(i < 0 ? 0 : i + d); })(); }
-function radioPower() { if (RADIO.mode !== 'off') { radioStop(); return; } if (RADIO.st) { radioPlay(RADIO.st); return; } radioSeek(1); }
-function radioSync(st) { if (!modById.radio || !st) return; const L = radioList(), i = L.findIndex(x => x.id === st.id); if (i >= 0 && !RDO.sweep) radioQuiet('tune', L.length > 1 ? i / (L.length - 1) : 0.5); }
+  const L = radioDial(); if (!L.length) { toast('No stations on this band yet', true); return; } const i = RADIO.st ? L.findIndex(x => x.id === RADIO.st.id) : -1; radioTuneTo(i < 0 ? 0 : i + d); })(); }
+function radioPower() { if (RADIO.mode !== 'off' || RADIO.pending) { radioStop(); return; } if (RADIO.st) { radioPlay(RADIO.st); return; } radioSeek(1); }
+function radioSync(st) { if (!modById.radio || !st) return; const L = radioDial(), i = L.findIndex(x => x.id === st.id); if (i >= 0 && !TUNE.active) radioQuiet('tune', L.length > 1 ? i / (L.length - 1) : 0.5); }
 function radioVisual() { if (!RDO.mod) return; const m = RDO.mod, on = RADIO.mode !== 'off', T = TEL.radio || {}, now = performance.now();
-  let tgt = m.knobs.tune.norm; if (RDO.sweep) { const s = RDO.sweep, k = Math.min(1, (now - s.t0) / s.dur); tgt = s.from + (s.to - s.from) * k * k * (3 - 2 * k); if (k >= 1) RDO.sweep = null; }
+  const tgt = m.knobs.tune.norm;
   RDO.nx += (tgt - RDO.nx) * 0.25; RDO.needle.position.x = RDO.nx0 + (RDO.nx1 - RDO.nx0) * RDO.nx;
-  RDO.glow = (RDO.glow || 0) + ((on ? 1 : 0) - (RDO.glow || 0)) * 0.05; RDO.dialMat.emissiveIntensity = 0.12 + 0.8 * RDO.glow; RDO.light.intensity = 0.9 * RDO.glow; RDO.jewel.material.emissiveIntensity = 0.1 + 2.4 * RDO.glow; RDO.backGlow.material.opacity = 0.35 * RDO.glow;
-  const E = RDO.eye.uniforms, lv = RADIO.mode === 'rack' ? Math.min(1, (T.env || 0) * 1.4) : RADIO.mode === 'direct' ? 0.7 : 0; E.uOn.value = RDO.glow; E.uOpen.value += (lv - E.uOpen.value) * 0.3;
-  const down = { power: on, jam: JAM.on, fx: m.v('fx') > 0.5, solo: m.v('solo') > 0.5, seek: m.knobs.seek.norm > 0.5 || !!RDO.sweep, grab: m.knobs.grab.norm > 0.5 };
+  RDO.glow = (RDO.glow || 0) + ((on || RADIO.pending ? 1 : 0) - (RDO.glow || 0)) * 0.05; RDO.dialMat.emissiveIntensity = 0.12 + 0.8 * RDO.glow; RDO.light.intensity = 0.9 * RDO.glow; RDO.jewel.material.emissiveIntensity = 0.1 + 2.4 * RDO.glow; RDO.backGlow.material.opacity = 0.35 * RDO.glow;
+  const E = RDO.eye.uniforms, sig = TUNE.active || RADIO.pending ? TUNE.s : 1, lv = TUNE.active || RADIO.pending ? sig * 0.85 : RADIO.mode === 'rack' ? Math.min(1, (T.env || 0) * 1.4) : RADIO.mode === 'direct' ? 0.7 : 0; E.uOn.value = Math.max(RDO.glow, TUNE.active ? 0.6 : 0); E.uOpen.value += (lv - E.uOpen.value) * 0.3;
+  const down = { power: on, jam: JAM.on, fx: m.v('fx') > 0.5, solo: m.v('solo') > 0.5, seek: m.knobs.seek.norm > 0.5 || !!TUNE.glide, grab: m.knobs.grab.norm > 0.5 };
   for (const id in RDO.keys) { const k = RDO.keys[id], z = down[id] ? 0.5 : 0.95; k.position.z += (z - k.position.z) * 0.35; }
-  const key = [RADIO.mode, RADIO.st && RADIO.st.id, m.v('band'), radioList().length, JAM.on, Math.round(T.bpm || 0), T.conf >= 0.66, JAM.key && JAM.key.fit > 0.5 ? JAM.key.root + JAM.key.mode : ''].join('|');
+  const key = [RADIO.mode, RADIO.st && RADIO.st.id, !!RADIO.pending, TUNE.active ? TUNE.i + ':' + (TUNE.s > 0.4 ? 1 : 0) + ':' + Math.round(m.knobs.tune.norm * 60) : '', m.v('band'), radioList().length, JAM.on, Math.round(T.bpm || 0), T.conf >= 0.66, JAM.key && JAM.key.fit > 0.5 ? JAM.key.root + JAM.key.mode : ''].join('|');
   if (key !== RDO.dialKey) { RDO.dialKey = key; radioDialDraw(); } }
 // ================================================================ METER, RECORDER, SCENES
 class MeterM extends Mod {
@@ -2482,14 +2496,16 @@ function radioDialDraw() { // the backlit dial: bands on top, the broadcast scal
   for (let f = 540; f <= 1600; f += 10) { const x = X0 + (f - 540) / 1060 * (X1 - X0), big = f % 100 === 0, mid = f % 50 === 0; g.lineWidth = big ? 2.5 : 1.2; g.beginPath(); g.moveTo(x, Y); g.lineTo(x, Y - (big ? 26 : mid ? 17 : 10)); g.stroke(); }
   g.font = '700 26px "Saira", sans-serif'; for (const f of [60, 70, 80, 100, 120, 140, 160]) { const x = X0 + (f * 10 - 540) / 1060 * (X1 - X0); g.fillText(String(f), x, Y - 50); }
   g.font = '600 17px "Saira", sans-serif'; g.fillText('KILOCYCLES · BROADCAST', W / 2, Y + 26);
-  const L = radioList(), n = L.length; if (n > 1) { g.fillStyle = 'rgba(60,40,16,.5)'; for (let i = 0; i < n; i++) { const x = X0 + i / (n - 1) * (X1 - X0); g.fillRect(x - 1, Y + 4, 2, 7); } }
+  const L = radioDial(), n = L.length; if (n > 1) for (let i = 0; i < n; i++) { const x = X0 + i / (n - 1) * (X1 - X0), near = TUNE.active && i === TUNE.i, cur = st && L[i].id === st.id; g.fillStyle = near && TUNE.s > 0.4 ? '#c8200e' : cur ? '#7a1e08' : 'rgba(60,40,16,.55)'; g.beginPath(); g.arc(x, Y + 10, near || cur ? 6 : 4, 0, Math.PI * 2); g.fill(); }
   // station card, clear of the magic eye on the right
   const cy = 256, cw = W - 190; g.fillStyle = on ? 'rgba(80,40,10,.10)' : 'rgba(40,30,20,.12)'; g.fillRect(36, cy, cw, H - cy - 36); g.textAlign = 'left';
   const fit = (t, size, wt, maxW) => { let s = size; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; while (g.measureText(t).width > maxW && s > 14) { s -= 1; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; } return t; };
-  const kc = st && n > 1 ? Math.round(540 + Math.max(0, L.findIndex(x => x.id === st.id)) / (n - 1) * 1060) : null, mw = cw - 40;
-  g.fillStyle = '#2a1606'; g.fillText(fit(on && st ? st.name.toUpperCase() : st ? 'OFF · ' + st.name.toUpperCase() : 'PRESS POWER', 40, 800, mw), 56, cy + 52);
-  g.fillStyle = '#5a3a14'; g.fillText(fit(st ? (kc ? kc + ' KC · ' : '') + placeOf(st) : 'TURN BAND, THEN TUNING, OR PRESS SEEK', 24, 700, mw), 56, cy + 104);
-  const T = TEL.radio || {}, info = !on ? 'RADIO OFF' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT (THE RACK CAN\'T HEAR IT)' : JAM.on ? 'JAM · ' + (T.conf >= 0.66 && T.bpm ? T.bpm.toFixed(0) + ' BPM' : 'LISTENING') + (JAM.key && JAM.key.fit > 0.5 ? ' · ' + NAMES12[JAM.key.root] + ' ' + JAM.key.mode.toUpperCase() : '') : 'ON AIR · THROUGH THE RACK';
+  const kn = modById.radio ? modById.radio.knobs.tune.norm : 0, kcNow = Math.round(540 + kn * 1060), near = n ? L[Math.min(n - 1, Math.max(0, TUNE.i))] : null, tuning = TUNE.active && n, mw = cw - 40;
+  const l1 = RADIO.pending && st ? 'CONNECTING… ' + st.name.toUpperCase() : tuning && TUNE.s <= 0.4 ? 'TUNING… ' + kcNow + ' KC' : tuning && near ? near.name.toUpperCase() : on && st ? st.name.toUpperCase() : st ? 'OFF · ' + st.name.toUpperCase() : 'PRESS POWER';
+  const l2 = tuning && TUNE.s <= 0.4 ? 'BETWEEN STATIONS: KEEP TURNING TO THE NEXT DOT' : tuning && near ? kcNow + ' KC · ' + placeOf(near) : st ? kcNow + ' KC · ' + placeOf(st) : 'TURN BAND, THEN TUNING, OR PRESS SEEK';
+  g.fillStyle = '#2a1606'; g.fillText(fit(l1, 40, 800, mw), 56, cy + 52);
+  g.fillStyle = '#5a3a14'; g.fillText(fit(l2, 24, 700, mw), 56, cy + 104);
+  const T = TEL.radio || {}, info = RADIO.pending ? 'LOADING THE STREAM… A FEW SECONDS' : !on ? 'RADIO OFF' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT (THE RACK CAN\'T HEAR IT)' : JAM.on ? 'JAM · ' + (T.conf >= 0.66 && T.bpm ? T.bpm.toFixed(0) + ' BPM' : 'LISTENING') + (JAM.key && JAM.key.fit > 0.5 ? ' · ' + NAMES12[JAM.key.root] + ' ' + JAM.key.mode.toUpperCase() : '') : 'ON AIR · THROUGH THE RACK';
   g.fillStyle = '#7a1e08'; g.fillText(fit(info, 21, 700, mw), 56, cy + 152);
   RDO.dialTex.needsUpdate = true; }
 const EYE_FS = `uniform float uOpen, uOn; varying vec2 vUv; void main(){ vec2 p = vUv * 2.0 - 1.0; float r = length(p); if (r > 1.0) discard; float a = abs(atan(p.x, p.y));
@@ -3417,7 +3433,7 @@ function moveCable(e) {
 }
 canvas.addEventListener('pointermove', e => {
   lastPointer = e;
-  if (drag && drag.type === 'knob') { const k = drag.knob; k.set(drag.n + (drag.y - e.clientY) / (e.shiftKey ? 1400 : 220)); if (e.shiftKey) { drag.y = e.clientY; drag.n = k.norm; } showTip(e, `${k.mod.def.title} · ${k.name}<small>${k.text()}</small>`); return; }
+  if (drag && drag.type === 'knob') { const k = drag.knob; k.set(drag.n + (drag.y - e.clientY) / (e.shiftKey ? 1400 : (k.def.px || 220))); if (e.shiftKey) { drag.y = e.clientY; drag.n = k.norm; } showTip(e, `${k.mod.def.title} · ${k.name}<small>${k.text()}</small>`); return; }
   if (drag && drag.type === 'cable') { moveCable(e); return; }
   const h = pick(e); hover = h; const hc = h && h.end ? h.end.cable : null; if (hc !== hoverCable) { if (hoverCable && cables.includes(hoverCable)) hoverCable.highlight(false); hoverCable = hc; if (hc) hc.highlight(true); }
   if (h && h.knob) { canvas.style.cursor = h.knob.def.btn ? 'pointer' : 'ns-resize'; ctl.enableZoom = false; showTip(e, `${h.knob.mod.def.title} · ${h.knob.name}<small>${h.knob.text()}</small>`); }
@@ -3881,7 +3897,7 @@ setInterval(refreshParts, 250);
 document.querySelectorAll('#pCam button').forEach(b => b.onclick = () => partsCam(b.dataset.c === '1')); partsCam(PARTS.cam);
 function toggleRadio() { const el = document.getElementById('radio'), open = el.classList.contains('hide'); if (open) fxChips(); PANELS.forEach(id => { if (id !== 'radio') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderRadio(); }
 document.getElementById('bRadio').onclick = toggleRadio;
-Object.assign(window, { RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
+Object.assign(window, { TUNE, radioDial, RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
 document.getElementById('rStop').onclick = () => radioStop();
 document.getElementById('rJam').onclick = () => jamToggle(); document.getElementById('rGrab').onclick = () => grabIt('gran'); document.getElementById('rGrabD').onclick = () => grabIt('drum');
 document.getElementById('rRemix').onclick = radioRemix; document.getElementById('rUnmix').onclick = radioClean;
