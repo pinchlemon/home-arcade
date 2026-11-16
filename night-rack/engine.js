@@ -1500,15 +1500,28 @@ class Euclid extends DSP {
   }
 }
 
+// THE TV: the old set by the TV cabinet plays films streamed from the Internet Archive. Its sound comes in on the worklet's second input.
+// Outputs: the sound (L/R), ENV (how loud), LIGHT (how bright the picture is: the page measures it and sends it as 'luma').
+class TV extends DSP {
+  static IN = []; static OUT = ['L', 'R', 'env', 'light'];
+  constructor(e) { super(e); this.g = 1; this.ms = 0; this.ef = 0; this.lu = 0; }
+  process(n) { const P = this.p, X = this.e.ext2, on = X && X[0] && P.live, xl = on ? X[0] : null, xr = on ? (X[1] || X[0]) : null, lvl = P.lvl ?? 0.7, O = this.out, sr = this.sr;
+    const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.15 * sr)), kl = 1 - Math.exp(-1 / (0.08 * sr)), lt = Math.max(0, Math.min(1, P.luma ?? 0)) * 10; let pk = 0;
+    for (let i = 0; i < n; i++) { let a = 0, b = 0;
+      if (on) { const l = xl[i] * 5, r = xr[i] * 5; this.ms += 0.00004 * ((l * l + r * r) / 2 - this.ms); if (this.ms > 1e-5) { const gt = Math.min(6, Math.max(0.25, Math.sqrt(2.0 / this.ms))); this.g += (gt - this.g) * 0.00003; } a = l * this.g; b = r * this.g; }
+      const x = Math.abs(a + b) / 2; this.ef += (x > this.ef ? ka : kd) * (x - this.ef); this.lu += kl * (lt - this.lu);
+      O.L[i] = a * lvl; O.R[i] = b * lvl; O.env[i] = Math.min(10, this.ef * 3); O.light[i] = this.lu; if (Math.abs(a) > pk) pk = Math.abs(a); }
+    this.L.led = Math.min(1, pk * lvl / 4); this.L.env = Math.min(1, this.ef / 2); }
+}
 // RADIO IN (on the rack): the radio's cords land here. The rack passes through, faded while a station plays if the radio says so (its RACK key),
 // and the station joins it: through the rack's effects when the radio's FX key is down, otherwise clean, straight into LIMIT.
 class Rx extends DSP {
-  static IN = ['inL', 'inR', 'radL', 'radR']; static OUT = ['L', 'R'];
-  process(n) { const E = this.e, R = E.mods.get('radio'), rg = R ? R.rk * R.rk : 1, fx = !!R && (R.p.fx ?? 0) > 0.5, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, SL = this.in.radL, SR = this.has.radR ? this.in.radR : this.in.radL, O = this.out;
+  static IN = ['inL', 'inR', 'radL', 'radR', 'tvL', 'tvR']; static OUT = ['L', 'R'];
+  process(n) { const E = this.e, R = E.mods.get('radio'), rg = R ? R.rk * R.rk : 1, fx = !!R && (R.p.fx ?? 0) > 0.5, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, SL = this.in.radL, SR = this.has.radR ? this.in.radR : this.in.radL, TL = this.in.tvL, TR = this.has.tvR ? this.in.tvR : this.in.tvL, O = this.out;
     if (!E.radL || E.radL.length < n) { E.radL = new Float32Array(Math.max(n, 128)); E.radR = new Float32Array(Math.max(n, 128)); } const DL = E.radL, DR = E.radR; let pk = 0;
-    for (let i = 0; i < n; i++) { const a = SL[i], b = SR[i]; O.L[i] = IL[i] * rg + (fx ? a : 0); O.R[i] = IR[i] * rg + (fx ? b : 0); DL[i] = fx ? 0 : a; DR[i] = fx ? 0 : b; if (Math.abs(a) > pk) pk = Math.abs(a); }
+    for (let i = 0; i < n; i++) { const a = SL[i], b = SR[i]; O.L[i] = IL[i] * rg + (fx ? a : 0); O.R[i] = IR[i] * rg + (fx ? b : 0); DL[i] = (fx ? 0 : a) + TL[i]; DR[i] = (fx ? 0 : b) + TR[i]; if (Math.abs(a) > pk) pk = Math.abs(a); }
     this.L.led = Math.min(1, pk / 4); } }
-const DSPS = { rx: Rx,  clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder, granular: Granular, euclid: Euclid };
+const DSPS = { rx: Rx, tv: TV,  clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder, granular: Granular, euclid: Euclid };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
