@@ -1387,7 +1387,27 @@ class Focus extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus };
+// RADIO: the page plays an internet station and feeds it into the engine's input; this adds it to IN L/R, levelled (stations and
+// talk shows arrive at very different levels), with TONE (low-pass) and WIDTH. When the page can only play a station directly
+// (the station doesn't allow processing), LIVE is off here and the sound bypasses the rack.
+class Radio extends DSP {
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.g = 1; this.ms = 0; this.lp = [0, 0, 0, 0]; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R, X = this.e.ext, lvl = P.lvl ?? 0.7;
+    if (!X || !X[0] || !P.live || lvl < 1e-3) { OL.set(IL); OR.set(IR); this.L.led = 0; return; }
+    const xl = X[0], xr = X[1] || X[0], kt = 1 - Math.exp(-TAU * Math.min(0.45 * sr, 700 + Math.pow(P.tone ?? 1, 2) * 19000) / sr), w = P.width ?? 1, L = this.lp; let pk = 0;
+    for (let i = 0; i < n; i++) {
+      let l = xl[i] * 5, r = xr[i] * 5; const m = (l + r) / 2, s = (l - r) / 2 * w; l = m + s; r = m - s;
+      this.ms += 0.00004 * ((l * l + r * r) / 2 - this.ms); if (this.ms > 1e-5) { const gt = Math.min(4, Math.max(0.25, Math.sqrt(0.5 / this.ms))); this.g += (gt - this.g) * 0.00003; }
+      L[0] += kt * (l - L[0]); L[1] += kt * (L[0] - L[1]); L[2] += kt * (r - L[2]); L[3] += kt * (L[2] - L[3]);
+      const a = L[1] * this.g * lvl, b = L[3] * this.g * lvl; OL[i] = IL[i] + a; OR[i] = IR[i] + b; pk = Math.max(pk, Math.abs(a));
+    }
+    this.L.led = Math.min(1, pk / 4);
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
