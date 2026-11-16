@@ -774,16 +774,16 @@ DEFS.focus = lay('FOCUS', 16, 'black',
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const RAD_MOMENTARY = new Set(['power', 'seek', 'jam', 'grab']);
 DEFS.radio = (() => { // the radio by the TV: x/y here are only for the controller ring (face coordinates mapped into module ones)
-  const KX = ['power', 'seek', 'jam', 'grab', 'fx', 'solo'], at = (lx, ly) => ({ x: lx - 3.5, y: U3 + 1.6 - ly, lx, ly }), key = (id, label, o) => K(id, 0, 0, label, { ...at(14.35 + KX.indexOf(id) * 1.52, 5.85), btn: true, min: 0, max: 1, step: 1, def: 0, ...o });
+  const KX = ['power', 'seek', 'jam', 'grab', 'fx', 'solo'], at = (lx, ly) => ({ x: lx - 3.5, y: U3 + 1.6 - ly, lx, ly }), key = (id, label, o) => K(id, 0, 0, label, { ...at(14.0 + KX.indexOf(id) * 1.4, 7.3), btn: true, min: 0, max: 1, step: 1, def: 0, ...o });
   return { title: 'RADIO', hp: 34, theme: 'navy', leds: [], labels: [], knobs: [
-    K('lvl', 0, 0, 'VOLUME', { ...at(5.4, 2.55), size: 'M', def: 0.7, fmt: fPct }),
-    K('tone', 0, 0, 'TONE', { ...at(10.3, 2.55), size: 'S', def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }),
-    K('band', 0, 0, 'BAND', { ...at(15.0, 2.55), size: 'M', min: 0, max: 6, step: 1, def: 0, fmt: v => RAD_BANDS()[v] }),
-    K('tune', 0, 0, 'TUNING', { ...at(20.9, 2.55), size: 'L', def: 0, fmt: v => radioTuneText(v) }),
+    K('lvl', 0, 0, 'VOLUME', { ...at(5.0, 3.05), size: 'M', def: 0.7, fmt: fPct }),
+    K('tone', 0, 0, 'TONE', { ...at(9.2, 3.05), size: 'S', def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }),
+    K('band', 0, 0, 'BAND', { ...at(14.2, 3.05), size: 'M', min: 0, max: 6, step: 1, def: 0, fmt: v => RAD_BANDS()[v] }),
+    K('tune', 0, 0, 'TUNING', { ...at(20.2, 3.05), size: 'L', def: 0, fmt: v => radioTuneText(v) }),
     key('power', 'POWER', { name: 'POWER: PLAY / STOP', fmt: () => RADIO.mode === 'off' ? 'OFF' : 'ON' }), key('seek', 'SEEK', { name: 'SEEK: NEXT STATION', fmt: () => 'searches the band' }),
     key('jam', 'JAM', { name: 'JAM ALONG', fmt: () => JAM.on ? 'ON' : 'OFF' }), key('grab', 'GRAB', { name: 'GRAB → GRANULAR', fmt: () => 'grabs the last 4 s' }),
     key('fx', 'FX', { name: 'THE RACK\'S EFFECTS ON THE STATION', fmt: v => v ? 'ON (ECHO, MANGLE...)' : 'OFF, CLEAN' }), key('solo', 'FADE', { def: 1, name: 'THE RACK WHILE THE RADIO PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' })],
-    jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(1.8, 13.4)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(1.8, 10.8)), J('env', 0, 0, 'ENV', 'out', 'cv', at(1.8, 8.2)), J('trig', 0, 0, 'TRIG', 'out', 'cv', at(1.8, 5.6))] }; })();
+    jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(2.3, 13.2)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(2.3, 11.0)), J('env', 0, 0, 'ENV', 'out', 'cv', at(2.3, 8.8)), J('trig', 0, 0, 'TRIG', 'out', 'cv', at(2.3, 6.6))] }; })();
 DEFS.rx = lay('RADIO IN', 20, 'navy', [[sc(1.3)], [tx('CORDS FROM THE RADIO')], [ld('led', 'amber')]],
   [[ji('inL', 'RACK L', 'audio'), ji('inR', 'RACK R', 'audio')], [ji('radL', 'RADIO L', 'audio'), ji('radR', 'RADIO R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const METER_T = [['YOUTUBE', -14], ['SPOTIFY', -14], ['APPLE', -16], ['OFF', null]];
@@ -2468,29 +2468,29 @@ function knobPlate(r, ticks, labels) { // brass scale plate behind a knob: ticks
   const gr = g.createRadialGradient(C * 0.8, C * 0.7, 10, C, C, C); gr.addColorStop(0, '#e8c97a'); gr.addColorStop(1, '#a87d2e'); g.fillStyle = gr; g.beginPath(); g.arc(C, C, C - 1, 0, Math.PI * 2); g.fill();
   g.strokeStyle = '#3a2410'; g.fillStyle = '#3a2410'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let i = 0; i < ticks; i++) { const a = THREE.MathUtils.degToRad((0.5 - i / (ticks - 1)) * 300), dx = -Math.sin(a), dy = -Math.cos(a), big = !labels && (i % 5 === 0);
-    g.lineWidth = labels || big ? 4 : 2; g.beginPath(); g.moveTo(C + dx * C * 0.8, C + dy * C * 0.8); g.lineTo(C + dx * C * (labels || big ? 0.95 : 0.9), C + dy * C * 0.95); g.stroke();
-    if (labels) { g.font = '700 22px "Saira", sans-serif'; g.save(); g.translate(C + dx * C * 0.66, C + dy * C * 0.66); g.fillText(labels[i], 0, 0); g.restore(); } }
+    g.lineWidth = labels || big ? 4 : 2; g.beginPath(); const r0 = labels ? 0.89 : 0.8, r1 = labels ? 0.97 : big ? 0.95 : 0.9; g.moveTo(C + dx * C * r0, C + dy * C * r0); g.lineTo(C + dx * C * r1, C + dy * C * r1); g.stroke();
+    if (labels) { g.font = '700 19px "Saira", sans-serif'; g.save(); g.translate(C + dx * C * 0.76, C + dy * C * 0.76); g.fillText(labels[i], 0, 0); g.restore(); } }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return new THREE.Mesh(new THREE.CircleGeometry(r, 48), plateMat(t)); }
-function radioDialDraw() { // the backlit dial: bands, the broadcast scale, and the station card
+function radioDialDraw() { // the backlit dial: bands on top, the broadcast scale, the station card (the magic eye sits at its right)
   const c = RDO.dialCv, g = c.getContext('2d'), W = c.width, H = c.height, on = RADIO.mode !== 'off', st = RADIO.st, band = modById.radio ? modById.radio.v('band') : 0;
   const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#f4e6c2'); bg.addColorStop(1, '#e3cd98'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = '#6b4a20'; g.lineWidth = 3; g.strokeRect(14, 14, W - 28, H - 28); g.lineWidth = 1; g.strokeRect(22, 22, W - 44, H - 44);
+  g.strokeStyle = '#6b4a20'; g.lineWidth = 3; g.strokeRect(12, 12, W - 24, H - 24); g.lineWidth = 1; g.strokeRect(19, 19, W - 38, H - 38);
   g.textAlign = 'center'; g.textBaseline = 'middle'; const B = RAD_BANDS(), bw = (W - 80) / B.length;
-  B.forEach((n, i) => { const x = 40 + bw * (i + 0.5), cur = i === band; g.fillStyle = cur ? '#b5300f' : '#8a6a3c'; let fs = 30; do { g.font = (cur ? '800 ' : '600 ') + fs + 'px "Saira", sans-serif'; fs -= 2; } while (g.measureText(n).width > bw - 10 && fs > 14); g.fillText(n, x, 66); if (cur) { g.fillRect(x - bw * 0.36, 88, bw * 0.72, 4); } });
-  const X0 = 60, X1 = W - 60, Y = 250; g.strokeStyle = '#3c2810'; g.fillStyle = '#3c2810'; g.lineWidth = 3; g.beginPath(); g.moveTo(X0, Y); g.lineTo(X1, Y); g.stroke();
-  for (let f = 540; f <= 1600; f += 10) { const x = X0 + (f - 540) / 1060 * (X1 - X0), big = f % 100 === 0, mid = f % 50 === 0; g.lineWidth = big ? 3 : 1.5; g.beginPath(); g.moveTo(x, Y); g.lineTo(x, Y - (big ? 38 : mid ? 24 : 14)); g.stroke(); }
-  g.font = '700 40px "Saira", sans-serif'; for (const f of [60, 70, 80, 90, 100, 120, 140, 160]) { const x = X0 + (f * 10 - 540) / 1060 * (X1 - X0); g.fillText(String(f), x, Y - 72); }
-  g.font = '600 24px "Saira", sans-serif'; g.fillText('KILOCYCLES · BROADCAST', W / 2, Y + 34);
-  const L = RADIO.list || [], n = L.length; if (n > 1) { g.fillStyle = 'rgba(60,40,16,.55)'; for (let i = 0; i < n; i++) { const x = X0 + i / (n - 1) * (X1 - X0); g.fillRect(x - 1.5, Y + 6, 3, 10); } }
-  // station card
-  const cy = 360; g.fillStyle = on ? 'rgba(80,40,10,.10)' : 'rgba(40,30,20,.12)'; g.fillRect(40, cy, W - 200, H - cy - 40); g.textAlign = 'left';
-  const fit = (t, size, wt, maxW) => { let s = size; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; while (g.measureText(t).width > maxW && s > 16) { s -= 2; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; } return t; };
-  const kc = st && n > 1 ? Math.round(540 + Math.max(0, L.findIndex(x => x.id === st.id)) / (n - 1) * 1060) : null;
-  g.fillStyle = '#2a1606'; g.fillText(fit(on && st ? st.name.toUpperCase() : st ? 'OFF · ' + st.name.toUpperCase() : 'PRESS POWER', 54, 800, W - 260), 60, cy + 58);
-  g.fillStyle = '#5a3a14'; g.fillText(fit(st ? (kc ? kc + ' KC · ' : '') + placeOf(st) : 'TURN BAND, THEN TUNING, OR PRESS SEEK', 32, 700, W - 260), 60, cy + 118);
+  B.forEach((n, i) => { const x = 40 + bw * (i + 0.5), cur = i === band; g.fillStyle = cur ? '#b5300f' : '#8a6a3c'; let fs = 24; do { g.font = (cur ? '800 ' : '600 ') + fs + 'px "Saira", sans-serif'; fs -= 1; } while (g.measureText(n).width > bw - 18 && fs > 12); g.fillText(n, x, 48); if (cur) g.fillRect(x - bw * 0.3, 64, bw * 0.6, 3); });
+  const X0 = 50, X1 = W - 50, Y = 196; g.strokeStyle = '#3c2810'; g.fillStyle = '#3c2810'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(X0, Y); g.lineTo(X1, Y); g.stroke();
+  for (let f = 540; f <= 1600; f += 10) { const x = X0 + (f - 540) / 1060 * (X1 - X0), big = f % 100 === 0, mid = f % 50 === 0; g.lineWidth = big ? 2.5 : 1.2; g.beginPath(); g.moveTo(x, Y); g.lineTo(x, Y - (big ? 26 : mid ? 17 : 10)); g.stroke(); }
+  g.font = '700 26px "Saira", sans-serif'; for (const f of [60, 70, 80, 100, 120, 140, 160]) { const x = X0 + (f * 10 - 540) / 1060 * (X1 - X0); g.fillText(String(f), x, Y - 50); }
+  g.font = '600 17px "Saira", sans-serif'; g.fillText('KILOCYCLES · BROADCAST', W / 2, Y + 26);
+  const L = radioList(), n = L.length; if (n > 1) { g.fillStyle = 'rgba(60,40,16,.5)'; for (let i = 0; i < n; i++) { const x = X0 + i / (n - 1) * (X1 - X0); g.fillRect(x - 1, Y + 4, 2, 7); } }
+  // station card, clear of the magic eye on the right
+  const cy = 256, cw = W - 190; g.fillStyle = on ? 'rgba(80,40,10,.10)' : 'rgba(40,30,20,.12)'; g.fillRect(36, cy, cw, H - cy - 36); g.textAlign = 'left';
+  const fit = (t, size, wt, maxW) => { let s = size; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; while (g.measureText(t).width > maxW && s > 14) { s -= 1; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; } return t; };
+  const kc = st && n > 1 ? Math.round(540 + Math.max(0, L.findIndex(x => x.id === st.id)) / (n - 1) * 1060) : null, mw = cw - 40;
+  g.fillStyle = '#2a1606'; g.fillText(fit(on && st ? st.name.toUpperCase() : st ? 'OFF · ' + st.name.toUpperCase() : 'PRESS POWER', 40, 800, mw), 56, cy + 52);
+  g.fillStyle = '#5a3a14'; g.fillText(fit(st ? (kc ? kc + ' KC · ' : '') + placeOf(st) : 'TURN BAND, THEN TUNING, OR PRESS SEEK', 24, 700, mw), 56, cy + 104);
   const T = TEL.radio || {}, info = !on ? 'RADIO OFF' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT (THE RACK CAN\'T HEAR IT)' : JAM.on ? 'JAM · ' + (T.conf >= 0.66 && T.bpm ? T.bpm.toFixed(0) + ' BPM' : 'LISTENING') + (JAM.key && JAM.key.fit > 0.5 ? ' · ' + NAMES12[JAM.key.root] + ' ' + JAM.key.mode.toUpperCase() : '') : 'ON AIR · THROUGH THE RACK';
-  g.fillStyle = '#7a1e08'; g.fillText(fit(info, 28, 700, W - 260), 60, cy + 172);
+  g.fillStyle = '#7a1e08'; g.fillText(fit(info, 21, 700, mw), 56, cy + 152);
   RDO.dialTex.needsUpdate = true; }
 const EYE_FS = `uniform float uOpen, uOn; varying vec2 vUv; void main(){ vec2 p = vUv * 2.0 - 1.0; float r = length(p); if (r > 1.0) discard; float a = abs(atan(p.x, p.y));
   float shadow = (1.0 - uOpen) * 2.6 + 0.12; float lit = step(shadow, a) * smoothstep(0.28, 0.36, r) * (1.0 - smoothstep(0.86, 0.98, r)); float edge = exp(-abs(a - shadow) * 18.0) * 0.6;
@@ -2504,45 +2504,44 @@ function buildRadio(parent) {
   const face = new THREE.Group(); face.position.set(-W / 2, F, 0); g.add(face); RDO.face = face;
   const at = (m, x, y, z) => { m.position.set(x, y, z); face.add(m); return m; };
   const ring = (w, h, r, t, d, mat) => { const s = rrShape(w + 2 * t, h + 2 * t, r + t); s.holes.push(rrShape(w, h, r, 0, 0, true)); return new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 10 }), mat); };
+  // face layout (x 0..24, y 0..16.5), every part with clear space around it:
+  // jack plate | grille | dial over the keys; a row of knobs along the bottom, each with its own name under it
+  const lab = (text, x, y, w, h, px, align = 'center') => { const c = document.createElement('canvas'), S = 100; c.width = Math.round(w * S); c.height = Math.round(h * S); const q = c.getContext('2d'); q.fillStyle = '#e2c27a'; q.font = `800 ${px}px "Saira", sans-serif`; q.textAlign = align; q.textBaseline = 'middle'; q.fillText(text, align === 'center' ? c.width / 2 : 4, c.height / 2 + 1);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return at(new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, color: 0xd8c08a })), x, y, 0.04); };
   // grille: woven cloth, a brass frame, walnut slats, the maker's plaque
-  const GX = 7.9, GY = 9.65, GW = 9.0, GH = 10.7;
+  const GX = 7.8, GY = 9.8, GW = 7.6, GH = 9.6;
   at(new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), new THREE.MeshStandardMaterial({ map: clothTex(), roughness: 0.95 })), GX, GY, 0.02);
-  at(ring(GW, GH, 0.8, 0.3, 0.22, brass), GX, GY, 0.0);
-  const slats = []; for (let k = 0; k < 5; k++) { const s = new THREE.BoxGeometry(0.55, GH - 0.3, 0.32); s.translate(GX - GW / 2 + GW * (k + 1) / 6, GY, 0.2); slats.push(s.toNonIndexed()); } face.add(new THREE.Mesh(mergeGeometries(slats), wood));
-  { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#f0d48a'); gr.addColorStop(1, '#a8802f'); q.fillStyle = gr; q.fillRect(0, 0, 512, 128);
-    q.fillStyle = '#3a2208'; q.font = 'italic 700 74px Georgia, "Times New Roman", serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText('Nocturne', 256, 60); q.font = '600 18px "Saira", sans-serif'; q.fillText('SEVEN TUBE · ALL WAVE', 256, 110);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const pl = new THREE.Mesh(new THREE.ExtrudeGeometry(rrShape(4.2, 1.15, 0.5), { depth: 0.12, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 }), [plateMat(t), brass]);
-    pl.geometry.computeBoundingBox(); const uv = pl.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) + 2.1) / 4.2, (uv.getY(i) + 0.575) / 1.15); at(pl, GX, 5.6, 0.42); }
-  // jack plate on the left, nearest the rack
-  { const c = document.createElement('canvas'); c.width = 96; c.height = 512; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 96, 0); gr.addColorStop(0, '#b48a3a'); gr.addColorStop(0.5, '#e6c779'); gr.addColorStop(1, '#a87e30'); q.fillStyle = gr; q.fillRect(0, 0, 96, 512);
-    q.fillStyle = '#3a2208'; q.textAlign = 'center'; q.font = '800 15px "Saira", sans-serif'; q.fillText('TO RACK', 48, 22); q.font = '700 14px "Saira", sans-serif';
-    [['OUT L', 13.4], ['OUT R', 10.8], ['ENV', 8.2], ['TRIG', 5.6]].forEach(([l, y]) => q.fillText(l, 48, (15.0 - (y + 0.95)) / 10.7 * 512 + 5));
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; at(new THREE.Mesh(new THREE.PlaneGeometry(2.0, 10.7), plateMat(t)), 1.8, 9.65, 0.04); }
+  at(ring(GW, GH, 0.7, 0.24, 0.2, brass), GX, GY, 0.0);
+  const slats = []; for (let k = 0; k < 4; k++) { const s = new THREE.BoxGeometry(0.45, GH - 0.3, 0.28); s.translate(GX - GW / 2 + GW * (k + 1) / 5, GY, 0.18); slats.push(s.toNonIndexed()); } face.add(new THREE.Mesh(mergeGeometries(slats), wood));
+  { const c = document.createElement('canvas'); c.width = 512; c.height = 144; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 0, 144); gr.addColorStop(0, '#f0d48a'); gr.addColorStop(1, '#a8802f'); q.fillStyle = gr; q.fillRect(0, 0, 512, 144);
+    q.fillStyle = '#3a2208'; q.font = 'italic 700 70px Georgia, "Times New Roman", serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText('Nocturne', 256, 62); q.font = '600 20px "Saira", sans-serif'; q.fillText('SEVEN TUBE · ALL WAVE', 256, 120);
+    const PW = 3.0, PH = 0.85, t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const pl = new THREE.Mesh(new THREE.ExtrudeGeometry(rrShape(PW, PH, 0.35), { depth: 0.1, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2 }), [plateMat(t), brass]);
+    const uv = pl.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) + PW / 2) / PW, (uv.getY(i) + PH / 2) / PH); at(pl, GX, GY - GH / 2 + 1.0, 0.38); }
+  // jack plate on the left, nearest the rack: a name over each jack
+  { const PW = 1.8, PH = 9.6, PY = 9.8, c = document.createElement('canvas'); c.width = 90; c.height = 480; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 90, 0); gr.addColorStop(0, '#b48a3a'); gr.addColorStop(0.5, '#e6c779'); gr.addColorStop(1, '#a87e30'); q.fillStyle = gr; q.fillRect(0, 0, 90, 480);
+    q.fillStyle = '#3a2208'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.font = '800 17px "Saira", sans-serif';
+    [['OUT L', 13.2], ['OUT R', 11.0], ['ENV', 8.8], ['TRIG', 6.6]].forEach(([l, y]) => q.fillText(l, 45, ((PY + PH / 2) - (y + 0.8)) * 50));
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; at(new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), plateMat(t)), 2.3, PY, 0.04); }
   // dial: printed face (backlit), brass bezel, glass, needle, magic eye
-  const DX = 18.15, DY = 11.5, DW = 10.1, DH = 6.9;
-  RDO.dialCv = document.createElement('canvas'); RDO.dialCv.width = 1010; RDO.dialCv.height = 690; RDO.dialTex = new THREE.CanvasTexture(RDO.dialCv); RDO.dialTex.colorSpace = THREE.SRGBColorSpace; RDO.dialTex.anisotropy = 8;
+  const DX = 17.5, DY = 12.0, DW = 9.8, DH = 5.2;
+  RDO.dialCv = document.createElement('canvas'); RDO.dialCv.width = 980; RDO.dialCv.height = 520; RDO.dialTex = new THREE.CanvasTexture(RDO.dialCv); RDO.dialTex.colorSpace = THREE.SRGBColorSpace; RDO.dialTex.anisotropy = 8;
   RDO.dialMat = new THREE.MeshStandardMaterial({ map: RDO.dialTex, emissive: 0xffc27a, emissiveMap: RDO.dialTex, emissiveIntensity: 0.15, roughness: 0.6 });
-  at(new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), RDO.dialMat), DX, DY, 0.05); at(ring(DW, DH, 0.5, 0.35, 0.3, brass), DX, DY, 0.0);
-  at(new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), new THREE.MeshPhysicalMaterial({ color: 0xfff6e0, transparent: true, opacity: 0.08, roughness: 0.22, depthWrite: false })), DX, DY, 0.36);
-  RDO.needle = at(new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.7, 0.03), new THREE.MeshStandardMaterial({ color: 0xc8200e, emissive: 0x801006, roughness: 0.4 })), DX, DY + DH / 2 - 2.05, 0.12);
-  RDO.nx0 = DX - DW / 2 + 0.6; RDO.nx1 = DX + DW / 2 - 0.6;
+  at(new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), RDO.dialMat), DX, DY, 0.05); at(ring(DW, DH, 0.45, 0.28, 0.26, brass), DX, DY, 0.0);
+  at(new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), new THREE.MeshPhysicalMaterial({ color: 0xfff6e0, transparent: true, opacity: 0.08, roughness: 0.22, depthWrite: false })), DX, DY, 0.32);
+  RDO.needle = at(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.4, 0.03), new THREE.MeshStandardMaterial({ color: 0xc8200e, emissive: 0x801006, roughness: 0.4 })), DX, DY + DH / 2 - 1.55, 0.12);
+  RDO.nx0 = DX - DW / 2 + 0.5; RDO.nx1 = DX + DW / 2 - 0.5;
   RDO.eye = new THREE.ShaderMaterial({ uniforms: { uOpen: { value: 0 }, uOn: { value: 0 } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: EYE_FS, toneMapped: false });
-  at(new THREE.Mesh(new THREE.CircleGeometry(0.62, 40), RDO.eye), DX + DW / 2 - 0.95, DY - DH / 2 + 1.25, 0.1); at(new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.08, 8, 40), brass), DX + DW / 2 - 0.95, DY - DH / 2 + 1.25, 0.12);
-  // piano keys under the dial, their names on a brass strip
-  const KEYS = [['power', 'POWER'], ['seek', 'SEEK'], ['jam', 'JAM'], ['grab', 'GRAB'], ['fx', 'FX'], ['solo', 'FADE']], KW = 1.4, KG = 0.12, kx0 = DX - (KEYS.length * KW + (KEYS.length - 1) * KG) / 2 + KW / 2, KY = 5.85;
-  at(new THREE.Mesh(new THREE.BoxGeometry(KEYS.length * (KW + KG) + 0.4, 2.35, 0.1), dark), DX, KY, 0.0);
-  { const c = document.createElement('canvas'); c.width = 1010; c.height = 64; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, '#e9cb7c'); gr.addColorStop(1, '#a87e30'); q.fillStyle = gr; q.fillRect(0, 0, 1010, 64);
-    q.fillStyle = '#3a2208'; q.font = '800 30px "Saira", sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; KEYS.forEach(([, l], i) => q.fillText(l, (kx0 + i * (KW + KG) - (DX - DW / 2)) / DW * 1010, 34));
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; at(new THREE.Mesh(new THREE.PlaneGeometry(DW, 0.64), plateMat(t)), DX, 7.4, 0.04); }
-  const keyG = rrBox(KW, 2.0, 1.4, 0.22, 0.14); KEYS.forEach(([id], i) => { const k = at(new THREE.Mesh(keyG, ivory), kx0 + i * (KW + KG), KY, 0.95); k.castShadow = true; RDO.keys[id] = k; });
-  // knobs, their scale plates, the pilot jewel, a brass name strip
-  const KR = [['lvl', 5.4, 1.15, 11, null], ['tone', 10.3, 1.0, 11, null], ['band', 15.0, 1.15, RAD_BANDS().length, RAD_BANDS().map(b => b.slice(0, 3))], ['tune', 20.9, 1.5, 31, null]], KYb = 2.55; RDO.knobs = {};
-  for (const [id, x, r, ticks, labels] of KR) { at(knobPlate(r * (labels ? 1.85 : 1.5), ticks, labels), x, KYb, 0.03); const kb = radioKnob(r, r * 0.95, id === 'tune' ? 30 : 22, ivory, brass); kb.holder.position.set(x, KYb, 0.05); face.add(kb.holder); RDO.knobs[id] = kb; }
-  { const c = document.createElement('canvas'); c.width = 1200; c.height = 40; const q = c.getContext('2d'); q.fillStyle = '#c9a24e'; q.fillRect(0, 0, 1200, 40); q.fillStyle = '#3a2208'; q.font = '800 24px "Saira", sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle';
-    [['VOLUME', 5.4], ['TONE', 10.3], ['BAND', 15.0], ['TUNING', 20.9]].forEach(([l, x]) => q.fillText(l, (x - 3) / 20 * 1200, 22)); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    at(new THREE.Mesh(new THREE.PlaneGeometry(20, 0.6), plateMat(t)), 13, 0.42, 0.04); }
-  RDO.jewel = at(new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), new THREE.MeshStandardMaterial({ color: 0xff5a18, emissive: 0xff3a08, emissiveIntensity: 0.1, roughness: 0.15, flatShading: true })), 18.0, KYb, 0.32);
-  at(new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.07, 8, 24), brass), 18.0, KYb, 0.2);
+  const EX = DX + DW / 2 - 0.85, EY = DY - DH / 2 + 1.05; at(new THREE.Mesh(new THREE.CircleGeometry(0.48, 40), RDO.eye), EX, EY, 0.1); at(new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.06, 8, 40), brass), EX, EY, 0.12);
+  // piano keys under the dial, their names printed just above them
+  const KEYS = [['power', 'POWER'], ['seek', 'SEEK'], ['jam', 'JAM'], ['grab', 'GRAB'], ['fx', 'FX'], ['solo', 'FADE']], KW = 1.15, KG = 0.25, kx0 = DX - (KEYS.length * KW + (KEYS.length - 1) * KG) / 2 + KW / 2, KY = 7.3;
+  at(new THREE.Mesh(new THREE.BoxGeometry(KEYS.length * (KW + KG) + 0.3, 1.85, 0.08), dark), DX, KY, 0.0);
+  KEYS.forEach(([, l], i) => lab(l, kx0 + i * (KW + KG), 8.75, 1.35, 0.42, 26));
+  const keyG = rrBox(KW, 1.5, 1.2, 0.18, 0.12); KEYS.forEach(([id], i) => { const k = at(new THREE.Mesh(keyG, ivory), kx0 + i * (KW + KG), KY, 0.8); k.castShadow = true; RDO.keys[id] = k; });
+  // knobs on their scale plates along the bottom, each name under its knob, the pilot jewel between BAND and TUNING
+  const KR = [['lvl', 'VOLUME', 5.0, 0.8, 1.3, 11, null], ['tone', 'TONE', 9.2, 0.8, 1.3, 11, null], ['band', 'BAND', 14.2, 0.7, 1.75, RAD_BANDS().length, RAD_BANDS().map(b => b.slice(0, 3))], ['tune', 'TUNING', 20.2, 1.05, 1.5, 31, null]], KYb = 3.05; RDO.knobs = {};
+  for (const [id, name, x, r, pr, ticks, labels] of KR) { at(knobPlate(pr, ticks, labels), x, KYb, 0.03); const kb = radioKnob(r, r * 0.9, id === 'tune' ? 26 : 18, ivory, brass); kb.holder.position.set(x, KYb, 0.05); face.add(kb.holder); RDO.knobs[id] = kb; lab(name, x, 0.95, 2.2, 0.42, 26); }
+  RDO.jewel = at(new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 0), new THREE.MeshStandardMaterial({ color: 0xff5a18, emissive: 0xff3a08, emissiveIntensity: 0.1, roughness: 0.15, flatShading: true })), 17.2, KYb, 0.26);
+  at(new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.055, 8, 24), brass), 17.2, KYb, 0.16);
   // brass trim around the front edge, a telescopic antenna, the back with vents
   { const s = rrShape(W - 0.9, H - 0.9, 2.0), pts = s.getSpacedPoints(160).map(p => new THREE.Vector3(p.x + W / 2, p.y + H / 2, 0.05)); face.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 240, 0.07, 6, true), brass)); }
   { const chrome = new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.18 }), base = new THREE.Vector3(W / 2 - 2.2, F + H - 0.1, -D + 1.6), dir = new THREE.Vector3(-0.42, 0.86, -0.3).normalize(); let p = base.clone();
