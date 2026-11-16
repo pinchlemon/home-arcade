@@ -2608,22 +2608,42 @@ function collideBoxes(P, O, ix) { for (const B of OBST) { if (!B.on()) continue;
 // ---------------------------------------------------------------- THE TV: the top set on the right cabinet plays public-domain videos streamed from Wikimedia Commons (the Internet Archive blocks this).
 // Six channels (noir, mystery, cartoons, deep sea, nature, sports), each played back to back as if broadcast: you join wherever "now" falls. The set is the TV module: CHANNEL, VOLUME, PREV, NEXT, POWER, and jacks (sound, ENV, LIGHT).
 const TVS = { set: null, scr: null, el: null, tex: null, inNode: null, chans: {}, k: 0, i: 0, mode: 'off', diag: [], lumaCv: null, lt: 0, chT: 0, tok: 0, found: false };
-// Channels: each is a kind of programme, searched on Wikimedia Commons (public-domain and CC0 videos only), played back to back like a station.
-const TV_CH = [['NOIR', 'filetype:video "film noir"', 1], ['MYSTERY', 'filetype:video (detective OR mystery OR crime) film', 1], ['CARTOONS', 'filetype:video (cartoon OR "animated short" OR "animated film")', 0],
-  ['DEEP SEA', 'filetype:video (ocean OR undersea OR "deep sea" OR underwater OR reef)', 0], ['NATURE', 'filetype:video (wildlife OR nature OR animals) documentary', 0], ['SPORTS', 'filetype:video (newsreel OR baseball OR boxing OR football OR olympics) sports', 1]];
 const TV_MOMENTARY = new Set(['power', 'prev', 'next']);
 function tvStatus(t) { TVS.status = t; const el = document.getElementById('tvStatus'); if (el) el.textContent = t; }
 const tvPD = m => { const l = ((m && m.LicenseShortName && m.LicenseShortName.value) || '').toLowerCase(); return /public domain|^pd|cc0|cc-zero/.test(l); };
 function tvPick(info) { // the best version this phone can play: a small transcode, MP4 first
   const v = document.createElement('video'), can = t => t && v.canPlayType(t) !== ''; const ds = (info.derivatives || []).filter(d => d.src && (d.height || 999) <= 480 && can(d.type)).sort((a, b) => (/mp4/.test(b.type) - /mp4/.test(a.type)) || ((b.height || 0) - (a.height || 0)));
   if (ds.length) return ds[0].src; if (can(info.mime) && (info.size || 0) < 400e6) return info.url; return null; }
-async function tvFind(ch) { // the channel's programmes, from Commons
-  const C = TVS.chans[ch] || (TVS.chans[ch] = { list: null, err: '' }); if (C.list) return C.list;
-  const u = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch=' + encodeURIComponent(TV_CH[ch][1]) + '&prop=videoinfo&viprop=url|size|mime|derivatives|extmetadata&viextmetadatafilter=LicenseShortName|ObjectName';
-  const r = await fetch(u); if (!r.ok) throw new Error('search HTTP ' + r.status); const j = await r.json(), pages = Object.values((j.query && j.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
-  const out = []; let pd = 0; for (const p of pages) { const vi = p.videoinfo && p.videoinfo[0]; if (!vi || !tvPD(vi.extmetadata)) continue; pd++; if (vi.duration && vi.duration < 45) continue; const src = tvPick(vi); if (!src) continue;
-    const name = (vi.extmetadata && vi.extmetadata.ObjectName && vi.extmetadata.ObjectName.value) || p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''); out.push({ title: name.replace(/<[^>]+>/g, '').replace(/_/g, ' ').slice(0, 80), url: src, dur: vi.duration || 600, page: p.title }); }
-  C.found = pages.length; C.pd = pd; C.list = out.slice(0, 30); return C.list; }
+// Channels: each is built from hand-sorted sources, in order, until it has 30 programmes:
+//   wd: Wikidata films of these genres that have a video on Commons (how WikiFlix finds full-length public-domain films)
+//   cat: a Commons category (files volunteers filed there)    q: a Commons search, often limited to a category; used last, to top up
+// Only public-domain / CC0 videos the phone can play are kept.
+const PREL = 'incategory:"Media_from_the_Prelinger_Archives"';
+const TV_CH = [
+  ['NOIR', [{ wd: ['Q185867'] }, { q: 'filetype:video "film noir"' }], 1],
+  ['MYSTERY', [{ wd: ['Q1200678', 'Q2484376', 'Q959790', 'Q2297927'] }, { q: 'filetype:video (detective OR mystery) film' }], 1],
+  ['CARTOONS', [{ cat: 'Black and white videos of cartoons' }, { cat: 'Animated films' }, { q: 'filetype:video incategory:"Animated_films"' }], 0],
+  ['DEEP SEA', [{ q: 'filetype:video ' + PREL + ' (ocean OR sea OR fish OR underwater OR whale OR coral)' }, { cat: 'Underwater videos' }, { cat: 'Videos of fish' }, { q: 'filetype:video (underwater OR "deep sea" OR "coral reef")' }], 0],
+  ['NATURE', [{ q: 'filetype:video ' + PREL + ' (animals OR wildlife OR birds OR insects OR nature OR forest)' }, { cat: 'Videos of animals' }, { q: 'filetype:video wildlife documentary' }], 0],
+  ['SPORTS', [{ q: 'filetype:video ' + PREL + ' (sports OR baseball OR football OR boxing OR racing OR olympic)' }, { q: 'filetype:video newsreel (sports OR baseball OR boxing OR football)' }], 1]];
+const CAPI = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=videoinfo&viprop=url|size|mime|derivatives|extmetadata&viextmetadatafilter=LicenseShortName|ObjectName';
+async function capi(params) { const r = await fetch(CAPI + params); if (!r.ok) throw new Error('Commons HTTP ' + r.status); const j = await r.json(); return Object.values((j.query && j.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0)); }
+async function tvSourcePages(src) { // one source's pages, each with its video info
+  if (src.q) return capi('&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch=' + encodeURIComponent(src.q));
+  if (src.cat) return capi('&generator=categorymembers&gcmtype=file&gcmlimit=50&gcmtitle=' + encodeURIComponent('Category:' + src.cat));
+  if (src.wd) { const q = 'SELECT DISTINCT ?v WHERE { VALUES ?g { ' + src.wd.map(x => 'wd:' + x).join(' ') + ' } ?f wdt:P136 ?g; wdt:P10 ?v. } LIMIT 80';
+    const r = await fetch('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q)); if (!r.ok) throw new Error('Wikidata HTTP ' + r.status); const j = await r.json();
+    const titles = j.results.bindings.map(b => 'File:' + decodeURIComponent(b.v.value.split('/Special:FilePath/')[1] || '').replace(/_/g, ' ')).filter(t => t.length > 5); const out = [];
+    for (let k = 0; k < titles.length; k += 50) out.push(...await capi('&titles=' + encodeURIComponent(titles.slice(k, k + 50).join('|')))); return out; }
+  return []; }
+async function tvFind(ch) { // the channel's programmes
+  const C = TVS.chans[ch] || (TVS.chans[ch] = { list: null }); if (C.list) return C.list; const out = [], seen = new Set(); C.found = 0; C.pd = 0; C.src = [];
+  for (const src of TV_CH[ch][1]) { if (out.length >= 30) break; let pages; try { pages = await tvSourcePages(src); } catch (e) { C.src.push((src.wd ? 'Wikidata' : src.cat ? src.cat : 'search') + ': ' + e.message); continue; }
+    let got = 0; for (const p of pages) { if (seen.has(p.title)) continue; seen.add(p.title); const vi = p.videoinfo && p.videoinfo[0]; if (!vi || !/^video\//.test(vi.mime || '')) continue; C.found++; if (!tvPD(vi.extmetadata)) continue; C.pd++; if (vi.duration && vi.duration < 45) continue; const url = tvPick(vi); if (!url) continue;
+      const name = (vi.extmetadata && vi.extmetadata.ObjectName && vi.extmetadata.ObjectName.value) || p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''); out.push({ title: name.replace(/<[^>]+>/g, '').replace(/_/g, ' ').slice(0, 80), url, dur: vi.duration || 600, page: p.title }); got++; if (out.length >= 30) break; }
+    C.src.push((src.wd ? 'Wikidata genre' : src.cat ? 'category "' + src.cat + '"' : 'search') + ': ' + got); }
+  if (!out.length && C.src.every(x => /HTTP|fetch|Failed|Load/i.test(x))) throw new Error(C.src.join('; '));
+  C.list = out; return out; }
 function tvScreen(on) { const u = TVS.scr && TVS.scr.material.uniforms; if (!u) return; if (on && TVS.tex) { u.uMap.value = TVS.tex; u.uZoom.value.set(1, 1, 0, 0); u.uMode.value = 1; u.uGray.value = TV_CH[TVS.i] ? TV_CH[TVS.i][2] : 0; } else { u.uMode.value = 0; u.uGray.value = 0; } }
 function tvKill() { if (TVS.el) { try { TVS.el.pause(); TVS.el.removeAttribute('src'); TVS.el.load(); } catch (e) { } } }
 function tvOff() { TVS.tok++; tvKill(); TVS.mode = 'off'; tvScreen(false); send({ t: 'param', id: 'tv', k: 'live', v: 0 }); send({ t: 'param', id: 'tv', k: 'playing', v: 0 }); tvOSD(null); tvStatus('TV off.'); tvDraw(); }
@@ -2662,8 +2682,9 @@ function tvQuiet(id, n) { const kn = modById.tv && modById.tv.knobs[id]; if (!kn
 function tvDraw() { const el = document.getElementById('tvCh'); if (!el) return; el.textContent = TVS.mode === 'off' ? 'OFF' : 'CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0]; }
 async function tvTest() { // a step-by-step check that she can read out on the phone
   const out = [], put = (ok, t) => { out.push((ok ? '✓ ' : '✗ ') + t); const el = document.getElementById('tvDiag'); if (el) el.textContent = out.join('\n'); }; const el = document.getElementById('tvDiag'); if (el) el.textContent = 'Testing… (up to 30 s)';
-  const ch = TVS.mode === 'off' ? 0 : TVS.i; TVS.chans[ch] = null; let L;
-  try { L = await tvFind(ch); const C = TVS.chans[ch]; put(true, 'Commons search (' + TV_CH[ch][0] + '): ' + C.found + ' videos, ' + C.pd + ' public domain'); put(L.length > 0, L.length + ' in a format this phone can play'); } catch (e) { put(false, 'Commons search: ' + e.message); return; }
+  let ch = TVS.mode === 'off' ? 0 : TVS.i, L = null; // every channel: how many programmes it found, and from where
+  for (let c = 0; c < TV_CH.length; c++) { TVS.chans[c] = null; try { const l = await tvFind(c), C = TVS.chans[c]; put(l.length > 0, 'CH ' + (c + 2) + ' ' + TV_CH[c][0] + ': ' + l.length + ' playable (' + C.src.join(' · ') + ')'); if (c === ch) L = l; } catch (e) { put(false, 'CH ' + (c + 2) + ' ' + TV_CH[c][0] + ': ' + e.message); } }
+  if (!L || !L.length) { ch = TV_CH.findIndex((_, c) => TVS.chans[c] && TVS.chans[c].list && TVS.chans[c].list.length); if (ch >= 0) L = TVS.chans[ch].list; }
   if (!L.length) { const v = document.createElement('video'); put(false, 'This phone: WebM ' + (v.canPlayType('video/webm; codecs="vp9"') || 'no') + ', MP4 ' + (v.canPlayType('video/mp4') || 'no')); return; }
   const it = L[0]; put(true, 'Trying: ' + it.title + ' (' + (it.url.match(/\.(\w+)$/) || ['', '?'])[1] + ')');
   const probe = cors => new Promise(res => { const v = document.createElement('video'); if (cors) v.crossOrigin = 'anonymous'; v.muted = true; v.playsInline = true; v.preload = 'auto'; const t = setTimeout(() => res([false, v]), 20000); v.onloadeddata = () => { clearTimeout(t); res([true, v]); }; v.onerror = () => { clearTimeout(t); res([false, v]); }; v.src = it.url; v.play().catch(() => { }); });
