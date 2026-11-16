@@ -1366,7 +1366,28 @@ class Chaos extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos };
+// FOCUS: two study aids on the master. AM adds a fast, even loudness flutter to the music at RATE (16 Hz is the beta-band rate
+// that helped listeners with more ADHD symptoms in Woods et al. 2019/2024); STEADY BASS leaves the lows unmodulated. NOISE adds
+// a steady pink-to-brown noise bed under it (Nigg et al. 2024 meta-analysis: small benefit with ADHD symptoms).
+export const FOCUS_RATES = [8, 12, 16, 20, 32];
+class Focus extends DSP {
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
+  constructor(e) { super(e); this.ph = 0; this.k = [new Float64Array(7), new Float64Array(7)]; this.br = [0, 0]; this.lo = [0, 0]; }
+  process(n) {
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R;
+    const rate = FOCUS_RATES[P.rate ?? 2] || 16, dep = P.depth ?? 0, keep = (P.low ?? 1) > 0.5, nz = P.noise ?? 0, col = P.color ?? 0.3, kl = 1 - Math.exp(-TAU * 150 / sr);
+    for (let i = 0; i < n; i++) {
+      this.ph += rate / sr; if (this.ph >= 1) this.ph -= 1; const m = 1 - dep * 0.5 * (1 - Math.cos(TAU * this.ph));
+      for (let c = 0; c < 2; c++) { const x = c ? IR[i] : IL[i]; this.lo[c] += kl * (x - this.lo[c]); let y = keep ? this.lo[c] + (x - this.lo[c]) * m : x * m;
+        if (nz > 0.001) { const b = this.k[c], w = Math.random() * 2 - 1; // pink (Kellet) and brown (leaky integral) noise
+          b[0] = 0.99886 * b[0] + w * 0.0555179; b[1] = 0.99332 * b[1] + w * 0.0750759; b[2] = 0.969 * b[2] + w * 0.153852; b[3] = 0.8665 * b[3] + w * 0.3104856; b[4] = 0.55 * b[4] + w * 0.5329522; b[5] = -0.7616 * b[5] - w * 0.016898;
+          const pk = (b[0] + b[1] + b[2] + b[3] + b[4] + b[5] + b[6] + w * 0.5362) * 0.11; b[6] = w * 0.115926; this.br[c] = this.br[c] * 0.995 + w * 0.06; y += (pk * (1 - col) + this.br[c] * 0.53 * col) * nz * 2.2; }
+        if (c) OR[i] = y; else OL[i] = y; }
+    }
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }

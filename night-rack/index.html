@@ -178,7 +178,7 @@ body.cam #cambar{display:flex}
 <div id="rand" class="hud hide">
   <div class="sec">NEW RANDOM PATCH</div>
   <div class="chips" id="rMode"><button data-m="clean">CLEAN</button><button data-m="exp">EXPERIMENTAL</button></div>
-  <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rLofi">LO-FI</button><button id="rSurp">SURPRISE</button></div>
+  <div class="chips"><button id="rAmb">AMBIENT</button><button id="rHouse">HOUSE</button><button id="rDnb">DNB</button><button id="rKiln">KILN-ISH</button><button id="rTinez">TINEZ-ISH</button><button id="rLofi">LO-FI</button><button id="rFocus">FOCUS</button><button id="rSurp">SURPRISE</button></div>
   <div class="muted" style="margin-top:6px">Rewires the whole rack into a new playable patch. Press R to roll again. CLEAN keeps each genre's proper sound; EXPERIMENTAL lets anything happen (wild modulation, folding, FM).</div>
   <div class="sec">DECKS</div>
   <div class="chips"><button id="rBlend">BLEND TO DECK B</button></div>
@@ -284,7 +284,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SCALES, MODELS, GROOVES, grooveWeight, STAB_NAMES, KEY_SOUNDS, WARP_SHAPES, warpWave } from './engine.js';
+import { SCALES, MODELS, GROOVES, grooveWeight, STAB_NAMES, KEY_SOUNDS, WARP_SHAPES, warpWave, FOCUS_RATES } from './engine.js';
 
 window.addEventListener('error', e => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = 'Error: ' + (e.message || e); });
 
@@ -739,12 +739,16 @@ DEFS.chaos = lay('CHAOS', 12, 'black',
   [[kn('rate', 'RATE', 'M', { def: 0.3, fmt: v => v > 0.75 ? 'AUDIO ' + fPct(v) : fPct(v) }), kn('shape', 'SHAPE', 'S', { def: 0.6, name: 'CALM TO WILD', fmt: fPct })],
    [kn('amt', 'AMOUNT', 'S', { def: 0.8, fmt: fPct }), ld('led', 'red')]],
   [[ji('reset', 'RESET', 'trig'), jo('trig', 'TRIG', 'cv')], [jo('x', 'X'), jo('y', 'Y'), jo('z', 'Z')]]);
+DEFS.focus = lay('FOCUS', 16, 'black',
+  [[kn('rate', 'AM RATE', 'M', { min: 0, max: FOCUS_RATES.length - 1, step: 1, def: 2, name: 'AMPLITUDE MODULATION RATE', fmt: v => FOCUS_RATES[v] + ' HZ' + (FOCUS_RATES[v] === 16 ? ' (BETA)' : '') }), kn('depth', 'AM DEPTH', 'S', { def: 0, name: 'AMPLITUDE MODULATION DEPTH', fmt: v => v < 0.01 ? 'OFF' : fPct(v) })],
+   [kn('noise', 'NOISE', 'S', { def: 0, name: 'NOISE BED', fmt: v => v < 0.01 ? 'OFF' : fPct(v) }), kn('color', 'COLOR', 'S', { def: 0.3, name: 'NOISE COLOUR', fmt: v => v < 0.33 ? 'PINK' : v > 0.66 ? 'BROWN' : 'PINK-BROWN' }), kn('low', 'STEADY BASS', 'S', { min: 0, max: 1, step: 1, def: 1, name: 'KEEP THE BASS UNMODULATED', fmt: v => v ? 'ON' : 'OFF' })]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const DECK_SHARED = new Set(['clock', 'scope', 'out', 'keys']);
 const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^blank/.test(type) ? bl(DEFS[type].hp, DEFS[type].theme === 'silver' ? 'navy' : DEFS[type].theme) : [id + '_b', type]);
 const WROWS = {
   L: [ROWX, ROWT, ROW0, ROW1, ROWD, ROWM].map(mirrorRow),
   R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], bl(10, 'navy'), bl(8, 'silver')],
-      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], bl(20, 'navy'), bl(16, 'black')],
+      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], bl(20, 'navy'), ['focus', 'focus']],
       [['cond', 'cond'], ['mangle', 'mangle'], ['warp', 'warp'], ['chaos', 'chaos']]] };
 const DEFAULT_PATCH = [
   ['clock.d2', 'rnd.trig', '#35e0ff'], ['rnd.step', 'quant.in', '#3b6cff'], ['quant.out', 'vcoA.voct', '#e8eef8'], ['quant.trig', 'env.trig1', '#ff7a2e'],
@@ -988,7 +992,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -2284,7 +2288,7 @@ function cableColor(a, b) {
 }
 function genPatch(style, wild, clean) {
   // clean: the main-genre sound (no pitch/FM/fold modulation, keyed melodies, tame resonance). Experimental: anything goes.
-  const CL = !!clean; if (CL) wild = 0;
+  const CL = !!clean || style === 'focus'; if (CL) wild = 0;
   const K = {}, C = [], set = (m, k, v) => ((K[m] = K[m] || {})[k] = v), con = (a, b) => C.push([a, b, cableColor(a, b)]);
   const used = new Set(), targets = [], maj = (style === 'ambient' && chance(0.35)) || (style === 'kiln' && chance(0.6)), PENT = maj ? [0, 2, 4, 7, 9] : [0, 3, 5, 7, 10], MINOR = [0, 2, 3, 5, 7, 8, 10];
   const note = (sc, lo, hi) => { let n; do { n = rpick(sc) + 12 * ri(0, 2); } while (n < lo || n > hi); return n; };
@@ -2427,6 +2431,30 @@ function genPatch(style, wild, clean) {
     master(rr(1.2, 2.8), rr(0.08, 0.16));
     tapeOut = true; set('tape', 'wow', rr(0.05, 0.18)); set('tape', 'flutter', rr(0.03, 0.12)); set('tape', 'drive', rr(0.3, 0.55)); set('tape', 'age', rr(0.15, 0.4)); set('tape', 'hiss', rr(0.03, 0.12)); set('tape', 'dust', rr(0.05, 0.2));
     set('lfo', 'rate1', rexp(0.03, 0.2)); set('lfo', 'shape1', 0);
+  } else if (style === 'focus') {
+    // FOCUS, for studying (sources in the PR): slow and soft, since fast and loud background music hurts reading comprehension
+    // (Thompson et al. 2012); no lyrics (irrelevant speech is the classic distractor) and almost no changing melody, since sound
+    // that changes from note to note distracts more than steady sound (the changing-state effect, Jones & Macken 1993);
+    // harmony moves only every couple of bars; and on the FOCUS module a pink/brown noise bed (Nigg et al. 2024: a small benefit
+    // for people with ADHD symptoms) and a 16 Hz amplitude flutter (Woods et al. 2024: beta-rate modulation helped listeners with
+    // more ADHD symptoms). No breakdowns or drops: the Conductor only makes small, slow changes in this style.
+    set('clock', 'tempo', ri(64, 78));
+    const prog = rpick([[0, 5], [0, 0, 5, 5], [0, 5, 0, 7], [0, 0, 5, 7]]); con('clock.d8', 'seq.clk'); prog.forEach((n, i) => set('seq', 's' + i, n)); set('seq', 'len', prog.length); set('seq', 'prob', 1); used.add('seq');
+    const pad = stabV('clock.d4', 'seq.cv', { chord: rpick([1, 4, 1]), cut: rexp(1200, 2600), env: rr(0.1, 0.3), dec: rr(0.6, 0.9) }); set('stab', 'sound', 1); set('stab', 'trem', rr(0.05, 0.2)); set('stab', 'voice', rr(0.3, 0.6));
+    con(pad, 'mix6.in3'); con('stab.R', 'mix6.in6');
+    const bass = bassM({ cv: 'seq.cv', gate: 'clock.d4' }, { wave: 0, oct: -1, cut: rexp(160, 260), res: 0.05, env: 0.05, dec: rr(0.7, 0.9), glide: 0.05, drive: 0.05 }); con(bass, 'mix6.in2');
+    const drums = chance(0.55); if (drums) { groove(1, { swing: rr(0, 0.12), chaos: 0, k: 0.5, s: 0, h: rr(0.5, 0.56), p: 0, clap: false }); drumKnobs(true); con(SMP ? 'sampler.mix' : 'drums.mix', 'mix.in1'); if (SMP) useKit(); set('mix', 'lvl1', rr(0.4, 0.5)); con('perc.mix', 'mix.in2'); set('mix', 'lvl2', 0); }
+    else { set('mix', 'lvl1', 0); set('mix', 'lvl2', 0); }
+    con(voice.drone(), 'mix.in4'); con('seq.cv', 'vcoB.voct'); set('mix', 'lvl4', rr(0.3, 0.4));
+    if (chance(0.5)) { const tp = getPitch('tur'); set('turing', 'chg', rr(0.01, 0.04)); set('turing', 'len', 8); set('turing', 'range', rr(0.4, 0.7));
+      con(tp.cv, 'mbira.voct'); con(tp.gate, 'mbira.trig'); used.add('mbira'); set('mbira', 'type', 2); set('mbira', 'oct', 0); set('mbira', 'dec', rr(0.7, 0.95)); set('mbira', 'lvl', rr(0.35, 0.5));
+      con('mbira.out', 'mix.in3'); set('mix', 'lvl3', 0.45); con('mbira.out', 'delay.in'); con('delay.L', 'mix6.in4'); con('delay.R', 'mix6.in5'); sendDelay(1.5, rr(0.2, 0.35)); set('delay', 'mod', 0); }
+    else set('mix', 'lvl3', 0);
+    con('mix.out', 'mix6.in1');
+    Object.assign(K.mix6 = K.mix6 || {}, { lvl1: 0.7, pan1: 0, lvl2: rr(0.42, 0.5), pan2: 0, lvl3: rr(0.45, 0.55), pan3: -0.3, lvl6: rr(0.45, 0.55), pan6: 0.3, lvl4: 0.3, pan4: -0.6, lvl5: 0.3, pan5: 0.6, master: 0.8 });
+    master(rr(2.5, 4.5), rr(0.16, 0.26));
+    set('focus', 'rate', 2); set('focus', 'depth', rr(0.4, 0.55)); set('focus', 'noise', rr(0.25, 0.4)); set('focus', 'color', rr(0.3, 0.7)); set('focus', 'low', 1);
+    for (const c of [1, 2]) { set('lfo', 'rate' + c, rexp(0.02, 0.06)); set('lfo', 'shape' + c, 0); }
   } else if (style === 'jazzy' || style === 'lofi') {
     // a tune from the songbook played by BAND on recorded keys (voiced and humanised), with a soft round bass on its roots.
     // LO-FI: dusty boom-bap at 72-86 BPM, lazy swing, heavy tape. JAZZY: deep house at 116-122 BPM.
@@ -2543,7 +2571,7 @@ function genPatch(style, wild, clean) {
     set('echo', 'div', style === 'dnb' ? rpick([1, 2, 5]) : house ? rpick([2, 2, 3, 4]) : rpick([2, 3, 4, 5])); set('echo', 'fb', dance ? rr(0.25, 0.45) : rr(0.4, 0.62)); set('echo', 'tone', rr(0.35, 0.6)); set('echo', 'wow', rr(0.15, 0.4)); set('echo', 'spread', rr(0.5, 0.9));
     set('echo', 'mix', style === 'dnb' ? rr(0.04, 0.1) : dance ? rr(0.06, 0.14) : rr(0.12, 0.26));
     set('pump', 'depth', style === 'lofi' ? rr(0.04, 0.1) : style === 'jazzy' ? rr(0.08, 0.18) : house ? rr(0.2, 0.4) : style === 'dnb' ? rr(0.08, 0.18) : 0); set('pump', 'rel', house ? rr(0.25, 0.45) : rr(0.15, 0.3)); set('pump', 'shape', rr(0.4, 0.7));
-    set('sub', 'xo', dance ? rr(100, 140) : rr(80, 120)); set('sub', 'sub', style === 'dnb' ? rr(0.15, 0.35) : house ? rr(0, 0.12) : 0); set('sub', 'tight', dance ? rr(26, 34) : rr(18, 26)); set('sub', 'low', 0); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'limit.inL'); con('wide.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
+    set('sub', 'xo', dance ? rr(100, 140) : rr(80, 120)); set('sub', 'sub', style === 'dnb' ? rr(0.15, 0.35) : house ? rr(0, 0.12) : 0); set('sub', 'tight', dance ? rr(26, 34) : rr(18, 26)); set('sub', 'low', 0); con('eq.L', 'glue.inL'); con('eq.R', 'glue.inR'); con('glue.L', 'wide.inL'); con('glue.R', 'wide.inR'); con('wide.L', 'focus.inL'); con('wide.R', 'focus.inR'); con('focus.L', 'limit.inL'); con('focus.R', 'limit.inR'); con('limit.L', 'out.L'); con('limit.R', 'out.R');
     set('eq', 'hp', dance ? rr(28, 40) : rr(22, 32)); set('eq', 'low', style === 'dnb' ? rr(1, 3) : dance ? rr(0, 2) : rr(-1, 1)); set('eq', 'midf', rexp(250, 500)); set('eq', 'mid', rr(-2.5, -0.5)); set('eq', 'mq', rr(0.7, 1.2)); set('eq', 'high', kil ? rr(-1.5, 0.5) : style === 'dnb' ? rr(-1.5, 0.5) : style === 'ambient' ? rr(0, 2) : rr(1, 3));
     if (dance) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(2, 3.2)); set('glue', 'atk', rexp(0.015, 0.035)); set('glue', 'rel', rr(0.12, 0.25)); set('glue', 'makeup', rr(1.5, 3)); set('glue', 'mix', rr(0.75, 1)); }
     else if (kil) { set('glue', 'thr', rr(-12, -7)); set('glue', 'ratio', rr(1.8, 2.6)); set('glue', 'atk', rexp(0.02, 0.04)); set('glue', 'rel', rr(0.25, 0.5)); set('glue', 'makeup', rr(2, 3.5)); set('glue', 'mix', rr(0.6, 0.85)); }
@@ -2551,7 +2579,7 @@ function genPatch(style, wild, clean) {
     set('wide', 'width', dance ? rr(1.1, 1.45) : rr(1.2, 1.6)); set('wide', 'mono', dance ? rr(90, 150) : rr(60, 120)); set('wide', 'chorus', kil ? rr(0.25, 0.4) : dance ? rr(0.1, 0.25) : rr(0.2, 0.4)); set('wide', 'depth', rr(0.3, 0.55)); set('wide', 'rate', rexp(0.3, 0.9));
     // gain staging: every new sound is levelled at the mixer, and the whole mix lands at a set loudness with headroom (no slamming)
     set('mix6', 'auto', 1); set('mix', 'auto', style === 'ambient' ? 1 : 0);
-    set('limit', 'level', { house: -12, tinez: -12, dnb: -12, lofi: -13, jazzy: -13, kiln: -14, ambient: -16 }[style] ?? -14);
+    set('limit', 'level', { house: -12, tinez: -12, dnb: -12, lofi: -13, jazzy: -13, kiln: -14, ambient: -16, focus: -18 }[style] ?? -14);
     set('limit', 'drive', dance ? rr(0.5, 1.5) : rr(0, 1)); set('limit', 'ceil', -3); set('limit', 'rel', rr(0.07, 0.16)); set('limit', 'air', kil || style === 'dnb' ? rr(0, 0.08) : rr(0.12, 0.3)); }
   // modulation
   const srcs = ['lfo.bi1', 'lfo.bi2', 'lfo.uni1', 'lfo.uni2', 'rnd.smooth', ...(CL ? [] : ['chaos.x', 'chaos.y', 'chaos.z'])], tset = [...new Set(targets)].filter(t => !C.some(c => c[1] === t)).sort(() => Math.random() - 0.5);
@@ -2598,11 +2626,12 @@ function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one 
   for (const m in P.knobs) if (base.has(m)) knobs[m + sfx] = P.knobs[m];
   return { cables, knobs };
 }
-const MIXSIDE = ['blend', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit', 'out'];
+const MIXSIDE = ['blend', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit', 'out'];
 function ensureFX() { // patches from before WARP and MANGLE: put them between KEYS and SWEEP, and let KEYS play WARP
   const find = (o, i) => cables.find(c => c.connected && c.out.module.id + '.' + c.out.id === o && c.inp.module.id + '.' + c.inp.id === i), P = (a, b) => { try { patchCable(a, b); } catch (e) { } };
-  const kl = find('keys.L', 'sweep.inL'), kr = find('keys.R', 'sweep.inR'); const was = loading; loading = true;
+  const kl = find('keys.L', 'sweep.inL'), kr = find('keys.R', 'sweep.inR'), wl = find('wide.L', 'limit.inL'), wr = find('wide.R', 'limit.inR'); const was = loading; loading = true;
   try { if (kl) { removeCable(kl); if (kr) removeCable(kr); P('keys.L', 'warp.inL'); P('keys.R', 'warp.inR'); P('warp.L', 'mangle.inL'); P('warp.R', 'mangle.inR'); P('mangle.L', 'sweep.inL'); P('mangle.R', 'sweep.inR'); }
+    if (wl) { removeCable(wl); if (wr) removeCable(wr); P('wide.L', 'focus.inL'); P('wide.R', 'focus.inR'); P('focus.L', 'limit.inL'); P('focus.R', 'limit.inR'); }
     if (find('warp.L', 'mangle.inL')) { if (!modById.warp.patched('voct')) P('keys.voct', 'warp.voct'); if (!modById.warp.patched('gate')) P('keys.gate', 'warp.gate'); if (!modById.mangle.patched('clk')) P('clock.x4', 'mangle.clk'); } }
   finally { loading = was; }
 }
@@ -2616,7 +2645,7 @@ function ensureChain() { // older patches (and the first-visit patch) skip the m
     for (const c of [...cables]) if (c.connected && M.has(c.inp.module.id) && !(c.inp.module.id === 'blend' && c.inp.id[0] === 'b')) removeCable(c);
     const r = mulberry32(5), P = (a, b) => { try { patchCable(a, b, undefined, r() < 0.4 ? 1 : 0); } catch (e) { } };
     P(sL, 'blend.aL'); P(sR, 'blend.aR');
-    const ch = ['blend', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
+    const ch = ['blend', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
     P('limit.L', 'out.L'); P('limit.R', 'out.R'); if (kick) P(kick, 'pump.trig');
     const set = (m, k, v) => modById[m].knobs[k].set(modById[m].knobs[k].toNorm(v)); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('echo', 'mix', 0.08);
     for (let i = 0; i < 200; i++) physics(1 / 120);
@@ -2699,6 +2728,7 @@ const JAZZ_BASS = [[0, 6, 10], [0, 8, 10], [0, 10, 14], [0, 6, 8, 14], [0, 8], [
 // kinds: fade (a level fades out or back in over 4 bars), jump (pattern settings change on a bar line), glide (a sound drifts over a few bars),
 // small (a smaller glide), step (a new value from a list, on a bar line), prog / comp (jazzy song book, on a phrase line)
 const MOVES = [
+  ['padtone', 'focus', 'stab', ['cutoff'], 'small', 'PAD TONE'], ['pianofade', 'focus', 'mbira', ['lvl'], 'fade', 'PIANO'],
   ['hats', 'd', 'groove', ['hDen'], 'jumpout', 'HATS'], ['perc', 'd', 'groove', ['pDen'], 'jumpout', 'PERCUSSION'], ['ghosts', 'd', 'groove', ['sDen'], 'jump', 'SNARE GHOSTS'],
   ['variation', 'd', 'groove', ['var'], 'jump', 'GROOVE VARIATION'], ['swing', 'house tinez', 'groove', ['swing'], 'small', 'SWING'],
   ['hatlen', 'd', 'sampler', ['hDec'], 'small', 'HAT LENGTH'], ['openhats', 'd', 'sampler|drums', ['oLvl'], 'fade', 'OPEN HATS'], ['clap', 'house tinez', 'sampler|drums', ['cLvl'], 'small', 'CLAP LEVEL'],
@@ -2717,7 +2747,7 @@ const MOVES = [
   ['vibesline', 'jazzy lofi', 'band', ['lead'], 'small', 'VIBES LINE'], ['feel', 'jazzy lofi', 'band', ['human'], 'small', 'LOOSENESS'], ['keystone', 'jazzy lofi', 'band', ['tone'], 'small', 'KEYS TONE'],
   ['hats', 'jazzy lofi', 'sampler|drums', ['hLvl'], 'fade', 'HATS'], ['shaker', 'jazzy lofi', 'perc', ['shLvl'], 'fade', 'SHAKER'], ['openhats', 'jazzy', 'sampler|drums', ['oLvl'], 'fade', 'OPEN HATS'], ['rim', 'jazzy', 'perc', ['rLvl'], 'fade', 'RIM'],
   ['bassfilter', 'jazzy lofi', 'bass', ['cutoff'], 'small', 'BASS TONE'], ['delay', 'jazzy lofi', 'delay', ['mix'], 'small', 'ECHOES'], ['space', 'jazzy lofi', 'verb', ['mix'], 'small', 'SPACE'], ['wobble', 'jazzy lofi', 'tape', ['wow'], 'small', 'TAPE WOBBLE'], ['swing', 'jazzy lofi', 'groove', ['swing'], 'small', 'SWING']];
-const moveOk = (mv, st) => mv[1] === '*' ? st !== 'jazzy' && st !== 'lofi' : mv[1] === 'd' ? ['house', 'tinez', 'dnb'].includes(st) : mv[1].split(' ').includes(st);
+const moveOk = (mv, st) => st === 'focus' ? mv[1].split(' ').includes('focus') : mv[1] === '*' ? st !== 'jazzy' && st !== 'lofi' : mv[1] === 'd' ? ['house', 'tinez', 'dnb'].includes(st) : mv[1].split(' ').includes(st);
 function condMove(phrase) {
   const st = DECK.style, depth = modById.cond.v('depth'), pool = MOVES.filter(mv => moveOk(mv, st) && (mv[4] === 'comp' ? phrase && isPatched(liveId(mv[2])) : mv[3].some(k => condKnob(mv[2], k))));
   // now and then, bring something that has wandered back home instead
@@ -2740,6 +2770,7 @@ function condMove(phrase) {
 }
 // song shape: lengths in bars, always whole phrases (multiples of 8). ENERGY lengthens drops or breakdowns.
 function sections(st, en) {
+  if (st === 'focus') return [['FLOW', 64]]; // focus: no breakdowns or drops, nothing that grabs attention
   if (st === 'jazzy' || st === 'lofi') return en < 0.35 ? [['GROOVE', 32], ['LAY BACK', 16], ['GROOVE', 24], ['LAY BACK', 16]] : [['GROOVE', 32], ['LAY BACK', en > 0.65 ? 8 : 16], ['GROOVE', 32], ['GROOVE', 16]];
   if (!DANCE_ST.has(st)) return [['FLOW', 32], ['THIN OUT', en > 0.65 ? 8 : 16], ['SWELL', 16], ['FLOW', 32]];
   if (en < 0.3) return [['GROOVE', 32], ['BREAKDOWN', 32], ['GROOVE', 32]];
@@ -2816,7 +2847,7 @@ function randomPatch(style) {
   pushUndo(); RND.style = style; const s = style === 'surprise' ? rpick(['ambient', 'house', 'tinez', 'dnb', 'kiln', 'lofi']) : style, X = RND.mode === 'exp', wild = X ? rr(0.5, 1) : 0;
   setTimeout(() => { window.__nextTune = null; }, 0); DECK.style = s; DECK.past = []; COND.since = 0; try { localStorage.setItem('nightrack.style', s); } catch (e) { } const keep = ['drift', 'depth', 'energy', 'swap'].map(k => [k, modById.cond.knobs[k].norm]);
   loadPatch(tastePick(() => genPatch(s, wild, !X), 4)); for (const [k, n] of keep) modById.cond.knobs[k].set(n); modById.cond.knobs.on.set(1); condRebase(); send({ t: 'barsync', reset: deckIds('A') }); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
-  toast((X ? 'Experimental · ' : '') + (style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy deep house patch', lofi: 'New lo-fi patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
+  toast((X ? 'Experimental · ' : '') + (style === 'surprise' ? 'Surprise · ' : '') + ({ house: 'New house patch', dnb: 'New drum & bass patch', kiln: 'New Kiln-ish patch', focus: 'New focus patch', tinez: 'New Tinez-ish deep house patch', jazzy: 'New jazzy deep house patch', lofi: 'New lo-fi patch', ambient: 'New ambient patch' }[s]) + ' · ' + cables.filter(c => c.connected).length + ' cables', true);
 }
 function undoRandom() { const P = RND.undo.pop(); if (!P) return; RND.tw = []; loadPatch(P); document.getElementById('rUndo').disabled = !RND.undo.length; toast('Undone', true); }
 Object.assign(window, { genPatch, randomPatch, shuffleKnobs, undoRandom, blendNext, deckPatch, DECK, serialize, loadPatch });
@@ -2829,6 +2860,7 @@ document.getElementById('rDnb').onclick = () => randomPatch('dnb');
 document.getElementById('rKiln').onclick = () => randomPatch('kiln');
 document.getElementById('rTinez').onclick = () => randomPatch('tinez');
 document.getElementById('rLofi').onclick = () => randomPatch('lofi');
+document.getElementById('rFocus').onclick = () => randomPatch('focus');
 document.getElementById('rSurp').onclick = () => randomPatch('surprise');
 function setMode(m) { RND.mode = m; try { localStorage.setItem('nightrack.mode', m); } catch (e) { } document.querySelectorAll('#rMode button').forEach(b => b.classList.toggle('cur', b.dataset.m === m)); }
 window.setMode = setMode; document.querySelectorAll('#rMode button').forEach(b => b.onclick = () => { setMode(b.dataset.m); toast(b.dataset.m === 'exp' ? 'Experimental: wild modulation, folding and FM allowed' : 'Clean: each genre keeps its proper sound', true); }); setMode(RND.mode);
@@ -2967,7 +2999,7 @@ document.getElementById('cmDel').onclick = () => { if (menuCable) removeCable(me
 // X: unplug a jack / reset a knob · Y: new random patch · LB/RB: cable color (on a jack) or fine turn (on a knob)
 // LT/RT: zoom · right stick: orbit · View: undo · Menu: power · L3: home view · R3: change random style · hold View+Menu: back to Hedron
 const PAD = { active: false, prev: [], focus: null, items: [], mode: 'nav', rep: 0, repDir: null, hold: 0, styleI: 0, idle: 0, hintShown: false };
-const STYLES = ['ambient', 'house', 'tinez', 'lofi', 'dnb', 'kiln', 'surprise'];
+const STYLES = ['ambient', 'house', 'tinez', 'lofi', 'dnb', 'kiln', 'focus', 'surprise'];
 const padRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 48), new THREE.MeshBasicMaterial({ color: 0x4fe3ff, toneMapped: false, transparent: true, opacity: 0.95 }));
 padRing.visible = false; scene.add(padRing);
 function padItems() {
