@@ -768,6 +768,22 @@ DEFS.recorder = lay('RECORDER', 10, 'navy',
 DEFS.scenes = lay('SCENES', 20, 'black',
   [[sc(0.9)], [kn('morph', 'MORPH', 'L', { def: 0, name: 'MORPH A TO B', fmt: v => 'A ' + Math.round((1 - v) * 100) + ' · B ' + Math.round(v * 100) }), kn('what', 'WHAT', 'S', { min: 0, max: 2, step: 1, def: 0, name: 'WHAT A SCENE HOLDS', fmt: v => ['EVERYTHING', 'PLAYING DECK', 'MIXING SIDE'][v] })],
    [BTN('setA', 'STORE A'), BTN('setB', 'STORE B'), BTN('swap', 'GO TO OTHER')], [tx('STORE A'), tx('STORE B'), tx('A ⇄ B')]], []);
+const CHORD_TYPES = [['MIN 9', [0, 3, 7, 10, 14]], ['MAJ 9', [0, 4, 7, 11, 14]], ['MIN 11', [0, 3, 7, 10, 14, 17]], ['DOM 9', [0, 4, 7, 10, 14]], ['MIN 7', [0, 3, 7, 10]], ['MAJ 7', [0, 4, 7, 11]], ['SUS 2', [0, 2, 7, 12]], ['6/9', [0, 4, 7, 9, 14]]];
+DEFS.chord = lay('CHORD MEMORY', 16, 'navy',
+  [[sc(0.75)], [kn('mode', 'MODE', 'M', { min: 0, max: 3, step: 1, def: 0, name: 'CHORD MODE', fmt: v => ['OFF', 'SAME CHORD', 'IN KEY (MINOR)', 'IN KEY (MAJOR)'][v] }), kn('type', 'TYPE', 'S', { min: 0, max: CHORD_TYPES.length - 1, step: 1, def: 0, name: 'CHORD TYPE', fmt: v => CHORD_TYPES[v][0] })],
+   [kn('spread', 'SPREAD', 'S', { def: 0.3, fmt: v => v < 0.33 ? 'CLOSE' : v < 0.66 ? 'OPEN' : 'WIDE' }), kn('strum', 'STRUM', 'S', { def: 0, fmt: v => Math.round(v * 90) + ' MS' }), kn('bass', 'BASS', 'S', { min: 0, max: 1, step: 1, def: 0, name: 'ADD ROOT BELOW', fmt: v => v ? 'ON' : 'OFF' })]], []);
+DEFS.looper = lay('LOOPER', 20, 'silver',
+  [[sc(1.0)], [kn('bars', 'BARS', 'S', { min: 0, max: 3, step: 1, def: 2, name: 'LOOP LENGTH', fmt: v => [1, 2, 4, 8][v] + (v ? ' BARS' : ' BAR') }), kn('quant', 'QUANT', 'S', { min: 0, max: 2, step: 1, def: 2, name: 'TIMING FIX', fmt: v => ['OFF', '1/8', '1/16'][v] }), ld('led', 'red')],
+   [BTN('rec', 'REC'), BTN('play', 'PLAY'), BTN('undo', 'UNDO'), BTN('clear', 'CLEAR')], [tx('REC'), tx('PLAY/STOP'), tx('UNDO'), tx('CLEAR')]], []);
+DEFS.granular = lay('GRANULAR', 16, 'black',
+  [[kn('size', 'SIZE', 'S', { def: 0.4, name: 'GRAIN SIZE', fmt: v => fS(0.02 * Math.pow(25, v)) }), kn('dens', 'DENSITY', 'S', { def: 0.5, fmt: v => (2 * Math.pow(50, v)).toFixed(0) + ' /S' }), kn('pitch', 'PITCH', 'S', { min: -12, max: 12, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v + ' ST' })],
+   [kn('spray', 'SPRAY', 'S', { def: 0.2, fmt: fPct }), kn('scan', 'SCAN', 'S', { def: 0.2, name: 'HOW FAR BACK', fmt: v => fS(v * 3.4) }), kn('rev', 'REVERSE', 'S', { def: 0, fmt: fPct })],
+   [BTN('freeze', 'FREEZE'), kn('mix', 'MIX', 'S', { def: 0, fmt: fPct })]],
+  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+DEFS.euclid = lay('EUCLID', 12, 'navy',
+  [[kn('steps', 'STEPS', 'S', { min: 1, max: 16, step: 1, def: 16, fmt: v => v + ' STEPS' }), kn('hits', 'HITS', 'S', { min: 0, max: 16, step: 1, def: 5, fmt: v => v + ' HITS' })],
+   [kn('rot', 'ROTATE', 'S', { min: 0, max: 15, step: 1, def: 0, fmt: v => '+' + v }), kn('chance', 'CHANCE', 'S', { def: 1, fmt: fPct })], [ld('led', 'amber')]],
+  [[ji('clk', 'CLOCK', 'trig'), ji('reset', 'RESET', 'trig')], [jo('trig', 'TRIG', 'cv'), jo('acc', 'ACCENT', 'cv')]]);
 const DECK_SHARED = new Set(['clock', 'scope', 'out', 'keys']);
 const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^blank/.test(type) ? bl(DEFS[type].hp, DEFS[type].theme === 'silver' ? 'navy' : DEFS[type].theme) : [id + '_b', type]);
 const WROWS = {
@@ -775,7 +791,7 @@ const WROWS = {
   R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], ['recorder', 'recorder'], ['meter', 'meter']],
       [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['radio', 'radio'], ['focus', 'focus']],
       [['cond', 'cond'], ['mangle', 'mangle'], ['warp', 'warp'], ['chaos', 'chaos']],
-      [['scenes', 'scenes'], bl(16, 'navy'), bl(20, 'silver'), bl(16, 'black'), bl(12, 'navy')]] };
+      [['scenes', 'scenes'], ['chord', 'chord'], ['looper', 'looper'], ['granular', 'granular'], ['euclid', 'euclid']]] };
 const DEFAULT_PATCH = [
   ['clock.d2', 'rnd.trig', '#35e0ff'], ['rnd.step', 'quant.in', '#3b6cff'], ['quant.out', 'vcoA.voct', '#e8eef8'], ['quant.trig', 'env.trig1', '#ff7a2e'],
   ['vcoA.saw', 'vcfA.in', '#5aa9ff'], ['vcfA.lp', 'vca.in1', '#2c3f7a'], ['env.env1', 'vca.cv1', '#ffcf3a'], ['env.env1', 'vcfA.cv2', '#ffcf3a'],
@@ -1049,6 +1065,55 @@ class ScenesM extends Mod {
     g.font = '500 ' + Math.round(11 * k) + 'px Saira, system-ui'; g.fillStyle = '#9fb6dd'; g.fillText(lab('A'), 28 * k, 25 * k); const lb = lab('B'); g.fillText(lb, W - 28 * k - g.measureText(lb).width, 25 * k);
     g.fillStyle = '#1b2a44'; g.fillRect(10 * k, 40 * k, W - 20 * k, 10 * k); const gr = g.createLinearGradient(10 * k, 0, W - 10 * k, 0); gr.addColorStop(0, '#7df0ff'); gr.addColorStop(1, '#ff9bd8'); g.fillStyle = gr; g.fillRect(10 * k, 40 * k, (W - 20 * k) * x, 10 * k);
     g.fillStyle = '#5f7fae'; g.fillText('holds: ' + ['everything', 'the playing deck', 'the mixing side'][this.v('what')], 10 * k, 70 * k); s.tex.needsUpdate = true; } }
+// ================================================================ CHORD MEMORY, LOOPER
+// CHORD MEMORY: one key plays a whole chord. SAME CHORD stacks TYPE on any key; IN KEY builds the chord the key and scale give
+// (stacked thirds, so it always fits). SPREAD opens the voicing, BASS adds the root an octave down, STRUM rolls the notes.
+const CHORD = { last: null };
+function chordNotes(m) { const c = modById.chord; if (!c) return [m]; const mode = c.v('mode'); if (!mode) return [m]; let iv;
+  if (mode === 1) iv = CHORD_TYPES[c.v('type')][1];
+  else { const sc = mode === 2 ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11], r = KB.key || 0, pc = ((m - r) % 12 + 12) % 12; let d = sc.length - 1; while (d > 0 && sc[d] > pc) d--;
+    const deg = k => { const o = Math.floor((d + k) / 7), j = (d + k) % 7; return sc[j] + 12 * o - sc[d]; }; iv = [0, 2, 4, 6, 8].map(deg).slice(0, c.v('type') >= 4 ? 4 : 5); }
+  let ns = iv.map(x => m + x); const sp = c.v('spread'); if (sp > 0.33 && ns.length > 2) ns[1] += 12; if (sp > 0.66 && ns.length > 3) ns[ns.length - 2] += 12;
+  if (c.v('bass')) ns.unshift(m - 12); return [...new Set(ns)].filter(x => x >= 0 && x < 128).sort((a, b) => a - b); }
+const NAMES12 = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+class ChordM extends Mod { drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = W / 240; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
+  const mode = this.v('mode'); g.fillStyle = mode ? '#7df0ff' : '#5f7fae'; g.font = '700 ' + Math.round(15 * k) + 'px Saira, system-ui'; g.fillText(['OFF: ONE KEY, ONE NOTE', 'SAME CHORD: ' + CHORD_TYPES[this.v('type')][0], 'IN KEY (MINOR) · ' + NAMES12[KB.key || 0], 'IN KEY (MAJOR) · ' + NAMES12[KB.key || 0]][mode], 8 * k, 24 * k);
+  g.fillStyle = '#e8eef8'; g.font = '600 ' + Math.round(13 * k) + 'px Saira, system-ui'; if (CHORD.last) g.fillText(CHORD.last.map(x => NAMES12[x % 12] + Math.floor(x / 12 - 1)).join(' '), 8 * k, 50 * k); s.tex.needsUpdate = true; } }
+// LOOPER: records what you play into KEYS (after CHORD MEMORY) in time with the clock, and plays it back. REC on an empty loop waits
+// for the next bar, records BARS bars, then plays; REC while playing overdubs a new layer; UNDO drops the last layer. QUANT tidies timing.
+const LOOP = { ev: [], layer: 0, state: 'empty', start: 0, len: 64, playing: new Set(), last: -1 };
+function clock16() { const c = TEL.clock || {}, tempo = modById.clock.v('tempo') || 120; return (c.count || 0) + Math.min(4, (performance.now() - (LOOP.telT || performance.now())) / 1000 / (15 / tempo)); }
+function loopRec(m, v) { if (LOOP.state !== 'rec' && LOOP.state !== 'dub') return; const lp = modById.looper; let t = ((clock16() - LOOP.start) % LOOP.len + LOOP.len) % LOOP.len;
+  const q = [0, 2, 1][lp.v('quant')]; if (q && v > 0) t = (Math.round(t / q) * q) % LOOP.len; LOOP.ev.push({ t, n: m, v, layer: LOOP.layer }); lp.screenDirty = true; }
+function loopAllOff() { for (const n of LOOP.playing) send({ t: 'note', id: 'keys', n, v: 0 }); LOOP.playing.clear(); }
+function loopTick() { const lp = modById.looper; if (!lp || !TEL.clock) return; const now = clock16();
+  if (LOOP.state === 'armed' && Math.floor(now / 16) > Math.floor(LOOP.armAt / 16)) { LOOP.start = Math.floor(now / 16) * 16; LOOP.len = [1, 2, 4, 8][lp.v('bars')] * 16; LOOP.state = 'rec'; LOOP.layer = 1; LOOP.last = -1; lp.screenDirty = true; }
+  if (LOOP.state === 'rec' && now - LOOP.start >= LOOP.len) { LOOP.state = 'play'; lp.screenDirty = true; }
+  if (LOOP.state === 'play' || LOOP.state === 'dub') { const pos = ((now - LOOP.start) % LOOP.len + LOOP.len) % LOOP.len, a = LOOP.last;
+    if (a >= 0 && pos < a && a - pos < LOOP.len / 2) return; // the clock estimate jittered back a little: not a wrap
+    if (a >= 0) for (const e of LOOP.ev) { if (LOOP.state === 'dub' && e.layer === LOOP.layer) continue; const hit = a <= pos ? (e.t > a && e.t <= pos) : (e.t > a || e.t <= pos); if (!hit) continue;
+      send({ t: 'note', id: 'keys', n: e.n, v: e.v }); if (e.v > 0) LOOP.playing.add(e.n); else LOOP.playing.delete(e.n); }
+    if (a >= 0 && pos < a) lp.screenDirty = true; LOOP.last = pos; } }
+setInterval(loopTick, 5);
+function loopButton(id) { const lp = modById.looper;
+  if (id === 'rec') { if (LOOP.state === 'empty' || LOOP.state === 'stopped' && !LOOP.ev.length) { if (!AC || AC.state !== 'running') powerOn().catch(() => { }); LOOP.ev = []; LOOP.state = 'armed'; LOOP.armAt = clock16(); toast('Looper: recording starts on the next bar', true); }
+    else if (LOOP.state === 'play') { LOOP.layer++; LOOP.state = 'dub'; toast('Looper: overdubbing (REC again to stop)', true); }
+    else if (LOOP.state === 'dub' || LOOP.state === 'rec') { LOOP.state = 'play'; loopAllOff(); } }
+  if (id === 'play') { if (LOOP.state === 'play' || LOOP.state === 'dub') { LOOP.state = 'stopped'; loopAllOff(); } else if (LOOP.ev.length) { LOOP.state = 'play'; LOOP.last = -1; } }
+  if (id === 'undo') { if (LOOP.layer > 0) { LOOP.ev = LOOP.ev.filter(e => e.layer !== LOOP.layer); LOOP.layer--; loopAllOff(); if (!LOOP.ev.length) LOOP.state = 'empty'; toast('Looper: last layer removed', true); } }
+  if (id === 'clear') { LOOP.ev = []; LOOP.layer = 0; LOOP.state = 'empty'; loopAllOff(); toast('Looper cleared', true); }
+  lp.screenDirty = true; }
+class LooperM extends Mod {
+  knobChanged(id, v) { super.knobChanged(id, v); if (!v || loading || !this.knobs[id].def.btn) return; loopButton(id); setTimeout(() => this.knobs[id].set(0), 150); }
+  visual() { if (this.leds.led) this.leds.led.vu(LOOP.state === 'rec' || LOOP.state === 'dub' ? 0.6 + 0.4 * Math.sin(performance.now() / 120) : LOOP.state === 'armed' ? 0.4 : 0); if (LOOP.state !== 'empty') { const t = performance.now(); if (t - (this.lt || 0) > 200) { this.lt = t; this.screenDirty = true; } } }
+  drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = W / 300; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
+    const st = { empty: 'EMPTY · press REC', armed: 'WAITING FOR THE BAR…', rec: '● RECORDING', dub: '● OVERDUB · layer ' + LOOP.layer, play: '▶ PLAYING · ' + LOOP.layer + (LOOP.layer === 1 ? ' layer' : ' layers'), stopped: '■ STOPPED' }[LOOP.state];
+    g.fillStyle = LOOP.state === 'rec' || LOOP.state === 'dub' ? '#ff5a5a' : '#7df0ff'; g.font = '700 ' + Math.round(15 * k) + 'px Saira, system-ui'; g.fillText(st, 8 * k, 22 * k);
+    const x0 = 8 * k, w = W - 16 * k, y0 = 34 * k, h = H - 42 * k; g.fillStyle = '#0d1830'; g.fillRect(x0, y0, w, h);
+    for (const e of LOOP.ev) if (e.v > 0) { g.fillStyle = e.layer === LOOP.layer ? '#ff9bd8' : '#35e0ff'; g.fillRect(x0 + w * e.t / LOOP.len, y0 + h - h * ((e.n - 36) / 60), 3 * k, 3 * k); }
+    if (LOOP.state === 'play' || LOOP.state === 'dub' || LOOP.state === 'rec') { const pos = ((clock16() - LOOP.start) % LOOP.len + LOOP.len) % LOOP.len; g.fillStyle = '#ffd36b'; g.fillRect(x0 + w * pos / LOOP.len, y0, 2 * k, h); }
+    s.tex.needsUpdate = true; } }
+class GranM extends Mod { knobChanged(id, v) { if (id === 'freeze') { super.knobChanged(id, v); return; } super.knobChanged(id, v); } }
 class LedM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class MbiraM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
 class FieldM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'rec') loadSet(this); } visual() { this.leds.led.set(clamp((this.T.led || 0) * 2, 0, 1)); } }
@@ -1133,7 +1198,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { chord: ChordM, looper: LooperM, granular: GranM, euclid: LedM, meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -2701,7 +2766,7 @@ function genPatch(style, wild, clean) {
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
   { const dance = style === 'house' || style === 'dnb' || style === 'tinez' || style === 'jazzy' || style === 'lofi', kil = style === 'kiln';
     // mixing side: deck -> BLEND -> KEYS (played live, always heard) -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
-    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'radio.inL'); con('blend.R', 'radio.inR'); con('radio.L', 'keys.inL'); con('radio.R', 'keys.inR'); con('keys.L', 'warp.inL'); con('keys.R', 'warp.inR'); con('warp.L', 'mangle.inL'); con('warp.R', 'mangle.inR'); con('mangle.L', 'sweep.inL'); con('mangle.R', 'sweep.inR');
+    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'radio.inL'); con('blend.R', 'radio.inR'); con('radio.L', 'keys.inL'); con('radio.R', 'keys.inR'); con('keys.L', 'warp.inL'); con('keys.R', 'warp.inR'); con('warp.L', 'mangle.inL'); con('warp.R', 'mangle.inR'); con('mangle.L', 'granular.inL'); con('mangle.R', 'granular.inR'); con('granular.L', 'sweep.inL'); con('granular.R', 'sweep.inR'); con('clock.x4', 'euclid.clk');
     con('keys.voct', 'warp.voct'); con('keys.gate', 'warp.gate'); con('clock.x4', 'mangle.clk'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
     con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
     { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
@@ -2767,12 +2832,14 @@ function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one 
   for (const m in P.knobs) if (base.has(m)) knobs[m + sfx] = P.knobs[m];
   return { cables, knobs };
 }
-const MIXSIDE = ['blend', 'radio', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit', 'out'];
+const MIXSIDE = ['blend', 'radio', 'keys', 'warp', 'mangle', 'granular', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit', 'out'];
 function ensureFX() { // patches from before WARP and MANGLE: put them between KEYS and SWEEP, and let KEYS play WARP
   const find = (o, i) => cables.find(c => c.connected && c.out.module.id + '.' + c.out.id === o && c.inp.module.id + '.' + c.inp.id === i), P = (a, b) => { try { patchCable(a, b); } catch (e) { } };
-  const kl = find('keys.L', 'sweep.inL'), kr = find('keys.R', 'sweep.inR'), wl = find('wide.L', 'limit.inL'), wr = find('wide.R', 'limit.inR'), bl_ = find('blend.L', 'keys.inL'), br_ = find('blend.R', 'keys.inR'); const was = loading; loading = true;
-  try { if (kl) { removeCable(kl); if (kr) removeCable(kr); P('keys.L', 'warp.inL'); P('keys.R', 'warp.inR'); P('warp.L', 'mangle.inL'); P('warp.R', 'mangle.inR'); P('mangle.L', 'sweep.inL'); P('mangle.R', 'sweep.inR'); }
+  const kl = find('keys.L', 'sweep.inL'), kr = find('keys.R', 'sweep.inR'), wl = find('wide.L', 'limit.inL'), wr = find('wide.R', 'limit.inR'), bl_ = find('blend.L', 'keys.inL'), br_ = find('blend.R', 'keys.inR'), ml = find('mangle.L', 'sweep.inL'), mr = find('mangle.R', 'sweep.inR'); const was = loading; loading = true;
+  try { if (kl) { removeCable(kl); if (kr) removeCable(kr); P('keys.L', 'warp.inL'); P('keys.R', 'warp.inR'); P('warp.L', 'mangle.inL'); P('warp.R', 'mangle.inR'); P('mangle.L', 'granular.inL'); P('mangle.R', 'granular.inR'); P('granular.L', 'sweep.inL'); P('granular.R', 'sweep.inR'); }
     if (bl_) { removeCable(bl_); if (br_) removeCable(br_); P('blend.L', 'radio.inL'); P('blend.R', 'radio.inR'); P('radio.L', 'keys.inL'); P('radio.R', 'keys.inR'); }
+    if (ml) { removeCable(ml); if (mr) removeCable(mr); P('mangle.L', 'granular.inL'); P('mangle.R', 'granular.inR'); P('granular.L', 'sweep.inL'); P('granular.R', 'sweep.inR'); }
+    if (modById.euclid && !modById.euclid.patched('clk')) P('clock.x4', 'euclid.clk');
     if (wl) { removeCable(wl); if (wr) removeCable(wr); P('wide.L', 'focus.inL'); P('wide.R', 'focus.inR'); P('focus.L', 'limit.inL'); P('focus.R', 'limit.inR'); }
     if (find('warp.L', 'mangle.inL')) { if (!modById.warp.patched('voct')) P('keys.voct', 'warp.voct'); if (!modById.warp.patched('gate')) P('keys.gate', 'warp.gate'); if (!modById.mangle.patched('clk')) P('clock.x4', 'mangle.clk'); } }
   finally { loading = was; }
@@ -2787,7 +2854,7 @@ function ensureChain() { // older patches (and the first-visit patch) skip the m
     for (const c of [...cables]) if (c.connected && M.has(c.inp.module.id) && !(c.inp.module.id === 'blend' && c.inp.id[0] === 'b')) removeCable(c);
     const r = mulberry32(5), P = (a, b) => { try { patchCable(a, b, undefined, r() < 0.4 ? 1 : 0); } catch (e) { } };
     P(sL, 'blend.aL'); P(sR, 'blend.aR');
-    const ch = ['blend', 'radio', 'keys', 'warp', 'mangle', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
+    const ch = ['blend', 'radio', 'keys', 'warp', 'mangle', 'granular', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
     P('limit.L', 'out.L'); P('limit.R', 'out.R'); if (kick) P(kick, 'pump.trig');
     const set = (m, k, v) => modById[m].knobs[k].set(modById[m].knobs[k].toNorm(v)); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('echo', 'mix', 0.08);
     for (let i = 0; i < 200; i++) physics(1 / 120);
@@ -3422,8 +3489,12 @@ const NN = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯'
 const KSCALES = [['CHROMATIC', null], ['MAJOR', [0, 2, 4, 5, 7, 9, 11]], ['MINOR', [0, 2, 3, 5, 7, 8, 10]], ['DORIAN', [0, 2, 3, 5, 7, 9, 10]], ['MIXOLYDIAN', [0, 2, 4, 5, 7, 9, 10]], ['MINOR PENT', [0, 3, 5, 7, 10]], ['MAJOR PENT', [0, 2, 4, 7, 9]], ['BLUES', [0, 3, 5, 6, 7, 10]]];
 function mapNote(n) { // KEY transposes so C plays the root; SCALE snaps out-of-key notes down to the nearest in-key note
   let m = n + KB.key; const sc = KSCALES[KB.scale][1]; if (sc) { while (!sc.includes((((m - KB.key) % 12) + 12) % 12)) m--; } return m; }
-function noteOn(n, v = 100) { if (n < 0 || n > 127) return; if (!KB.wired) ensureKeysWired(); if (!AC || AC.state !== 'running') powerOn().catch(() => { }); const m = mapNote(n); if (KB.map[n] != null && KB.map[n] !== m) send({ t: 'note', id: 'keys', n: KB.map[n], v: 0 }); KB.map[n] = m; send({ t: 'note', id: 'keys', n: m, v }); kbLight(n, true); }
-function noteOff(n) { const m = KB.map[n] ?? n; delete KB.map[n]; send({ t: 'note', id: 'keys', n: m, v: 0 }); kbLight(n, false); }
+// a key press: CHORD MEMORY may turn it into a chord; LOOPER may record it (what reaches KEYS is what gets recorded)
+function keysNote(m, v, fromLoop) { send({ t: 'note', id: 'keys', n: m, v }); if (!fromLoop) loopRec(m, v); }
+function noteOn(n, v = 100) { if (n < 0 || n > 127) return; if (!KB.wired) ensureKeysWired(); if (!AC || AC.state !== 'running') powerOn().catch(() => { });
+  const m = mapNote(n); if (KB.map[n] != null) noteOff(n, true); const ns = chordNotes(m); KB.map[n] = ns;
+  const sm = modById.chord ? modById.chord.v('strum') * 90 : 0; ns.forEach((x, i) => { if (i && sm) setTimeout(() => { if (KB.map[n] === ns) keysNote(x, v); }, i * sm); else keysNote(x, v); }); kbLight(n, true); if (ns.length > 1 && modById.chord) { CHORD.last = ns; modById.chord.screenDirty = true; } }
+function noteOff(n, keep) { const ms = KB.map[n] ?? [n]; delete KB.map[n]; for (const x of [].concat(ms)) keysNote(x, 0); if (!keep) kbLight(n, false); }
 function ensureKeysWired() { // make sure KEYS sits in the signal path to OUT so notes are heard
   KB.wired = true; const keysOut = cables.some(c => c.connected && c.out.module.id === 'keys' && (c.out.id === 'L' || c.out.id === 'R')); if (keysOut) return;
   pushUndo(); const P = serialize(); let hit = false;
@@ -3549,7 +3620,7 @@ setInterval(refreshParts, 250);
 document.querySelectorAll('#pCam button').forEach(b => b.onclick = () => partsCam(b.dataset.c === '1')); partsCam(PARTS.cam);
 function toggleRadio() { const el = document.getElementById('radio'), open = el.classList.contains('hide'); PANELS.forEach(id => { if (id !== 'radio') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderRadio(); }
 document.getElementById('bRadio').onclick = toggleRadio;
-Object.assign(window, { RADIO, radioStop, radioPlay, fillIdle, isPatchedId: id => isPatched(id) });
+Object.assign(window, { RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id) });
 document.getElementById('rStop').onclick = () => radioStop();
 document.getElementById('rFavs').onclick = () => { RADIO.genre = 'fav'; radioStatus(RADIO.favs.length ? RADIO.favs.length + ' favourite stations.' : 'No favourites yet: tap ☆ next to a station.'); renderRadio(); };
 document.getElementById('rSurprise').onclick = async () => { await radioGenre(Math.floor(Math.random() * RGENRES.length)); const L = RADIO.list; if (L.length) radioPlay(L[Math.floor(Math.random() * Math.min(L.length, 60))]); };
@@ -3568,7 +3639,7 @@ try { if (sessionStorage.getItem('ha.pad') === '1') { const s = document.querySe
 let AUDIO_ERR = "", GOTTEL = false;
 async function loadSrc(name) { const r = await fetch(name); if (!r.ok) throw new Error(name + ' ' + r.status); return r.text(); }
 async function startEngine() {
-  const onTel = d => { TEL = d; TELNEW = true; GOTTEL = true; if (d.recorder && d.recorder.clip) gotClip(d.recorder); if (d.meter && 's' in d.meter && modById.meter) modById.meter.tel = d.meter; };
+  const onTel = d => { TEL = d; TELNEW = true; GOTTEL = true; LOOP.telT = performance.now(); if (d.recorder && d.recorder.clip) gotClip(d.recorder); if (d.meter && 's' in d.meter && modById.meter) modById.meter.tel = d.meter; };
   let made = false;
   // 1) AudioWorklet from a Blob (engine + processor bundled: no relative imports, works in sandboxed pages)
   try {
