@@ -759,13 +759,23 @@ DEFS.radio = lay('RADIO', 20, 'navy',
    [kn('lvl', 'LEVEL', 'M', { def: 0.7, fmt: fPct }), kn('tone', 'TONE', 'S', { def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }), kn('width', 'WIDTH', 'S', { def: 1, fmt: v => v < 0.05 ? 'MONO' : fPct(v) })],
    [BTN('prev', 'PREV'), BTN('stop', 'STOP'), BTN('next', 'NEXT')], [tx('PREV'), tx('STOP'), tx('NEXT')]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+const METER_T = [['YOUTUBE', -14], ['SPOTIFY', -14], ['APPLE', -16], ['OFF', null]];
+DEFS.meter = lay('METER', 8, 'silver',
+  [[sc(1.6)], [kn('target', 'TARGET', 'S', { min: 0, max: 3, step: 1, def: 0, name: 'LOUDNESS TARGET', fmt: v => METER_T[v][1] == null ? 'OFF' : METER_T[v][0] + ' ' + METER_T[v][1] + ' LUFS' }), BTN('reset', 'RESET')]], []);
+DEFS.recorder = lay('RECORDER', 10, 'navy',
+  [[sc(0.8)], [kn('len', 'LENGTH', 'S', { min: 0, max: 2, step: 1, def: 1, name: 'SAVE THE LAST', fmt: v => [30, 60, 120][v] + ' S' }), ld('led', 'red')],
+   [BTN('save', 'SAVE'), BTN('rec', 'REC')], [tx('SAVE LAST'), tx('REC')]], []);
+DEFS.scenes = lay('SCENES', 20, 'black',
+  [[sc(0.9)], [kn('morph', 'MORPH', 'L', { def: 0, name: 'MORPH A TO B', fmt: v => 'A ' + Math.round((1 - v) * 100) + ' · B ' + Math.round(v * 100) }), kn('what', 'WHAT', 'S', { min: 0, max: 2, step: 1, def: 0, name: 'WHAT A SCENE HOLDS', fmt: v => ['EVERYTHING', 'PLAYING DECK', 'MIXING SIDE'][v] })],
+   [BTN('setA', 'STORE A'), BTN('setB', 'STORE B'), BTN('swap', 'GO TO OTHER')], [tx('STORE A'), tx('STORE B'), tx('A ⇄ B')]], []);
 const DECK_SHARED = new Set(['clock', 'scope', 'out', 'keys']);
 const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^blank/.test(type) ? bl(DEFS[type].hp, DEFS[type].theme === 'silver' ? 'navy' : DEFS[type].theme) : [id + '_b', type]);
 const WROWS = {
   L: [ROWX, ROWT, ROW0, ROW1, ROWD, ROWM].map(mirrorRow),
-  R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], bl(10, 'navy'), bl(8, 'silver')],
+  R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], ['recorder', 'recorder'], ['meter', 'meter']],
       [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['radio', 'radio'], ['focus', 'focus']],
-      [['cond', 'cond'], ['mangle', 'mangle'], ['warp', 'warp'], ['chaos', 'chaos']]] };
+      [['cond', 'cond'], ['mangle', 'mangle'], ['warp', 'warp'], ['chaos', 'chaos']],
+      [['scenes', 'scenes'], bl(16, 'navy'), bl(20, 'silver'), bl(16, 'black'), bl(12, 'navy')]] };
 const DEFAULT_PATCH = [
   ['clock.d2', 'rnd.trig', '#35e0ff'], ['rnd.step', 'quant.in', '#3b6cff'], ['quant.out', 'vcoA.voct', '#e8eef8'], ['quant.trig', 'env.trig1', '#ff7a2e'],
   ['vcoA.saw', 'vcfA.in', '#5aa9ff'], ['vcfA.lp', 'vca.in1', '#2c3f7a'], ['env.env1', 'vca.cv1', '#ffcf3a'], ['env.env1', 'vcfA.cv2', '#ffcf3a'],
@@ -978,6 +988,67 @@ class RadioM extends Mod {
     g.fillStyle = RADIO.mode === 'rack' ? '#7df0ff' : RADIO.mode === 'direct' ? '#ffd36b' : '#5f7fae'; g.font = '700 ' + Math.round(13 * k) + 'px Saira, system-ui'; g.fillText(RADIO.mode === 'rack' ? 'ON AIR · THROUGH THE RACK' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT' : 'RADIO OFF', 10 * k, 22 * k);
     g.fillStyle = '#e8eef8'; g.font = '600 ' + Math.round(17 * k) + 'px Saira, system-ui'; const nm = RADIO.st ? RADIO.st.name : 'press RADIO in the menu'; g.fillText(nm.length > 30 ? nm.slice(0, 29) + '…' : nm, 10 * k, 48 * k);
     g.fillStyle = '#5f7fae'; g.font = '500 ' + Math.round(12 * k) + 'px Saira, system-ui'; if (RADIO.st) g.fillText([RADIO.st.country, RADIO.st.genre, RADIO.st.kbps ? RADIO.st.kbps + ' kbps' : ''].filter(Boolean).join(' · '), 10 * k, 70 * k); s.tex.needsUpdate = true; } }
+// ================================================================ METER, RECORDER, SCENES
+class MeterM extends Mod {
+  knobChanged(id, v) { super.knobChanged(id, v); if (id === 'reset' && v && !loading) { send({ t: 'param', id: 'meter', k: 'reset', v: Math.random() }); setTimeout(() => this.knobs.reset.set(0), 150); } }
+  visual() { const t = performance.now(); if (t - (this.lt || 0) > 250) { this.lt = t; this.screenDirty = true; } }
+  drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = W / 160, T = this.tel || {}, tg = METER_T[this.v('target')][1], f = v => v == null || v < -60 ? '–' : v.toFixed(1);
+    g.fillStyle = '#020611'; g.fillRect(0, 0, W, H); const st = T.s, near = tg != null && st != null && Math.abs(st - tg) <= 1, hot = tg != null && st != null && st > tg + 1;
+    g.fillStyle = '#5f7fae'; g.font = '600 ' + Math.round(11 * k) + 'px Saira, system-ui'; g.fillText('SHORT-TERM LUFS', 8 * k, 16 * k);
+    g.fillStyle = near ? '#7dff6a' : hot ? '#ff7a59' : '#e8eef8'; g.font = '700 ' + Math.round(34 * k) + 'px Saira, system-ui'; g.fillText(f(st), 8 * k, 52 * k);
+    const bar = v => Math.max(0, Math.min(1, (v + 40) / 40)); g.fillStyle = '#1b2a44'; g.fillRect(8 * k, 62 * k, W - 16 * k, 8 * k); g.fillStyle = near ? '#7dff6a' : '#35e0ff'; g.fillRect(8 * k, 62 * k, (W - 16 * k) * bar(T.m ?? -99), 8 * k);
+    if (tg != null) { g.fillStyle = '#ffd36b'; g.fillRect(8 * k + (W - 16 * k) * bar(tg) - k, 58 * k, 2 * k, 16 * k); }
+    g.fillStyle = '#9fb6dd'; g.font = '500 ' + Math.round(11 * k) + 'px Saira, system-ui'; g.fillText('INTEGRATED ' + f(T.i), 8 * k, 90 * k); g.fillText('PEAK ' + f(T.pk) + ' dB', 8 * k, 106 * k);
+    if (tg != null) g.fillText('TARGET ' + tg + ' (' + METER_T[this.v('target')][0] + ')', 8 * k, 122 * k); s.tex.needsUpdate = true; } }
+const REC = { mr: null, chunks: [], dest: null, n: 0 };
+async function shareOrSave(blob, name) { const file = new File([blob], name, { type: blob.type });
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
+function wavBlob(i16, sr) { const n = i16.length, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  new Int16Array(b, 44).set(i16); return new Blob([b], { type: 'audio/wav' }); }
+const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+function gotClip(t) { if (!REC.want) return; REC.want = false; const secs = Math.round(t.clip.length / 2 / t.sr); shareOrSave(wavBlob(t.clip, t.sr), 'night-rack-' + stamp() + '-last-' + secs + 's.wav'); toast('Saved the last ' + secs + ' seconds', true); }
+function recToggle() { if (!AC || !ENG) { toast('Turn POWER on first', true); return; }
+  if (REC.mr) { REC.mr.stop(); return; }
+  if (!REC.dest) { REC.dest = AC.createMediaStreamDestination(); ENG.node.connect(REC.dest); }
+  const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+  try { REC.mr = new MediaRecorder(REC.dest.stream, type ? { mimeType: type, audioBitsPerSecond: 256000 } : undefined); } catch (e) { toast('Recording is not supported in this browser', true); return; }
+  REC.chunks = []; REC.t0 = performance.now(); REC.mr.ondataavailable = e => { if (e.data.size) REC.chunks.push(e.data); };
+  REC.mr.onstop = () => { const t = REC.mr.mimeType || type || 'audio/webm', blob = new Blob(REC.chunks, { type: t }); REC.mr = null; modById.recorder.screenDirty = true; shareOrSave(blob, 'night-rack-' + stamp() + (t.includes('mp4') ? '.m4a' : '.webm')); toast('Recording saved', true); };
+  REC.mr.start(1000); modById.recorder.screenDirty = true; toast('Recording… press REC again to stop', true); }
+class RecorderM extends Mod {
+  knobChanged(id, v) { super.knobChanged(id, v); if (!v || loading) return;
+    if (id === 'save') { if (!AC || !ENG) toast('Turn POWER on first', true); else { REC.want = true; send({ t: 'param', id: 'recorder', k: 'save', v: ++REC.n }); } }
+    if (id === 'rec') recToggle();
+    if (this.knobs[id].def.btn) setTimeout(() => this.knobs[id].set(0), 150); }
+  visual() { if (this.leds.led) this.leds.led.vu(REC.mr ? 0.6 + 0.4 * Math.sin(performance.now() / 150) : 0); const t = performance.now(); if (REC.mr && t - (this.lt || 0) > 500) { this.lt = t; this.screenDirty = true; } }
+  drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = W / 200; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
+    g.font = '700 ' + Math.round(20 * k) + 'px Saira, system-ui'; g.fillStyle = REC.mr ? '#ff5a5a' : '#5f7fae';
+    const sec = REC.mr ? Math.floor((performance.now() - REC.t0) / 1000) : 0; g.fillText(REC.mr ? '● REC ' + Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : 'READY', 10 * k, 30 * k);
+    g.fillStyle = '#9fb6dd'; g.font = '500 ' + Math.round(13 * k) + 'px Saira, system-ui'; g.fillText('SAVE keeps the last ' + [30, 60, 120][this.v('len')] + ' s', 10 * k, 56 * k); s.tex.needsUpdate = true; } }
+// SCENES: two snapshots of the knobs (A and B) and one MORPH knob between them. Smooth knobs glide, switch-like ones change at halfway.
+const SCN = (() => { try { return JSON.parse(localStorage.getItem('nightrack.scenes')) || {}; } catch (e) { return {}; } })();
+const SCENE_SKIP = new Set(['scenes', 'recorder', 'meter', 'radio', 'out', 'cond', 'keys', 'limit']);
+function sceneMods(what) { const live = new Set(deckIds(DECK.live || 'A')), side = new Set(MIXSIDE);
+  return modules.filter(m => realMod(m) && !SCENE_SKIP.has(m.id) && (what === 0 || (what === 1 ? live.has(m.id) : side.has(m.id)))); }
+function sceneSnap(which) { const m = modById.scenes, o = {}; for (const md of sceneMods(m.v('what'))) { const k = {}; for (const id in md.knobs) { const kn = md.knobs[id]; if (kn.def.btn || id === 'auto') continue; k[id] = kn.norm; } o[md.id] = k; }
+  SCN[which] = o; SCN[which + 't'] = Date.now(); try { localStorage.setItem('nightrack.scenes', JSON.stringify(SCN)); } catch (e) { } m.screenDirty = true; toast('Stored scene ' + which, true); }
+function sceneMorph(x) { const A = SCN.A, B = SCN.B; if (!A || !B) return; let n = 0;
+  for (const id in A) { const md = modById[id], b = B[id]; if (!md || !b) continue; for (const k in A[id]) { const kn = md.knobs[k]; if (!kn || b[k] == null) continue; const a = A[id][k], c = b[k]; if (Math.abs(a - c) < 1e-4) continue; n++;
+    const t = kn.def.step ? (x < 0.5 ? a : c) : a + (c - a) * x; if (Math.abs(kn.norm - t) > 0.0015) kn.set(t); } } return n; }
+class ScenesM extends Mod {
+  knobChanged(id, v) { super.knobChanged(id, v); if (loading) return;
+    if (id === 'morph') { if (!SCN.A || !SCN.B) { if (!this.warned) { this.warned = true; toast('Store scene A and scene B first, then turn MORPH', true); } } else sceneMorph(v); }
+    if (v && id === 'setA') sceneSnap('A'); if (v && id === 'setB') sceneSnap('B');
+    if (v && id === 'swap' && SCN.A && SCN.B) { const to = this.v('morph') < 0.5 ? 1 : 0, from = this.knobs.morph.norm, t0 = performance.now(), m = this; (function step() { const t = Math.min(1, (performance.now() - t0) / 4000), e = t * t * (3 - 2 * t); m.knobs.morph.set(from + (to - from) * e); if (t < 1) requestAnimationFrame(step); })(); }
+    if (this.knobs[id].def.btn && v) setTimeout(() => this.knobs[id].set(0), 150); }
+  drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = W / 300, x = this.v('morph'); g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
+    const lab = w => SCN[w] ? 'stored ' + new Date(SCN[w + 't']).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'empty';
+    g.font = '700 ' + Math.round(16 * k) + 'px Saira, system-ui'; g.fillStyle = '#7df0ff'; g.fillText('A', 10 * k, 26 * k); g.fillStyle = '#ff9bd8'; g.fillText('B', W - 22 * k, 26 * k);
+    g.font = '500 ' + Math.round(11 * k) + 'px Saira, system-ui'; g.fillStyle = '#9fb6dd'; g.fillText(lab('A'), 28 * k, 25 * k); const lb = lab('B'); g.fillText(lb, W - 28 * k - g.measureText(lb).width, 25 * k);
+    g.fillStyle = '#1b2a44'; g.fillRect(10 * k, 40 * k, W - 20 * k, 10 * k); const gr = g.createLinearGradient(10 * k, 0, W - 10 * k, 0); gr.addColorStop(0, '#7df0ff'); gr.addColorStop(1, '#ff9bd8'); g.fillStyle = gr; g.fillRect(10 * k, 40 * k, (W - 20 * k) * x, 10 * k);
+    g.fillStyle = '#5f7fae'; g.fillText('holds: ' + ['everything', 'the playing deck', 'the mixing side'][this.v('what')], 10 * k, 70 * k); s.tex.needsUpdate = true; } }
 class LedM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class MbiraM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'type') loadSet(this); } visual() { this.leds.led.vu(this.T.led || 0); } }
 class FieldM extends Mod { knobChanged(id, v) { super.knobChanged(id, v); if (id === 'rec') loadSet(this); } visual() { this.leds.led.set(clamp((this.T.led || 0) * 2, 0, 1)); } }
@@ -1062,7 +1133,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { radio: RadioM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -3497,7 +3568,7 @@ try { if (sessionStorage.getItem('ha.pad') === '1') { const s = document.querySe
 let AUDIO_ERR = "", GOTTEL = false;
 async function loadSrc(name) { const r = await fetch(name); if (!r.ok) throw new Error(name + ' ' + r.status); return r.text(); }
 async function startEngine() {
-  const onTel = d => { TEL = d; TELNEW = true; GOTTEL = true; };
+  const onTel = d => { TEL = d; TELNEW = true; GOTTEL = true; if (d.recorder && d.recorder.clip) gotClip(d.recorder); if (d.meter && 's' in d.meter && modById.meter) modById.meter.tel = d.meter; };
   let made = false;
   // 1) AudioWorklet from a Blob (engine + processor bundled: no relative imports, works in sandboxed pages)
   try {
