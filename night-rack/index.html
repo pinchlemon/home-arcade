@@ -207,7 +207,7 @@ body.cam #cambar{display:flex}
     <b>GRAB → DRUM HIT</b>: catches a short bit and makes it the PERC drum sound.<br>
     <b>REMIX IT</b>: puts the station through the rack's effects with random chop, pitch and echo. <b>CLEAN</b> takes it back out.<br>
     <b>EFFECTS</b>: OFF keeps the station clean (no echo from the rack). ON sends it through the rack's effects.<br>
-    The RADIO module is on the right side of the rack, second row. Its jacks let you cable the station into anything.
+    <b>The radio</b> sits on the TV cabinet to the right: VOLUME, TONE, BAND (kind of station) and TUNING knobs, keys for POWER, SEEK (next station), JAM, GRAB, FX and FADE (rack quieter while it plays). Two cords run from its jacks to RADIO IN on the rack: unplug them and the rack can't hear the station. Its ENV and TRIG jacks follow the station's loudness and beats, so you can patch them into anything.
   </div>
   <div class="chips"><button id="rJam">JAM ALONG</button><button id="rGrab">GRAB → GRANULAR</button><button id="rGrabD">GRAB → DRUM HIT</button><button id="rRemix">REMIX IT</button><button id="rUnmix">CLEAN</button></div>
   <div class="muted" id="rJamTxt"></div>
@@ -215,7 +215,7 @@ body.cam #cambar{display:flex}
   <div class="chips" id="rFx"><button data-v="0">OFF, CLEAN</button><button data-v="1">ON</button></div>
   <div class="sec" style="margin-top:8px">CABLES AND LIGHTS MOVE WITH</div>
   <div class="chips" id="rDance"><button data-v="all">EVERY SOUND</button><button data-v="beat">JUST THE BEAT</button><button data-v="off">NOTHING</button></div>
-  <div class="chips"><button id="rShow">SHOW ME THE RADIO MODULE</button></div>
+  <div class="chips"><button id="rShow">SHOW ME THE RADIO</button></div>
   <div class="sec" style="margin-top:8px">SPIN THE DIAL</div>
   <div class="chips" id="rDial"><button data-m="0">OFF</button><button data-m="2">EVERY 2 MIN</button><button data-m="5">5 MIN</button><button data-m="15">15 MIN</button><button data-any="1" id="rAny">ANY KIND</button></div>
   <div id="rList"></div>
@@ -772,11 +772,20 @@ DEFS.focus = lay('FOCUS', 16, 'black',
   [[kn('rate', 'AM RATE', 'M', { min: 0, max: FOCUS_RATES.length - 1, step: 1, def: 2, name: 'AMPLITUDE MODULATION RATE', fmt: v => FOCUS_RATES[v] + ' HZ' + (FOCUS_RATES[v] === 16 ? ' (BETA)' : '') }), kn('depth', 'AM DEPTH', 'S', { def: 0, name: 'AMPLITUDE MODULATION DEPTH', fmt: v => v < 0.01 ? 'OFF' : fPct(v) })],
    [kn('noise', 'NOISE', 'S', { def: 0, name: 'NOISE BED', fmt: v => v < 0.01 ? 'OFF' : fPct(v) }), kn('color', 'COLOR', 'S', { def: 0.3, name: 'NOISE COLOUR', fmt: v => v < 0.33 ? 'PINK' : v > 0.66 ? 'BROWN' : 'PINK-BROWN' }), kn('low', 'STEADY BASS', 'S', { min: 0, max: 1, step: 1, def: 1, name: 'KEEP THE BASS UNMODULATED', fmt: v => v ? 'ON' : 'OFF' })]],
   [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
-DEFS.radio = lay('RADIO', 20, 'navy',
-  [[sc(1.0)],
-   [kn('lvl', 'LEVEL', 'M', { def: 0.7, fmt: fPct }), kn('tone', 'TONE', 'S', { def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }), kn('width', 'WIDTH', 'S', { def: 1, fmt: v => v < 0.05 ? 'MONO' : fPct(v) }), kn('solo', 'RACK', 'S', { min: 0, max: 1, step: 1, def: 1, name: 'THE RACK WHILE THE RADIO PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' })],
-   [kn('route', 'ROUTE', 'S', { min: 0, max: 1, step: 1, def: 0, name: 'WHERE THE STATION GOES', fmt: v => v ? 'ONLY THE SIG JACKS' : 'INTO THE MIX' }), kn('fx', 'FX', 'S', { min: 0, max: 1, step: 1, def: 0, name: 'THE RACK\'S EFFECTS ON THE STATION', fmt: v => v ? 'ON (ECHO, MANGLE...)' : 'OFF, CLEAN' }), BTN('prev', 'PREV'), BTN('stop', 'STOP'), BTN('next', 'NEXT'), BTN('jam', 'JAM')], [tx(''), tx(''), tx('PREV'), tx('STOP'), tx('NEXT'), tx('JAM')]],
-  [[ji('inL', 'IN L', 'audio'), ji('inR', 'IN R', 'audio')], [jo('sigL', 'SIG L'), jo('sigR', 'SIG R'), jo('env', 'ENV', 'cv'), jo('trig', 'TRIG', 'cv'), jo('L', 'OUT L'), jo('R', 'OUT R')]]);
+const RAD_MOMENTARY = new Set(['power', 'seek', 'jam', 'grab']);
+DEFS.radio = (() => { // the radio by the TV: x/y here are only for the controller ring (face coordinates mapped into module ones)
+  const KX = ['power', 'seek', 'jam', 'grab', 'fx', 'solo'], at = (lx, ly) => ({ x: lx - 3.5, y: U3 + 1.6 - ly, lx, ly }), key = (id, label, o) => K(id, 0, 0, label, { ...at(14.35 + KX.indexOf(id) * 1.52, 5.85), btn: true, min: 0, max: 1, step: 1, def: 0, ...o });
+  return { title: 'RADIO', hp: 34, theme: 'navy', leds: [], labels: [], knobs: [
+    K('lvl', 0, 0, 'VOLUME', { ...at(5.4, 2.55), size: 'M', def: 0.7, fmt: fPct }),
+    K('tone', 0, 0, 'TONE', { ...at(10.3, 2.55), size: 'S', def: 1, fmt: v => v > 0.97 ? 'OPEN' : Math.round(700 + v * v * 19000) + ' HZ' }),
+    K('band', 0, 0, 'BAND', { ...at(15.0, 2.55), size: 'M', min: 0, max: 6, step: 1, def: 0, fmt: v => RAD_BANDS()[v] }),
+    K('tune', 0, 0, 'TUNING', { ...at(20.9, 2.55), size: 'L', def: 0, fmt: v => radioTuneText(v) }),
+    key('power', 'POWER', { name: 'POWER: PLAY / STOP', fmt: () => RADIO.mode === 'off' ? 'OFF' : 'ON' }), key('seek', 'SEEK', { name: 'SEEK: NEXT STATION', fmt: () => 'searches the band' }),
+    key('jam', 'JAM', { name: 'JAM ALONG', fmt: () => JAM.on ? 'ON' : 'OFF' }), key('grab', 'GRAB', { name: 'GRAB → GRANULAR', fmt: () => 'grabs the last 4 s' }),
+    key('fx', 'FX', { name: 'THE RACK\'S EFFECTS ON THE STATION', fmt: v => v ? 'ON (ECHO, MANGLE...)' : 'OFF, CLEAN' }), key('solo', 'FADE', { def: 1, name: 'THE RACK WHILE THE RADIO PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' })],
+    jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(1.8, 13.4)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(1.8, 10.8)), J('env', 0, 0, 'ENV', 'out', 'cv', at(1.8, 8.2)), J('trig', 0, 0, 'TRIG', 'out', 'cv', at(1.8, 5.6))] }; })();
+DEFS.rx = lay('RADIO IN', 20, 'navy', [[sc(1.3)], [tx('CORDS FROM THE RADIO')], [ld('led', 'amber')]],
+  [[ji('inL', 'RACK L', 'audio'), ji('inR', 'RACK R', 'audio')], [ji('radL', 'RADIO L', 'audio'), ji('radR', 'RADIO R', 'audio')], [jo('L', 'OUT L'), jo('R', 'OUT R')]]);
 const METER_T = [['YOUTUBE', -14], ['SPOTIFY', -14], ['APPLE', -16], ['OFF', null]];
 DEFS.meter = lay('METER', 8, 'silver',
   [[sc(1.6)], [kn('target', 'TARGET', 'S', { min: 0, max: 3, step: 1, def: 0, name: 'LOUDNESS TARGET', fmt: v => METER_T[v][1] == null ? 'OFF' : METER_T[v][0] + ' ' + METER_T[v][1] + ' LUFS' }), BTN('reset', 'RESET')]], []);
@@ -807,7 +816,7 @@ const mirrorRow = row => row.map(([id, type]) => DECK_SHARED.has(id) || /^bl|^bl
 const WROWS = {
   L: [ROWX, ROWT, ROW0, ROW1, ROWD, ROWM].map(mirrorRow),
   R: [[['blend', 'blend'], ['sweep', 'sweep'], ['echo', 'echo'], ['pump', 'pump'], ['sub', 'sub'], ['recorder', 'recorder'], ['meter', 'meter']],
-      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['radio', 'radio'], ['focus', 'focus']],
+      [['glue', 'glue'], ['eq', 'eq'], ['wide', 'wide'], ['limit', 'limit'], ['rx', 'rx'], ['focus', 'focus']],
       [['cond', 'cond'], ['mangle', 'mangle'], ['warp', 'warp'], ['chaos', 'chaos']],
       [['scenes', 'scenes'], ['chord', 'chord'], ['looper', 'looper'], ['granular', 'granular'], ['euclid', 'euclid']]] };
 const DEFAULT_PATCH = [
@@ -978,7 +987,7 @@ const RGENRES = [['HOUSE', ['house', 'deep house', 'tech house']], ['EDM', ['edm
 async function rbGet(path) { const order = [...RB_SERVERS].sort(() => Math.random() - 0.5);
   for (const sv of order) { try { const ac = new AbortController(), t = setTimeout(() => ac.abort(), 6000); const r = await fetch(sv + path, { signal: ac.signal }); clearTimeout(t); if (r.ok) { RADIO.server = sv; return await r.json(); } } catch (e) { } }
   throw new Error('the station directory could not be reached'); }
-async function radioGenre(gi) { const [name, tags] = RGENRES[gi]; RADIO.genre = gi; radioStatus('Finding ' + name.toLowerCase() + ' stations…'); renderRadio();
+async function radioGenre(gi) { const [name, tags] = RGENRES[gi]; RADIO.genre = gi; if (modById.radio && modById.radio.v('band') !== gi) radioQuiet('band', gi / 6); radioStatus('Finding ' + name.toLowerCase() + ' stations…'); renderRadio();
   if (!RADIO.cache[gi]) { const seen = new Set(), out = [];
     const res = await Promise.allSettled(tags.map(t => rbGet('/json/stations/bytag/' + encodeURIComponent(t) + '?hidebroken=true&order=clickcount&reverse=true&limit=60')));
     if (!res.some(r => r.status === 'fulfilled')) { radioStatus('Could not reach the station directory. Check the internet connection.'); return; }
@@ -992,7 +1001,7 @@ const geoTxt = st => Math.abs(st.lat).toFixed(2) + '°' + (st.lat >= 0 ? 'N' : '
 function whereFrom(st) { return 'From ' + placeOf(st) + (hasGeo(st) ? ' (' + geoTxt(st) + ')' : '') + '.'; }
 function radioStatus(t) { const e = document.getElementById('rStatus'); if (e) e.textContent = t; if (modById.radio) modById.radio.screenDirty = true; }
 function radioStop() { if (RADIO.el) { try { RADIO.el.pause(); RADIO.el.removeAttribute('src'); RADIO.el.load(); } catch (e) { } } RADIO.el = null; RADIO.mode = 'off'; send({ t: 'param', id: 'radio', k: 'live', v: 0 }); send({ t: 'param', id: 'radio', k: 'playing', v: 0 }); if (modById.radio) modById.radio.screenDirty = true; renderRadio(); }
-async function radioPlay(st) {
+async function radioPlay(st) { radioSync(st);
   radioStop(); RADIO.st = st; radioStatus('Tuning in to ' + st.name + '…'); renderRadio();
   if (RADIO.server) fetch(RADIO.server + '/json/url/' + st.id).catch(() => { }); // counts the listen, as the directory asks
   if (!AC || AC.state !== 'running') { try { await powerOn(); } catch (e) { } }
@@ -1063,14 +1072,45 @@ function renderRadio() { const g = document.getElementById('rGen'), L = document
     if (hasGeo(st)) { const mp = document.createElement('button'); mp.textContent = 'MAP'; mp.title = 'Show where it broadcasts from'; mp.onclick = e => { e.stopPropagation(); window.open('https://www.openstreetmap.org/?mlat=' + st.lat + '&mlon=' + st.lon + '#map=9/' + st.lat + '/' + st.lon, '_blank'); }; d.append(mp); }
     d.append(f); L.append(d); } }
 class RadioM extends Mod {
-  knobChanged(id, v) { super.knobChanged(id, v); if (id === 'fx') fxChips(); if (id === 'lvl' && RADIO.mode === 'direct' && RADIO.el) RADIO.el.volume = Math.min(1, v);
-    if (v && !loading) { if (id === 'jam') jamToggle(); else if (id === 'next') radioStep(1); else if (id === 'prev') radioStep(-1); else if (id === 'stop') { if (RADIO.mode === 'off' && RADIO.st) radioPlay(RADIO.st); else radioStop(); } }
-    if (this.knobs[id] && this.knobs[id].def.btn && v) setTimeout(() => this.knobs[id].set(0), 150); }
-  visual() { if (this.leds.led) this.leds.led.vu(this.T.led || 0); }
-  drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = H / 84; g.fillStyle = '#020611'; g.fillRect(0, 0, W, H);
-    g.fillStyle = RADIO.mode === 'rack' ? '#7df0ff' : RADIO.mode === 'direct' ? '#ffd36b' : '#5f7fae'; g.font = '700 ' + Math.round(13 * k) + 'px Saira, system-ui'; g.fillText(RADIO.mode === 'rack' ? 'ON AIR · THROUGH THE RACK' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT' : 'RADIO OFF', 10 * k, 22 * k);
-    g.fillStyle = '#e8eef8'; g.font = '600 ' + Math.round(17 * k) + 'px Saira, system-ui'; const nm = RADIO.st ? RADIO.st.name : 'press RADIO in the menu'; g.fillText(nm.length > 30 ? nm.slice(0, 29) + '…' : nm, 10 * k, 48 * k);
+  knobChanged(id, v) { super.knobChanged(id, v); radioSaveKnobs(); if (id === 'fx') fxChips(); if (id === 'lvl' && RADIO.mode === 'direct' && RADIO.el) RADIO.el.volume = Math.min(1, v);
+    if (loading || RDO.quiet) return;
+    if (id === 'band') radioBand(v); else if (id === 'tune') radioTuneMove(); else if (v && RAD_MOMENTARY.has(id)) { if (id === 'power') radioPower(); else if (id === 'seek') radioSeek(1); else if (id === 'jam') jamToggle(); else if (id === 'grab') grabIt('gran'); setTimeout(() => this.knobs[id].set(0), 160); } }
+  visual() { radioVisual(); } idle() { radioVisual(); } }
+class RxM extends Mod { // RADIO IN: where the radio's cords land on the rack
+  visual() { if (this.leds.led) this.leds.led.vu(this.T.led || 0); const t = performance.now(); if (t - (this.lt || 0) > 500) { this.lt = t; this.screenDirty = true; } } idle() { this.visual(); }
+  drawScreen() { const s = this.scr; if (!s) return; const g = s.g, W = s.cw, H = s.ch, k = H / 84, cord = this.patched('radL'); g.fillStyle = '#020611'; g.fillRect(0, 0, W, H); g.textAlign = 'left';
+    g.fillStyle = !cord ? '#ff6a5a' : RADIO.mode === 'rack' ? '#7df0ff' : RADIO.mode === 'direct' ? '#ffd36b' : '#5f7fae'; g.font = '700 ' + Math.round(13 * k) + 'px Saira, system-ui';
+    g.fillText(!cord ? 'RADIO UNPLUGGED · PATCH ITS OUT L/R HERE' : RADIO.mode === 'rack' ? 'ON AIR · FROM THE RADIO' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT (NOT THROUGH THE RACK)' : 'RADIO OFF', 10 * k, 22 * k);
+    g.fillStyle = '#e8eef8'; g.font = '600 ' + Math.round(17 * k) + 'px Saira, system-ui'; const nm = RADIO.st ? RADIO.st.name : 'turn on the radio by the TV'; g.fillText(nm.length > 30 ? nm.slice(0, 29) + '…' : nm, 10 * k, 48 * k);
     g.fillStyle = '#5f7fae'; g.font = '500 ' + Math.round(12 * k) + 'px Saira, system-ui'; if (RADIO.st) g.fillText([placeOf(RADIO.st), RADIO.st.genre].filter(Boolean).join(' · '), 10 * k, 70 * k); s.tex.needsUpdate = true; } }
+function radioSaveKnobs() { const m = modById.radio; if (!m) return; const o = {}; for (const k in m.knobs) if (!RAD_MOMENTARY.has(k)) o[k] = m.knobs[k].norm; try { localStorage.setItem('nightrack.radioKnobs', JSON.stringify(o)); } catch (e) { } }
+function radioQuiet(id, n) { const kn = modById.radio && modById.radio.knobs[id]; if (!kn) return; RDO.quiet = true; try { kn.set(n); } finally { RDO.quiet = false; } }
+function radioList() { return RADIO.genre === 'fav' ? RADIO.favs : RADIO.list || []; }
+function radioTuneText(v) { const L = radioList(), kc = Math.round(540 + v * 1060) + ' KC'; if (!L.length) return kc; return kc + ' · ' + L[Math.round(v * (L.length - 1))].name; }
+async function radioBandLoad(b) { if (b >= RGENRES.length) { RADIO.genre = 'fav'; RADIO.list = RADIO.favs.slice(); renderRadio(); radioStatus(RADIO.favs.length ? RADIO.favs.length + ' favourite stations.' : 'No favourites yet: star stations in the RADIO menu.'); return; } if (RADIO.genre !== b || !RADIO.list.length) await radioGenre(b); }
+const radioStatic = v => send({ t: 'param', id: 'radio', k: 'static', v });
+let bandT = 0, tuneT = 0;
+function radioBand(b) { clearTimeout(bandT); bandT = setTimeout(async () => { await radioBandLoad(b); if (RADIO.mode !== 'off') radioTuneTo(0); else radioQuiet('tune', 0); }, 350); }
+function radioTuneMove() { radioStatic(1); RDO.sweep = null; clearTimeout(tuneT); tuneT = setTimeout(async () => { const b = modById.radio.v('band'); if (!radioList().length || (b < RGENRES.length && RADIO.genre !== b)) await radioBandLoad(b);
+  const L = radioList(); if (!L.length) { radioStatic(0); return; } const i = Math.round(modById.radio.knobs.tune.norm * (L.length - 1));
+  try { if (!RADIO.st || RADIO.st.id !== L[i].id || RADIO.mode === 'off') await radioPlay(L[i]); } finally { setTimeout(() => radioStatic(0), 400); } }, 450); }
+function radioTuneTo(i) { // the needle sweeps to station i of the band through static, then it plays (SEEK and BAND use this)
+  const L = radioList(); if (!L.length) return; i = ((i % L.length) + L.length) % L.length; const n = L.length > 1 ? i / (L.length - 1) : 0.5;
+  radioStatic(1); RDO.sweep = { from: RDO.nx, to: n, t0: performance.now(), dur: 800 };
+  setTimeout(async () => { radioQuiet('tune', n); try { await radioPlay(L[i]); } finally { setTimeout(() => radioStatic(0), 400); } }, 800); }
+function radioSeek(d) { (async () => { const b = modById.radio.v('band'); if (!radioList().length || (b < RGENRES.length && RADIO.genre !== b)) await radioBandLoad(b);
+  const L = radioList(); if (!L.length) { toast('No stations on this band yet', true); return; } const i = RADIO.st ? L.findIndex(x => x.id === RADIO.st.id) : -1; radioTuneTo(i < 0 ? 0 : i + d); })(); }
+function radioPower() { if (RADIO.mode !== 'off') { radioStop(); return; } if (RADIO.st) { radioPlay(RADIO.st); return; } radioSeek(1); }
+function radioSync(st) { if (!modById.radio || !st) return; const L = radioList(), i = L.findIndex(x => x.id === st.id); if (i >= 0 && !RDO.sweep) radioQuiet('tune', L.length > 1 ? i / (L.length - 1) : 0.5); }
+function radioVisual() { if (!RDO.mod) return; const m = RDO.mod, on = RADIO.mode !== 'off', T = TEL.radio || {}, now = performance.now();
+  let tgt = m.knobs.tune.norm; if (RDO.sweep) { const s = RDO.sweep, k = Math.min(1, (now - s.t0) / s.dur); tgt = s.from + (s.to - s.from) * k * k * (3 - 2 * k); if (k >= 1) RDO.sweep = null; }
+  RDO.nx += (tgt - RDO.nx) * 0.25; RDO.needle.position.x = RDO.nx0 + (RDO.nx1 - RDO.nx0) * RDO.nx;
+  RDO.glow = (RDO.glow || 0) + ((on ? 1 : 0) - (RDO.glow || 0)) * 0.05; RDO.dialMat.emissiveIntensity = 0.12 + 0.8 * RDO.glow; RDO.light.intensity = 0.9 * RDO.glow; RDO.jewel.material.emissiveIntensity = 0.1 + 2.4 * RDO.glow; RDO.backGlow.material.opacity = 0.35 * RDO.glow;
+  const E = RDO.eye.uniforms, lv = RADIO.mode === 'rack' ? Math.min(1, (T.env || 0) * 1.4) : RADIO.mode === 'direct' ? 0.7 : 0; E.uOn.value = RDO.glow; E.uOpen.value += (lv - E.uOpen.value) * 0.3;
+  const down = { power: on, jam: JAM.on, fx: m.v('fx') > 0.5, solo: m.v('solo') > 0.5, seek: m.knobs.seek.norm > 0.5 || !!RDO.sweep, grab: m.knobs.grab.norm > 0.5 };
+  for (const id in RDO.keys) { const k = RDO.keys[id], z = down[id] ? 0.5 : 0.95; k.position.z += (z - k.position.z) * 0.35; }
+  const key = [RADIO.mode, RADIO.st && RADIO.st.id, m.v('band'), radioList().length, JAM.on, Math.round(T.bpm || 0), T.conf >= 0.66, JAM.key && JAM.key.fit > 0.5 ? JAM.key.root + JAM.key.mode : ''].join('|');
+  if (key !== RDO.dialKey) { RDO.dialKey = key; radioDialDraw(); } }
 // ================================================================ METER, RECORDER, SCENES
 class MeterM extends Mod {
   knobChanged(id, v) { super.knobChanged(id, v); if (id === 'reset' && v && !loading) { send({ t: 'param', id: 'meter', k: 'reset', v: Math.random() }); setTimeout(() => this.knobs.reset.set(0), 150); } }
@@ -1112,7 +1152,7 @@ class RecorderM extends Mod {
     g.fillStyle = '#9fb6dd'; g.font = '500 ' + Math.round(13 * k) + 'px Saira, system-ui'; g.fillText('SAVE keeps the last ' + [30, 60, 120][this.v('len')] + ' s', 10 * k, 56 * k); s.tex.needsUpdate = true; } }
 // SCENES: two snapshots of the knobs (A and B) and one MORPH knob between them. Smooth knobs glide, switch-like ones change at halfway.
 const SCN = (() => { try { return JSON.parse(localStorage.getItem('nightrack.scenes')) || {}; } catch (e) { return {}; } })();
-const SCENE_SKIP = new Set(['scenes', 'recorder', 'meter', 'radio', 'out', 'cond', 'keys', 'limit']);
+const SCENE_SKIP = new Set(['scenes', 'recorder', 'meter', 'radio', 'rx', 'out', 'cond', 'keys', 'limit']);
 function sceneMods(what) { const live = new Set(deckIds(DECK.live || 'A')), side = new Set(MIXSIDE);
   return modules.filter(m => realMod(m) && !SCENE_SKIP.has(m.id) && (what === 0 || (what === 1 ? live.has(m.id) : side.has(m.id)))); }
 function sceneSnap(which) { const m = modById.scenes, o = {}; for (const md of sceneMods(m.v('what'))) { const k = {}; for (const id in md.knobs) { const kn = md.knobs[id]; if (kn.def.btn || id === 'auto') continue; k[id] = kn.norm; } o[md.id] = k; }
@@ -1265,7 +1305,7 @@ class PercM extends Mod { visual() { const L = this.T; for (const p of ['s', 'r'
 class StabM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class BassM extends Mod { visual() { this.leds.led.vu(this.T.led || 0); } }
 class TapeM extends Mod { visual() { if (this.T.wow != null) this.leds.wow.set(this.T.wow * 0.6); } }
-const CLASSES = { chord: ChordM, looper: LooperM, granular: GranM, euclid: LedM, meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
+const CLASSES = { chord: ChordM, looper: LooperM, granular: GranM, euclid: LedM, meter: MeterM, recorder: RecorderM, scenes: ScenesM, radio: RadioM, rx: RxM, focus: Mod, warp: WarpM, mangle: Mod, chaos: LedM, swell: SwellM, detail: LedM, nature: LedM, mbira: MbiraM, field: FieldM, sampler: SamplerM, keys: KeysM, glue: GlueM, eq: Mod, wide: WideM, limit: LimitM, groove: GrooveM, perc: PercM, stab: StabM, bass: BassM, tape: TapeM, cond: CondM, harm: HarmM, band: BandM, pump: DuckM, sweep: SweepM, echo: EchoM, sub: SubM, blend: BlendM, clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPGm, turing: Turing, atten: Atten, trigseq: TrigSeqM, drums: DrumsM, mix6: Mix6M, duck: DuckM };
 
 // ================================================================ renderer & scene
 const canvas = document.getElementById('c');
@@ -1752,6 +1792,7 @@ function collideMain(r) {
     }
     P[ix] = x; P[ix + 1] = y; P[ix + 2] = z;
     for (const k in WING) collideWing(WING[k], P, O, ix);
+    if (OBST.length) collideBoxes(P, O, ix);
   }
 }
 class Rope {
@@ -2396,12 +2437,160 @@ function mediaCabinet() { // low wooden cabinet: console in one cubby, a stack o
   const r = mulberry32(64); for (let k = 0; k < 7; k++) { const c = new THREE.Mesh(new THREE.BoxGeometry(1.4, 15, 11), new THREE.MeshStandardMaterial({ color: [0x1a2a6a, 0x0f0f12, 0x2a5a2a, 0x6a1a1a, 0x1a1a1a, 0xe0e0e0, 0x3a3a8a][k], roughness: 0.4 })); c.position.set(10 + k * 1.55, 2 + t + 7.5, -10 - r() * 1.5); c.rotation.z = k > 4 ? -0.12 : 0; g.add(c); }
   return { g, cons, H, D, shelfY: 2 + t };
 }
+// ---------------------------------------------------------------- THE RADIO: a 1950s walnut table radio on the TV cabinet. It is the RADIO module:
+// its knobs and keys are the module's controls, its jacks are real (two cords run from it to RADIO IN on the rack).
+const plateMat = t => new THREE.MeshStandardMaterial({ map: t, metalness: 0.35, roughness: 0.4, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.22, envMapIntensity: 0.3 }); // printed brass: warm even under the blue room light
+const RDO = { W: 24, H: 16.5, D: 10.5, FOOT: 0.55, g: null, face: null, keys: {}, needle: null, nx: 0.5, eye: null, dialTex: null, dialCv: null, dialKey: '', dialMat: null, jewel: null, light: null, table: null, sec: null, sweep: null };
+const RAD_BANDS = () => ['HOUSE', 'EDM', 'DNB', 'AMBIENT', 'EXPER.', 'OLD TIME', 'FAVS'];
+function woodTex() { const c = document.createElement('canvas'); c.width = 512; c.height = 512; const g = c.getContext('2d'), r = mulberry32(77);
+  const gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, '#4a2914'); gr.addColorStop(0.5, '#5a3319'); gr.addColorStop(1, '#43240f'); g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  for (let k = 0; k < 140; k++) { const y0 = r() * 512, a = 2 + r() * 10, f = 0.004 + r() * 0.012, ph = r() * 6; g.strokeStyle = r() < 0.55 ? `rgba(28,12,4,${0.12 + r() * 0.3})` : `rgba(140,82,40,${0.08 + r() * 0.18})`; g.lineWidth = 0.6 + r() * 2.4; g.beginPath();
+    for (let x = 0; x <= 512; x += 8) { const y = y0 + Math.sin(x * f + ph) * a + Math.sin(x * f * 3.1 + ph * 2) * a * 0.3; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  for (let k = 0; k < 9; k++) { const x = r() * 512, y = r() * 512, rx = 10 + r() * 30; g.strokeStyle = 'rgba(30,12,4,.25)'; g.lineWidth = 1.2; for (let q = 1; q < 6; q++) { g.beginPath(); g.ellipse(x, y, rx * q / 5, rx * q / 14, 0, 0, Math.PI * 2); g.stroke(); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function clothTex() { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mulberry32(12); g.fillStyle = '#6b4a2a'; g.fillRect(0, 0, 128, 128);
+  for (let y = 0; y < 128; y += 4) for (let x = 0; x < 128; x += 4) { const o = ((x + y) / 4) % 2; g.fillStyle = o ? `rgba(214,170,104,${0.35 + r() * 0.25})` : `rgba(40,24,10,${0.3 + r() * 0.2})`; g.fillRect(x, y, o ? 4 : 2, o ? 2 : 4); if (r() < 0.04) { g.fillStyle = 'rgba(255,214,120,.55)'; g.fillRect(x, y + 1, 4, 1); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(5, 6); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function radioKnob(r, h, ribs, mat, brass) { // a ribbed bakelite knob on a brass skirt; its axis is +z
+  const holder = new THREE.Group(), rot = new THREE.Group(); holder.add(rot);
+  const body = new THREE.CylinderGeometry(r * 0.88, r, h, 96, 1), pa = body.attributes.position;
+  for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), z = pa.getZ(i), d = Math.hypot(x, z); if (d < 1e-3) continue; const k = 1 + 0.045 * Math.pow(Math.max(0, Math.cos(Math.atan2(z, x) * ribs)), 2); pa.setX(i, x * k); pa.setZ(i, z * k); }
+  body.computeVertexNormals(); body.rotateX(Math.PI / 2); body.translate(0, 0, h / 2);
+  const dome = new THREE.SphereGeometry(r * 0.9, 40, 10, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, 0.32, 1); dome.rotateX(Math.PI / 2); dome.translate(0, 0, h);
+  const b = new THREE.Mesh(body, mat), d = new THREE.Mesh(dome, mat); b.castShadow = true; rot.add(b, d);
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.2, r * 1.26, 0.16, 48).rotateX(Math.PI / 2), brass); skirt.position.z = 0.08; rot.add(skirt);
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(r * 0.36, 32), brass); cap.position.z = h + r * 0.29; rot.add(cap);
+  const ptr = new THREE.Mesh(new THREE.BoxGeometry(r * 0.1, r * 0.46, 0.06), new THREE.MeshStandardMaterial({ color: 0x2a1408, roughness: 0.5 })); ptr.position.set(0, r * 0.6, h + r * 0.17); ptr.rotation.x = -0.32; rot.add(ptr);
+  return { holder, rot, picks: [b, d] };
+}
+function knobPlate(r, ticks, labels) { // brass scale plate behind a knob: ticks where the pointer lands, small engraved labels
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), C = S / 2, k = S / (2 * r);
+  const gr = g.createRadialGradient(C * 0.8, C * 0.7, 10, C, C, C); gr.addColorStop(0, '#e8c97a'); gr.addColorStop(1, '#a87d2e'); g.fillStyle = gr; g.beginPath(); g.arc(C, C, C - 1, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#3a2410'; g.fillStyle = '#3a2410'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let i = 0; i < ticks; i++) { const a = THREE.MathUtils.degToRad((0.5 - i / (ticks - 1)) * 300), dx = -Math.sin(a), dy = -Math.cos(a), big = !labels && (i % 5 === 0);
+    g.lineWidth = labels || big ? 4 : 2; g.beginPath(); g.moveTo(C + dx * C * 0.8, C + dy * C * 0.8); g.lineTo(C + dx * C * (labels || big ? 0.95 : 0.9), C + dy * C * 0.95); g.stroke();
+    if (labels) { g.font = '700 22px "Saira", sans-serif'; g.save(); g.translate(C + dx * C * 0.66, C + dy * C * 0.66); g.fillText(labels[i], 0, 0); g.restore(); } }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return new THREE.Mesh(new THREE.CircleGeometry(r, 48), plateMat(t)); }
+function radioDialDraw() { // the backlit dial: bands, the broadcast scale, and the station card
+  const c = RDO.dialCv, g = c.getContext('2d'), W = c.width, H = c.height, on = RADIO.mode !== 'off', st = RADIO.st, band = modById.radio ? modById.radio.v('band') : 0;
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#f4e6c2'); bg.addColorStop(1, '#e3cd98'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#6b4a20'; g.lineWidth = 3; g.strokeRect(14, 14, W - 28, H - 28); g.lineWidth = 1; g.strokeRect(22, 22, W - 44, H - 44);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; const B = RAD_BANDS(), bw = (W - 80) / B.length;
+  B.forEach((n, i) => { const x = 40 + bw * (i + 0.5), cur = i === band; g.fillStyle = cur ? '#b5300f' : '#8a6a3c'; let fs = 30; do { g.font = (cur ? '800 ' : '600 ') + fs + 'px "Saira", sans-serif'; fs -= 2; } while (g.measureText(n).width > bw - 10 && fs > 14); g.fillText(n, x, 66); if (cur) { g.fillRect(x - bw * 0.36, 88, bw * 0.72, 4); } });
+  const X0 = 60, X1 = W - 60, Y = 250; g.strokeStyle = '#3c2810'; g.fillStyle = '#3c2810'; g.lineWidth = 3; g.beginPath(); g.moveTo(X0, Y); g.lineTo(X1, Y); g.stroke();
+  for (let f = 540; f <= 1600; f += 10) { const x = X0 + (f - 540) / 1060 * (X1 - X0), big = f % 100 === 0, mid = f % 50 === 0; g.lineWidth = big ? 3 : 1.5; g.beginPath(); g.moveTo(x, Y); g.lineTo(x, Y - (big ? 38 : mid ? 24 : 14)); g.stroke(); }
+  g.font = '700 40px "Saira", sans-serif'; for (const f of [60, 70, 80, 90, 100, 120, 140, 160]) { const x = X0 + (f * 10 - 540) / 1060 * (X1 - X0); g.fillText(String(f), x, Y - 72); }
+  g.font = '600 24px "Saira", sans-serif'; g.fillText('KILOCYCLES · BROADCAST', W / 2, Y + 34);
+  const L = RADIO.list || [], n = L.length; if (n > 1) { g.fillStyle = 'rgba(60,40,16,.55)'; for (let i = 0; i < n; i++) { const x = X0 + i / (n - 1) * (X1 - X0); g.fillRect(x - 1.5, Y + 6, 3, 10); } }
+  // station card
+  const cy = 360; g.fillStyle = on ? 'rgba(80,40,10,.10)' : 'rgba(40,30,20,.12)'; g.fillRect(40, cy, W - 200, H - cy - 40); g.textAlign = 'left';
+  const fit = (t, size, wt, maxW) => { let s = size; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; while (g.measureText(t).width > maxW && s > 16) { s -= 2; g.font = `${wt} ${s}px "Courier New", ui-monospace, monospace`; } return t; };
+  const kc = st && n > 1 ? Math.round(540 + Math.max(0, L.findIndex(x => x.id === st.id)) / (n - 1) * 1060) : null;
+  g.fillStyle = '#2a1606'; g.fillText(fit(on && st ? st.name.toUpperCase() : st ? 'OFF · ' + st.name.toUpperCase() : 'PRESS POWER', 54, 800, W - 260), 60, cy + 58);
+  g.fillStyle = '#5a3a14'; g.fillText(fit(st ? (kc ? kc + ' KC · ' : '') + placeOf(st) : 'TURN BAND, THEN TUNING, OR PRESS SEEK', 32, 700, W - 260), 60, cy + 118);
+  const T = TEL.radio || {}, info = !on ? 'RADIO OFF' : RADIO.mode === 'direct' ? 'ON AIR · DIRECT (THE RACK CAN\'T HEAR IT)' : JAM.on ? 'JAM · ' + (T.conf >= 0.66 && T.bpm ? T.bpm.toFixed(0) + ' BPM' : 'LISTENING') + (JAM.key && JAM.key.fit > 0.5 ? ' · ' + NAMES12[JAM.key.root] + ' ' + JAM.key.mode.toUpperCase() : '') : 'ON AIR · THROUGH THE RACK';
+  g.fillStyle = '#7a1e08'; g.fillText(fit(info, 28, 700, W - 260), 60, cy + 172);
+  RDO.dialTex.needsUpdate = true; }
+const EYE_FS = `uniform float uOpen, uOn; varying vec2 vUv; void main(){ vec2 p = vUv * 2.0 - 1.0; float r = length(p); if (r > 1.0) discard; float a = abs(atan(p.x, p.y));
+  float shadow = (1.0 - uOpen) * 2.6 + 0.12; float lit = step(shadow, a) * smoothstep(0.28, 0.36, r) * (1.0 - smoothstep(0.86, 0.98, r)); float edge = exp(-abs(a - shadow) * 18.0) * 0.6;
+  vec3 c = vec3(0.12, 1.0, 0.45) * (lit * (0.55 + 0.45 * (1.0 - r)) + edge * step(0.3, r)) * uOn; c += vec3(0.02, 0.05, 0.03) * (1.0 - r); gl_FragColor = vec4(c, 1.0); }`;
+function buildRadio(parent) {
+  const W = RDO.W, H = RDO.H, D = RDO.D, F = RDO.FOOT, g = new THREE.Group(); parent.add(g); RDO.g = g;
+  const wood = new THREE.MeshPhysicalMaterial({ map: woodTex(), color: 0xe8c0a0, roughness: 0.4, clearcoat: 0.6, clearcoatRoughness: 0.3, emissive: 0x3c1a08, envMapIntensity: 0.3 }); wood.map.repeat.set(0.05, 0.07);
+  const brass = new THREE.MeshStandardMaterial({ color: 0xd8a84a, metalness: 0.85, roughness: 0.32, emissive: 0x5a3a0c, envMapIntensity: 0.35 }), ivory = new THREE.MeshPhysicalMaterial({ color: 0xece0c4, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.2, emissive: 0x4a3a20, envMapIntensity: 0.4 }), dark = new THREE.MeshStandardMaterial({ color: 0x120a05, roughness: 0.7 });
+  const cab = new THREE.Mesh(rrBox(W, H, D, 2.4, 0.7), wood); cab.position.y = F + H / 2; cab.castShadow = cab.receiveShadow = true; g.add(cab);
+  for (const [x, z] of [[-W / 2 + 2, -1.5], [W / 2 - 2, -1.5], [-W / 2 + 2, -D + 1.5], [W / 2 - 2, -D + 1.5]]) { const f = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.6, F, 16), dark); f.position.set(x, F / 2, z); g.add(f); }
+  const face = new THREE.Group(); face.position.set(-W / 2, F, 0); g.add(face); RDO.face = face;
+  const at = (m, x, y, z) => { m.position.set(x, y, z); face.add(m); return m; };
+  const ring = (w, h, r, t, d, mat) => { const s = rrShape(w + 2 * t, h + 2 * t, r + t); s.holes.push(rrShape(w, h, r, 0, 0, true)); return new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 10 }), mat); };
+  // grille: woven cloth, a brass frame, walnut slats, the maker's plaque
+  const GX = 7.9, GY = 9.65, GW = 9.0, GH = 10.7;
+  at(new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), new THREE.MeshStandardMaterial({ map: clothTex(), roughness: 0.95 })), GX, GY, 0.02);
+  at(ring(GW, GH, 0.8, 0.3, 0.22, brass), GX, GY, 0.0);
+  const slats = []; for (let k = 0; k < 5; k++) { const s = new THREE.BoxGeometry(0.55, GH - 0.3, 0.32); s.translate(GX - GW / 2 + GW * (k + 1) / 6, GY, 0.2); slats.push(s.toNonIndexed()); } face.add(new THREE.Mesh(mergeGeometries(slats), wood));
+  { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#f0d48a'); gr.addColorStop(1, '#a8802f'); q.fillStyle = gr; q.fillRect(0, 0, 512, 128);
+    q.fillStyle = '#3a2208'; q.font = 'italic 700 74px Georgia, "Times New Roman", serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText('Nocturne', 256, 60); q.font = '600 18px "Saira", sans-serif'; q.fillText('SEVEN TUBE · ALL WAVE', 256, 110);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const pl = new THREE.Mesh(new THREE.ExtrudeGeometry(rrShape(4.2, 1.15, 0.5), { depth: 0.12, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 2 }), [plateMat(t), brass]);
+    pl.geometry.computeBoundingBox(); const uv = pl.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) + 2.1) / 4.2, (uv.getY(i) + 0.575) / 1.15); at(pl, GX, 5.6, 0.42); }
+  // jack plate on the left, nearest the rack
+  { const c = document.createElement('canvas'); c.width = 96; c.height = 512; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 96, 0); gr.addColorStop(0, '#b48a3a'); gr.addColorStop(0.5, '#e6c779'); gr.addColorStop(1, '#a87e30'); q.fillStyle = gr; q.fillRect(0, 0, 96, 512);
+    q.fillStyle = '#3a2208'; q.textAlign = 'center'; q.font = '800 15px "Saira", sans-serif'; q.fillText('TO RACK', 48, 22); q.font = '700 14px "Saira", sans-serif';
+    [['OUT L', 13.4], ['OUT R', 10.8], ['ENV', 8.2], ['TRIG', 5.6]].forEach(([l, y]) => q.fillText(l, 48, (15.0 - (y + 0.95)) / 10.7 * 512 + 5));
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; at(new THREE.Mesh(new THREE.PlaneGeometry(2.0, 10.7), plateMat(t)), 1.8, 9.65, 0.04); }
+  // dial: printed face (backlit), brass bezel, glass, needle, magic eye
+  const DX = 18.15, DY = 11.5, DW = 10.1, DH = 6.9;
+  RDO.dialCv = document.createElement('canvas'); RDO.dialCv.width = 1010; RDO.dialCv.height = 690; RDO.dialTex = new THREE.CanvasTexture(RDO.dialCv); RDO.dialTex.colorSpace = THREE.SRGBColorSpace; RDO.dialTex.anisotropy = 8;
+  RDO.dialMat = new THREE.MeshStandardMaterial({ map: RDO.dialTex, emissive: 0xffc27a, emissiveMap: RDO.dialTex, emissiveIntensity: 0.15, roughness: 0.6 });
+  at(new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), RDO.dialMat), DX, DY, 0.05); at(ring(DW, DH, 0.5, 0.35, 0.3, brass), DX, DY, 0.0);
+  at(new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), new THREE.MeshPhysicalMaterial({ color: 0xfff6e0, transparent: true, opacity: 0.08, roughness: 0.22, depthWrite: false })), DX, DY, 0.36);
+  RDO.needle = at(new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.7, 0.03), new THREE.MeshStandardMaterial({ color: 0xc8200e, emissive: 0x801006, roughness: 0.4 })), DX, DY + DH / 2 - 2.05, 0.12);
+  RDO.nx0 = DX - DW / 2 + 0.6; RDO.nx1 = DX + DW / 2 - 0.6;
+  RDO.eye = new THREE.ShaderMaterial({ uniforms: { uOpen: { value: 0 }, uOn: { value: 0 } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: EYE_FS, toneMapped: false });
+  at(new THREE.Mesh(new THREE.CircleGeometry(0.62, 40), RDO.eye), DX + DW / 2 - 0.95, DY - DH / 2 + 1.25, 0.1); at(new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.08, 8, 40), brass), DX + DW / 2 - 0.95, DY - DH / 2 + 1.25, 0.12);
+  // piano keys under the dial, their names on a brass strip
+  const KEYS = [['power', 'POWER'], ['seek', 'SEEK'], ['jam', 'JAM'], ['grab', 'GRAB'], ['fx', 'FX'], ['solo', 'FADE']], KW = 1.4, KG = 0.12, kx0 = DX - (KEYS.length * KW + (KEYS.length - 1) * KG) / 2 + KW / 2, KY = 5.85;
+  at(new THREE.Mesh(new THREE.BoxGeometry(KEYS.length * (KW + KG) + 0.4, 2.35, 0.1), dark), DX, KY, 0.0);
+  { const c = document.createElement('canvas'); c.width = 1010; c.height = 64; const q = c.getContext('2d'), gr = q.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, '#e9cb7c'); gr.addColorStop(1, '#a87e30'); q.fillStyle = gr; q.fillRect(0, 0, 1010, 64);
+    q.fillStyle = '#3a2208'; q.font = '800 30px "Saira", sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; KEYS.forEach(([, l], i) => q.fillText(l, (kx0 + i * (KW + KG) - (DX - DW / 2)) / DW * 1010, 34));
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; at(new THREE.Mesh(new THREE.PlaneGeometry(DW, 0.64), plateMat(t)), DX, 7.4, 0.04); }
+  const keyG = rrBox(KW, 2.0, 1.4, 0.22, 0.14); KEYS.forEach(([id], i) => { const k = at(new THREE.Mesh(keyG, ivory), kx0 + i * (KW + KG), KY, 0.95); k.castShadow = true; RDO.keys[id] = k; });
+  // knobs, their scale plates, the pilot jewel, a brass name strip
+  const KR = [['lvl', 5.4, 1.15, 11, null], ['tone', 10.3, 1.0, 11, null], ['band', 15.0, 1.15, RAD_BANDS().length, RAD_BANDS().map(b => b.slice(0, 3))], ['tune', 20.9, 1.5, 31, null]], KYb = 2.55; RDO.knobs = {};
+  for (const [id, x, r, ticks, labels] of KR) { at(knobPlate(r * (labels ? 1.85 : 1.5), ticks, labels), x, KYb, 0.03); const kb = radioKnob(r, r * 0.95, id === 'tune' ? 30 : 22, ivory, brass); kb.holder.position.set(x, KYb, 0.05); face.add(kb.holder); RDO.knobs[id] = kb; }
+  { const c = document.createElement('canvas'); c.width = 1200; c.height = 40; const q = c.getContext('2d'); q.fillStyle = '#c9a24e'; q.fillRect(0, 0, 1200, 40); q.fillStyle = '#3a2208'; q.font = '800 24px "Saira", sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle';
+    [['VOLUME', 5.4], ['TONE', 10.3], ['BAND', 15.0], ['TUNING', 20.9]].forEach(([l, x]) => q.fillText(l, (x - 3) / 20 * 1200, 22)); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    at(new THREE.Mesh(new THREE.PlaneGeometry(20, 0.6), plateMat(t)), 13, 0.42, 0.04); }
+  RDO.jewel = at(new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), new THREE.MeshStandardMaterial({ color: 0xff5a18, emissive: 0xff3a08, emissiveIntensity: 0.1, roughness: 0.15, flatShading: true })), 18.0, KYb, 0.32);
+  at(new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.07, 8, 24), brass), 18.0, KYb, 0.2);
+  // brass trim around the front edge, a telescopic antenna, the back with vents
+  { const s = rrShape(W - 0.9, H - 0.9, 2.0), pts = s.getSpacedPoints(160).map(p => new THREE.Vector3(p.x + W / 2, p.y + H / 2, 0.05)); face.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 240, 0.07, 6, true), brass)); }
+  { const chrome = new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.18 }), base = new THREE.Vector3(W / 2 - 2.2, F + H - 0.1, -D + 1.6), dir = new THREE.Vector3(-0.42, 0.86, -0.3).normalize(); let p = base.clone();
+    const sw = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 12), brass); sw.position.copy(base); g.add(sw);
+    for (const [len, r] of [[5.5, 0.17], [5.5, 0.13], [5.5, 0.095]]) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12), chrome); m.position.copy(p).addScaledVector(dir, len / 2); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); g.add(m); p.addScaledVector(dir, len - 0.15); }
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), chrome); tip.position.copy(p); g.add(tip); }
+  { const vents = []; for (let k = 0; k < 9; k++) { const v = new THREE.BoxGeometry(W * 0.6, 0.35, 0.1); v.translate(0, F + 3 + k * 1.2, -D - 0.02); vents.push(v.toNonIndexed()); } g.add(new THREE.Mesh(mergeGeometries(vents), dark));
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.55, 9.5), new THREE.MeshBasicMaterial({ color: 0xff8a30, transparent: true, opacity: 0, toneMapped: false })); glow.position.set(0, F + 7.8, -D - 0.06); glow.rotation.y = Math.PI; g.add(glow); RDO.backGlow = glow; }
+  RDO.light = new THREE.PointLight(0xffa858, 0, 26, 0); RDO.light.position.set(-3, F + H + 6, 9); g.add(RDO.light);
+  RDO.cab = cab; return g;
+}
+function radioTable(parent) { // a little walnut side table that holds the radio when the TV cabinet isn't shown
+  const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x3b2718, roughness: 0.55 }), T = 22, w = 28, d = 16, parts = [];
+  const bx = (W, H, D, x, y, z) => { const b = new THREE.BoxGeometry(W, H, D); b.translate(x, y, z); parts.push(b.toNonIndexed()); };
+  bx(w, 1.6, d, 0, T - 0.8, -d / 2 + 2); bx(w - 3, 1.4, d - 3, 0, 6, -d / 2 + 2); for (const sx of [-1, 1]) for (const sz of [-1, 1]) bx(1.6, T - 1.6, 1.6, sx * (w / 2 - 1.8), (T - 1.6) / 2, -d / 2 + 2 + sz * (d / 2 - 1.8));
+  const m = new THREE.Mesh(mergeGeometries(parts), wood); m.castShadow = m.receiveShadow = true; g.add(m); parent.add(g); return g; }
+// the radio is the RADIO module: knobs/keys/jacks wired to it like a module's, in a "section" frame on its front
+function radioModule() {
+  const m = new RadioM('radio', 'radio'); modules.push(m); modById.radio = m; RDO.mod = m; const face = RDO.face;
+  m.group = RDO.g; m.w = 17; m.x0 = 3.5; m.y0 = 1.6; m.prop = true;
+  RDO.sec = { k: 'RADIO', inner: face, knobGrid: new Map(), plugGrid: new Map(), mw: new THREE.Matrix4(), inv: new THREE.Matrix4(), q: new THREE.Quaternion(), n: new THREE.Vector3() }; m.sec = RDO.sec;
+  for (const id in RDO.knobs) { const kn = m.knobs[id], kb = RDO.knobs[id]; kn.rot = kb.rot; kn.updateMesh(); for (const p of kb.picks) { p.userData.knob = kn; pickKnobs.push(p); } }
+  for (const id in RDO.keys) { const kn = m.knobs[id]; RDO.keys[id].userData.knob = kn; pickKnobs.push(RDO.keys[id]); }
+  for (const j of m.def.jacks) { const port = m.ports[j.id], jg = new THREE.Group(); jg.position.set(j.lx, j.ly, 0.04); face.add(jg);
+    const mm = new THREE.Mesh(GEO.jack, MAT.metal), hole = new THREE.Mesh(GEO.hole, MAT.hole), pk = new THREE.Mesh(GEO.pick, MAT.hole); pk.visible = false; pk.userData.port = port;
+    const ring = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, transparent: true, opacity: 0.9 })); ring.visible = false; jg.add(mm, hole, pk, ring); pickJacks.push(pk); port.ring = ring; port.sec = RDO.sec; }
+  RDO.cab.userData.module = m; pickPanels.push(RDO.cab);
+  try { const S = JSON.parse(localStorage.getItem('nightrack.radioKnobs') || 'null'); if (S) for (const k in S) if (m.knobs[k] && !RAD_MOMENTARY.has(k)) { m.knobs[k].norm = S[k]; m.knobs[k].updateMesh(); } } catch (e) { }
+  radioPlace(); }
+function radioPlace() { // after the radio (or its side) moves: its frame, its jacks' world positions, and its cords' lengths
+  if (!RDO.face) return; RDO.face.updateWorldMatrix(true, false); const S = RDO.sec; S.mw.copy(RDO.face.matrixWorld); S.inv.copy(S.mw).invert(); RDO.face.getWorldQuaternion(S.q); S.n.set(0, 0, 1).applyQuaternion(S.q);
+  const m = RDO.mod; if (!m) return; for (const j of m.def.jacks) { const p = m.ports[j.id]; p.world.set(j.lx, j.ly, 0.52).applyMatrix4(S.mw); p.n = S.n; p.lx = j.lx; p.ly = j.ly; }
+  for (const c of cables) if (c.connected && c.ends.some(e => e.port && e.port.module === m)) c.length = Math.max(c.length, stdLen(c.ends[0].port.world.distanceTo(c.ends[1].port.world)));
+  OBST.length = 0; const S2 = SIDES.R; if (!S2) return; S2.root.updateMatrixWorld(true);
+  const box = (obj, min, max, on) => { const inv = obj.matrixWorld.clone().invert(); OBST.push({ mw: obj.matrixWorld.clone(), inv, min: new THREE.Vector3(...min), max: new THREE.Vector3(...max), on }); };
+  box(S2.crt, [-30, 0, -40], [30, 22, 0.4], () => S2.crt.visible && S2.root.visible); box(RDO.table, [-14, 0, -12], [14, 22, 4], () => RDO.table.visible && S2.root.visible);
+  box(S2.lamp, [-10.5, 0, -10.5], [10.5, CASE_H, 10.5], () => S2.lamp.visible && S2.root.visible); box(RDO.g, [-RDO.W / 2, 0, -RDO.D], [RDO.W / 2, RDO.FOOT + RDO.H, 1.3], () => S2.root.visible); }
+const OBST = [], _ob = new THREE.Vector3();
+function collideBoxes(P, O, ix) { for (const B of OBST) { if (!B.on()) continue; _ob.set(P[ix], P[ix + 1], P[ix + 2]).applyMatrix4(B.inv); const m = CR + 0.1, a = B.min, b = B.max;
+    if (_ob.x < a.x - m || _ob.x > b.x + m || _ob.y < a.y - m || _ob.y > b.y + m || _ob.z < a.z - m || _ob.z > b.z + m) continue;
+    const d = [[_ob.x - (a.x - m), 'x', a.x - m], [(b.x + m) - _ob.x, 'x', b.x + m], [(b.y + m) - _ob.y, 'y', b.y + m], [(b.z + m) - _ob.z, 'z', b.z + m], [_ob.z - (a.z - m), 'z', a.z - m]].sort((u, v) => u[0] - v[0])[0];
+    _ob[d[1]] = d[2]; _ob.applyMatrix4(B.mw); P[ix] = _ob.x; P[ix + 1] = _ob.y; P[ix + 2] = _ob.z; O[ix] = lerp(O[ix], _ob.x, 0.3); O[ix + 1] = lerp(O[ix + 1], _ob.y, 0.3); O[ix + 2] = lerp(O[ix + 2], _ob.z, 0.3); } }
 const SIDE_CABLES = {};
 function crtSetup(side) { // monitors on a media cabinet, a speaker, a console with two controllers on the floor; every cord runs back into the rack
   const root = new THREE.Group(), cab = mediaCabinet(); root.add(cab.g); const top = cab.H, ports = [];
   const put = (t, x, y, z = -4, ry = 0) => { t.g.position.set(x, y, z); t.g.rotation.y = ry; root.add(t.g); for (const j of t.jacks.slice(0, 1)) ports.push({ obj: t.g, p: j.p, col: j.col }); return t; };
   if (side === 'L') { const a = put(tvSet('pvm', 31, 27, 'game'), -13, top, -2); put(tvSet('pvm', 23, 20, 'scope'), 15, top, -3, -0.06); put(tvSet('jvc', 18, 16, 'info'), -7.5, top + 27, -4, 0.05); put(tvSet('pvm', 25, 22, 'seq'), 16, top + 20, -5, -0.06); }
-  else { put(tvSet('home', 31, 26, 'vu'), -2, top, -2); put(tvSet('home', 29, 24, 'scope'), -1.5, top + 26, -3, 0.03); put(tvSet('home', 27, 22, 'static'), -2.5, top + 50, -4, -0.04); put(tvSet('jvc', 17, 15, 'cam'), 24, top, -1, -0.18); }
+  else { put(tvSet('home', 31, 26, 'vu'), -12, top, -2); put(tvSet('home', 29, 24, 'scope'), -11.5, top + 26, -3, 0.03); put(tvSet('home', 27, 22, 'static'), -12.5, top + 50, -4, -0.04); } // the radio sits to their right
   const spk = speaker(); spk.g.position.set(side === 'L' ? -44 : 44, 0, -8); spk.g.rotation.y = side === 'L' ? 0.3 : -0.3; root.add(spk.g); for (const j of spk.jacks) ports.push({ obj: spk.g, p: j.p, col: j.col });
   // controllers on the floor, corded to the console
   const loc = [], cg = []; const cons = cab.cons;
@@ -2412,7 +2601,7 @@ function crtSetup(side) { // monitors on a media cabinet, a speaker, a console w
       new THREE.Vector3(x1, 1.2, cr + 0.25), new THREE.Vector3(x2, cr, 1.8), new THREE.Vector3((x2 + b.x) / 2 + (k ? 3 : -3), cr, (1.8 + b.z) / 2 - 1), b.clone().add(new THREE.Vector3(0, -b.y + cr, -2.5)), b];
     const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 140, 0.21, 10, false), BRAID(200)); tube.castShadow = true; root.add(tube); });
   // console AV cable up to the bottom monitor
-  { root.updateMatrixWorld(true); const a = cons.g.localToWorld(cons.av.clone()); root.worldToLocal(a); const tvBack = new THREE.Vector3(side === 'L' ? -13 : -2, top + 8, -30);
+  { root.updateMatrixWorld(true); const a = cons.g.localToWorld(cons.av.clone()); root.worldToLocal(a); const tvBack = new THREE.Vector3(side === 'L' ? -13 : -12, top + 8, -30);
     const hz = -cab.D, hy = a.y; const gr = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.22, 8, 24), new THREE.MeshStandardMaterial({ color: 0x0a0a0b, roughness: 0.6 })); gr.position.set(a.x, hy, hz + 1.65); root.add(gr); // cable grommet in the back panel
     const pts = [a, new THREE.Vector3(a.x, hy, a.z - 3), new THREE.Vector3(a.x, hy, hz + 3), new THREE.Vector3(a.x, hy, hz - 1.5), new THREE.Vector3(a.x + 1, hy + 4, hz - 3.5), new THREE.Vector3((a.x + tvBack.x) / 2, top + 3, hz - 3), new THREE.Vector3(tvBack.x, top + 6, -36), tvBack];
     root.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 60, 0.28, 6, false), new THREE.MeshStandardMaterial({ color: 0xd8a818, roughness: 0.45 }))); }
@@ -2427,10 +2616,12 @@ function sideCables(k) { // every monitor and speaker cord runs down to the floo
     (byCol[pt.col] = byCol[pt.col] || []).push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 120, 0.3, 6, false)); });
   for (const c in byCol) { const m = new THREE.Mesh(mergeGeometries(byCol[c]), new THREE.MeshStandardMaterial({ color: +c, roughness: 0.45 })); m.castShadow = true; grp.add(m); }
 }
-let cablesQueued = false; function queueSideCables() { if (cablesQueued) return; cablesQueued = true; requestAnimationFrame(() => { cablesQueued = false; for (const k in SIDES) sideCables(k); }); }
+let cablesQueued = false; function queueSideCables() { if (cablesQueued) return; cablesQueued = true; requestAnimationFrame(() => { cablesQueued = false; for (const k in SIDES) sideCables(k); radioPlace(); rebuildPlugGrid(); }); }
 function buildSides() {
   for (const [k, x, ry] of [['L', -88, 0.62], ['R', 88, -0.62]]) { const root = new THREE.Group(); root.position.set(x, FLOOR_Y, 30); root.rotation.y = ry; scene.add(root);
     const lamp = washiLamp(), crt = crtSetup(k); root.add(lamp, crt); SIDES[k] = { lamp, crt, root }; regProp('side.' + k, root); }
+  RDO.table = radioTable(SIDES.R.root); RDO.table.position.set(17.5, 0, -2); RDO.table.rotation.y = -0.12; RDO.table.visible = SET.sideR !== 'crt';
+  const rg = buildRadio(SIDES.R.root); rg.position.set(17.5, 22, -2); rg.rotation.y = -0.12; radioModule();
   queueSideCables();
 }
 
@@ -2462,7 +2653,7 @@ function applySettings(save = true) {
   shafts.visible = SET.shafts > 0.01;
   MOTE_U.uColor.value.copy(C_('key')).lerp(new THREE.Color(0xffffff), 0.5); MOTE_U.uInt.value = 0.3 + SET.shafts; motes.visible = SET.shafts > 0.01;
   plantGroup.visible = SET.plants; floorPlantGroup.visible = SET.floorPlants; rugGroup.visible = SET.rug; hallGroup.visible = SET.room !== 'black';
-  for (const k in SIDES) { const v = SET['side' + k]; SIDES[k].lamp.visible = v === 'lamp'; SIDES[k].crt.visible = v === 'crt'; }
+  for (const k in SIDES) { const v = SET['side' + k]; SIDES[k].lamp.visible = v === 'lamp'; SIDES[k].crt.visible = v === 'crt'; } if (RDO.table) RDO.table.visible = SET.sideR !== 'crt';
   for (const L of LAMP_LIGHTS) L.intensity = SET.lampsLit ? 1.1 * SET.lampB : 0; for (const m of LAMP_PAPER) m.emissiveIntensity = SET.lampsLit ? 0.9 * SET.lampB : 0.03; CRT_U.uBright.value = 0.15 + 0.85 * SET.crtB; if (hallStrips.mat) hallStrips.mat.color.copy(C_('key')).multiplyScalar(1.6);
   for (const c of cables) { c.applyOpacity(); c.applyNeon(); }
   for (const m of DECOR_CABLE_MATS) { m.emissive.copy(SET.neon ? m.color : new THREE.Color(0)); m.emissiveIntensity = SET.neon ? 1.3 : 1; }
@@ -2517,14 +2708,14 @@ function loadPatch(P) {
   loading = true;
   try {
     for (const c of [...cables]) removeCable(c);
-    for (const m of modules) for (const k in m.knobs) { const kn = m.knobs[k], v = P.knobs && P.knobs[m.id] && P.knobs[m.id][k]; kn.set(v == null ? kn.defNorm : kn.toNorm(v)); }
+    for (const m of modules) { if (m.id === 'radio') continue; for (const k in m.knobs) { const kn = m.knobs[k], v = P.knobs && P.knobs[m.id] && P.knobs[m.id][k]; kn.set(v == null ? kn.defNorm : kn.toNorm(v)); } } // the radio keeps its own settings
     const r = mulberry32(7); for (const [a, b, col, len] of P.cables || []) { try { const c = patchCable(a, b, col, r() < 0.4 ? 1 : 0); if (len) c.length = Math.min(len, Math.ceil(c.length * 1.3) + 2); } catch (e) { } }
     for (let i = 0; i < 300; i++) physics(1 / 120);
   } finally { loading = false; }
   DECK.blending = null; ensureChain(); ensureFX(); deckRestore(); condRebase(); send({ t: 'param', id: 'limit', k: 'relearn', v: Math.random() }); COND.on = modById.cond.v('on') > 0.5; COND.hold = modById.cond.v('hold') > 0.5;
   autosave();
 }
-function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
+function loadFactory(name) { if (!FACTORY[name]) { for (const c of [...cables]) removeCable(c); for (const m of modules) if (m.id !== 'radio') for (const k in m.knobs) m.knobs[k].set(m.knobs[k].defNorm); defaultPatch(); for (let i = 0; i < 300; i++) physics(1 / 120); autosave(); } else loadPatch(FACTORY[name]); toast('Loaded “' + name + '”', true); }
 function autosave() { if (loading) return; clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('nightrack.current.v1', JSON.stringify(serialize())); } catch (e) { } }, 700); }
 function slots() { try { return JSON.parse(localStorage.getItem('nightrack.patches.v1') || '{}'); } catch (e) { return {}; } }
 function setSlots(o) { try { localStorage.setItem('nightrack.patches.v1', JSON.stringify(o)); return true; } catch (e) { toast('This browser won’t let the page save patches.'); return false; } }
@@ -2833,7 +3024,7 @@ function genPatch(style, wild, clean) {
   // polish chain: EQ -> GLUE -> WIDE -> LIMIT -> OUT
   { const dance = style === 'house' || style === 'dnb' || style === 'tinez' || style === 'jazzy' || style === 'lofi', kil = style === 'kiln';
     // mixing side: deck -> BLEND -> KEYS (played live, always heard) -> SWEEP -> ECHO -> PUMP -> SUB, then the polish row
-    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'radio.inL'); con('blend.R', 'radio.inR'); con('radio.L', 'keys.inL'); con('radio.R', 'keys.inR'); con('keys.L', 'warp.inL'); con('keys.R', 'warp.inR'); con('warp.L', 'mangle.inL'); con('warp.R', 'mangle.inR'); con('mangle.L', 'granular.inL'); con('mangle.R', 'granular.inR'); con('granular.L', 'sweep.inL'); con('granular.R', 'sweep.inR'); con('clock.x4', 'euclid.clk');
+    con(fL, 'blend.aL'); con(fR, 'blend.aR'); con('blend.L', 'rx.inL'); con('blend.R', 'rx.inR'); con('rx.L', 'keys.inL'); con('rx.R', 'keys.inR');; con('keys.L', 'warp.inL'); con('keys.R', 'warp.inR'); con('warp.L', 'mangle.inL'); con('warp.R', 'mangle.inR'); con('mangle.L', 'granular.inL'); con('mangle.R', 'granular.inR'); con('granular.L', 'sweep.inL'); con('granular.R', 'sweep.inR'); con('clock.x4', 'euclid.clk');
     con('keys.voct', 'warp.voct'); con('keys.gate', 'warp.gate'); con('clock.x4', 'mangle.clk'); con('sweep.L', 'echo.inL'); con('sweep.R', 'echo.inR');
     con('echo.L', 'pump.inL'); con('echo.R', 'pump.inR'); con('pump.L', 'sub.inL'); con('pump.R', 'sub.inR'); con('sub.L', 'eq.inL'); con('sub.R', 'eq.inR');
     { const kk = C.find(c => c[1] === 'duck.trig'); if (kk) con(kk[0], 'pump.trig'); }
@@ -2899,12 +3090,14 @@ function deckPatch(P, d) { // a patch made for the middle rack, re-aimed at one 
   for (const m in P.knobs) if (base.has(m)) knobs[m + sfx] = P.knobs[m];
   return { cables, knobs };
 }
-const MIXSIDE = ['blend', 'radio', 'keys', 'warp', 'mangle', 'granular', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit', 'out'];
+const MIXSIDE = ['blend', 'rx', 'keys', 'warp', 'mangle', 'granular', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit', 'out'];
 function ensureFX() { // patches from before WARP and MANGLE: put them between KEYS and SWEEP, and let KEYS play WARP
   const find = (o, i) => cables.find(c => c.connected && c.out.module.id + '.' + c.out.id === o && c.inp.module.id + '.' + c.inp.id === i), P = (a, b) => { try { patchCable(a, b); } catch (e) { } };
   const kl = find('keys.L', 'sweep.inL'), kr = find('keys.R', 'sweep.inR'), wl = find('wide.L', 'limit.inL'), wr = find('wide.R', 'limit.inR'), bl_ = find('blend.L', 'keys.inL'), br_ = find('blend.R', 'keys.inR'), ml = find('mangle.L', 'sweep.inL'), mr = find('mangle.R', 'sweep.inR'); const was = loading; loading = true;
   try { if (kl) { removeCable(kl); if (kr) removeCable(kr); P('keys.L', 'warp.inL'); P('keys.R', 'warp.inR'); P('warp.L', 'mangle.inL'); P('warp.R', 'mangle.inR'); P('mangle.L', 'granular.inL'); P('mangle.R', 'granular.inR'); P('granular.L', 'sweep.inL'); P('granular.R', 'sweep.inR'); }
-    if (bl_) { removeCable(bl_); if (br_) removeCable(br_); P('blend.L', 'radio.inL'); P('blend.R', 'radio.inR'); P('radio.L', 'keys.inL'); P('radio.R', 'keys.inR'); }
+    if (bl_) { removeCable(bl_); if (br_) removeCable(br_); P('blend.L', 'rx.inL'); P('blend.R', 'rx.inR'); P('rx.L', 'keys.inL'); P('rx.R', 'keys.inR'); }
+    if (!modById.rx.patched('inL') && !out1(modById.blend.ports.L) && !modById.keys.patched('inL')) { P('blend.L', 'rx.inL'); P('blend.R', 'rx.inR'); P('rx.L', 'keys.inL'); P('rx.R', 'keys.inR'); } // patches from when RADIO sat in the rack
+    radioCords();
     if (ml) { removeCable(ml); if (mr) removeCable(mr); P('mangle.L', 'granular.inL'); P('mangle.R', 'granular.inR'); P('granular.L', 'sweep.inL'); P('granular.R', 'sweep.inR'); }
     if (modById.euclid && !modById.euclid.patched('clk')) P('clock.x4', 'euclid.clk');
     if (wl) { removeCable(wl); if (wr) removeCable(wr); P('wide.L', 'focus.inL'); P('wide.R', 'focus.inR'); P('focus.L', 'limit.inL'); P('focus.R', 'limit.inR'); }
@@ -2921,14 +3114,16 @@ function ensureChain() { // older patches (and the first-visit patch) skip the m
     for (const c of [...cables]) if (c.connected && M.has(c.inp.module.id) && !(c.inp.module.id === 'blend' && c.inp.id[0] === 'b')) removeCable(c);
     const r = mulberry32(5), P = (a, b) => { try { patchCable(a, b, undefined, r() < 0.4 ? 1 : 0); } catch (e) { } };
     P(sL, 'blend.aL'); P(sR, 'blend.aR');
-    const ch = ['blend', 'radio', 'keys', 'warp', 'mangle', 'granular', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
-    P('limit.L', 'out.L'); P('limit.R', 'out.R'); if (kick) P(kick, 'pump.trig');
+    const ch = ['blend', 'rx', 'keys', 'warp', 'mangle', 'granular', 'sweep', 'echo', 'pump', 'sub', 'eq', 'glue', 'wide', 'focus', 'limit']; for (let i = 0; i < ch.length - 1; i++) { P(ch[i] + '.L', ch[i + 1] + '.inL'); P(ch[i] + '.R', ch[i + 1] + '.inR'); }
+    P('limit.L', 'out.L'); P('limit.R', 'out.R'); if (kick) P(kick, 'pump.trig'); radioCords();
     const set = (m, k, v) => modById[m].knobs[k].set(modById[m].knobs[k].toNorm(v)); set('blend', 'lvlA', 0.89); set('blend', 'lvlB', 0.89); set('blend', 'master', 0.9); set('echo', 'mix', 0.08);
     for (let i = 0; i < 200; i++) physics(1 / 120);
   } finally { loading = false; }
   autosave(); return true;
 }
 const out1 = p => p && p.cables.length;
+function radioCords() { // the radio's two cords into RADIO IN (put back on a patch load if they're missing)
+  if (!modById.radio || !modById.rx || modById.rx.patched('radL') || modById.radio.ports.L.cables.length) return; try { patchCable('radio.L', 'rx.radL', '#e6d6ae', 1); patchCable('radio.R', 'rx.radR', '#c9a46a', 1); } catch (e) { } }
 function fillIdle() { // keep the resting deck patched too (asleep, so it costs no sound processing): the next blend goes to it
   if (DECK.blending || !out1(modById.blend.ports.L)) return; const live = DECK.live, to = live === 'A' ? 'B' : 'A';
   const P = deckPatch(genPatch(DECK.style || 'house', RND.mode === 'exp' ? rr(0.5, 1) : 0, RND.mode !== 'exp'), to), oq = modById[live === 'A' ? 'quant' : 'quant_b'], qk = to === 'B' ? 'quant_b' : 'quant';
@@ -3632,14 +3827,14 @@ canvas.addEventListener('pointerup', e => {
 const PARTS = { sel: null, cam: (() => { try { return localStorage.getItem('nightrack.partsCam') !== '0'; } catch (e) { return true; } })(), drag: null };
 const realMod = m => !/^bk/.test(m.id) && m.def && ((m.def.knobs || []).length || (m.def.jacks || []).length);
 function partRows() { // [{k, name, rows: [[mod, ...], ...]}] in rack order, top row first, left to right
-  const G = [['M', 'DECK A · MIDDLE RACK'], ['R', 'MIXING + PLAY · RIGHT RACK'], ['L', 'DECK B · LEFT RACK']].map(([k, name]) => ({ k, name, rows: new Map() }));
+  const G = [['M', 'DECK A · MIDDLE RACK'], ['R', 'MIXING + PLAY · RIGHT RACK'], ['L', 'DECK B · LEFT RACK'], ['RADIO', 'THE RADIO · BY THE TV']].map(([k, name]) => ({ k, name, rows: new Map() }));
   for (const m of modules) { if (!realMod(m)) continue; const g = G.find(g => g.k === (m.sec ? m.sec.k : 'M')); if (!g) continue; const y = Math.round(m.y0 * 10); if (!g.rows.has(y)) g.rows.set(y, []); g.rows.get(y).push(m); }
   return G.map(g => ({ ...g, rows: [...g.rows.entries()].sort((a, b) => b[0] - a[0]).map(([, r]) => r.sort((a, b) => a.x0 - b.x0)) }));
 }
 function partOrder() { return partRows().flatMap(g => g.rows.flat()); }
 function flyToMod(m) { // frame the module in the part of the screen the PARTS panel leaves free (left of it on wide screens, above it on phones)
   const el = document.getElementById('parts'), open = el && !el.classList.contains('hide'), q = m.sec ? m.sec.q : QI;
-  const dist = Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1), vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
+  const dist = m.prop ? Math.max(36, 16 / Math.tan(camera.fov * Math.PI / 360) / Math.min(1, camera.aspect)) : Math.max(20, m.w * 2.6) * (innerWidth < innerHeight ? 1.8 : 1), vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
   let dx = 0, dy = 0; if (open) { if (el.offsetWidth < innerWidth * 0.7) dx = vw * (el.offsetWidth + 20) / innerWidth / 2; else dy = -vh * (el.offsetHeight + 10) / innerHeight / 2; }
   const c = modPt(m, m.w / 2, U3 / 2, 0), off = new THREE.Vector3(dx, dy, 0).applyQuaternion(q), t = c.clone().add(off);
   flyTo(t.clone().add(new THREE.Vector3(0, 0.5, dist).applyQuaternion(q)), t); }
@@ -3687,7 +3882,7 @@ setInterval(refreshParts, 250);
 document.querySelectorAll('#pCam button').forEach(b => b.onclick = () => partsCam(b.dataset.c === '1')); partsCam(PARTS.cam);
 function toggleRadio() { const el = document.getElementById('radio'), open = el.classList.contains('hide'); if (open) fxChips(); PANELS.forEach(id => { if (id !== 'radio') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderRadio(); }
 document.getElementById('bRadio').onclick = toggleRadio;
-Object.assign(window, { RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]) });
+Object.assign(window, { RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
 document.getElementById('rStop').onclick = () => radioStop();
 document.getElementById('rJam').onclick = () => jamToggle(); document.getElementById('rGrab').onclick = () => grabIt('gran'); document.getElementById('rGrabD').onclick = () => grabIt('drum');
 document.getElementById('rRemix').onclick = radioRemix; document.getElementById('rUnmix').onclick = radioClean;
@@ -3696,7 +3891,7 @@ document.querySelectorAll('#rFx button').forEach(b => b.onclick = () => radioFx(
 document.querySelectorAll('#rDance button').forEach(b => b.onclick = () => radioDance(b.dataset.v)); radioDance(RADIO.dance, true);
 document.getElementById('rShow').onclick = () => { document.getElementById('radio').classList.add('hide'); flyToMod(modById.radio); };
 document.querySelectorAll('#rDial button[data-m]').forEach(b => b.onclick = () => dialSet(+b.dataset.m)); document.getElementById('rAny').onclick = e => { DIAL.any = !DIAL.any; e.target.classList.toggle('cur', DIAL.any); }; dialSet(0);
-document.getElementById('rFavs').onclick = () => { RADIO.genre = 'fav'; radioStatus(RADIO.favs.length ? RADIO.favs.length + ' favourite stations.' : 'No favourites yet: tap ☆ next to a station.'); renderRadio(); };
+document.getElementById('rFavs').onclick = () => { RADIO.genre = 'fav'; radioQuiet('band', 1); radioStatus(RADIO.favs.length ? RADIO.favs.length + ' favourite stations.' : 'No favourites yet: tap ☆ next to a station.'); renderRadio(); };
 document.getElementById('rSurprise').onclick = async () => { await radioGenre(Math.floor(Math.random() * RGENRES.length)); const L = RADIO.list; if (L.length) radioPlay(L[Math.floor(Math.random() * Math.min(L.length, 60))]); };
 function toggleParts() { const el = document.getElementById('parts'), open = el.classList.contains('hide'); PANELS.forEach(id => { if (id !== 'parts') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderParts(); }
 document.getElementById('bParts').onclick = toggleParts;
@@ -3771,6 +3966,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // ================================================================ module descriptions, guide, hide UI
 const DESC = {
+  radio: 'The radio: live stations from around the world. BAND picks the kind, TUNING moves between stations, SEEK searches. Its cords carry the station to RADIO IN on the rack.', rx: 'RADIO IN: the radio\'s cords land here. Unplug them and the rack can\'t hear the station.',
   groove: 'Drum pattern generator. Pick a STYLE (house, deep, tech, garage, disco, breaks, DnB, dusty), then turn the density knobs to add or remove hits. Feed it CLOCK ×4.',
   perc: 'Snare, rim, shaker and tom. Trigger them from GROOVE or TRIG SEQ.', stab: 'Chord synth for deep-house stabs and pads: each trigger plays a whole chord through its own filter. V/OCT sets the root.',
   bass: 'Mono bass voice: sub, saw, square or reese (two detuned saws). TRIG plucks the filter, GLIDE slides between notes.', sampler: 'Drum sampler: six one-shot slots (kick, clap, snare, hat, open hat, perc) playing real recorded drum machines. Turn KIT or open KITS in the menu to pick a 909, 808, 707 or other kit, load your own sounds and save your own kits. TUNE, DECAY and LEVEL per slot; the hat chokes the open hat.', keys: 'Play it yourself: press KEYS (or K) for touch keys, type on a computer keyboard, or plug in a MIDI keyboard (Chrome on a computer). Has its own electric piano mixed into IN L/R, plus V/OCT, GATE, VELOCITY and MOD WHEEL outputs to play any voice.', glue: 'Bus compressor: squashes peaks so the whole mix sounds tight and glued. THRESH and RATIO set how hard, ATTACK/RELEASE how it breathes, MAKEUP brings the level back. MIX blends in the untouched sound (parallel compression). KEY takes a sidechain signal.', eq: 'Equalizer: HI-PASS clears sub rumble, LOW and HIGH are shelves, MID sweeps and boosts or cuts a band. Cut mud around 300 Hz, add a little air up top.', wide: 'Stereo widener: WIDTH spreads the sides, BASS MONO keeps the low end centered and punchy, CHORUS adds a shimmering ensemble.', limit: 'Final limiter: DRIVE pushes the mix louder, CEILING stops it clipping, AIR adds a little sparkle. Put this last, right before OUT.', mbira: 'Real kalimba or marimba notes (recorded, public domain). Plays the note at V/OCT each time TRIG fires; four notes can ring at once. OCTAVE shifts, DECAY shortens.', field: 'Field recording: a looping nature sound (birds, forest, rain, river, stream, waves, wind chimes). TONE darkens it, WIDTH spreads it, LEVEL CV can swell it with an LFO.', tape: 'Tape machine: wow and flutter wobble the pitch, DRIVE saturates, AGE darkens, HISS and DUST add noise. Put it last for a warm, worn sound.',
@@ -3844,7 +4040,7 @@ async function main() {
   buildPlants();
   applySettings(false);
   let restored = false; try { const P = JSON.parse(localStorage.getItem('nightrack.current.v1') || 'null'); if (P && Array.isArray(P.cables)) { loadPatch(P); restored = true; } } catch (e) { }
-  if (!restored) defaultPatch();
+  if (!restored) defaultPatch(); radioCords();
   for (let i = 0; i < 480; i++) physics(1 / 120);
   requestAnimationFrame(frame);
 }
