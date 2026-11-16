@@ -1391,25 +1391,45 @@ class Focus extends DSP {
 // talk shows arrive at very different levels), with TONE (low-pass) and WIDTH. When the page can only play a station directly
 // (the station doesn't allow processing), LIVE is off here and the sound bypasses the rack.
 class Radio extends DSP {
-  static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
-  constructor(e) { super(e); this.g = 1; this.ms = 0; this.lp = [0, 0, 0, 0]; this.rk = 1; this.ef = 0; this.es = 0; }
+  static IN = ['inL', 'inR']; static OUT = ['L', 'R', 'sigL', 'sigR', 'env', 'trig'];
+  constructor(e) { super(e); const sr = e.sr; this.g = 1; this.ms = 0; this.lp = [0, 0, 0, 0]; this.rk = 1; this.ef = 0; this.es = 0; this.tg = 0;
+    this.RN = Math.round(sr * 6); this.rb = [new Float32Array(this.RN), new Float32Array(this.RN)]; this.rw = 0; this.gv = -1;          // the last 6 s, for GRAB
+    this.FR = 512; this.fa = 0; this.fc = 0; this.pe = 0; this.nov = new Float32Array(700); this.ni = 0; this.nf = 0; this.bpm = 0; this.conf = 0; this.next = -1; this.per = 0; // beat tracking
+    this.st = { a: 0, ph: 0, sw: 0, n1: 0, n2: 0 }; }
+  track() { // onset curve = rises in the peak-follower envelope (raw frame energy beats against low bass notes and fakes onsets). Tempo by autocorrelating the onset curve (last ~8 s), then the beat phase that lines up best
+    const N = this.nov.length, F = this.FR / this.sr, nv = k => this.nov[(this.ni - 1 - k + N * 2) % N]; let best = 0, bl = 0, sum = 0;
+    for (let k = 0; k < N; k++) sum += nv(k); const mean = sum / N + 1e-9;
+    const rs = []; for (let bpm = 70; bpm <= 180; bpm += 0.5) { const l = 60 / bpm / F; let r = 0; for (let k = 0; k < N - l * 2; k++) { const a = l * 1 | 0, f = l - a; r += nv(k) * (nv(k + a) * (1 - f) + nv(k + a + 1) * f); }
+      r *= 1 + 0.15 * Math.exp(-Math.pow((bpm - 122) / 30, 2)); rs.push(r); if (r > best) { best = r; bl = l; this.bpm = bpm; } }
+    const prev = this.lastBpm || 0; this.lastBpm = this.bpm; this.stable = Math.abs(this.bpm - prev) <= 1.5 ? Math.min(3, (this.stable || 0) + 1) : 0; this.conf = this.stable / 3; this.per = bl * this.FR; // a real beat gives the same tempo every time; talk doesn't
+    let bp = 0, bs = -1; for (let ph = 0; ph < bl; ph += 0.5) { let s2 = 0; for (let k = ph; k < N; k += bl) s2 += nv(Math.round(k)); if (s2 > bs) { bs = s2; bp = ph; } }
+    this.next = Math.round((bl - (bp % bl) - 1.5) * this.FR) - this.fc; while (this.next < 0) this.next += this.per; } // 1.5 frames early: the onset curve lags the actual hit
   process(n) {
-    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R, X = this.e.ext, lvl = P.lvl ?? 0.7;
-    // RACK: while a station plays, the rack's own music can fade out (SOLO) and come back when the radio stops
-    const rkT = (P.solo ?? 1) > 0.5 && P.playing ? 0 : 1, kr = 1 / (1.5 * sr), on = X && X[0] && P.live && lvl >= 1e-3;
+    const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, O = this.out, X = this.e.ext, lvl = P.lvl ?? 0.7, route = (P.route ?? 0) | 0;
+    const rkT = P.playing ? ((P.solo ?? 1) > 0.5 && !P.jam ? 0 : P.jam ? 0.7 : 1) : 1, kr = 1 / (1.5 * sr), on = X && X[0] && P.live;
     const xl = on ? X[0] : null, xr = on ? (X[1] || X[0]) : null, kt = 1 - Math.exp(-TAU * Math.min(0.45 * sr, 700 + Math.pow(P.tone ?? 1, 2) * 19000) / sr), w = P.width ?? 1, L = this.lp;
-    const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.12 * sr)), ks = 1 - Math.exp(-1 / (0.6 * sr)); let pk = 0, onset = 0;
+    const ka = 1 - Math.exp(-1 / (0.005 * sr)), kd = 1 - Math.exp(-1 / (0.12 * sr)), ks = 1 - Math.exp(-1 / (0.6 * sr)), S = this.st, stat = P.static ?? 0; let pk = 0, onset = 0;
     for (let i = 0; i < n; i++) {
       this.rk += Math.sign(rkT - this.rk) * Math.min(kr, Math.abs(rkT - this.rk)); const rg = this.rk * this.rk;
       let a = 0, b = 0;
       if (on) { let l = xl[i] * 5, r = xr[i] * 5; const m = (l + r) / 2, s = (l - r) / 2 * w; l = m + s; r = m - s;
         this.ms += 0.00004 * ((l * l + r * r) / 2 - this.ms); if (this.ms > 1e-5) { const gt = Math.min(6, Math.max(0.25, Math.sqrt(2.5 / this.ms))); this.g += (gt - this.g) * 0.00003; }
-        L[0] += kt * (l - L[0]); L[1] += kt * (L[0] - L[1]); L[2] += kt * (r - L[2]); L[3] += kt * (L[2] - L[3]); a = L[1] * this.g * lvl; b = L[3] * this.g * lvl;
-        // a fast and a slow envelope: words and beats show up as the fast one jumping above the slow one
-        const x = Math.abs(m) * this.g; this.ef += (x > this.ef ? ka : kd) * (x - this.ef); this.es += ks * (x - this.es); onset = Math.max(onset, this.ef / (this.es + 0.05) - 1); pk = Math.max(pk, Math.abs(a)); }
-      OL[i] = IL[i] * rg + a; OR[i] = IR[i] * rg + b;
+        L[0] += kt * (l - L[0]); L[1] += kt * (L[0] - L[1]); L[2] += kt * (r - L[2]); L[3] += kt * (L[2] - L[3]); a = L[1] * this.g; b = L[3] * this.g;
+        const x = Math.abs(m) * this.g; this.ef += (x > this.ef ? ka : kd) * (x - this.ef); this.es += ks * (x - this.es); const o = this.ef / (this.es + 0.05) - 1; onset = Math.max(onset, o);
+        if (o > 0.6 && this.tg <= -2000) this.tg = Math.round(0.01 * sr); this.tg--;
+        this.rb[0][this.rw] = a; this.rb[1][this.rw] = b; this.rw = (this.rw + 1) % this.RN;
+        this.fa += m * m; if (++this.fc >= this.FR) { const en = Math.log(this.ef * this.ef + 1e-6); this.nov[this.ni] = Math.max(0, en - this.pe); this.pe = en; this.ni = (this.ni + 1) % this.nov.length; this.fa = 0; this.fc = 0; if (++this.nf % 172 === 0) this.track(); } }
+      // JAM: on each beat the station gives, pull the rack's clock toward it (a gentle phase lock)
+      if (this.next >= 0 && --this.next <= 0) { this.next = this.per > 0 ? this.per : -1; this.L.beat = 1;
+        if (P.jam && this.conf > 0.25) { const C = this.e.mods.get('clock'); if (C) { const pos = (C.c % 4) + C.ph, err = pos < 2 ? -pos : 4 - pos, adj = err * 0.35; C.ph += adj; while (C.ph < 0) { C.ph += 1; C.c = Math.max(0, C.c - 1); } while (C.ph >= 1) { C.ph -= 1; C.c++; } } } }
+      // STATIC between stations: hiss and a whistle sliding past as if turning a dial
+      if (stat > 0.001 || S.a > 0.001) { S.a += ((stat > 0.5 ? 1 : 0) - S.a) * 0.0006; S.sw += 0.00002; const nz = Math.random() * 2 - 1; S.n1 += 0.3 * (nz - S.n1); S.n2 += 0.05 * (S.n1 - S.n2);
+        S.ph += (900 + 1400 * Math.sin(S.sw * 3)) / sr; const st = ((S.n1 - S.n2) * 1.4 + Math.sin(TAU * S.ph) * 0.08 * (0.5 + 0.5 * Math.sin(S.sw * 11))) * S.a * 1.6; a += st; b += st; }
+      O.sigL[i] = a; O.sigR[i] = b; O.env[i] = Math.min(10, this.ef * 3); O.trig[i] = this.tg > 0 ? 10 : 0;
+      const g2 = route === 1 ? 0 : lvl; O.L[i] = IL[i] * rg + a * g2; O.R[i] = IR[i] * rg + b * g2; pk = Math.max(pk, Math.abs(a * g2));
     }
-    this.L.led = Math.min(1, pk / 4); if (on) { this.L.env = Math.min(1, this.ef / 2); this.L.on = Math.max(0, Math.min(1, onset)); }
+    if (P.grab != null && P.grab !== this.gv) { if (this.gv !== -1 || P.grab > 0) { const k = Math.round(sr * Math.min(6, P.grabLen || 2)), o2 = new Float32Array(k); for (let j = 0; j < k; j++) { const q = (this.rw - k + j + this.RN) % this.RN; o2[j] = (this.rb[0][q] + this.rb[1][q]) * 0.5; } this.L.grab = o2; this.L.sr = sr; } this.gv = P.grab; }
+    this.L.led = Math.min(1, pk / 4); if (on) { this.L.env = Math.min(1, this.ef / 2); this.L.on = Math.max(0, Math.min(1, onset)); this.L.bpm = this.bpm; this.L.conf = this.conf; }
   }
 }
 
@@ -1446,6 +1466,7 @@ class Recorder extends DSP {
 class Granular extends DSP {
   static IN = ['inL', 'inR']; static OUT = ['L', 'R'];
   constructor(e) { super(e); this.N = Math.round(e.sr * 4); this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); this.w = 0; this.G = []; this.next = 0; }
+  load(d) { const N = this.N, n = Math.min(N, d.length); this.bL.fill(0); this.bR.fill(0); for (let i = 0; i < n; i++) { this.bL[i] = this.bR[i] = d[d.length - n + i]; } this.w = n % N; this.G.length = 0; } // a grab from the radio: fills the buffer, the page freezes it
   process(n) {
     const P = this.p, sr = this.sr, IL = this.in.inL, IR = this.has.inR ? this.in.inR : this.in.inL, OL = this.out.L, OR = this.out.R, N = this.N, mix = P.mix ?? 0, frz = (P.freeze ?? 0) > 0.5;
     if (mix < 1e-3) { OL.set(IL); OR.set(IR); if (!frz) for (let i = 0; i < n; i++) { this.bL[this.w] = IL[i]; this.bR[this.w] = IR[i]; this.w = (this.w + 1) % N; } this.G.length = 0; return; }
@@ -1488,6 +1509,7 @@ export class Engine {
     else if (m.t === 'param') { const d = this.mods.get(m.id); if (d) { d.p[m.k] = m.v; d.onParam(m.k, m.v); } }
     else if (m.t === 'wave') { const d = this.mods.get(m.id); if (d && d.D) d.D.set(m.data); }
     else if (m.t === 'smpclear') { const d = this.mods.get(m.id); if (d && d.S) d.S = []; }
+    else if (m.t === 'gload') { const d = this.mods.get(m.id); if (d && d.load) d.load(m.data); }
     else if (m.t === 'smp') { const d = this.mods.get(m.id); if (d && d.setSample) d.setSample(m.slot, m.data, m.root); }
     else if (m.t === 'hit') { const d = this.mods.get(m.id); if (d && d.hit) d.hit(m.slot); }
     else if (m.t === 'note') { const d = this.mods.get(m.id); if (d && d.note) d.note(m.n, m.v); }
