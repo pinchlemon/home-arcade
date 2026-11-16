@@ -1407,7 +1407,35 @@ class Radio extends DSP {
   }
 }
 
-const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio };
+// METER: listens to the final output (after OUTPUT's volume) and shows loudness the way streaming sites measure it (LUFS, K-weighted):
+// momentary (0.4 s), short-term (3 s), integrated since RESET (gated like BS.1770), and the peak.
+class Meter extends DSP {
+  static IN = []; static OUT = [];
+  constructor(e) { super(e); const sr = e.sr; this.f = [0, 1].map(() => ({ h1: 0, h2: 0, lp: 0 })); this.ka = 1 - Math.exp(-TAU * 38 / sr); this.kl = 1 - Math.exp(-TAU * 1500 / sr);
+    this.blk = Math.round(0.1 * sr); this.acc = 0; this.cnt = 0; this.B = []; this.I = []; this.pk = 0; this.rs = -1; this.tick = 0; }
+  process(n) {
+    const P = this.p, L = this.e.oL, R = this.e.oR; if ((P.reset ?? 0) !== this.rs) { this.rs = P.reset ?? 0; this.I = []; this.pk = 0; }
+    for (let i = 0; i < n; i++) { let s = 0; for (let c = 0; c < 2; c++) { const F = this.f[c]; let v = c ? R[i] : L[i]; const a = Math.abs(v); if (a > this.pk) this.pk = a;
+        F.h1 += this.ka * (v - F.h1); v -= F.h1; F.h2 += this.ka * (v - F.h2); v -= F.h2; F.lp += this.kl * (v - F.lp); v += 0.58 * (v - F.lp); s += v * v; }
+      this.acc += s; if (++this.cnt >= this.blk) { this.B.push(this.acc / this.cnt); if (this.B.length > 30) this.B.shift(); this.acc = 0; this.cnt = 0;
+        const lu = a => -0.691 + 10 * Math.log10(a + 1e-12), mean = k => { const b = this.B.slice(-k); return b.reduce((x, y) => x + y, 0) / b.length; };
+        const m = mean(4); if (this.B.length >= 4 && lu(m) > -70) this.I.push(m); if (this.I.length > 36000) this.I.shift();
+        let ig = -99; if (this.I.length) { const g0 = this.I.reduce((x, y) => x + y, 0) / this.I.length, rel = this.I.filter(v => lu(v) > lu(g0) - 10); if (rel.length) ig = lu(rel.reduce((x, y) => x + y, 0) / rel.length); }
+        this.L.m = lu(m); this.L.s = lu(mean(30)); this.L.i = ig; this.L.pk = 20 * Math.log10(this.pk + 1e-9); } }
+  }
+}
+// RECORDER: always keeps the last two minutes of the final output (16-bit). SAVE hands the last LENGTH seconds to the page as a WAV.
+class Recorder extends DSP {
+  static IN = []; static OUT = [];
+  constructor(e) { super(e); this.N = Math.round(e.sr * 120); this.b = new Int16Array(this.N * 2); this.w = 0; this.full = false; this.sv = -1; }
+  process(n) {
+    const L = this.e.oL, R = this.e.oR, b = this.b; for (let i = 0; i < n; i++) { const k = this.w * 2; b[k] = Math.max(-32767, Math.min(32767, L[i] * 32767)); b[k + 1] = Math.max(-32767, Math.min(32767, R[i] * 32767)); if (++this.w >= this.N) { this.w = 0; this.full = true; } }
+    const P = this.p; if (P.save != null && P.save !== this.sv) { if (this.sv !== -1 || P.save > 0) { const secs = [30, 60, 120][P.len ?? 1] || 60, want = Math.min(Math.round(secs * this.sr), this.full ? this.N : this.w), out = new Int16Array(want * 2);
+        for (let j = 0; j < want; j++) { const src = ((this.w - want + j) % this.N + this.N) % this.N; out[j * 2] = b[src * 2]; out[j * 2 + 1] = b[src * 2 + 1]; } this.L.clip = out; this.L.sr = this.sr; } this.sv = P.save; }
+  }
+}
+
+const DSPS = { clock: Clock, random: Random, quant: Quant, vcoA: VCO, vcoB: VCO, lfo: LFO, mixer: Mixer, noise: Noise, scope: Scope, seq: Seq, vcfA: VCF, vcfB: VCF, env: Env, vca: VCA, delay: Delay, reverb: Reverb, output: Output, macro: Macro, texture: Texture, folder: Folder, lpg: LPG, turing: Turing, atten: Atten, trigseq: TrigSeq, drums: Drums, mix6: Mix6, duck: Duck, groove: Groove, perc: Perc, stab: Stab, bass: Bass, tape: Tape, glue: Glue, eq: EQ, wide: Wide, limit: Limit, keys: Keys, sampler: Sampler, mbira: Mbira, field: Field, blend: Blend, sweep: Sweep, echo: Echo, pump: Duck, sub: Sub, harm: Harmony, band: Band, detail: Detail, nature: Nature, swell: Swell, warp: Warp, mangle: Mangle, chaos: Chaos, focus: Focus, radio: Radio, meter: Meter, recorder: Recorder };
 
 export class Engine {
   constructor(sr, N = 128) { this.sr = sr; this.N = N; this.zero = new Float32Array(N); this.oL = new Float32Array(N); this.oR = new Float32Array(N); this.oLv = new Float32Array(N); this.mods = new Map(); this.cables = new Map(); this.order = []; this.dirty = true; }
