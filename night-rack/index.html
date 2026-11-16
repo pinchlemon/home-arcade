@@ -222,6 +222,7 @@ body.cam #cambar{display:flex}
   <div class="sec" style="margin-top:10px">TV <span id="tvCh" class="muted">OFF</span></div>
   <div class="muted" id="tvStatus">The top TV on the right plays public-domain videos from Wikimedia Commons: noir, mystery, cartoons, deep sea, nature, sports. Press POWER on it, or here.</div>
   <div class="chips"><button id="tvPow">TV POWER</button><button id="tvPrev">◀ CH</button><button id="tvNext">CH ▶</button><button id="tvTest">TEST STREAMING</button><button id="tvShow">SHOW ME THE TV</button></div>
+  <div class="chips" id="tvFade"><button data-v="1">RACK FADES WHILE TV PLAYS</button><button data-v="0">RACK KEEPS PLAYING</button></div>
   <pre id="tvDiag" class="muted" style="white-space:pre-wrap;font:11px/1.45 ui-monospace,monospace;margin:4px 0 0"></pre>
   <div class="muted" style="margin-top:8px">For listening and ideas at home. Don't rebroadcast stations on a stream.</div>
 </div>
@@ -2291,7 +2292,7 @@ function tvSet(kind, w, h, mode, film) { // pvm: grey pro monitor with a control
   const fr = new THREE.Mesh(new THREE.ExtrudeGeometry(frame, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.25, bevelSegments: 2, curveSegments: 8 }), dark); fr.position.set(0, sy, -2.3); g.add(fr);
   const scr = crtScreen(sw, sh, mode); scr.position.set(0, sy, -1.9); g.add(scr);
   // control strip: one layout drives both the printed labels and the real buttons/knobs, so they line up
-  const pw = w * 0.92, ph = strip * 0.86, cy = strip * 0.36, CTRL = film ? [[0.06, 'k', 'CHANNEL'], [0.16, 'k', 'VOLUME'], [0.25, 'b', 'PREV'], [0.33, 'b', 'NEXT'], [0.46, 'j', 'OUT L'], [0.55, 'j', 'OUT R'], [0.64, 'j', 'ENV'], [0.73, 'j', 'LIGHT'], [0.89, 'p', 'POWER']] : home ? [[0.07, 'b', 'MENU'], [0.16, 'b', 'TV/AV'], [0.25, 'b', 'VOL'], [0.34, 'b', 'CH'], [0.89, 'p', 'POWER']]
+  const pw = w * 0.92, ph = strip * 0.86, cy = strip * 0.36, CTRL = film ? [[0.06, 'k', 'CHANNEL'], [0.155, 'k', 'VOLUME'], [0.24, 'b', 'PREV'], [0.31, 'b', 'NEXT'], [0.38, 'b', 'FADE'], [0.48, 'j', 'OUT L'], [0.565, 'j', 'OUT R'], [0.65, 'j', 'ENV'], [0.735, 'j', 'LIGHT'], [0.89, 'p', 'POWER']] : home ? [[0.07, 'b', 'MENU'], [0.16, 'b', 'TV/AV'], [0.25, 'b', 'VOL'], [0.34, 'b', 'CH'], [0.89, 'p', 'POWER']]
     : kind === 'pvm' ? [[0.06, 'b', 'LINE A'], [0.15, 'b', 'LINE B'], [0.24, 'b', 'RGB'], [0.33, 'b', 'UNDER'], [0.42, 'b', 'H/V'], [0.51, 'b', 'BLUE'], [0.65, 'k', 'CHROMA'], [0.78, 'k', 'BRIGHT'], [0.91, 'p', 'POWER']]
     : [[0.08, 'b', 'A'], [0.17, 'b', 'B'], [0.26, 'b', 'MENU'], [0.5, 'k', 'CONTR'], [0.66, 'k', 'BRIGHT'], [0.88, 'p', 'POWER']];
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ roughness: 0.6, map: labelTex(pw, ph, (c, W, H) => {
@@ -2625,13 +2626,13 @@ async function tvFind(ch) { // the channel's programmes, from Commons
   C.found = pages.length; C.pd = pd; C.list = out.slice(0, 30); return C.list; }
 function tvScreen(on) { const u = TVS.scr && TVS.scr.material.uniforms; if (!u) return; if (on && TVS.tex) { u.uMap.value = TVS.tex; u.uZoom.value.set(1, 1, 0, 0); u.uMode.value = 1; u.uGray.value = TV_CH[TVS.i] ? TV_CH[TVS.i][2] : 0; } else { u.uMode.value = 0; u.uGray.value = 0; } }
 function tvKill() { if (TVS.el) { try { TVS.el.pause(); TVS.el.removeAttribute('src'); TVS.el.load(); } catch (e) { } } }
-function tvOff() { TVS.tok++; tvKill(); TVS.mode = 'off'; tvScreen(false); send({ t: 'param', id: 'tv', k: 'live', v: 0 }); tvStatus('TV off.'); tvDraw(); }
+function tvOff() { TVS.tok++; tvKill(); TVS.mode = 'off'; tvScreen(false); send({ t: 'param', id: 'tv', k: 'live', v: 0 }); send({ t: 'param', id: 'tv', k: 'playing', v: 0 }); tvOSD(null); tvStatus('TV off.'); tvDraw(); }
 function tvElement() { if (TVS.el) return TVS.el; const v = document.createElement('video'); v.crossOrigin = 'anonymous'; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; TVS.el = v;
   TVS.tex = new THREE.VideoTexture(v); TVS.tex.colorSpace = THREE.SRGBColorSpace; TVS.tex.generateMipmaps = false; TVS.tex.minFilter = THREE.LinearFilter;
   if (AC && ENG && ENG.kind === 'worklet') { try { TVS.inNode = AC.createGain(); TVS.inNode.connect(ENG.node, 0, 1); AC.createMediaElementSource(v).connect(TVS.inNode); TVS.audio = true; } catch (e) { TVS.audio = false; } }
   v.addEventListener('ended', () => { if (TVS.mode === 'on') tvProg(TVS.tok, TVS.k + 1, 0); }); return v; }
 async function tvPlay(ch) { // tune to a channel: static while it connects, then whatever it is "broadcasting" right now
-  const tok = ++TVS.tok, n = TV_CH.length; TVS.i = ((ch % n) + n) % n; TVS.mode = 'loading'; tvScreen(false); tvQuiet('chan', TVS.i); tvDraw();
+  const tok = ++TVS.tok, n = TV_CH.length; TVS.i = ((ch % n) + n) % n; TVS.mode = 'loading'; tvScreen(false); tvQuiet('chan', TVS.i); tvDraw(); tvOSD('TUNING…');
   if (!AC || AC.state !== 'running') { try { await powerOn(); } catch (e) { } }
   tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': finding programmes…'); let L;
   try { L = await tvFind(TVS.i); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('Could not reach Wikimedia Commons (' + e.message + ').'); tvDraw(); return; }
@@ -2646,8 +2647,17 @@ async function tvProg(tok, k, at, tries = 0) { const L = TVS.chans[TVS.i] && TVS
   if (ok !== 'ok') { if (tries < 3) { tvProg(tok, k + 1, 0, tries + 1); return; } TVS.mode = 'blocked'; tvStatus('CH ' + (TVS.i + 2) + ': programmes would not load (' + ok + '). Press TEST STREAMING.'); tvDraw(); return; }
   if (at && isFinite(v.duration) && at < v.duration - 10) { try { v.currentTime = at; } catch (e) { } }
   try { await v.play(); } catch (e) { if (tok !== TVS.tok) return; TVS.mode = 'blocked'; tvStatus('It loaded but would not play (' + e.message + '). Tap POWER again.'); tvDraw(); return; }
-  if (tok !== TVS.tok) return; TVS.mode = 'on'; tvScreen(true); send({ t: 'param', id: 'tv', k: 'live', v: TVS.audio ? 1 : 0 });
+  if (tok !== TVS.tok) return; TVS.mode = 'on'; tvScreen(true); send({ t: 'param', id: 'tv', k: 'live', v: TVS.audio ? 1 : 0 }); send({ t: 'param', id: 'tv', k: 'playing', v: 1 }); tvOSD(it.title);
   tvStatus('CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0] + ': ' + it.title + ' · from Wikimedia Commons (public domain).'); tvDraw(); }
+function tvOSD(sub) { // the on-screen channel banner: shows on a change, then fades away
+  const sc = TVS.scr; if (!sc) return; if (!TVS.osd) { const c = document.createElement('canvas'); c.width = 512; c.height = 384; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const p = sc.geometry.parameters;
+    TVS.osd = new THREE.Mesh(new THREE.PlaneGeometry(p.width * 0.94, p.height * 0.94), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0, depthWrite: false, toneMapped: false })); TVS.osd.position.z = Math.min(p.width, p.height) * 0.04 + 0.25; TVS.osd.renderOrder = 3; sc.add(TVS.osd); TVS.osdCv = c; }
+  const c = TVS.osdCv, g = c.getContext('2d'); g.clearRect(0, 0, 512, 384); if (sub == null) { TVS.osdT = 0; return; }
+  g.font = '700 54px ui-monospace, "Courier New", monospace'; g.textBaseline = 'top'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.75)'; g.fillStyle = '#7dff9a';
+  const ch = 'CH ' + String(TVS.i + 2).padStart(2, '0'); g.strokeText(ch, 30, 26); g.fillText(ch, 30, 26); g.font = '700 30px ui-monospace, "Courier New", monospace'; g.strokeText(TV_CH[TVS.i][0], 32, 88); g.fillText(TV_CH[TVS.i][0], 32, 88);
+  let t = String(sub).toUpperCase(), fs = 24; g.font = `600 ${fs}px ui-monospace, "Courier New", monospace`; while (g.measureText(t).width > 450 && t.length > 4) t = t.slice(0, -2) + '…'; g.fillStyle = '#e8ffe8'; g.strokeText(t, 32, 318); g.fillText(t, 32, 318);
+  TVS.osd.material.map.needsUpdate = true; TVS.osdT = performance.now(); }
+function tvFadeChips() { const v = modById.tv ? modById.tv.v('fade') : 1; document.querySelectorAll('#tvFade button').forEach(b => b.classList.toggle('cur', +b.dataset.v === v)); }
 function tvQuiet(id, n) { const kn = modById.tv && modById.tv.knobs[id]; if (!kn) return; TVS.quiet = true; try { kn.set(kn.toNorm(n)); } finally { TVS.quiet = false; } }
 function tvDraw() { const el = document.getElementById('tvCh'); if (!el) return; el.textContent = TVS.mode === 'off' ? 'OFF' : 'CH ' + (TVS.i + 2) + ' · ' + TV_CH[TVS.i][0]; }
 async function tvTest() { // a step-by-step check that she can read out on the phone
@@ -2665,12 +2675,12 @@ setInterval(() => { // LIGHT: how bright the picture is, for the rack
   if (TVS.mode !== 'on' || !TVS.el) return; if (!TVS.lumaCv) { TVS.lumaCv = document.createElement('canvas'); TVS.lumaCv.width = 16; TVS.lumaCv.height = 12; }
   try { const g = TVS.lumaCv.getContext('2d', { willReadFrequently: true }); g.drawImage(TVS.el, 0, 0, 16, 12); const d = g.getImageData(0, 0, 16, 12).data; let s = 0; for (let k = 0; k < d.length; k += 4) s += d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11; send({ t: 'param', id: 'tv', k: 'luma', v: s / (d.length / 4) / 255 }); } catch (e) { } }, 100);
 class TVM extends Mod {
-  knobChanged(id, v) { super.knobChanged(id, v); tvSaveKnobs(); if (loading || TVS.quiet) return;
+  knobChanged(id, v) { super.knobChanged(id, v); if (id === 'fade') tvFadeChips(); tvSaveKnobs(); if (loading || TVS.quiet) return;
     if (id === 'chan') { tvScreen(false); clearTimeout(TVS.chT); TVS.chT = setTimeout(() => { const i = this.v('chan'); if (TVS.mode === 'off' || i !== TVS.i) tvPlay(i); else if (TVS.mode === 'on') tvScreen(true); }, 350); }
     else if (v && TV_MOMENTARY.has(id)) { if (id === 'power') { if (TVS.mode === 'off') tvPlay(TVS.i); else tvOff(); } else if (id === 'next') tvPlay(TVS.i + 1); else if (id === 'prev') tvPlay(TVS.i - 1); setTimeout(() => this.knobs[id].set(0), 160); } }
   visual() { tvVisual(); } idle() { tvVisual(); } }
-function tvVisual() { if (!TVS.set) return; const on = TVS.mode === 'on' || TVS.mode === 'loading'; if (TVS.led) TVS.led.material.color.setHex(TVS.mode === 'off' ? 0x330808 : TVS.mode === 'blocked' ? 0xffa020 : 0xff2a2a);
-  for (const id in TVS.keys) { const k = TVS.keys[id], kn = modById.tv && modById.tv.knobs[id], down = kn && kn.norm > 0.5, z = down ? -0.15 : 0; k.position.z += (z - k.position.z) * 0.4; } }
+function tvVisual() { if (!TVS.set) return; if (TVS.osd) { const a = TVS.osdT ? (performance.now() - TVS.osdT) / 1000 : 99; TVS.osd.material.opacity = a < 3.5 ? 1 : Math.max(0, 1 - (a - 3.5) / 0.8); } const on = TVS.mode === 'on' || TVS.mode === 'loading'; if (TVS.led) TVS.led.material.color.setHex(TVS.mode === 'off' ? 0x330808 : TVS.mode === 'blocked' ? 0xffa020 : 0xff2a2a);
+  for (const id in TVS.keys) { const k = TVS.keys[id], kn = modById.tv && modById.tv.knobs[id], down = id === 'power' ? TVS.mode !== 'off' : kn && kn.norm > 0.5, z = down ? -0.15 : 0; k.position.z += (z - k.position.z) * 0.4; } }
 function tvSaveKnobs() { const m = modById.tv; if (!m) return; const o = {}; for (const k in m.knobs) if (!TV_MOMENTARY.has(k)) o[k] = m.knobs[k].norm; try { localStorage.setItem('nightrack.tvKnobs', JSON.stringify(o)); } catch (e) { } }
 function tvModule() { // turn the top set's control strip into the TV module
   const T = TVS.set; if (!T || !T.ctl) return; const face = T.g, U = U3, sh = T.h / 2 - U / 2; const at = (x, y) => ({ x: x + 12, y: U + sh - y, lx: x, ly: y });
@@ -2678,7 +2688,7 @@ function tvModule() { // turn the top set's control strip into the TV module
   DEFS.tv = { title: 'TV', hp: 30, theme: 'navy', leds: [], labels: [], knobs: [
     K('chan', 0, 0, 'CHANNEL', { ...at(c.CHANNEL.X, c.CHANNEL.cy), size: 'S', min: 0, max: TV_CH.length - 1, step: 1, def: 0, px: 500, fmt: v => 'CH ' + (v + 2) + ' · ' + TV_CH[v][0] }),
     K('lvl', 0, 0, 'VOLUME', { ...at(c.VOLUME.X, c.VOLUME.cy), size: 'S', def: 0.7, fmt: fPct }),
-    key('prev', 'PREV', { name: 'PREVIOUS CHANNEL', fmt: () => '' }), key('next', 'NEXT', { name: 'NEXT CHANNEL', fmt: () => '' }), key('power', 'POWER', { name: 'POWER', fmt: () => TVS.mode === 'off' ? 'OFF' : 'ON' })],
+    key('prev', 'PREV', { name: 'PREVIOUS CHANNEL', fmt: () => '' }), key('next', 'NEXT', { name: 'NEXT CHANNEL', fmt: () => '' }), key('fade', 'FADE', { def: 1, name: 'THE RACK WHILE THE TV PLAYS', fmt: v => v ? 'FADES OUT' : 'KEEPS PLAYING' }), key('power', 'POWER', { name: 'POWER', fmt: () => TVS.mode === 'off' ? 'OFF' : 'ON' })],
     jacks: [J('L', 0, 0, 'OUT L', 'out', 'audio', at(c['OUT L'].X, c['OUT L'].cy)), J('R', 0, 0, 'OUT R', 'out', 'audio', at(c['OUT R'].X, c['OUT R'].cy)), J('env', 0, 0, 'ENV', 'out', 'cv', at(c.ENV.X, c.ENV.cy)), J('light', 0, 0, 'LIGHT', 'out', 'cv', at(c.LIGHT.X, c.LIGHT.cy))] };
   const m = new TVM('tv', 'tv'); modules.push(m); modById.tv = m; m.group = face; m.w = 24; m.x0 = -12; m.y0 = sh; m.prop = true;
   const sec = TVS.sec = { k: 'TV', inner: face, knobGrid: new Map(), plugGrid: new Map(), mw: new THREE.Matrix4(), inv: new THREE.Matrix4(), q: new THREE.Quaternion(), n: new THREE.Vector3() }; m.sec = sec;
@@ -3990,12 +4000,13 @@ function refreshParts(force) { if (document.getElementById('parts').classList.co
   if ((ch || force) && PARTS.sel === 'warp') paintWave(); }
 setInterval(refreshParts, 250);
 document.querySelectorAll('#pCam button').forEach(b => b.onclick = () => partsCam(b.dataset.c === '1')); partsCam(PARTS.cam);
-function toggleRadio() { const el = document.getElementById('radio'), open = el.classList.contains('hide'); if (open) fxChips(); PANELS.forEach(id => { if (id !== 'radio') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderRadio(); }
+function toggleRadio() { const el = document.getElementById('radio'), open = el.classList.contains('hide'); if (open) { fxChips(); tvFadeChips(); } PANELS.forEach(id => { if (id !== 'radio') document.getElementById(id).classList.add('hide'); }); el.classList.toggle('hide', !open); if (open) renderRadio(); }
 document.getElementById('bRadio').onclick = toggleRadio;
-Object.assign(window, { TVS, tvPlay, tvOff, tvTest, TUNE, radioDial, RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
+Object.assign(window, { TVS, tvPlay, tvOff, tvTest, tvOSD, TUNE, radioDial, RADIO, radioStop, radioPlay, fillIdle, LOOP, isPatchedId: id => isPatched(id), JAM, jamToggle, grabIt, radioRemix, radioClean, dialSet, spinDial, DIAL, flyToMod: id => flyToMod(modById[id]), RDO, removeCable, serialize, loadPatch });
 document.getElementById('rStop').onclick = () => radioStop();
 document.getElementById('rJam').onclick = () => jamToggle(); document.getElementById('rGrab').onclick = () => grabIt('gran'); document.getElementById('rGrabD').onclick = () => grabIt('drum');
 document.getElementById('tvPow').onclick = () => { if (TVS.mode === 'off') tvPlay(TVS.i); else tvOff(); }; document.getElementById('tvPrev').onclick = () => tvPlay(TVS.i - 1); document.getElementById('tvNext').onclick = () => tvPlay(TVS.i + 1); document.getElementById('tvTest').onclick = tvTest;
+document.querySelectorAll('#tvFade button').forEach(b => b.onclick = () => { const k = modById.tv.knobs.fade; k.set(+b.dataset.v); }); tvFadeChips();
 document.getElementById('tvShow').onclick = () => { document.getElementById('radio').classList.add('hide'); flyToMod(modById.tv); };
 document.getElementById('rRemix').onclick = radioRemix; document.getElementById('rUnmix').onclick = radioClean;
 document.getElementById('rHelp').onclick = () => document.getElementById('rHelpTxt').classList.toggle('hide');
