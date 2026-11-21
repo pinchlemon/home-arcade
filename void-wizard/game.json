@@ -299,7 +299,8 @@
         "demon.burst": 1,
         "demon.poly": 3,
         "health.on": 1,
-        "ball.aim": 90
+        "ball.aim": 90,
+        "ball.cancel": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -356,7 +357,8 @@
         "demon.burst": "Demon · Capture burst BEAMS",
         "demon.poly": "Demon · Polygon CRYSTAL",
         "health.on": "Health · Health ON",
-        "ball.aim": "Ball play · Aim speed 90°/S"
+        "ball.aim": "Ball play · Aim speed 90°/S",
+        "ball.cancel": "Ball play · Circle cancels ON"
       },
       "made": 1794356977080
     },
