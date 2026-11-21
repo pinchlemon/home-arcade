@@ -301,7 +301,9 @@
         "health.on": 1,
         "ball.aim": 90,
         "ball.cancel": 1,
-        "ball.own": 1
+        "ball.own": 1,
+        "ball.resHold": 8,
+        "ball.resAim": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -360,7 +362,9 @@
         "health.on": "Health · Health ON",
         "ball.aim": "Ball play · Aim speed 90°/S",
         "ball.cancel": "Ball play · Triangle cancels ON",
-        "ball.own": "Ball play · Own solids ON"
+        "ball.own": "Ball play · Own solids ON",
+        "ball.resHold": "Ball play · Resonance holds 8 S",
+        "ball.resAim": "Ball play · No fade while aiming ON"
       },
       "made": 1794356977080
     },
