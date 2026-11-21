@@ -31,6 +31,7 @@ LAB.shelf('colours', 'Colours', (game) => {
   const wiz = [];
   function prep(W, key) { W.robe0 = robeCols(W); W.hoodM = hoodMats(W); W.labKey = key; W.robeGeo0 = W.robeGeo; W.robeBase0 = W.robeBase; wiz.push(W); }
   prep(game.player, 'you'); prep(game.buddy, 'buddy');
+  LAB.repaintWizard = (W) => { if (W.robe0) wizard(W)(); };   // for other shelves that set W.labCloakOwn
   function paintRobe(geo, base, trim, cloak) {
     const c = geo.attributes.color; if (!c) return;
     for (let i = 0; i < base.length / 3; i++) { const k = band(base[i * 3 + 1]); if (k === 1) trim.toArray(c.array, i * 3); else if (k === 2) cloak.toArray(c.array, i * 3); }
@@ -38,12 +39,13 @@ LAB.shelf('colours', 'Colours', (game) => {
   }
   function wizard(W, part) {
     return (x) => {
-      const cloak = new T.Color(pick(LAB.get('colours.' + W.labKey + 'Cloak'), W.robe0[2].getHex()));
+      const own = W.labCloakOwn != null;   // Ball play's Own solids: the cloak takes the colour of this wizard's solid
+      const cloak = new T.Color(own ? W.labCloakOwn : pick(LAB.get('colours.' + W.labKey + 'Cloak'), W.robe0[2].getHex()));
       const trim = new T.Color(pick(LAB.get('colours.' + W.labKey + 'Trim'), W.robe0[1].getHex()));
       paintRobe(W.robeGeo, W.robeBase, trim, cloak);
       if (W.labHi) paintRobe(W.labHi.robe, W.labHi.robeBase, trim, cloak);   // PS1 low poly keeps the full robe aside
       for (const m of W.hoodM) m.color.copy(cloak);
-      W.labCloak = LAB.get('colours.' + W.labKey + 'Cloak') ? cloak.getHex() : 0;   // the Health shelf's bar takes this colour
+      W.labCloak = own || LAB.get('colours.' + W.labKey + 'Cloak') ? cloak.getHex() : 0;   // the Health shelf's bar takes this colour
     };
   }
   // trim height: the robe is rebuilt from the game's outline with two extra rows, so the trim ends in a crisp line

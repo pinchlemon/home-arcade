@@ -68,14 +68,20 @@ LAB.shelf('ball', 'Ball play', (game) => {
     const c = W.labFire != null ? W.labFire : W.charge, L = launch(W, c); W.labFire = null;
     game.throwOrb(W, c, L.dx, L.dz, L.vh, L.vy, true);
     if (L.mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
-    if (get('super', 0) && L.mod < 0 && c >= 0.95 && o.res >= get('superRes', 5)) superShot(W);
+    const r1 = L.mod < 0 || W.labR1; W.labR1 = false;   // R1 counts if it was pressed at any point in the wind-up
+    if (get('super', 0) && (r1 || get('superHow', 0) === 1) && c >= get('superPower', 0.75) && o.res >= get('superRes', 4)) superShot(W);
     FX.emit('holdThrow', W, c, L.mod);
   }
 
   // ---- super shot: a full low throw at full resonance. Faster, it bends onto the centipede, hits much harder, and bursts
   let superHit = false;
   function superShot(W) {
-    o.labSuper = true; o.labMul = get('superDmg', 2.5); o.fast = true; o.v.multiplyScalar(1.4);
+    o.labSuper = true; o.labMul = get('superDmg', 2.5); o.fast = true;
+    // it flies flat and fast whatever arc was aimed: straight at the head when that's roughly ahead, otherwise forward
+    const sp = Math.max(26, o.v.length() * 1.4), d = game.demon, fx = Math.sin(W.yaw), fz = Math.cos(W.yaw);
+    let dir = v1.set(fx, 0.1, fz);
+    if (d.alive && !d.dying) { game.headCenter(aim); v2.copy(aim).sub(o.p); const h = Math.hypot(v2.x, v2.z) || 1; if ((v2.x * fx + v2.z * fz) / h > 0.35) dir = v2; }
+    o.v.copy(dir.normalize()).multiplyScalar(sp);
     const col = game.solid.col;
     game.popup('SUPER SHOT!', W.pos, '#ffd36a', true); game.shake(0.25); game.rumble(W, 0.5, 1, 260);
     game.fxRing(W.pos.x, W.pos.z, col, 4.5, 0.45); game.fxRing(W.pos.x, W.pos.z, 0xffffff, 2.6, 0.3, 0.05); game.sparkBurst(o.p, 30, 6, 0.9);
@@ -154,20 +160,20 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (needSkip !== skipTrig) { skipTrig = needSkip; LAB.skip('aimtrig', needSkip ? [4, 5] : null); }   // the game's tackle and run (read from LT and RT)
   }
 
-  // ---- Circle cancels a throw you're winding up or aiming: you keep the Solid, and it doesn't dive
+  // ---- Triangle cancels a throw you're winding up or aiming: you keep the Solid, and its shape doesn't change
   let circleWas = {}, skipCircle = false;
   function cancelCheck() {
     let need = false;
     for (const W of game.ALL) {
       if (!W.human || !W.gp) continue;
-      const i = W.gp.index, now = btn(W.gp, 1), was = !!circleWas[i]; circleWas[i] = now;
+      const i = W.gp.index, now = btn(W.gp, 3), was = !!circleWas[i]; circleWas[i] = now;
       if (W.charging && now && !was && !game.blockPad) {
-        W.charging = false; W.charge = 0; W.labAiming = false; W.labBtn = null; W.ctl.castHeld = false; W.ctl.castPressed = false;
+        W.charging = false; W.charge = 0; W.labAiming = false; W.labR1 = false; W.labBtn = null; W.ctl.castHeld = false; W.ctl.castPressed = false;
         game.popup('CANCEL', W.pos, '#9aa4b8');
       }
-      if (W.charging || (now && (was || skipCircle))) need = true;   // keep Circle from the game until it's let go, so no dive
+      if (W.charging || (now && (was || skipCircle))) need = true;   // keep Triangle from the game until it's let go, so the shape doesn't change
     }
-    if (need !== skipCircle) { skipCircle = need; LAB.skip('cancel', need ? [1] : null); }
+    if (need !== skipCircle) { skipCircle = need; LAB.skip('cancel', need ? [3] : null); }
   }
 
   // ---- aiming while you wind up: turn toward the stick at a limited speed (a light push turns slowly), let go to hold the aim
@@ -184,13 +190,44 @@ LAB.shelf('ball', 'Ball play', (game) => {
   // ---- switch on throw: take over whoever is nearest where it will come down
   let switchFrom = null;
   FX.on('throw', (W) => { if (get('switch', 0) && W.human && !game.DUEL) switchFrom = W; }, 'lab');
+  function willHitDemon() {   // fly a copy of the Solid forward and see if it meets the centipede before it comes down
+    const d = game.demon; if (!d.alive || d.dying) return false;
+    const parts = game.demonParts(), g = game.G * game.solid.grav, h = 1 / 60, rr = 0.35;
+    sim.copy(o.p); simV.copy(o.v);
+    for (let i = 0; i < 240; i++) {
+      simV.y -= g * h; sim.addScaledVector(simV, h);
+      for (const q of parts) { const dx = sim.x - q.x, dy = sim.y - q.y, dz = sim.z - q.z, r = q.r + rr; if (dx * dx + dy * dy + dz * dz < r * r) return true; }
+      if (simV.y < 0 && sim.y < 0.3) return false;
+    }
+    return false;
+  }
   function doSwitch() {
     const W = switchFrom; switchFrom = null;
     if (o.state !== 'air' || o.last !== W || W !== game.you) return;
+    if (willHitDemon()) return;   // it's going into the centipede, not to anyone: stay yourself
     const p = predict(2, true); if (!p) return;
     let best = null, bd = 1e9;
     for (const x of game.ALL) { if (x.downT > 0 || x.capT > 0) continue; const d = Math.hypot(x.pos.x - p[1], x.pos.z - p[2]); if (d < bd) { bd = d; best = x; } }
     if (best && best !== W) game.swapTo(best);
+  }
+
+  // ---- own solids: every wizard has a solid of their own and a cloak in its colour; whoever catches the Solid turns it into theirs
+  const solidOf = (W) => { const i = game.ALL.indexOf(W), S = game.SOLIDS;
+    return S[(i === 0 ? get('ownYou', 4) : i === 1 ? get('ownMate', 0) : i * 2 + 1) % S.length]; };   // blue, red, then the Party shelf's extra wizards
+  let morphFor = null;
+  FX.on('catch', (W) => { if (get('own', 0) && !game.DUEL) morphFor = W; }, 'lab');
+  function ownPaint() {
+    const on = get('own', 0) && !game.DUEL;
+    for (const W of game.ALL) {
+      const hex = on ? solidOf(W).color.getHex() : null;
+      W.labCloakOwn = hex;
+    }
+    if (on && o.state === 'held' && o.holder) morphFor = o.holder;
+  }
+  function morph() {
+    const W = morphFor; morphFor = null;
+    if (!(o.state === 'held' && o.holder === W)) return;
+    const S = solidOf(W); if (S !== game.solid) game.setSolid(S);
   }
 
   // ---- perfect catches and one-timers
@@ -314,10 +351,14 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
+    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (W.human && modOf(W) < 0) W.labR1 = true; }
     if (get('power', 0) || skipTrig) aimPower(dt);
     if (get('cancel', 0) || skipCircle) cancelCheck();
     if (get('path', 0) || dots) preview(dt);
+    if (morphFor) morph();
     if (oneTimer) fireOneTimer();
+    if (get('own', 0) && game.ALL.some((W) => W.labCloakOwn === undefined)) ownPaint();   // the Party shelf's extra wizards, once they're made
+    if (LAB.repaintWizard) for (const W of game.ALL) if (W.labCloakOwn !== undefined && W.labOwnPainted !== W.labCloakOwn) { W.labOwnPainted = W.labCloakOwn; LAB.repaintWizard(W); }   // the Colours shelf loads after this one
     const r = get('ring', 0); if (r || ring) showRing(r, dt);
     if (o.labSuper) superFly(dt);
     const f = o.labSuper ? Math.max(get('fire', 0), 1.6) : get('fire', 0); if (f || fire) burn(dt, f);
@@ -334,7 +375,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'power', label: 'Distance', help: (x) => x === 2 ? 'Hold Square to aim, RT throws farther and LT shorter, let go of Square to throw (Sports buttons)'
       : x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
       min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['HOLD', 'RIGHT STICK', 'TRIGGERS'][x] },
-    { id: 'cancel', label: 'Circle cancels', help: 'While winding up or aiming a throw, Circle cancels it (you keep the Solid and do not dive)', kind: 'onoff', value: 0, dice: false },
+    { id: 'cancel', label: 'Triangle cancels', help: 'While winding up or aiming a throw, Triangle cancels it (you keep the Solid; its shape does not change)', kind: 'onoff', value: 0, dice: false },
     { id: 'windup', label: 'Wind up', help: 'How long a full-power throw takes to build, as times the Studio setting (Throwing > Wind up); higher is slower',
       min: 0.3, max: 4, step: 0.1, value: 1, dice: false, fmt: (x) => x.toFixed(1) + '×', apply: (x) => { game.MOD.windup = x; } },
     { id: 'arc', label: 'Normal arc', help: 'The angle a plain throw leaves at', min: 10, max: 70, step: 2, value: 38, dice: false, fmt: (x) => x + '°' },
@@ -355,9 +396,16 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'ring', label: 'Catch ring', help: 'A ring where the Solid comes down, closing as it arrives; white in the perfect window', min: 0, max: 2, step: 1, value: 0, dice: false,
       fmt: (x) => ['OFF', 'PASSES TO YOU', 'EVERY THROW'][x] },
     { id: 'ringTime', label: 'Ring time', help: 'How long before it arrives the ring starts closing', min: 0.3, max: 2, step: 0.1, value: 0.9, dice: false, fmt: (x) => x.toFixed(1) + ' S' },
-    { id: 'super', label: 'Super shot', help: 'A full low throw (R1, held all the way) at full resonance: faster, bends onto the centipede, hits much harder', kind: 'onoff', value: 0, dice: false },
-    { id: 'superRes', label: 'Super needs', help: 'Resonance needed for a super shot', min: 1, max: 5, step: 1, value: 5, dice: false, fmt: (x) => 'RES ' + x },
+    { id: 'super', label: 'Super shot', help: 'A hard throw with R1 (pressed any time in the wind-up) once the Solid has built resonance: flies flat at the centipede, hits much harder', kind: 'onoff', value: 0, dice: false },
+    { id: 'superHow', label: 'Super with', help: (x) => x ? 'Any throw at enough power, once the Solid has enough resonance' : 'Press R1 at any point while winding up (or aiming) a throw at enough power',
+      min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (x) => (x ? 'ANY HARD THROW' : 'R1') },
+    { id: 'superPower', label: 'Super power', help: 'How much power the throw needs for a super shot', min: 0.3, max: 1, step: 0.05, value: 0.75, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
+    { id: 'superRes', label: 'Super needs', help: 'Resonance needed for a super shot', min: 1, max: 5, step: 1, value: 4, dice: false, fmt: (x) => 'RES ' + x },
     { id: 'superDmg', label: 'Super damage', help: 'How many times harder a super shot hits', min: 1, max: 5, step: 0.5, value: 2.5, dice: false, fmt: (x) => x.toFixed(1) + '×' },
+    { id: 'own', label: 'Own solids', help: 'Every player has a solid of their own and a cloak in its colour; the Solid turns into the solid of whoever catches it',
+      kind: 'onoff', value: 0, dice: false, apply: ownPaint },
+    { id: 'ownYou', label: 'Your solid', help: 'The solid of the wizard you start as', min: 0, max: 4, step: 1, value: 4, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
+    { id: 'ownMate', label: "Teammate's solid", help: 'The solid of the wizard who starts as your teammate', min: 0, max: 4, step: 1, value: 0, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
     { id: 'fire', label: 'Fire aura', help: 'The Solid burns brighter as resonance builds: light, orbiting sparks, flames, embers', min: 0, max: 2, step: 0.1, value: 0, dice: true }
   ].map((t) => (t.kind === 'onoff' && !t.fmt ? { ...t, fmt: OFFON } : t));
 });
