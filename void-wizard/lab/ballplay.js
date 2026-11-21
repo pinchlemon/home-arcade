@@ -33,6 +33,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
         if (holding && get('power', 0)) { W.labAiming = true; W.labPower = lastPower; W.labBtn = 'aim'; }   // Distance: RIGHT STICK, the first tap starts aiming
       }
       if (!now && was && W.labBtn === 'throw') { C.castHeld = false; W.labBtn = null; }
+      else if (!now && was && W.labAiming && get('power', 0) === 2) { W.charge = W.labPower; W.labFire = W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // TRIGGERS: letting go of Square throws
     }
   }
   let hintWas = null;
@@ -330,7 +331,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
     { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
-    { id: 'power', label: 'Distance', help: (x) => x === 2 ? 'Tap Square to aim, hold RT to throw farther and LT shorter, tap Square again to throw (Sports buttons)'
+    { id: 'power', label: 'Distance', help: (x) => x === 2 ? 'Hold Square to aim, RT throws farther and LT shorter, let go of Square to throw (Sports buttons)'
       : x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
       min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['HOLD', 'RIGHT STICK', 'TRIGGERS'][x] },
     { id: 'cancel', label: 'Circle cancels', help: 'While winding up or aiming a throw, Circle cancels it (you keep the Solid and do not dive)', kind: 'onoff', value: 0, dice: false },
