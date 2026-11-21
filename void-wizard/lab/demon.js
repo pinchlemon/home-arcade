@@ -148,10 +148,94 @@ LAB.shelf('demon', 'Demon', (game) => {
     }
     if (!left) {
       game.fxBurst(tgt, hex, 70, 6); game.fxRing(tgt.x, tgt.z, hex, 4, 0.55); game.fxRing(tgt.x, tgt.z, 0xffffff, 2.4, 0.4, 0.06);
-      game.shake(0.3); endAbsorb(true);
+      game.shake(0.3); endAbsorb(true); burst(tgt);
     }
   }
   window.FEATURES.on('frame', absorb, 'lab');
+
+  // capture burst: when it's caught, a white flash and beams of light that shoot out and turn, like a PS2 finale.
+  // With Absorbed it goes off as the head goes into the Solid, otherwise where the head was when it went down.
+  const T = game.THREE;
+  let BU = null;
+  window.FEATURES.on('demonDown', () => { if (LAB.get('demon.burst') && !LAB.get('demon.absorb')) { game.headCenter(st); burst(st); } }, 'lab');
+  function makeBurst() {
+    const geo = new T.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);
+    const beams = [];
+    for (let i = 0; i < 24; i++) {
+      const mat = new T.ShaderMaterial({ transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide,
+        uniforms: { col: { value: new T.Color() }, a: { value: 0 } },
+        vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: `varying vec2 vU; uniform vec3 col; uniform float a;
+          void main(){ float along = vU.y, across = abs(vU.x * 2.0 - 1.0);
+            float k = pow(1.0 - along, 1.4) * pow(1.0 - across, 2.2) * a;
+            gl_FragColor = vec4(mix(col, vec3(1.0), (1.0 - along) * 0.75) * k, 1.0); }` });
+      const g = new T.Group(), m1 = new T.Mesh(geo, mat), m2 = new T.Mesh(geo, mat); m2.rotation.y = Math.PI / 2;   // crossed, so it shows from any side
+      g.add(m1, m2); g.visible = false; beams.push({ g, mat, dir: new T.Vector3(), len: 1, w: 1, ph: 0 });
+    }
+    const root = new T.Group(); for (const b of beams) root.add(b.g); root.visible = false; game.scene.add(root);
+    BU = { root, beams, t: 9, dur: 1, n: 0 };
+  }
+  function burst(p) {
+    const lvl = LAB.get('demon.burst') || 0; if (!lvl) return;
+    if (!BU) makeBurst();
+    const big = lvl >= 2, hex = game.solid.color.getHex();
+    BU.root.position.copy(p); BU.root.visible = true; BU.t = 0; BU.dur = big ? 2.4 : 1.5; BU.n = big ? 24 : 14;
+    BU.beams.forEach((b, i) => {
+      b.g.visible = i < BU.n; if (i >= BU.n) return;
+      const a = Math.random() * Math.PI * 2, up = Math.random() * 1.3 - 0.25;   // mostly outward and up
+      b.dir.set(Math.cos(a), up, Math.sin(a)).normalize();
+      b.g.quaternion.setFromUnitVectors(st.set(0, 1, 0), b.dir);
+      b.len = (big ? 9 : 6) * (0.6 + Math.random() * 0.6); b.w = (big ? 0.9 : 0.6) * (0.5 + Math.random()); b.ph = Math.random() * 6;
+      b.mat.uniforms.col.value.setHex(i % 3 === 0 ? 0xffffff : hex);
+    });
+    game.fxSphere(p, 0xffffff, big ? 4 : 2.6, 0.3); game.fxSphere(p, hex, big ? 7 : 4.5, 0.6);
+    game.fxRing(p.x, p.z, hex, big ? 9 : 6, 0.7); game.fxRing(p.x, p.z, 0xffffff, big ? 5 : 3.5, 0.5, 0.08);
+    game.shake(big ? 0.45 : 0.3);
+  }
+  window.FEATURES.on('frame', (dt) => {
+    if (!BU || !BU.root.visible) return;
+    BU.t += dt; const u = BU.t / BU.dur;
+    if (u >= 1) { BU.root.visible = false; return; }
+    BU.root.rotation.y += dt * (2.2 - 1.4 * u);   // the whole burst turns, slowing as it fades
+    const grow = 1 - Math.pow(1 - Math.min(1, BU.t / 0.25), 3), fade = Math.pow(1 - u, 1.5);
+    for (let i = 0; i < BU.n; i++) {
+      const b = BU.beams[i], fl = 0.75 + 0.25 * Math.sin(BU.t * 30 + b.ph);   // a flicker
+      b.g.scale.set(b.w * (1 + u * 0.6), b.len * grow, b.w * (1 + u * 0.6));
+      b.mat.uniforms.a.value = fade * fl * 1.4;
+    }
+  }, 'lab');
+
+  // polygon centipede: its round parts swapped for faceted ones. LOW POLY few faces; GEM twenty-sided; CRYSTAL a gem
+  // with glowing edges. Its own shapes come back at OFF.
+  const orig = new Map(), geos = new Map(), edgeMats = new Map(), flatWas = new Map();
+  function polyGeo(g, lvl) {
+    const key = g.uuid + ':' + lvl; if (geos.has(key)) return geos.get(key);
+    const p = g.parameters || {}; let n = null;
+    if (g.type === 'SphereGeometry') n = lvl === 1 ? new T.SphereGeometry(p.radius, 6, 3) : new T.IcosahedronGeometry(p.radius, 0);
+    else if (g.type === 'CylinderGeometry') {
+      n = new T.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, lvl === 1 ? 4 : 3, 1, p.openEnded);
+      g.computeBoundingBox(); if (g.boundingBox.min.y > -1e-6) n.translate(0, p.height / 2, 0);   // the legs grow from their top end
+    }
+    geos.set(key, n); return n;
+  }
+  function polyfy(lvl) {
+    if (!lvl && !orig.size) return;
+    const meshes = []; for (const r of parts()) r.traverse(o => { if (o.isMesh && !(o.parent && o.parent.isLineSegments)) meshes.push(o); });
+    for (const m of meshes) {
+      let rec = orig.get(m); if (!rec) { rec = { geo: m.geometry, edges: null }; orig.set(m, rec); }
+      if (rec.edges) { m.remove(rec.edges); rec.edges = null; }
+      const n = lvl ? polyGeo(rec.geo, lvl) : null;
+      m.geometry = n || rec.geo;
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      for (const mt of mats) { if (!mt || !('flatShading' in mt)) continue; if (!flatWas.has(mt)) flatWas.set(mt, mt.flatShading);
+        const f = lvl ? true : flatWas.get(mt); if (mt.flatShading !== f) { mt.flatShading = f; mt.needsUpdate = true; } }
+      if (lvl === 3 && n) {
+        const hex = (mats[0] && mats[0].color ? mats[0].color.getHex() : 0xffffff);
+        let em = edgeMats.get(hex); if (!em) { em = new T.LineBasicMaterial({ color: new T.Color(hex).lerp(new T.Color(1, 1, 1), 0.55), transparent: true, opacity: 0.85, blending: T.AdditiveBlending, depthWrite: false }); edgeMats.set(hex, em); }
+        rec.edges = new T.LineSegments(new T.EdgesGeometry(n, 1), em); m.add(rec.edges);
+      }
+    }
+  }
   function dissolve() {
     if (disT < 0) return;
     const k = (performance.now() / 1000 - disT) / (LAB.get('demon.dissolveLen') ?? 1.5);
@@ -180,6 +264,9 @@ LAB.shelf('demon', 'Demon', (game) => {
     { id: 'dissolveLen', label: 'Dissolve time', help: 'Seconds it takes to burn away', min: 0.5, max: 3, step: 0.1, value: 1.5, dice: false },
     { id: 'dissolveCol', label: 'Burn colour', help: "Orange, or the solid's colour", kind: 'onoff', value: 0, fmt: (x) => (x ? 'SOLID' : 'ORANGE') },
     { id: 'absorb', label: 'Absorbed', help: 'A beaten demon is sucked into the Solid, tail first', kind: 'onoff', value: 0, dice: true },
+    { id: 'burst', label: 'Capture burst', help: 'A flash and turning beams of light when it is caught', min: 0, max: 2, step: 1, value: 0, dice: true, fmt: (x) => ['OFF', 'BEAMS', 'BIG'][x] },
+    { id: 'poly', label: 'Polygon', help: 'A faceted centipede: few faces, a gem, or a gem with glowing edges', min: 0, max: 3, step: 1, value: 0, dice: true,
+      fmt: (x) => ['OFF', 'LOW POLY', 'GEM', 'CRYSTAL'][x], apply: (x) => polyfy(x) },
     { id: 'absorbLen', label: 'Absorb speed', help: 'Seconds each piece takes to fly in', min: 0.3, max: 2, step: 0.1, value: 0.8, dice: false }
   ];
 });

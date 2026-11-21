@@ -73,10 +73,12 @@ LAB.shelf('health', 'Health', (game) => {
       if (!hide) b.style.transform = `translate(${(sx * W2).toFixed(1)}px,${((1 - sy) * H2 - 4).toFixed(1)}px) translate(-50%,-100%)`;
     }
   }
+  // placed after every camera move of the frame (the Camera shelf's lean and right stick come last), so they stay on the heads
+  window.FEATURES.on('camera', (cam) => { if (on()) place(cam); }, 'lab');
   function off() { for (const b of bars.values()) b.style.display = 'none'; for (const W of game.ALL) { W.labDown = false; W.labHp = W.labMax = undefined; } }
   return [
     { id: 'on', label: 'Health', help: 'Health bars over the wizards', kind: 'onoff', value: 0, dice: true,
-      frame: (dt) => tick(dt), camera: (cam) => place(cam), apply: (v) => { if (!v) off(); } },
+      frame: (dt) => tick(dt), apply: (v) => { if (!v) off(); } },
     { id: 'you', label: 'Your health', help: 'Hits you can take', min: 1, max: 20, step: 1, value: 5 },
     { id: 'buddy', label: 'Buddy health', help: 'Your buddy (and the party wizards)', min: 1, max: 20, step: 1, value: 5 },
     { id: 'contact', label: 'Centipede hurts', help: 'Touching it costs health (with Health on)', kind: 'onoff', value: 0, dice: true },

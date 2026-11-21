@@ -1575,7 +1575,7 @@ for(let i=0;i<9;i++){
   const puddle=glowDisc(0xff4a1a,1.1,0);
   venoms.push({g,v:new THREE.Vector3(),alive:false,acc:0,puddle});
 }
-let venomNext=0,spitHook=null,throwHook=null,padAlias=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
+let venomNext=0,spitHook=null,throwHook=null,padAlias=null,shakeHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
 const vLook=new THREE.Vector3();
 function spitVenom(T){
   headCenter(lO);lO.y+=0.05;
@@ -1637,7 +1637,7 @@ function orbVsDemon(){
   const head=hit==='head';
   if(orb.special==='fire')boomFx(hcV);if(orb.special==='aether'){fxSphere(hcV,0xff7ac8,3,0.4);fxPillar(hcV.x,hcV.z,0xff7ac8,8,1,0.6);}
   const relay=PARTY&&orb.res>=1&&orb.chain?orb.chain.size:1;
-  const mult=RES_MULT[orb.res]*(orb.fast?1.3:1)*(orb.oop?1.6:1)*(head?1.5:1)*(1+0.5*(relay-1))*(orb.special==='fire'?1.8:orb.special==='aether'?2:1);
+  const mult=RES_MULT[orb.res]*(orb.fast?1.3:1)*(orb.oop?1.6:1)*(head?1.5:1)*(1+0.5*(relay-1))*(orb.special==='fire'?1.8:orb.special==='aether'?2:1)*(orb.labMul||1); // labMul: a feature's extra damage for this throw
   if(relay>=3){demon.stunT=Math.max(demon.stunT||0,1.2);for(let i=0;i<30;i++){randDir(rv).multiplyScalar(3+Math.random()*3);spark(orb.p,rv,0.5,0.7,ELEM_COL[i%5],2.5);}}
   const dmg=(DM('hitBase',6)+sp*DM('hitPerSpeed',0.8))*mult*cur.dmg*(orb.last&&orb.last.stStrength||1); // stStrength: the Lab's Strength stat
   const hs=Math.hypot(orb.v.x,orb.v.z)||1, pushX=orb.v.x/hs, pushZ=orb.v.z/hs;
@@ -1979,7 +1979,8 @@ function frame(now){
   tmp.set(pos.x,CAM_UP*zoom+camY*0.2,pos.z+CAM_BACK*zoom);camBase.lerp(tmp,ca2);
   tmp.set(pos.x,0.8+camY*0.5,pos.z);camLook.lerp(tmp,ca2);
   camera.position.copy(camBase);
-  if(shake>0.002){camera.position.x+=(Math.random()-.5)*shake*2.5;camera.position.y+=(Math.random()-.5)*shake*2.5;shake*=Math.exp(-9*dt);}
+  if(shakeHook)shake=shakeHook(camera,shake,dt); // a feature's own shake: moves the camera, returns what's left
+  else if(shake>0.002){camera.position.x+=(Math.random()-.5)*shake*2.5;camera.position.y+=(Math.random()-.5)*shake*2.5;shake*=Math.exp(-9*dt);}
   camera.lookAt(camLook);
   FX.emit('camera',camera,camLook);
 
@@ -2017,7 +2018,8 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
   lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
-  G,playerThrow,throwOrb,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;},get padAlias(){return padAlias;},set padAlias(v){padAlias=v||null;}};
+  G,playerThrow,throwOrb,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;},get padAlias(){return padAlias;},set padAlias(v){padAlias=v||null;},
+  get shakeHook(){return shakeHook;},set shakeHook(f){shakeHook=f||null;}};
 requestAnimationFrame(frame);
 })();
 

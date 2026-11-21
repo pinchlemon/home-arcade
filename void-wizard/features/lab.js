@@ -15,16 +15,16 @@ feature('lab', ({ game, on }) => {
     ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
     ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.shoot party.shotRange party.accuracy party.think party.toYou']]],
-    ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
-      ['Catching', 'ball.perfect ball.window ball.bonus ball.oop ball.ring ball.ringTime'], ['On fire', 'ball.fire']]],
+    ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
+      ['Catching', 'ball.perfect ball.window ball.bonus ball.oop ball.ring ball.ringTime'], ['On fire', 'ball.fire ball.super ball.superRes ball.superDmg']]],
     ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
       ...['Blue', 'Red', 'Green', 'Purple', 'Gold'].map(n => [n + ' wizard', ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + n.toLowerCase() + '.' + s).join(' ')])]],
     ['solids', 'Solids', [['Flight', 'throws.spiral bodies.solid world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'],
       ['Extra solids', 'spawn.count spawn.size spawn.bounce spawn.kick spawn.pickup spawn.power spawn.damage']]],
-    ['demon', 'Demon', [['How it acts', 'bodies.demon demon.aggression demon.health'], ['Hurting you', 'health.contact health.contactDmg'],
+    ['demon', 'Demon', [['How it acts', 'bodies.demon demon.aggression demon.health'], ['Look', 'demon.poly'], ['Hurting you', 'health.contact health.contactDmg'],
       ['When hit', 'demon.flash demon.flashLen demon.flashRate'], ['Spit', 'attacks.attack attacks.spitCount attacks.spitSpread attacks.spitSize attacks.puddles'],
       ['Fire breath', 'attacks.breathLen attacks.breathReach attacks.breathWidth attacks.breathSweep attacks.breathCol'],
-      ['When beaten', 'demon.absorb demon.absorbLen demon.dissolve demon.dissolveLen demon.dissolveCol']]],
+      ['When beaten', 'demon.absorb demon.absorbLen demon.burst demon.dissolve demon.dissolveLen demon.dissolveCol']]],
     ['rules', 'Rules', [1, 2, 3, 4].map(n => ['Rule ' + n, `rules.when${n} rules.then${n} rules.for${n}`])],
     ['colours', 'Colours', [['Wizards', 'colours.youCloak colours.youTrim colours.buddyCloak colours.buddyTrim colours.greenCloak colours.greenTrim colours.purpleCloak colours.purpleTrim colours.goldCloak colours.goldTrim colours.trimH'],
       ['Solids', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
@@ -38,7 +38,8 @@ feature('lab', ({ game, on }) => {
     ['film', 'Film', [['Screen', 'colour.scan screen.crt screen.vignette screen.grain screen.halftone screen.dotSize'],
       ['Glow', 'glow.bloom glow.radius glow.threshold glow.tilt glow.focus glow.glitch'],
       ['Print', 'print.techni print.bleach print.dots print.halftone print.radius print.shape']]],
-    ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown']]],
+    ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown'],
+      ['Shake', 'feel.strength feel.style feel.length'], ['Hit freeze', 'feel.freeze']]],
     ['ps1', 'PS1', [['Models', 'ps1.snap ps1.wobble ps1.lowpoly ps1.gouraud'], ['Picture', 'ps1.depth ps1.fog']]],
     ['ps2', 'PS2', [['Console', 'ps2.res ps2.c16 ps2.bloom ps2.wash ps2.rays ps2.blur'], ['TV', 'ps2.inter ps2.comp']]]
   ];
@@ -89,7 +90,7 @@ feature('lab', ({ game, on }) => {
   const skips = {};
   const made = [];   // the shelves the files made, in order (the panel regroups them)
   window.LAB = {
-    game, get, set, boost, base: (id) => values[id],   // base: the knob itself, without a rule's boost
+    game, get, set, boost, hitstop: 1, base: (id) => values[id],   // base: the knob itself, without a rule's boost
     // skip(owner, buttons): controller buttons a shelf takes from the game (null gives them back); every shelf's together
     skip(owner, list) { if (list && list.length) skips[owner] = list; else delete skips[owner];
       const all = new Set(); for (const k in skips) for (const b of skips[k]) all.add(b); game.padSkip = all.size ? all : null; },
@@ -121,7 +122,8 @@ feature('lab', ({ game, on }) => {
   // ---------------------------------------------------------------- pausing: the game's clock reads 0 while the Lab is open
   // (MOD.time keeps what the knobs set; only what the game reads changes, and only while paused)
   let realTime = game.MOD.time, paused = false, open = false;
-  Object.defineProperty(game.MOD, 'time', { get: () => (paused ? 0 : realTime), set: (v) => { realTime = v; }, enumerable: true, configurable: true });
+  // the game's clock: paused while the Lab is open; LAB.hitstop (1 normally) slows it on top of whatever speed is set
+  Object.defineProperty(game.MOD, 'time', { get: () => (paused ? 0 : realTime * LAB.hitstop), set: (v) => { realTime = v; }, enumerable: true, configurable: true });
   function syncPause() { paused = open && (values['lab.pause'] ?? 1) === 1; }
 
   // ---------------------------------------------------------------- saved things, kept as phone edits of game.json lab.*

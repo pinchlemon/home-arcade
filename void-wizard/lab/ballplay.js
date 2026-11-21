@@ -52,13 +52,74 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
 
   // ---- hold to throw: speed from the hold, arc from the shoulder buttons
-  function holdThrow(W) {
-    const c = W.charge, S = game.solid, dx = Math.sin(W.yaw), dz = Math.cos(W.yaw);
-    const mod = sports() ? modOf(W) : 0;
+  function launch(W, c) {   // how a throw would leave the hand now: speed from the hold, angle from the shoulder buttons
+    const S = game.solid, mod = sports() ? modOf(W) : 0;
     const deg = mod > 0 ? get('high', 62) : mod < 0 ? get('low', 14) : get('arc', 38), a = deg * Math.PI / 180;
     const tap = get('tap', 12), sp = (tap + (get('full', 22) - tap) * c) * (W.stThrow || 1) * Math.sqrt(S.grav * S.range);   // every solid goes about as far
-    game.throwOrb(W, c, dx, dz, sp * Math.cos(a), sp * Math.sin(a), true);
-    if (mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
+    return { dx: Math.sin(W.yaw), dz: Math.cos(W.yaw), vh: sp * Math.cos(a), vy: sp * Math.sin(a), mod };
+  }
+  function holdThrow(W) {
+    const c = W.charge, L = launch(W, c);
+    game.throwOrb(W, c, L.dx, L.dz, L.vh, L.vy, true);
+    if (L.mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
+    if (get('super', 0) && L.mod < 0 && c >= 0.95 && o.res >= get('superRes', 5)) superShot(W);
+    FX.emit('holdThrow', W, c, L.mod);
+  }
+
+  // ---- super shot: a full low throw at full resonance. Faster, it bends onto the centipede, hits much harder, and bursts
+  let superHit = false;
+  function superShot(W) {
+    o.labSuper = true; o.labMul = get('superDmg', 2.5); o.fast = true; o.v.multiplyScalar(1.4);
+    const col = game.solid.col;
+    game.popup('SUPER SHOT!', W.pos, '#ffd36a', true); game.shake(0.25); game.rumble(W, 0.5, 1, 260);
+    game.fxRing(W.pos.x, W.pos.z, col, 4.5, 0.45); game.fxRing(W.pos.x, W.pos.z, 0xffffff, 2.6, 0.3, 0.05); game.sparkBurst(o.p, 30, 6, 0.9);
+  }
+  const aim = new T.Vector3();
+  function superFly(dt) {
+    if (o.state !== 'air' || o.touched || superHit) { o.labSuper = false; o.labMul = undefined; superHit = false; return; }
+    const d = game.demon, sp = o.v.length();
+    if (d.alive && !d.dying) {   // bend toward the head when it's roughly ahead
+      game.headCenter(aim); aim.sub(o.p); const dist = aim.length() || 1; aim.divideScalar(dist);
+      if (aim.dot(v1.copy(o.v).divideScalar(sp || 1)) > 0.5) { v1.lerp(aim, Math.min(1, dt * 5)).normalize(); o.v.copy(v1).multiplyScalar(sp); }
+    }
+    for (let i = 0; i < 4; i++) {   // a comet tail
+      v2.copy(o.v).multiplyScalar(-0.12 - Math.random() * 0.1); v2.x += (Math.random() - 0.5) * 1.5; v2.y += (Math.random() - 0.5) * 1.5; v2.z += (Math.random() - 0.5) * 1.5;
+      game.spark(o.p, v2, 0.35 + Math.random() * 0.25, 0.8 + Math.random() * 0.6, i % 2 ? game.solid.col : 0xffffff, 2);
+    }
+  }
+  FX.on('demonHit', () => {
+    if (!o.labSuper || superHit) return;
+    superHit = true; const col = game.solid.col; at.copy(o.p);
+    game.fxSphere(at, 0xffffff, 3.2, 0.35); game.fxSphere(at, col, 5.5, 0.6);
+    game.fxRing(at.x, at.z, col, 7, 0.6); game.fxRing(at.x, at.z, 0xffffff, 4.5, 0.45, 0.06); game.fxPillar(at.x, at.z, col, 10, 1.3, 0.7);
+    game.fxBurst(at, col, 60, 14); game.shake(0.5); game.popup('SUPER!', at, '#ffffff', true);
+  }, 'lab');
+
+  // ---- flight arc: a dotted line showing where the throw will go, while you hold it
+  let dots = null, march = 0;
+  const dc = new T.Color();
+  function makeDots() {   // plain meshes (the PS1 shelf's vertex snap doesn't know instanced ones)
+    const geo = new T.IcosahedronGeometry(0.15, 0); dots = [];
+    for (let i = 0; i < 60; i++) { const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: T.AdditiveBlending, depthWrite: false }));
+      m.visible = false; m.frustumCulled = false; game.scene.add(m); dots.push(m); }
+  }
+  function preview(dt) {
+    const W = game.you;
+    const show = get('path', 0) && get('slider', 0) && !game.DUEL && W.charging && o.state === 'held' && o.holder === W && W.crouchK <= 0.5;
+    if (!show) { if (dots) for (const d of dots) d.visible = false; return; }
+    if (!dots) makeDots();
+    const L = launch(W, W.charge), g = game.G * game.solid.grav, gap = 0.6, col = game.solid.color, h = 1 / 120;
+    march = (march + dt * 1.4) % gap;   // the dots creep forward along the path
+    sim.copy(o.p); simV.set(L.dx * L.vh, L.vy, L.dz * L.vh);
+    let n = 0, acc = gap - march;
+    for (let i = 0; i < 900 && n < dots.length; i++) {
+      v2.copy(sim); simV.y -= g * h; sim.addScaledVector(simV, h); acc += sim.distanceTo(v2);
+      const down = sim.y < 0.08;
+      if (acc >= gap || down) { acc = 0; const d = dots[n]; d.visible = true; d.scale.setScalar(down ? 2 : 1); d.position.set(sim.x, Math.max(sim.y, 0.06), sim.z); n++; }
+      if (down) break;
+    }
+    for (let i = 0; i < dots.length; i++) { if (i >= n) { dots[i].visible = false; continue; }
+      dots[i].material.color.copy(col).lerp(WHITE, 0.6).multiplyScalar(1 - 0.45 * i / n); }   // fades toward the far end
   }
   function throwHook(W) {
     if (game.DUEL || W.crouchK > 0.5 || !get('slider', 0)) return false;   // crouched throws still bowl
@@ -164,7 +225,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     fire = { m, mat, sats };
   }
   function burn(dt, v) {
-    heat += ((v && o.res ? 0.15 + o.res * 0.17 : 0) - heat) * (1 - Math.exp(-5 * dt));   // eases up and down, so a fizzle fades out
+    heat += ((o.labSuper ? 1.2 : v && o.res ? 0.15 + o.res * 0.17 : 0) - heat) * (1 - Math.exp(-5 * dt));   // eases up and down, so a fizzle fades out
     if (!fire && heat < 0.01) return;
     if (!fire) makeFire();
     const k = heat * v, on = k > 0.01 && game.orbMesh.visible;
@@ -199,9 +260,11 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
+    if (get('path', 0) || dots) preview(dt);
     if (oneTimer) fireOneTimer();
     const r = get('ring', 0); if (r || ring) showRing(r, dt);
-    const f = get('fire', 0); if (f || fire) burn(dt, f);
+    if (o.labSuper) superFly(dt);
+    const f = o.labSuper ? Math.max(get('fire', 0), 1.6) : get('fire', 0); if (f || fire) burn(dt, f);
     if (perfectFlash > 0) perfectFlash = Math.max(0, perfectFlash - dt * 3);
   }, 'lab');
 
@@ -217,6 +280,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'low', label: 'Low arc (R1)', help: 'The angle with R1 held', min: 0, max: 30, step: 2, value: 14, dice: false, fmt: (x) => x + '°' },
     { id: 'tap', label: 'Tap speed', help: 'How fast a quick tap throws it', min: 4, max: 20, step: 1, value: 12, dice: false },
     { id: 'full', label: 'Full speed', help: 'How fast a full hold throws it', min: 14, max: 44, step: 1, value: 22, dice: false },
+    { id: 'path', label: 'Flight arc', help: 'A dotted line showing where the throw will go while you hold it (with Hold to throw)', kind: 'onoff', value: 0, dice: false },
     { id: 'switch', label: 'Switch on throw', help: 'You take over whoever is nearest where it comes down (you stay if that is you)', kind: 'onoff', value: 0, dice: false },
     { id: 'perfect', label: 'Perfect catch', help: 'Press catch just as the Solid arrives for extra resonance', kind: 'onoff', value: 0, dice: false },
     { id: 'window', label: 'Perfect timing', help: 'How exact it has to be (seconds); bigger is easier', min: 0.04, max: 0.3, step: 0.02, value: 0.12, dice: false, fmt: (x) => x.toFixed(2) + ' S' },
@@ -226,6 +290,9 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'ring', label: 'Catch ring', help: 'A ring where the Solid comes down, closing as it arrives; white in the perfect window', min: 0, max: 2, step: 1, value: 0, dice: false,
       fmt: (x) => ['OFF', 'PASSES TO YOU', 'EVERY THROW'][x] },
     { id: 'ringTime', label: 'Ring time', help: 'How long before it arrives the ring starts closing', min: 0.3, max: 2, step: 0.1, value: 0.9, dice: false, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'super', label: 'Super shot', help: 'A full low throw (R1, held all the way) at full resonance: faster, bends onto the centipede, hits much harder', kind: 'onoff', value: 0, dice: false },
+    { id: 'superRes', label: 'Super needs', help: 'Resonance needed for a super shot', min: 1, max: 5, step: 1, value: 5, dice: false, fmt: (x) => 'RES ' + x },
+    { id: 'superDmg', label: 'Super damage', help: 'How many times harder a super shot hits', min: 1, max: 5, step: 0.5, value: 2.5, dice: false, fmt: (x) => x.toFixed(1) + '×' },
     { id: 'fire', label: 'Fire aura', help: 'The Solid burns brighter as resonance builds: light, orbiting sparks, flames, embers', min: 0, max: 2, step: 0.1, value: 0, dice: true }
   ].map((t) => (t.kind === 'onoff' && !t.fmt ? { ...t, fmt: OFFON } : t));
 });
