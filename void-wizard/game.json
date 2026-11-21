@@ -308,7 +308,8 @@
         "sound.on": 1,
         "feel.punch": 0.6,
         "feel.slow": 0.25,
-        "feel.squash": 1
+        "feel.squash": 1,
+        "sound.music": 0.6
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -373,7 +374,8 @@
         "sound.on": "Sound · Sound ON",
         "feel.punch": "Feel · Zoom punch 60%",
         "feel.slow": "Feel · Final slow-mo 25% SPEED",
-        "feel.squash": "Feel · Squash 100%"
+        "feel.squash": "Feel · Squash 100%",
+        "sound.music": "Sound · Music 60%"
       },
       "made": 1794356977080
     },
