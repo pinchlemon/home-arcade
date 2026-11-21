@@ -6,7 +6,7 @@ const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typ
 // features: add-ons in features/ that hook into the game (engine/features.js). With none on, nothing here changes how it plays.
 const FX=window.FEATURES||{emit(){},on(){}};
 // multipliers a feature can change (1 = normal)
-const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,turn:0,passCone:2,passSpeed:1,autoCatch:0}; // passCone: a standing throw goes to a teammate within this (cosine of the angle; 2 is off); passSpeed: those passes fly this much faster; autoCatch: you catch without pressing // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
+const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,windup:1,turn:0,passCone:2,passSpeed:1,autoCatch:0}; // passCone: a standing throw goes to a teammate within this (cosine of the angle; 2 is off); passSpeed: those passes fly this much faster; autoCatch: you catch without pressing // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -1745,7 +1745,7 @@ function frame(now){
       const bl=holding?(DUEL?'SPECIAL':'SHAPE'):DUEL?'SWITCH':(bud.label||'FOLLOW');if(budBtn.textContent!==bl)budBtn.textContent=bl;}
     if(W.charging){
       if(!holding)W.charging=false;
-      else{W.charge=Math.min(1,W.charge+dt/TH('chargeTime',1.0));if(!C.castHeld)playerThrow(W);}
+      else{W.charge=Math.min(1,W.charge+dt/(TH('chargeTime',1.0)*MOD.windup));if(!C.castHeld)playerThrow(W);}
     }
   }
 
