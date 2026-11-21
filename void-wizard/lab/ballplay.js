@@ -275,6 +275,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
     { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
+    { id: 'windup', label: 'Wind up', help: 'How long a full-power throw takes to build, as times the Studio setting (Throwing > Wind up); higher is slower',
+      min: 0.3, max: 4, step: 0.1, value: 1, dice: false, fmt: (x) => x.toFixed(1) + '×', apply: (x) => { game.MOD.windup = x; } },
     { id: 'arc', label: 'Normal arc', help: 'The angle a plain throw leaves at', min: 10, max: 70, step: 2, value: 38, dice: false, fmt: (x) => x + '°' },
     { id: 'high', label: 'High arc (L1)', help: 'The angle with L1 held', min: 30, max: 85, step: 2, value: 62, dice: false, fmt: (x) => x + '°' },
     { id: 'low', label: 'Low arc (R1)', help: 'The angle with R1 held', min: 0, max: 30, step: 2, value: 14, dice: false, fmt: (x) => x + '°' },
