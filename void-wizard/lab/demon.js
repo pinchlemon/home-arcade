@@ -212,9 +212,13 @@ LAB.shelf('demon', 'Demon', (game) => {
     const key = g.uuid + ':' + lvl; if (geos.has(key)) return geos.get(key);
     const p = g.parameters || {}; let n = null;
     if (g.type === 'SphereGeometry') n = lvl === 1 ? new T.SphereGeometry(p.radius, 6, 3) : new T.IcosahedronGeometry(p.radius, 0);
-    else if (g.type === 'CylinderGeometry') {
+    else if (g.type === 'CylinderGeometry' && p.radialSegments > 4) {   // already four-sided ones (the antennae) stay as they are
       n = new T.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, lvl === 1 ? 4 : 3, 1, p.openEnded);
-      g.computeBoundingBox(); if (g.boundingBox.min.y > -1e-6) n.translate(0, p.height / 2, 0);   // the legs grow from their top end
+      g.computeBoundingBox(); const b = g.boundingBox, r = Math.max(p.radiusTop, p.radiusBottom) + 1e-4;
+      const upright = Math.abs(b.max.x) <= r && Math.abs(b.min.x) <= r && Math.abs(b.max.z) <= r && Math.abs(b.min.z) <= r;
+      if (!upright) n = null;   // turned when it was built: leave it, rather than stand it up the wrong way
+      else if (b.min.y > -1e-6) n.translate(0, p.height / 2, 0);   // the legs grow from their top end
+      else if (Math.abs(b.max.y - p.height / 2) > 1e-4) n = null;   // moved some other way: leave it
     }
     geos.set(key, n); return n;
   }

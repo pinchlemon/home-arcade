@@ -300,7 +300,8 @@
         "demon.poly": 3,
         "health.on": 1,
         "ball.aim": 90,
-        "ball.cancel": 1
+        "ball.cancel": 1,
+        "ball.own": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -358,7 +359,8 @@
         "demon.poly": "Demon · Polygon CRYSTAL",
         "health.on": "Health · Health ON",
         "ball.aim": "Ball play · Aim speed 90°/S",
-        "ball.cancel": "Ball play · Circle cancels ON"
+        "ball.cancel": "Ball play · Triangle cancels ON",
+        "ball.own": "Ball play · Own solids ON"
       },
       "made": 1794356977080
     },
