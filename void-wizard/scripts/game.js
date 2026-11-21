@@ -158,7 +158,7 @@ function updateWizard(W,dt,inp){
     if(W.downT<=0){W.downT=0;W.grounded=true;W.y=0;W.jumpQ=true;W.landSquash=0.4;}}
   // movement
   let ix=inp.ix,iz=inp.iz;const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il;}
-  const maxSpd=(inp.run?WZ('run',8.5):WZ('walk',5.2))*MOD.speed*(W.stSpeed||1)*(W.charging?WZ('chargeSlow',0.45):1)*(W.crouchK>0.5?WZ('crouchSlow',0.45):1)*(W.slowT>0?0.5:1), a=1-Math.exp(-(down?(W.grounded?(DOWN_TIME-W.downT<1?1.6:14):0.3):(W.grounded?WZ('groundGrip',12):WZ('airGrip',7)))*dt);
+  const maxSpd=(inp.run?WZ('run',8.5):WZ('walk',5.2))*MOD.speed*(W.stSpeed||1)*(W.charging?WZ('chargeSlow',0.45)*(W.aimMove!=null?W.aimMove:1):1)*(W.crouchK>0.5?WZ('crouchSlow',0.45):1)*(W.slowT>0?0.5:1), a=1-Math.exp(-(down?(W.grounded?(DOWN_TIME-W.downT<1?1.6:14):0.3):(W.grounded?WZ('groundGrip',12):WZ('airGrip',7)))*dt);
   W.lungeCD=Math.max(0,W.lungeCD-dt);W.diveCD=Math.max(0,W.diveCD-dt);
   const diving=W.diveT>0;
   if(diving){
@@ -173,6 +173,7 @@ function updateWizard(W,dt,inp){
   let ty=null,turn=16;
   if(speed>0.15&&W.faceLock<=0&&il>0.1)ty=Math.atan2(W.vel.x,W.vel.z);
   else if(W.faceTarget&&W.faceLock<=0){ty=Math.atan2(W.faceTarget.x-W.pos.x,W.faceTarget.z-W.pos.z);turn=8;}
+  if(W.charging&&aimHook&&!down){const y=aimHook(W,ix,iz,il,dt);if(y!=null){ty=null;W.yaw=y;}} // a feature's own aiming while winding up
   if(down){ty=null;W.yaw+=W.spinV*dt;W.spinV*=Math.exp(-(W.grounded?4:0.5)*dt);}
   if(ty!==null){let d=ty-W.yaw;d=Math.atan2(Math.sin(d),Math.cos(d));W.yaw+=d*(1-Math.exp(-turn*dt));}
   if(!down)W.phase+=dt*Math.min(speed,6)*2.9;
@@ -1575,7 +1576,7 @@ for(let i=0;i<9;i++){
   const puddle=glowDisc(0xff4a1a,1.1,0);
   venoms.push({g,v:new THREE.Vector3(),alive:false,acc:0,puddle});
 }
-let venomNext=0,spitHook=null,throwHook=null,padAlias=null,shakeHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
+let venomNext=0,spitHook=null,throwHook=null,padAlias=null,shakeHook=null,aimHook=null; // spitHook: a feature's own attack in place of the spit (returns true when it did one)
 const vLook=new THREE.Vector3();
 function spitVenom(T){
   headCenter(lO);lO.y+=0.05;
@@ -2019,7 +2020,7 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
   lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
   G,playerThrow,throwOrb,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;},get padAlias(){return padAlias;},set padAlias(v){padAlias=v||null;},
-  get shakeHook(){return shakeHook;},set shakeHook(f){shakeHook=f||null;}};
+  get shakeHook(){return shakeHook;},set shakeHook(f){shakeHook=f||null;},get aimHook(){return aimHook;},set aimHook(f){aimHook=f||null;}};
 requestAnimationFrame(frame);
 })();
 

@@ -298,7 +298,8 @@
         "feel.freeze": 0.08,
         "demon.burst": 1,
         "demon.poly": 3,
-        "health.on": 1
+        "health.on": 1,
+        "ball.aim": 90
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -354,7 +355,8 @@
         "feel.freeze": "Feel · Hit freeze 0.08 S",
         "demon.burst": "Demon · Capture burst BEAMS",
         "demon.poly": "Demon · Polygon CRYSTAL",
-        "health.on": "Health · Health ON"
+        "health.on": "Health · Health ON",
+        "ball.aim": "Ball play · Aim speed 90°/S"
       },
       "made": 1794356977080
     },

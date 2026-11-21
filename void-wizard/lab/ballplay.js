@@ -127,6 +127,17 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
   const hook = () => { game.throwHook = get('slider', 0) ? throwHook : null; };
 
+  // ---- aiming while you wind up: turn toward the stick at a limited speed (a light push turns slowly), let go to hold the aim
+  function aimTurn(W, ix, iz, il, dt) {
+    W.aimMove = get('aimMove', 1);
+    if (!W.human) return null;
+    const dead = 0.12; if (il < dead) return W.yaw;
+    let d = Math.atan2(ix, iz) - W.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+    const rate = get('aim', 0) * Math.PI / 180 * Math.pow(Math.min(1, (il - dead) / (1 - dead)), 1.3);
+    return W.yaw + Math.sign(d) * Math.min(Math.abs(d), rate * dt);
+  }
+  const aimOn = () => { game.aimHook = get('aim', 0) ? aimTurn : null; if (!game.aimHook) for (const W of game.ALL) W.aimMove = undefined; };
+
   // ---- switch on throw: take over whoever is nearest where it will come down
   let switchFrom = null;
   FX.on('throw', (W) => { if (get('switch', 0) && W.human && !game.DUEL) switchFrom = W; }, 'lab');
@@ -282,6 +293,9 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'low', label: 'Low arc (R1)', help: 'The angle with R1 held', min: 0, max: 30, step: 2, value: 14, dice: false, fmt: (x) => x + '°' },
     { id: 'tap', label: 'Tap speed', help: 'How fast a quick tap throws it', min: 4, max: 20, step: 1, value: 12, dice: false },
     { id: 'full', label: 'Full speed', help: 'How fast a full hold throws it', min: 14, max: 44, step: 1, value: 22, dice: false },
+    { id: 'aim', label: 'Aim speed', help: 'While you hold the throw, how fast you turn toward the stick (degrees a second at a full push); a light push turns slowly, letting go holds your aim. OFF snaps to the stick',
+      min: 0, max: 360, step: 10, value: 0, dice: false, fmt: (x) => (x ? x + '°/S' : 'OFF'), apply: aimOn },
+    { id: 'aimMove', label: 'Move while aiming', help: 'How fast you can still walk while winding up a throw', min: 0, max: 1, step: 0.1, value: 1, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
     { id: 'path', label: 'Flight arc', help: 'A dotted line showing where the throw will go while you hold it (with Hold to throw)', kind: 'onoff', value: 0, dice: false },
     { id: 'switch', label: 'Switch on throw', help: 'You take over whoever is nearest where it comes down (you stay if that is you)', kind: 'onoff', value: 0, dice: false },
     { id: 'perfect', label: 'Perfect catch', help: 'Press catch just as the Solid arrives for extra resonance', kind: 'onoff', value: 0, dice: false },
