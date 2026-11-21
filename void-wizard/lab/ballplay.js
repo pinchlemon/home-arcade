@@ -26,8 +26,13 @@ LAB.shelf('ball', 'Ball play', (game) => {
       const now = btn(gp, 2), was = !!prev[gp.index]; prev[gp.index] = now;
       const C = W.ctl;
       if (game.blockPad) { if (W.labBtn) { C.castHeld = false; W.labBtn = null; } continue; }
-      if (now && !was && !C.castHeld) { W.labBtn = 'throw'; C.castHeld = true; C.castPressed = true; }
-      if (!now && was && W.labBtn) { C.castHeld = false; W.labBtn = null; }
+      const holding = o.state === 'held' && o.holder === W;
+      if (now && !was && W.labAiming) { W.charge = W.labPower; W.labFire = W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // second tap throws
+      else if (now && !was && !C.castHeld) {
+        W.labBtn = 'throw'; C.castHeld = true; C.castPressed = true;
+        if (holding && get('power', 0)) { W.labAiming = true; W.labPower = lastPower; W.labBtn = 'aim'; }   // Distance: RIGHT STICK, the first tap starts aiming
+      }
+      if (!now && was && W.labBtn === 'throw') { C.castHeld = false; W.labBtn = null; }
     }
   }
   let hintWas = null;
@@ -59,7 +64,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     return { dx: Math.sin(W.yaw), dz: Math.cos(W.yaw), vh: sp * Math.cos(a), vy: sp * Math.sin(a), mod };
   }
   function holdThrow(W) {
-    const c = W.charge, L = launch(W, c);
+    const c = W.labFire != null ? W.labFire : W.charge, L = launch(W, c); W.labFire = null;
     game.throwOrb(W, c, L.dx, L.dz, L.vh, L.vy, true);
     if (L.mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
     if (get('super', 0) && L.mod < 0 && c >= 0.95 && o.res >= get('superRes', 5)) superShot(W);
@@ -108,7 +113,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     const show = get('path', 0) && get('slider', 0) && !game.DUEL && W.charging && o.state === 'held' && o.holder === W && W.crouchK <= 0.5;
     if (!show) { if (dots) for (const d of dots) d.visible = false; return; }
     if (!dots) makeDots();
-    const L = launch(W, W.charge), g = game.G * game.solid.grav, gap = 0.6, col = game.solid.color, h = 1 / 120;
+    const L = launch(W, W.labAiming ? W.labPower : W.charge), g = game.G * game.solid.grav, gap = 0.6, col = game.solid.color, h = 1 / 120;
     march = (march + dt * 1.4) % gap;   // the dots creep forward along the path
     sim.copy(o.p); simV.set(L.dx * L.vh, L.vy, L.dz * L.vh);
     let n = 0, acc = gap - march;
@@ -126,6 +131,36 @@ LAB.shelf('ball', 'Ball play', (game) => {
     holdThrow(W); return true;
   }
   const hook = () => { game.throwHook = get('slider', 0) ? throwHook : null; };
+
+  // ---- Distance: RIGHT STICK. While aiming, up and down on the right stick set how far it goes (the camera stops zooming);
+  // it remembers the last distance for the next throw.
+  let lastPower = 0.5;
+  function aimPower(dt) {
+    for (const W of game.ALL) {
+      if (!W.labAiming) continue;
+      const holding = o.state === 'held' && o.holder === W;
+      if (!W.human || !holding || (!W.charging && !W.ctl.castPressed) || game.blockPad) { W.labAiming = false; W.ctl.castHeld = false; W.labBtn = null; continue; }
+      const a = (W.gp && W.gp.axes[3]) || 0, ry = Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8;
+      W.labPower = lastPower = Math.min(1, Math.max(0, W.labPower - ry * dt * 0.9));   // up is farther
+      W.charge = W.labPower;
+    }
+  }
+
+  // ---- Circle cancels a throw you're winding up or aiming: you keep the Solid, and it doesn't dive
+  let circleWas = {}, skipCircle = false;
+  function cancelCheck() {
+    let need = false;
+    for (const W of game.ALL) {
+      if (!W.human || !W.gp) continue;
+      const i = W.gp.index, now = btn(W.gp, 1), was = !!circleWas[i]; circleWas[i] = now;
+      if (W.charging && now && !was && !game.blockPad) {
+        W.charging = false; W.charge = 0; W.labAiming = false; W.labBtn = null; W.ctl.castHeld = false; W.ctl.castPressed = false;
+        game.popup('CANCEL', W.pos, '#9aa4b8');
+      }
+      if (W.charging || (now && (was || skipCircle))) need = true;   // keep Circle from the game until it's let go, so no dive
+    }
+    if (need !== skipCircle) { skipCircle = need; LAB.skip('cancel', need ? [1] : null); }
+  }
 
   // ---- aiming while you wind up: turn toward the stick at a limited speed (a light push turns slowly), let go to hold the aim
   function aimTurn(W, ix, iz, il, dt) {
@@ -271,6 +306,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
+    if (get('power', 0)) aimPower(dt);
+    if (get('cancel', 0) || skipCircle) cancelCheck();
     if (get('path', 0) || dots) preview(dt);
     if (oneTimer) fireOneTimer();
     const r = get('ring', 0); if (r || ring) showRing(r, dt);
@@ -286,6 +323,9 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
     { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
+    { id: 'power', label: 'Distance', help: (x) => x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
+      min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (x) => (x ? 'RIGHT STICK' : 'HOLD') },
+    { id: 'cancel', label: 'Circle cancels', help: 'While winding up or aiming a throw, Circle cancels it (you keep the Solid and do not dive)', kind: 'onoff', value: 0, dice: false },
     { id: 'windup', label: 'Wind up', help: 'How long a full-power throw takes to build, as times the Studio setting (Throwing > Wind up); higher is slower',
       min: 0.3, max: 4, step: 0.1, value: 1, dice: false, fmt: (x) => x.toFixed(1) + '×', apply: (x) => { game.MOD.windup = x; } },
     { id: 'arc', label: 'Normal arc', help: 'The angle a plain throw leaves at', min: 10, max: 70, step: 2, value: 38, dice: false, fmt: (x) => x + '°' },
