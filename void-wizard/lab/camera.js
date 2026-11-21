@@ -13,7 +13,7 @@ LAB.shelf('camera', 'Camera', (game) => {
     const dz = (a) => (Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8);
     const rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
     if (rx) yaw -= rx * dt * 2.4 * (LAB.get('camera.stickSpeed') ?? 1);
-    if (ry && !(game.you && game.you.labAiming)) zoom = Math.min(2.2, Math.max(0.5, zoom * Math.exp(-ry * dt * 1.4)));
+    if (ry && !(game.you && game.you.labAiming && game.you.labAimStick)) zoom = Math.min(2.2, Math.max(0.5, zoom * Math.exp(-ry * dt * 1.4)));
     if (gp.buttons[11] && gp.buttons[11].pressed) { yaw = 0; zoom = 1; }
     game.MOD.turn = yaw;
   }, 'lab');

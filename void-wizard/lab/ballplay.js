@@ -132,18 +132,25 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
   const hook = () => { game.throwHook = get('slider', 0) ? throwHook : null; };
 
-  // ---- Distance: RIGHT STICK. While aiming, up and down on the right stick set how far it goes (the camera stops zooming);
-  // it remembers the last distance for the next throw.
-  let lastPower = 0.5;
+  // ---- Distance: RIGHT STICK or TRIGGERS. While aiming, up and down on the right stick (the camera stops zooming), or RT
+  // farther and LT shorter (run and tackle wait until you let go), set how far it goes; it remembers the last distance.
+  let lastPower = 0.5, skipTrig = false;
+  const trig = (gp, i) => { const b = gp && gp.buttons[i]; return b ? Math.max(b.value || 0, b.pressed ? 1 : 0) : 0; };
   function aimPower(dt) {
+    const mode = get('power', 0); let needSkip = false;
     for (const W of game.ALL) {
+      if (mode === 2 && W.human && W.gp && (W.labAiming || (skipTrig && (trig(W.gp, 6) > 0.1 || trig(W.gp, 7) > 0.1)))) needSkip = true;
       if (!W.labAiming) continue;
+      W.labAimStick = mode === 1;
       const holding = o.state === 'held' && o.holder === W;
       if (!W.human || !holding || (!W.charging && !W.ctl.castPressed) || game.blockPad) { W.labAiming = false; W.ctl.castHeld = false; W.labBtn = null; continue; }
-      const a = (W.gp && W.gp.axes[3]) || 0, ry = Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8;
-      W.labPower = lastPower = Math.min(1, Math.max(0, W.labPower - ry * dt * 0.9));   // up is farther
+      let push = 0;
+      if (mode === 2) push = trig(W.gp, 7) - trig(W.gp, 6);   // RT farther, LT shorter, by how hard they're pressed
+      else { const a = (W.gp && W.gp.axes[3]) || 0; push = -(Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8); }   // stick up is farther
+      W.labPower = lastPower = Math.min(1, Math.max(0, W.labPower + push * dt * 0.9));
       W.charge = W.labPower;
     }
+    if (needSkip !== skipTrig) { skipTrig = needSkip; LAB.skip('aimtrig', needSkip ? [4, 5] : null); }   // the game's tackle and run (read from LT and RT)
   }
 
   // ---- Circle cancels a throw you're winding up or aiming: you keep the Solid, and it doesn't dive
@@ -306,7 +313,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
-    if (get('power', 0)) aimPower(dt);
+    if (get('power', 0) || skipTrig) aimPower(dt);
     if (get('cancel', 0) || skipCircle) cancelCheck();
     if (get('path', 0) || dots) preview(dt);
     if (oneTimer) fireOneTimer();
@@ -323,8 +330,9 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
     { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
-    { id: 'power', label: 'Distance', help: (x) => x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
-      min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (x) => (x ? 'RIGHT STICK' : 'HOLD') },
+    { id: 'power', label: 'Distance', help: (x) => x === 2 ? 'Tap Square to aim, hold RT to throw farther and LT shorter, tap Square again to throw (Sports buttons)'
+      : x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
+      min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['HOLD', 'RIGHT STICK', 'TRIGGERS'][x] },
     { id: 'cancel', label: 'Circle cancels', help: 'While winding up or aiming a throw, Circle cancels it (you keep the Solid and do not dive)', kind: 'onoff', value: 0, dice: false },
     { id: 'windup', label: 'Wind up', help: 'How long a full-power throw takes to build, as times the Studio setting (Throwing > Wind up); higher is slower',
       min: 0.3, max: 4, step: 0.1, value: 1, dice: false, fmt: (x) => x.toFixed(1) + '×', apply: (x) => { game.MOD.windup = x; } },
