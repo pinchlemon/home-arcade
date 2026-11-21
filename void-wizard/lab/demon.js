@@ -190,7 +190,7 @@ LAB.shelf('demon', 'Demon', (game) => {
     });
     game.fxSphere(p, 0xffffff, big ? 4 : 2.6, 0.3); game.fxSphere(p, hex, big ? 7 : 4.5, 0.6);
     game.fxRing(p.x, p.z, hex, big ? 9 : 6, 0.7); game.fxRing(p.x, p.z, 0xffffff, big ? 5 : 3.5, 0.5, 0.08);
-    game.shake(big ? 0.45 : 0.3);
+    game.shake(big ? 0.45 : 0.3); window.FEATURES.emit('captureBurst', p);
   }
   window.FEATURES.on('frame', (dt) => {
     if (!BU || !BU.root.visible) return;

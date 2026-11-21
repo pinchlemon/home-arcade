@@ -107,13 +107,13 @@ LAB.shelf('attacks', 'Attacks', (game) => {
   }
   function startBreath(W) {
     if (!flames) makeFlames();
-    breath = { t: 0, len: get('breathLen', 1.4), W, acc: 0, hit: new Set() };
+    breath = { t: 0, len: get('breathLen', 1.4), W, acc: 0, hit: new Set() }; game.labBreathing = true;   // the Sound shelf roars while this is on
     return true;
   }
   function breathe(dt) {
     if (!breath) return;
     const B = breath;
-    if (!D.alive || D.dying || D.stunT > 0 || B.t >= B.len) { breath = null; return; }
+    if (!D.alive || D.dying || D.stunT > 0 || B.t >= B.len) { breath = null; game.labBreathing = false; return; }
     B.t += dt;
     D.state = 'recover'; D.atkT = Math.max(D.atkT, 0.35);   // it stays put (head low) until the breath ends
     // turn toward the target: the game turns it a little; Sweep adds more (or holds it still at 0)

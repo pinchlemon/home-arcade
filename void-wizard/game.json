@@ -165,6 +165,7 @@
       "spawn",
       "camera",
       "feel",
+      "sound",
       "hud",
       "colours",
       "stars",
@@ -303,7 +304,11 @@
         "ball.cancel": 1,
         "ball.own": 1,
         "ball.resHold": 8,
-        "ball.resAim": 1
+        "ball.resAim": 1,
+        "sound.on": 1,
+        "feel.punch": 0.6,
+        "feel.slow": 0.25,
+        "feel.squash": 1
       },
       "labels": {
         "bodies.demon": "Bodies · Demon size 2.0",
@@ -364,7 +369,11 @@
         "ball.cancel": "Ball play · Triangle cancels ON",
         "ball.own": "Ball play · Own solids ON",
         "ball.resHold": "Ball play · Resonance holds 8 S",
-        "ball.resAim": "Ball play · No fade while aiming ON"
+        "ball.resAim": "Ball play · No fade while aiming ON",
+        "sound.on": "Sound · Sound ON",
+        "feel.punch": "Feel · Zoom punch 60%",
+        "feel.slow": "Feel · Final slow-mo 25% SPEED",
+        "feel.squash": "Feel · Squash 100%"
       },
       "made": 1794356977080
     },

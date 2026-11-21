@@ -169,7 +169,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
       const i = W.gp.index, now = btn(W.gp, 3), was = !!circleWas[i]; circleWas[i] = now;
       if (W.charging && now && !was && !game.blockPad) {
         W.charging = false; W.charge = 0; W.labAiming = false; W.labR1 = false; W.labBtn = null; W.ctl.castHeld = false; W.ctl.castPressed = false;
-        game.popup('CANCEL', W.pos, '#9aa4b8');
+        game.popup('CANCEL', W.pos, '#9aa4b8'); FX.emit('throwCancel', W);
       }
       if (W.charging || (now && (was || skipCircle))) need = true;   // keep Triangle from the game until it's let go, so the shape doesn't change
     }
@@ -238,7 +238,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (!get('perfect', 0) || !caught || !W.human || game.DUEL) return;
     const C = W.ctl; if (!(C.catchT > 0 && C.catchT <= 0.2 + 1e-6)) return;   // a dive's long catch window doesn't count
     if (0.2 - C.catchT > get('window', 0.12) + 1 / 60) return;
-    o.res = Math.min(5, o.res + get('bonus', 1)); perfectFlash = 1;
+    o.res = Math.min(5, o.res + get('bonus', 1)); perfectFlash = 1; FX.emit('perfectCatch', W);
     game.popup('PERFECT!', W.pos, '#ffffff', true); game.sparkBurst(o.p, 18, 3.2, 0.7); game.rumble(W, 0.2, 0.7, 90); game.shake(0.08);
     if (sports() && modOf(W) < 0 && o.res >= get('oop', 3)) oneTimer = W;
   }, 'lab');
