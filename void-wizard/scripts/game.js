@@ -6,7 +6,7 @@ const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typ
 // features: add-ons in features/ that hook into the game (engine/features.js). With none on, nothing here changes how it plays.
 const FX=window.FEATURES||{emit(){},on(){}};
 // multipliers a feature can change (1 = normal)
-const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,windup:1,turn:0,passCone:2,passSpeed:1,autoCatch:0}; // passCone: a standing throw goes to a teammate within this (cosine of the angle; 2 is off); passSpeed: those passes fly this much faster; autoCatch: you catch without pressing // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
+const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,windup:1,resHold:1,resStep:1,resAim:0,turn:0,passCone:2,passSpeed:1,autoCatch:0}; // passCone: a standing throw goes to a teammate within this (cosine of the angle; 2 is off); passSpeed: those passes fly this much faster; autoCatch: you catch without pressing // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -1826,7 +1826,7 @@ function frame(now){
     holdSpot(hw,tmp);
     orb.p.lerp(tmp,1-Math.exp(-(hw.charging?16:7)*dt));
     orb.heldFor+=dt;
-    if(orb.heldFor>3&&orb.res>0){orb.decayT+=dt;if(orb.decayT>0.8){orb.decayT=0;orb.res--;fizzle();}}
+    if(orb.heldFor>3*MOD.resHold&&orb.res>0&&!(MOD.resAim&&orb.holder&&orb.holder.charging)){orb.decayT+=dt;if(orb.decayT>0.8*MOD.resStep){orb.decayT=0;orb.res--;fizzle();}}
     const c=hw.charging?hw.charge:0;
     orbSpin.rotation.y+=dt*(1.4+c*4);orbSpin.rotation.x=Math.sin(time*0.9)*0.5;
     orbG.scale.setScalar((1+c*0.45)*morphScale);
