@@ -41,7 +41,7 @@ feature('lab', ({ game, on }) => {
     ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown'],
       ['Shake', 'feel.strength feel.style feel.length'], ['Hits', 'feel.freeze feel.punch'],
       ['Final blow', 'feel.slow feel.slowLen'], ['Wizards', 'feel.squash']]],
-    ['sound', 'Sound', [['Sound', 'sound.on sound.music sound.volume'], ['Mix', 'sound.ball sound.magic sound.hits sound.demon sound.wiz'], ['Character', 'sound.room sound.crunch']]],
+    ['sound', 'Sound', [['Sound', 'sound.on sound.music sound.volume'], ['Mix', 'sound.ball sound.wind sound.magic sound.hits sound.demon sound.wiz'], ['Character', 'sound.room sound.crunch']]],
     ['ps1', 'PS1', [['Models', 'ps1.snap ps1.wobble ps1.lowpoly ps1.gouraud'], ['Picture', 'ps1.depth ps1.fog']]],
     ['ps2', 'PS2', [['Console', 'ps2.res ps2.c16 ps2.bloom ps2.wash ps2.rays ps2.blur'], ['TV', 'ps2.inter ps2.comp']]]
   ];

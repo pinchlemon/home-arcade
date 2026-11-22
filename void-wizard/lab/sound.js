@@ -5,7 +5,7 @@
 //   - sounds are built in layers, the way sampled effects were: a hit is a deep thump, a body and a crack together;
 //   - magic is glassy FM bells and shimmer; voices are breathy formant grunts; whooshes sweep across the speakers.
 // Effects: throws whoosh (bigger with power, a hard low shot cracks), catches thump with a bell that climbs a scale as
-// resonance builds, a perfect catch rings, the wind-up swells like a spell charging, resonance fizzles, the Solid
+// resonance builds, a perfect catch rings, the wind-up clicks lightly like a toy being wound, resonance fizzles, the Solid
 // shimmers when it changes shape, hits on the centipede land deep (a super shot is huge), the centipede spits, splats,
 // roars its fire breath and falls, the capture swells into a choir; wizards dive, tackle, hop, land and grunt.
 // Music: a moody loop (pads, bass, breakbeat, bells) that builds with the fight: calm when nothing's going on, drums
@@ -41,7 +41,7 @@ LAB.shelf('sound', 'Sound', (game) => {
     verbIn.connect(verb).connect(verbOut).connect(master); verbOut.gain.value = 0.9;
     // one bus per kind of sound, each with a dry part and a reverb part
     const G = {};
-    for (const k of ['ball', 'magic', 'hits', 'demon', 'wiz', 'music']) {
+    for (const k of ['ball', 'magic', 'hits', 'demon', 'wiz', 'wind', 'music']) {
       const dry = ctx.createGain(), wet = ctx.createGain(), vol = ctx.createGain();
       vol.connect(dry).connect(master); vol.connect(wet).connect(verbIn); G[k] = { vol, dry, wet };
     }
@@ -64,7 +64,7 @@ LAB.shelf('sound', 'Sound', (game) => {
       if (rev) { const s = ctx.createGain(); s.gain.value = rev; n.connect(s).connect(G[g].wet); }
     }
     function env(t, at, dur, vol, hold = 0) {   // up fast, (hold), then die away
-      const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(vol, t + at);
+      const e = ctx.createGain(); e.gain.value = 0.0001; e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(vol, t + at);   // silent from the start: no pop on the first sample
       if (hold) e.gain.setValueAtTime(vol, t + at + hold);
       e.gain.exponentialRampToValueAtTime(0.0001, t + at + hold + dur); return e;
     }
@@ -169,20 +169,17 @@ LAB.shelf('sound', 'Sound', (game) => {
     S.land = (pan = 0, v = 1) => { const t = now(); osc(t, 'sine', 110, 50, 0.12, 0.3 * v, { g: 'wiz', rev: 0.1, pan }); hiss(t, 0.16, 0.1 * v, { type: 'lowpass', f0: 1200, f1: 400, g: 'wiz', pan }); };
     S.knock = (pan = 0, v = 1) => { const t = now(); S.land(pan, v * 1.3); grunt(t + 0.02, 200, 110, 0.3, 0.3 * v, { a: 600, b: 1000, pan }); };   // "oof"
 
-    // ---- held sounds: the spell charging, the fire breath
+    // ---- the wind-up: tiny, light clicks, like winding a toy; one each time the power steps up, a touch higher each time.
+    // Nothing while the power isn't changing.
+    E.tick = (k, pan = 0) => { const t = now();
+      hiss(t, 0.005, 0.012, { type: 'highpass', f0: 5200 + k * 140, q: 0.8, g: 'wind', rev: 0.06, pan, at: 0.0008 });
+      osc(t, 'sine', 2600 + k * 90, 2600 + k * 90, 0.016, 0.004, { g: 'wind', rev: 0.08, pan, at: 0.0008 });
+    };
     E.charge = (c) => {   // c: 0..1 while winding up; null stops
-      if (c == null) { if (E._ch) { const h = E._ch; E._ch = null; h.e.gain.setTargetAtTime(0.0001, now(), 0.04); h.stop(now() + 0.3); } return; }
-      if (!E._ch) {
-        const e = ctx.createGain(), f = ctx.createBiquadFilter(), oss = [], lfo = ctx.createOscillator(), lg = ctx.createGain();
-        f.type = 'lowpass'; f.Q.value = 6; f.frequency.value = 500; lfo.frequency.value = 6; lg.gain.value = 0.35;
-        const trem = ctx.createGain(); trem.gain.value = 0.65; lfo.connect(lg).connect(trem.gain);
-        for (const [type, d, m] of [['sawtooth', -8, 1], ['sawtooth', 8, 1], ['sine', 0, 2], ['triangle', 0, 3]]) { const s = ctx.createOscillator(); s.type = type; s.detune.value = d; s.labMul = m; s.connect(f); oss.push(s); s.start(); }
-        f.connect(trem).connect(e); out(e, 'magic', 0.5); e.gain.value = 0.0001; e.gain.setTargetAtTime(0.06, now(), 0.06); lfo.start();
-        E._ch = { e, f, oss, lfo, stop: (t) => { for (const s of oss) s.stop(t); lfo.stop(t); } };
-      }
-      const h = E._ch, f0 = 110 + c * 330, t = now();
-      for (const s of h.oss) s.frequency.setTargetAtTime(f0 * s.labMul, t, 0.05);
-      h.f.frequency.setTargetAtTime(400 + c * 3200, t, 0.08); h.lfo.frequency.setTargetAtTime(5 + c * 9, t, 0.1);
+      if (c == null) { E._step = null; return; }
+      const st = Math.floor(c * 16);
+      if (E._step == null) { E._step = st; return; }
+      if (st !== E._step) { E.tick(st); E._step = st; }
     };
     E.roar = (on) => {
       if (!on) { if (E._roar) { const r = E._roar; E._roar = null; r.e.gain.setTargetAtTime(0.0001, now(), 0.15); r.stop(now() + 0.8); } return; }
@@ -256,8 +253,8 @@ LAB.shelf('sound', 'Sound', (game) => {
   function mix() {
     if (!E) return;
     E.set({ volume: get('volume', 0.8), room: get('room', 0.5), crunch: get('crunch', 0),
-      vols: { ball: get('ball', 1), magic: get('magic', 1), hits: get('hits', 1), demon: get('demon', 1), wiz: get('wiz', 1), music: get('music', 0) * (get('on', 0) || get('music', 0) ? 1 : 0) } });
-    if (!get('on', 0)) for (const k of ['ball', 'magic', 'hits', 'demon', 'wiz']) E.groups[k].vol.gain.value = 0;
+      vols: { ball: get('ball', 1), magic: get('magic', 1), hits: get('hits', 1), demon: get('demon', 1), wiz: get('wiz', 1), wind: get('wind', 1), music: get('music', 0) * (get('on', 0) || get('music', 0) ? 1 : 0) } });
+    if (!get('on', 0)) for (const k of ['ball', 'magic', 'hits', 'demon', 'wiz', 'wind']) E.groups[k].vol.gain.value = 0;
     music();
   }
   function music() {   // books notes ahead on a timer while Music is up
@@ -330,7 +327,8 @@ LAB.shelf('sound', 'Sound', (game) => {
       fmt: (x) => (x ? pct(x) : 'OFF'), apply: () => { if (anyOn()) wantEngine(); mix(); } },
     { id: 'volume', label: 'Volume', help: 'Everything together', min: 0, max: 1.5, step: 0.05, value: 0.8, dice: false, fmt: pct, apply: mix },
     { id: 'ball', label: 'Throws and catches', help: 'Whooshes and the thump of a catch', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
-    { id: 'magic', label: 'Resonance', help: 'The bells as it builds, the perfect-catch chime, the spell-charging wind-up, fizzles and shape changes', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
+    { id: 'magic', label: 'Resonance', help: 'The bells as it builds, the perfect-catch chime, fizzles and shape changes', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
+    { id: 'wind', label: 'Wind-up clicks', help: 'The light clicks as you wind up or set a throw, like winding a toy', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF'), apply: mix },
     { id: 'hits', label: 'Hits', help: 'The Solid hitting the centipede, and the super shot', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
     { id: 'demon', label: 'Centipede', help: 'Spit, splats, fire breath and its fall', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
     { id: 'wiz', label: 'Wizards', help: 'Dives, tackles, hops, landings and grunts', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
