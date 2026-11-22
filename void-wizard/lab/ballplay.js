@@ -19,7 +19,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
   const prev = {};
   const btn = (gp, i) => !!(gp && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.3));
   const sports = () => get('buttons', 0) === 1 && !game.DUEL;
-  const modOf = (W) => { const hi = btn(W.gp, 4), lo = btn(W.gp, 5); return hi === lo ? 0 : hi ? 1 : -1; };   // L1 higher, R1 lower
+  const modOf = (W) => { const hi = btn(W.gp, 4), lo = !get('lock', 0) && btn(W.gp, 5); return hi === lo ? 0 : hi ? 1 : -1; };   // L1 higher, R1 lower (R1 locks on instead, with Lock-on)
+  const stickY = (W) => { const a = (W.gp && W.gp.axes[1]) || 0; return Math.abs(a) < 0.15 ? 0 : -(a - Math.sign(a) * 0.15) / 0.85; };   // + up
   function readButtons() {   // Square: the game's throw-and-catch button, pressed and let go
     for (const W of game.ALL) {
       const gp = W.human && W.gp; if (!gp) continue;
@@ -59,8 +60,13 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   // ---- hold to throw: speed from the hold, arc from the shoulder buttons
   function launch(W, c) {   // how a throw would leave the hand now: speed from the hold, angle from the shoulder buttons
-    const S = game.solid, mod = sports() ? modOf(W) : 0;
-    const deg = mod > 0 ? get('high', 62) : mod < 0 ? get('low', 14) : get('arc', 38), a = deg * Math.PI / 180;
+    const S = game.solid, by = sports() ? get('arcBy', 0) : 0;
+    let mod = sports() ? modOf(W) : 0, deg;
+    if (by) {   // Arc by STICK: the left stick's up and down set the arc smoothly, low line to high lob
+      const y = stickY(W) * (by === 2 ? -1 : 1), A = get('arc', 38);
+      deg = y >= 0 ? A + (get('high', 62) - A) * y : A + (A - get('low', 14)) * y; mod = y > 0.5 ? 1 : y < -0.5 ? -1 : 0;
+    } else deg = mod > 0 ? get('high', 62) : mod < 0 ? get('low', 14) : get('arc', 38);
+    const a = deg * Math.PI / 180;
     const tap = get('tap', 12), sp = (tap + (get('full', 22) - tap) * c) * (W.stThrow || 1) * Math.sqrt(S.grav * S.range);   // every solid goes about as far
     return { dx: Math.sin(W.yaw), dz: Math.cos(W.yaw), vh: sp * Math.cos(a), vy: sp * Math.sin(a), mod };
   }
@@ -178,14 +184,77 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   // ---- aiming while you wind up: turn toward the stick at a limited speed (a light push turns slowly), let go to hold the aim
   function aimTurn(W, ix, iz, il, dt) {
-    W.aimMove = get('aimMove', 1);
+    W.aimMove = get('arcBy', 0) && sports() ? 0 : get('aimMove', 1);
     if (!W.human) return null;
+    if (lock && W === game.you && lockPos(lock, at)) {   // locked on: face the target
+      let d = Math.atan2(at.x - W.pos.x, at.z - W.pos.z) - W.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      return W.yaw + d * Math.min(1, dt * 14);
+    }
+    if (get('arcBy', 0) && sports()) {   // the stick's up-down is the arc: only its left-right turns (right turns you right)
+      const x = (W.gp && W.gp.axes[0]) || 0, xx = Math.abs(x) < 0.15 ? 0 : (x - Math.sign(x) * 0.15) / 0.85;
+      return W.yaw - xx * Math.abs(xx) * (get('aim', 0) || 120) * Math.PI / 180 * dt;
+    }
+    if (!get('aim', 0)) return null;
     const dead = 0.12; if (il < dead) return W.yaw;
     let d = Math.atan2(ix, iz) - W.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
     const rate = get('aim', 0) * Math.PI / 180 * Math.pow(Math.min(1, (il - dead) / (1 - dead)), 1.3);
     return W.yaw + Math.sign(d) * Math.min(Math.abs(d), rate * dt);
   }
-  const aimOn = () => { game.aimHook = get('aim', 0) ? aimTurn : null; if (!game.aimHook) for (const W of game.ALL) W.aimMove = undefined; };
+  const aimOn = () => { game.aimHook = get('aim', 0) || get('arcBy', 0) || get('lock', 0) ? aimTurn : null; if (!game.aimHook) for (const W of game.ALL) W.aimMove = undefined; };
+
+  // ---- lock-on: R1 picks what you're facing (the centipede or a teammate), the right stick flicks to the next one left
+  // or right, the camera keeps you both in view, a little triangle bobs over the target, and you aim at it while winding up
+  let lock = null, lockK = 0, r1Was = false, flick = 0, marker = null, bob = 0;
+  const lockPos = (L, out) => {   // where the target is (the demon's head, or a wizard's chest); false when it's gone
+    if (L === 'demon') { const d = game.demon; if (!d.alive || d.dying) return false; game.headCenter(out); return true; }
+    if (!game.ALL.includes(L) || L === game.you) return false; out.set(L.pos.x, (L.y || 0) + 1, L.pos.z); return true;
+  };
+  function targets() { const list = []; const d = game.demon; if (d.alive && !d.dying) list.push('demon'); for (const W of game.ALL) if (W !== game.you) list.push(W); return list; }
+  function pickFacing() {   // the target nearest to where you face; the centipede counts a little nearer than it is
+    const me = game.you, fx = Math.sin(me.yaw), fz = Math.cos(me.yaw); let best = null, bs = -9;
+    for (const L of targets()) { if (!lockPos(L, v2)) continue; const dx = v2.x - me.pos.x, dz = v2.z - me.pos.z, d = Math.hypot(dx, dz) || 1;
+      const sc = (dx * fx + dz * fz) / d - d * 0.004 + (L === 'demon' ? 0.15 : 0); if (sc > bs) { bs = sc; best = L; } }
+    return best;
+  }
+  function cycle(dir) {   // the next target to the right (1) or left (-1) on screen
+    const cam = game.camera, me = game.you; if (!lockPos(lock, v2)) return;
+    const cur = v2.clone().project(cam).x; let best = null, bd = 9;
+    for (const L of targets()) { if (L === lock || !lockPos(L, v1)) continue; const x = v1.clone().project(cam).x, dd = (x - cur) * dir; if (dd > 0.001 && dd < bd) { bd = dd; best = L; } }
+    if (!best) { let ex = null, ev = 9 * -dir; for (const L of targets()) { if (L === lock || !lockPos(L, v1)) continue; const x = v1.clone().project(cam).x; if (dir > 0 ? x < ev : x > ev) { ev = x; ex = L; } } best = ex; }   // wrap round
+    if (best) { lock = best; game.popup(best === 'demon' ? 'CENTIPEDE' : 'TEAMMATE', me.pos, '#ffd36a'); }
+  }
+  function lockTick(dt) {
+    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad;
+    if (!mode || game.DUEL || !sports()) lock = null;
+    else {
+      if (mode === 1 && r1 && !r1Was) lock = lock ? null : pickFacing();   // press: on, press again: off
+      if (mode === 2) { if (r1 && !lock) lock = pickFacing(); if (!r1) lock = null; }   // hold
+      if (lock && !lockPos(lock, at)) lock = lock !== 'demon' && targets().includes('demon') ? 'demon' : null;   // its target's gone
+      const rx = (gp && gp.axes[2]) || 0;   // right stick: flick left or right for the next target
+      if (lock && !flick && Math.abs(rx) > 0.6) { flick = Math.sign(rx); cycle(flick); } else if (Math.abs(rx) < 0.3) flick = 0;
+    }
+    r1Was = r1;
+    for (const W of game.ALL) W.labLocked = W === me && !!lock;
+    lockK += ((lock ? 1 : 0) - lockK) * (1 - Math.exp(-dt * 6));
+    // the marker: a little upside-down triangle bobbing over the target
+    if (lock && !marker) {
+      marker = new T.Mesh(new T.ConeGeometry(0.38, 0.7, 3), new T.MeshBasicMaterial({ color: 0xffd36a, transparent: true, depthTest: false }));
+      marker.rotation.x = Math.PI; marker.renderOrder = 20; game.scene.add(marker);
+    }
+    if (marker) { marker.visible = !!lock && lockPos(lock, at);
+      if (marker.visible) { bob += dt; marker.position.set(at.x, at.y + (lock === 'demon' ? 1.6 : 1.4) + Math.abs(Math.sin(bob * 4.5)) * 0.25, at.z); marker.rotation.y += dt * 2; } }
+  }
+  // the camera, last of all: behind you, looking past you at the target
+  const lp = new T.Vector3(), lk = new T.Vector3();
+  game.labLockView = (cam, look) => {   // the Camera shelf calls this after its own moves
+    if (lockK < 0.01) return;
+    const me = game.you; if (!lock || !lockPos(lock, at)) { if (lockK < 0.02) lockK = 0; return; }
+    const off = v1.copy(cam.position).sub(look), hdist = Math.hypot(off.x, off.z), up = off.y;
+    const dx = at.x - me.pos.x, dz = at.z - me.pos.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
+    lk.set(me.pos.x + dx * 0.3, 1 + (at.y - 1) * 0.3, me.pos.z + dz * 0.3);   // between you and it, nearer you
+    lp.set(me.pos.x - ux * hdist * 0.75, lk.y + up * 0.85, me.pos.z - uz * hdist * 0.75);
+    cam.position.lerp(lp, lockK); v2.copy(look).lerp(lk, lockK); cam.lookAt(v2);
+  };
 
   // ---- switch on throw: take over whoever is nearest where it will come down
   let switchFrom = null;
@@ -240,7 +309,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (0.2 - C.catchT > get('window', 0.12) + 1 / 60) return;
     o.res = Math.min(5, o.res + get('bonus', 1)); perfectFlash = 1; FX.emit('perfectCatch', W);
     game.popup('PERFECT!', W.pos, '#ffffff', true); game.sparkBurst(o.p, 18, 3.2, 0.7); game.rumble(W, 0.2, 0.7, 90); game.shake(0.08);
-    if (sports() && modOf(W) < 0 && o.res >= get('oop', 3)) oneTimer = W;
+    if (sports() && (get('lock', 0) ? lock === 'demon' : modOf(W) < 0) && o.res >= get('oop', 3)) oneTimer = W;
   }, 'lab');
   function fireOneTimer() {
     const W = oneTimer; oneTimer = null;
@@ -353,7 +422,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
-    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (W.human && modOf(W) < 0) W.labR1 = true; }
+    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (W.human && (get('lock', 0) ? lock === 'demon' && W === game.you : modOf(W) < 0)) W.labR1 = true; }
+    if (get('lock', 0) || lock) lockTick(dt);
     if (get('power', 0) || skipTrig) aimPower(dt);
     if (get('cancel', 0) || skipCircle) cancelCheck();
     if (get('path', 0) || dots) preview(dt);
@@ -374,6 +444,10 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
     { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
+    { id: 'lock', label: 'Lock-on', help: (x) => x ? 'R1 locks onto what you face (the centipede or a teammate): the camera frames you both, you aim at it, the right stick flicks to the next target' + (x === 2 ? ' (hold R1)' : ' (press R1 again to let go)') : 'R1 throws lower',
+      min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'R1 PRESS', 'R1 HOLD'][x], apply: () => { aimOn(); if (!get('lock', 0)) lock = null; } },
+    { id: 'arcBy', label: 'Arc by', help: (x) => x ? 'While winding up, the left stick ' + (x === 1 ? 'up throws higher, down lower' : 'down throws higher, up lower') + '; left and right turn you; you stand still' : 'L1 throws higher, R1 lower',
+      min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['SHOULDERS', 'STICK, UP = HIGH', 'STICK, UP = LOW'][x], apply: aimOn },
     { id: 'power', label: 'Distance', help: (x) => x === 2 ? 'Hold Square to aim, RT throws farther and LT shorter, let go of Square to throw (Sports buttons)'
       : x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
       min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['HOLD', 'RIGHT STICK', 'TRIGGERS'][x] },
