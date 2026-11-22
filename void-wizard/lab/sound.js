@@ -56,25 +56,29 @@ LAB.shelf('sound', 'Sound', (game) => {
       spu.frequency.value = crunch ? 11000 - crunch * 1800 : 11000;
     };
 
-    // ---- building blocks. Every one ends in out(): a pan, then its group (dry), plus a reverb send
+    // ---- building blocks. Every one ends in out(): a pan, then its group (dry), plus a reverb send.
+    // C: the settings of the effect being played (its pitch, length, volume and reverb), applied by every block
+    const C0 = { pf: 1, lf: 1, vf: 1, rf: 1, style: 0 }; let C = C0;
     function out(node, g, rev = 0.3, pan = 0) {
       let n = node;
       if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); n = n.connect(p); }
       n.connect(G[g].vol);
-      if (rev) { const s = ctx.createGain(); s.gain.value = rev; n.connect(s).connect(G[g].wet); }
+      rev *= C.rf; if (rev) { const s = ctx.createGain(); s.gain.value = rev; n.connect(s).connect(G[g].wet); }
     }
     function env(t, at, dur, vol, hold = 0) {   // up fast, (hold), then die away
-      const e = ctx.createGain(); e.gain.value = 0.0001; e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(vol, t + at);   // silent from the start: no pop on the first sample
-      if (hold) e.gain.setValueAtTime(vol, t + at + hold);
+      const e = ctx.createGain(); e.gain.value = 0.0001; e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + at);   // silent from the start: no pop on the first sample
+      if (hold) e.gain.setValueAtTime(Math.max(0.0002, vol), t + at + hold);
       e.gain.exponentialRampToValueAtTime(0.0001, t + at + hold + dur); return e;
     }
     function osc(t, type, f0, f1, dur, vol, { at = 0.003, g = 'ball', rev = 0.25, pan = 0, lp = 0, q = 0.7, hold = 0, detune = 0 } = {}) {
+      f0 *= C.pf; f1 *= C.pf; dur *= C.lf; hold *= C.lf; vol *= C.vf;
       const s = ctx.createOscillator(); s.type = type; s.detune.value = detune;
       s.frequency.setValueAtTime(f0, t); if (f1 !== f0) s.frequency.exponentialRampToValueAtTime(Math.max(15, f1), t + at + hold + dur);
-      let n = s; if (lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = q; n = n.connect(f); }
+      let n = s; if (lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp * C.pf; f.Q.value = q; n = n.connect(f); }
       const e = env(t, at, dur, vol, hold); out(n.connect(e), g, rev, pan); s.start(t); s.stop(t + at + hold + dur + 0.05);
     }
     function hiss(t, dur, vol, { type = 'bandpass', f0 = 1200, f1 = f0, q = 1, at = 0.004, g = 'ball', rev = 0.25, pan = 0, pan1 = null, hold = 0 } = {}) {
+      f0 = Math.min(18000, f0 * C.pf); f1 = Math.min(18000, f1 * C.pf); dur *= C.lf; hold *= C.lf; vol *= C.vf;
       const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(); s.buffer = noiseBuf; s.loop = true;
       f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + at + hold + dur);
       const e = env(t, at, dur, vol, hold); let n = s.connect(f).connect(e);
@@ -83,6 +87,7 @@ LAB.shelf('sound', 'Sound', (game) => {
     }
     // a glassy FM bell: a sine bent by another sine whose bite fades fast
     function bell(t, f, dur, vol, { ratio = 3.5, index = 2.2, g = 'magic', rev = 0.55, pan = 0 } = {}) {
+      f *= C.pf; dur *= C.lf; vol *= C.vf;
       const c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(); c.frequency.value = f; m.frequency.value = f * ratio;
       mg.gain.setValueAtTime(f * ratio * index, t); mg.gain.exponentialRampToValueAtTime(f * 0.05, t + dur * 0.5);
       m.connect(mg).connect(c.frequency); const e = env(t, 0.002, dur, vol); out(c.connect(e), g, rev, pan);
@@ -90,105 +95,155 @@ LAB.shelf('sound', 'Sound', (game) => {
     }
     // a voice: a buzzy pitch through two vowel formants, plus breath
     function grunt(t, f0, f1, dur, vol, { a = 650, b = 1100, g = 'wiz', rev = 0.2, pan = 0 } = {}) {
-      const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueAtTime(f0, t); s.frequency.exponentialRampToValueAtTime(f1, t + dur);
-      const e = env(t, 0.015, dur, vol);
-      for (const [f, q, k] of [[a, 7, 1], [b, 9, 0.6]]) { const bp = ctx.createBiquadFilter(), kg = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; kg.gain.value = k; s.connect(bp).connect(kg).connect(e); }
-      out(e, g, rev, pan); s.start(t); s.stop(t + dur + 0.05);
+      const k = Math.sqrt(C.pf); f0 *= C.pf; f1 *= C.pf; a *= k; b *= k;
+      const d = dur * C.lf, v = vol * C.vf, s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueAtTime(f0, t); s.frequency.exponentialRampToValueAtTime(f1, t + d);
+      const e = env(t, 0.015, d, v);
+      for (const [f, q, kk] of [[a, 7, 1], [b, 9, 0.6]]) { const bp = ctx.createBiquadFilter(), kg = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; kg.gain.value = kk; s.connect(bp).connect(kg).connect(e); }
+      out(e, g, rev, pan); s.start(t); s.stop(t + d + 0.05);
       hiss(t, dur * 0.8, vol * 0.3, { f0: 1600, q: 1.5, g, rev, pan });
+    }
+    function choir(t, steps, base, dur, vol, g = 'magic') {   // an "aah": detuned saws through vowel formants
+      base *= C.pf; dur *= C.lf; vol *= C.vf;
+      for (const s of steps) for (const dt of [-9, 9]) {
+        const f = semis(base, s), so = ctx.createOscillator(); so.type = 'sawtooth'; so.frequency.value = f; so.detune.value = dt;
+        const e = env(t, 0.35, dur, vol, dur * 0.3);
+        for (const [ff, q, kk] of [[750, 6, 1], [1150, 8, 0.5], [2600, 10, 0.15]]) { const bp = ctx.createBiquadFilter(), kg = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = ff; bp.Q.value = q; kg.gain.value = kk; so.connect(bp).connect(kg).connect(e); }
+        out(e, g, 0.8, dt > 0 ? 0.35 : -0.35); so.start(t); so.stop(t + 0.35 + dur * 1.3 + 0.1);
+      }
     }
     const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19];
     const pitch = (i, base) => base * Math.pow(2, PENTA[Math.max(0, Math.min(PENTA.length - 1, i))] / 12);
     const semis = (base, s) => base * Math.pow(2, s / 12);
 
-    // ====== the effects ======
-    const S = E.sfx = {};
-    S.throw = (c = 0.5, pan = 0, fast = false) => { const t = now();
-      hiss(t, 0.22 + c * 0.22, 0.22 + c * 0.2, { f0: 350, f1: 2200 + c * 2600, q: 1.6, pan: pan - 0.3, pan1: pan + 0.3, rev: 0.25 });   // the whoosh crosses the speakers
-      osc(t, 'sine', 150, 60, 0.12, 0.25, { rev: 0.1 });
-      if (c > 0.4) for (let i = 0; i < 3; i++) bell(t + 0.04 + i * 0.035, semis(1568, i * 5), 0.35, 0.03 * c, { index: 1.2, rev: 0.6, pan: pan + (i - 1) * 0.3 });   // a little magic on a strong throw
+    // ====== the effects. Each has a few styles; RAW holds them, S plays them with that effect's own settings ======
+    const RAW = {}, ST = () => C.style;
+    RAW.throw = (c = 0.5, pan = 0, fast = false) => { const t = now(), st = ST();
+      if (st === 0) { hiss(t, 0.22 + c * 0.22, 0.22 + c * 0.2, { f0: 350, f1: 2200 + c * 2600, q: 1.6, pan: pan - 0.3, pan1: pan + 0.3 }); osc(t, 'sine', 150, 60, 0.12, 0.25, { rev: 0.1 });
+        if (c > 0.4) for (let i = 0; i < 3; i++) bell(t + 0.04 + i * 0.035, semis(1568, i * 5), 0.35, 0.03 * c, { index: 1.2, rev: 0.6, pan: pan + (i - 1) * 0.3 }); }
+      if (st === 1) { hiss(t, 0.3 + c * 0.2, 0.1 + c * 0.08, { f0: 900, f1: 5000, q: 1, pan: pan - 0.4, pan1: pan + 0.4 });   // magic: a rising run of bells
+        for (let i = 0; i < 4 + Math.round(c * 3); i++) bell(t + i * 0.03, pitch(i, 784), 0.5, 0.05, { index: 1.4, rev: 0.6, pan: pan + (i % 2 ? 0.3 : -0.3) }); }
+      if (st === 2) { hiss(t, 0.12 + c * 0.08, 0.2 + c * 0.15, { f0: 1500, f1: 3500 + c * 2500, q: 0.9, pan: pan - 0.2, pan1: pan + 0.2, rev: 0.12 }); }   // swish: short and airy
+      if (st === 3) { osc(t, 'sine', 95, 40, 0.25 + c * 0.1, 0.35, { rev: 0.15 }); hiss(t, 0.3 + c * 0.2, 0.25 + c * 0.15, { type: 'lowpass', f0: 500, f1: 1400, q: 1.2, pan: pan - 0.3, pan1: pan + 0.3 }); }   // heavy whomp
       if (fast) { hiss(t, 0.08, 0.3, { type: 'highpass', f0: 3500, q: 0.8, rev: 0.4, g: 'hits' }); osc(t, 'square', 90, 45, 0.1, 0.08, { lp: 900, rev: 0.2 }); }
     };
-    S.catch = (res = 0, pan = 0) => { const t = now();
-      osc(t, 'sine', 170, 70, 0.1, 0.38, { rev: 0.12, pan }); hiss(t, 0.05, 0.16, { type: 'lowpass', f0: 2800, pan, rev: 0.1 });   // the thump into the hands
-      hiss(t, 0.025, 0.1, { f0: 4200, q: 2, pan });
-      if (res > 0) { bell(t + 0.015, pitch(res - 1, 587.3), 1.2, 0.11, { pan }); bell(t + 0.015, pitch(res - 1, 587.3) * 2, 0.6, 0.03, { index: 1, pan }); }   // climbs with resonance
+    RAW.catch = (res = 0, pan = 0) => { const t = now(), st = ST();
+      if (st === 0 || st === 1) { osc(t, 'sine', 170, 70, 0.1, 0.38, { rev: 0.12, pan }); hiss(t, 0.05, 0.16, { type: 'lowpass', f0: 2800, pan, rev: 0.1 }); hiss(t, 0.025, 0.1, { f0: 4200, q: 2, pan }); }
+      if (st === 3) { hiss(t, 0.06, 0.4, { f0: 2200, q: 0.9, pan, rev: 0.25 }); hiss(t, 0.02, 0.2, { type: 'highpass', f0: 5000, pan }); osc(t, 'sine', 240, 120, 0.05, 0.15, { pan }); }   // a slap
+      if ((st === 0 || st === 2 || st === 3) && res > 0) { bell(t + 0.015, pitch(res - 1, 587.3), 1.2, 0.11, { pan }); bell(t + 0.015, pitch(res - 1, 587.3) * 2, 0.6, 0.03, { index: 1, pan }); }   // climbs with resonance
+      if (st === 2 && !res) bell(t, 523.3, 0.6, 0.06, { pan });
     };
-    S.perfect = () => { const t = now();
-      [0, 4, 7, 12].forEach((s, i) => bell(t + i * 0.045, semis(1174.7, s), 1.4, 0.07, { ratio: 2.01, index: 1.6, pan: (i - 1.5) * 0.4 }));
-      hiss(t, 0.6, 0.06, { type: 'highpass', f0: 6000, at: 0.02, rev: 0.7, g: 'magic' });
+    RAW.perfect = () => { const t = now(), st = ST();
+      if (st === 0) { [0, 4, 7, 12].forEach((s, i) => bell(t + i * 0.045, semis(1174.7, s), 1.4, 0.07, { ratio: 2.01, index: 1.6, pan: (i - 1.5) * 0.4 })); hiss(t, 0.6, 0.06, { type: 'highpass', f0: 6000, at: 0.02, rev: 0.7, g: 'magic' }); }
+      if (st === 1) { for (let i = 0; i < 10; i++) bell(t + i * 0.025, pitch(i % 9, 1568), 0.5, 0.04, { index: 1, pan: (R() - 0.5) * 1.4 }); hiss(t, 0.5, 0.08, { type: 'highpass', f0: 7000, at: 0.01, g: 'magic', rev: 0.6 }); }
+      if (st === 2) { bell(t, 196, 2.2, 0.14, { ratio: 1.41, index: 3 }); bell(t, 392, 1.6, 0.06, { ratio: 2.76, index: 2 }); }   // a gong
     };
-    S.cancel = () => { const t = now(); osc(t, 'triangle', 660, 220, 0.18, 0.08, { g: 'magic', rev: 0.4, lp: 2400 }); hiss(t, 0.15, 0.04, { f0: 3000, f1: 800, g: 'magic' }); };
-    S.fizzle = () => { const t = now();
-      for (let i = 0; i < 6; i++) bell(t + i * 0.05, semis(1760, -i * 2.2), 0.3, 0.035, { index: 3, rev: 0.6, pan: (R() - 0.5) * 1.2 });
-      hiss(t, 0.5, 0.07, { f0: 5000, f1: 600, q: 4, g: 'magic', rev: 0.5 });
+    RAW.tick = (k = 0, pan = 0) => { const t = now(), st = ST();   // the wind-up: light, like winding a toy
+      if (st === 0) { hiss(t, 0.005, 0.012, { type: 'highpass', f0: 5200 + k * 140, q: 0.8, g: 'wind', rev: 0.06, pan, at: 0.0008 }); osc(t, 'sine', 2600 + k * 90, 2600 + k * 90, 0.016, 0.004, { g: 'wind', rev: 0.08, pan, at: 0.0008 }); }
+      if (st === 1) { osc(t, 'triangle', 900 + k * 25, 700 + k * 25, 0.03, 0.02, { g: 'wind', rev: 0.08, pan, at: 0.0008 }); hiss(t, 0.008, 0.01, { f0: 2400, q: 3, g: 'wind', pan, at: 0.0008 }); }   // wood
+      if (st === 2) { const f = k % 2 ? 2100 : 1500; osc(t, 'sine', f + k * 30, f + k * 30, 0.02, 0.008, { g: 'wind', rev: 0.08, pan, at: 0.0008 }); hiss(t, 0.004, 0.01, { type: 'highpass', f0: 6000, g: 'wind', pan, at: 0.0008 }); }   // tick-tock
+      if (st === 3) bell(t, pitch(k % 9, 2093), 0.12, 0.008, { index: 1, g: 'wind', rev: 0.3, pan });   // a twinkle
     };
-    S.morph = () => { const t = now();
-      hiss(t, 0.45, 0.12, { f0: 600, f1: 5000, q: 2, at: 0.2, g: 'magic', rev: 0.6, pan: -0.6, pan1: 0.6 });
-      [0, 7, 12, 19].forEach((s, i) => bell(t + 0.12 + i * 0.05, semis(784, s), 0.9, 0.05, { ratio: 1.5, index: 2.5 }));
+    RAW.cancel = () => { const t = now(), st = ST();
+      if (st === 0) { osc(t, 'triangle', 660, 220, 0.18, 0.08, { g: 'magic', rev: 0.4, lp: 2400 }); hiss(t, 0.15, 0.04, { f0: 3000, f1: 800, g: 'magic' }); }
+      else hiss(t, 0.2, 0.08, { type: 'lowpass', f0: 2000, f1: 300, g: 'magic', rev: 0.3 });   // a puff
     };
-    S.hit = (k = 1, sup = false) => { const t = now(); k = Math.max(0.4, Math.min(1.6, k));
-      osc(t, 'sine', 120 / Math.sqrt(k), 38, 0.3 + k * 0.15, 0.5 + k * 0.15, { g: 'hits', rev: 0.25 });   // the deep thump
-      hiss(t, 0.18 + k * 0.12, 0.4 + k * 0.1, { type: 'lowpass', f0: 1400, f1: 220, g: 'hits', rev: 0.35 });   // the body
-      hiss(t, 0.04, 0.3, { type: 'highpass', f0: 3000, g: 'hits', rev: 0.3 });   // the crack
-      osc(t, 'square', 75, 50, 0.12, 0.09, { g: 'hits', lp: 700, rev: 0.2 });   // crunch
+    RAW.fizzle = () => { const t = now(), st = ST();
+      if (st === 0) { for (let i = 0; i < 6; i++) bell(t + i * 0.05, semis(1760, -i * 2.2), 0.3, 0.035, { index: 3, rev: 0.6, pan: (R() - 0.5) * 1.2 }); hiss(t, 0.5, 0.07, { f0: 5000, f1: 600, q: 4, g: 'magic', rev: 0.5 }); }
+      if (st === 1) { osc(t, 'sine', 880, 180, 0.5, 0.08, { g: 'magic', rev: 0.4 }); osc(t, 'triangle', 1320, 270, 0.5, 0.03, { g: 'magic', rev: 0.4 }); }   // deflating
+      if (st === 2) { for (let i = 0; i < 9; i++) hiss(t + i * 0.035 + R() * 0.02, 0.02, 0.06, { type: 'highpass', f0: 3000 + R() * 4000, q: 2, g: 'magic', rev: 0.3, pan: (R() - 0.5) }); }   // crackle
+    };
+    RAW.morph = () => { const t = now(), st = ST();
+      if (st === 0 || st === 1) hiss(t, 0.45, st ? 0.2 : 0.12, { f0: 600, f1: 5000, q: 2, at: 0.2, g: 'magic', rev: 0.6, pan: -0.6, pan1: 0.6 });
+      if (st === 0 || st === 2) [0, 7, 12, 19].forEach((s, i) => bell(t + 0.12 + i * 0.05, semis(784, s), 0.9, st ? 0.07 : 0.05, { ratio: 1.5, index: 2.5 }));
+    };
+    RAW.hit = (k = 1, sup = false) => { const t = now(), st = ST(); k = Math.max(0.4, Math.min(1.6, k));
+      if (st === 0 || st === 3) { const big = st === 3 ? 1.5 : 1; osc(t, 'sine', 120 / Math.sqrt(k), 38, (0.3 + k * 0.15) * big, (0.5 + k * 0.15), { g: 'hits', rev: 0.25 * big });
+        hiss(t, (0.18 + k * 0.12) * big, 0.4 + k * 0.1, { type: 'lowpass', f0: 1400, f1: 220, g: 'hits', rev: 0.35 * big }); hiss(t, 0.04, 0.3, { type: 'highpass', f0: 3000, g: 'hits', rev: 0.3 });
+        osc(t, 'square', 75, 50, 0.12, 0.09, { g: 'hits', lp: 700, rev: 0.2 }); }
+      if (st === 1) { osc(t, 'sine', 110, 40, 0.25 + k * 0.1, 0.45, { g: 'hits', rev: 0.2 }); osc(t, 'square', 120, 60, 0.18, 0.18, { g: 'hits', lp: 1600, q: 3, rev: 0.2 }); hiss(t, 0.15 + k * 0.1, 0.5, { f0: 900, f1: 300, q: 1.5, g: 'hits', rev: 0.3 }); }   // crunch
+      if (st === 2) { hiss(t, 0.08 + k * 0.05, 0.55, { f0: 2500, f1: 900, q: 0.8, g: 'hits', rev: 0.35 }); osc(t, 'sine', 200, 90, 0.1, 0.3, { g: 'hits', rev: 0.2 }); }   // a slap
       if (sup) { osc(t, 'sine', 55, 25, 1.6, 0.6, { g: 'hits', rev: 0.4 }); hiss(t, 1.4, 0.35, { type: 'lowpass', f0: 3000, f1: 100, at: 0.01, g: 'hits', rev: 0.7 }); }
     };
-    S.super = () => { const t = now();
-      hiss(t, 0.5, 0.3, { f0: 200, f1: 5000, q: 1.2, at: 0.25, g: 'hits', rev: 0.5 });   // rushing up
-      choir(t, [0, 7, 12, 16], 220, 1.6, 0.06);
-      osc(t + 0.2, 'sine', 70, 30, 0.9, 0.4, { g: 'hits', rev: 0.4 });
+    RAW.super = () => { const t = now(), st = ST();
+      if (st === 0) { hiss(t, 0.5, 0.3, { f0: 200, f1: 5000, q: 1.2, at: 0.25, g: 'hits', rev: 0.5 }); choir(t, [0, 7, 12, 16], 220, 1.6, 0.06); osc(t + 0.2, 'sine', 70, 30, 0.9, 0.4, { g: 'hits', rev: 0.4 }); }
+      if (st === 1) { hiss(t, 0.9, 0.4, { type: 'lowpass', f0: 300, f1: 2500, q: 2, at: 0.15, g: 'hits', rev: 0.5 }); osc(t, 'sawtooth', 70, 50, 0.9, 0.18, { g: 'hits', lp: 500, q: 4, rev: 0.4 }); }   // a roar
+      if (st === 2) { const c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(); c.frequency.setValueAtTime(1800 * C.pf, t); c.frequency.exponentialRampToValueAtTime(120 * C.pf, t + 0.7 * C.lf);   // a laser
+        m.frequency.value = 340 * C.pf; mg.gain.value = 900 * C.pf; m.connect(mg).connect(c.frequency); const e = env(t, 0.005, 0.7 * C.lf, 0.12 * C.vf); out(c.connect(e), 'hits', 0.5); c.start(t); m.start(t); c.stop(t + C.lf); m.stop(t + C.lf); }
     };
-    function choir(t, steps, base, dur, vol, g = 'magic') {   // an "aah": detuned saws through vowel formants
-      for (const s of steps) for (const d of [-9, 9]) {
-        const f = semis(base, s), so = ctx.createOscillator(); so.type = 'sawtooth'; so.frequency.value = f; so.detune.value = d;
-        const e = env(t, 0.35, dur, vol, dur * 0.3);
-        for (const [ff, q, kk] of [[750, 6, 1], [1150, 8, 0.5], [2600, 10, 0.15]]) { const bp = ctx.createBiquadFilter(), kg = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = ff; bp.Q.value = q; kg.gain.value = kk; so.connect(bp).connect(kg).connect(e); }
-        out(e, g, 0.8, d > 0 ? 0.35 : -0.35); so.start(t); so.stop(t + 0.35 + dur * 1.3 + 0.1);
-      }
-    }
-    S.spit = (pan = 0) => { const t = now();
-      hiss(t, 0.12, 0.25, { f0: 1400, f1: 700, q: 2, g: 'demon', rev: 0.25, pan });
-      osc(t, 'sine', 380, 110, 0.14, 0.2, { g: 'demon', rev: 0.2, pan });
-      osc(t + 0.03, 'triangle', 90, 60, 0.12, 0.12, { g: 'demon', pan });   // a gurgle
+    RAW.spit = (pan = 0) => { const t = now(), st = ST();
+      if (st === 0) { hiss(t, 0.12, 0.25, { f0: 1400, f1: 700, q: 2, g: 'demon', rev: 0.25, pan }); osc(t, 'sine', 380, 110, 0.14, 0.2, { g: 'demon', rev: 0.2, pan }); osc(t + 0.03, 'triangle', 90, 60, 0.12, 0.12, { g: 'demon', pan }); }
+      if (st === 1) hiss(t, 0.2, 0.25, { type: 'highpass', f0: 2500, f1: 5000, q: 1, g: 'demon', rev: 0.3, pan });   // a hiss
+      if (st === 2) { osc(t, 'sine', 160, 320, 0.08, 0.3, { g: 'demon', pan }); osc(t + 0.06, 'sine', 300, 140, 0.1, 0.2, { g: 'demon', pan, rev: 0.25 }); }   // a blob
     };
-    S.splat = (pan = 0) => { const t = now(); hiss(t, 0.25, 0.2, { type: 'lowpass', f0: 1100, f1: 180, g: 'demon', rev: 0.3, pan }); osc(t, 'sine', 160, 60, 0.1, 0.15, { g: 'demon', pan }); };
-    S.down = () => { const t = now();
-      S.hit(1.6);
-      osc(t + 0.05, 'sawtooth', 180, 35, 1.8, 0.16, { g: 'demon', lp: 600, q: 5, rev: 0.6 });   // a long falling growl
-      grunt(t + 0.05, 120, 45, 1.4, 0.35, { a: 450, b: 900, g: 'demon', rev: 0.6 });
-      hiss(t + 0.1, 1.8, 0.2, { type: 'lowpass', f0: 900, f1: 90, at: 0.05, g: 'demon', rev: 0.7 });   // rumble and debris
+    RAW.splat = (pan = 0) => { const t = now(), st = ST();
+      if (st === 0) { hiss(t, 0.25, 0.2, { type: 'lowpass', f0: 1100, f1: 180, g: 'demon', rev: 0.3, pan }); osc(t, 'sine', 160, 60, 0.1, 0.15, { g: 'demon', pan }); }
+      else hiss(t, 0.6, 0.12, { type: 'highpass', f0: 3000, f1: 1500, at: 0.02, g: 'demon', rev: 0.3, pan });   // a sizzle
     };
-    S.burst = () => { const t = now();
-      hiss(t, 0.8, 0.16, { f0: 300, f1: 7000, q: 1, at: 0.55, g: 'magic', rev: 0.6 });
-      choir(t + 0.5, [0, 4, 7, 11, 14], 261.6, 2.4, 0.05);
-      for (let i = 0; i < 8; i++) bell(t + 0.55 + i * 0.07, pitch(i, 1046.5), 1.6, 0.045, { pan: (i % 2 ? 0.5 : -0.5), ratio: 2.01 });
+    RAW.down = () => { const t = now(), st = ST();
+      const was = C; C = { ...C, style: st === 1 ? 3 : 0 }; RAW.hit(1.6); C = was;
+      if (st === 0) { osc(t + 0.05, 'sawtooth', 180, 35, 1.8, 0.16, { g: 'demon', lp: 600, q: 5, rev: 0.6 }); grunt(t + 0.05, 120, 45, 1.4, 0.35, { a: 450, b: 900, g: 'demon', rev: 0.6 }); }
+      if (st === 2) grunt(t + 0.05, 320, 90, 1.3, 0.35, { a: 700, b: 1300, g: 'demon', rev: 0.6 });   // a wail
+      hiss(t + 0.1, st === 1 ? 2.4 : 1.8, st === 1 ? 0.3 : 0.2, { type: 'lowpass', f0: 900, f1: 90, at: 0.05, g: 'demon', rev: 0.7 });   // rumble and debris
     };
-    S.dive = (pan = 0, v = 1) => { const t = now(); hiss(t, 0.32, 0.26 * v, { f0: 900, f1: 280, q: 1.3, g: 'wiz', rev: 0.15, pan, pan1: pan * -1 }); };
-    S.tackle = (pan = 0, v = 1) => { const t = now(); osc(t, 'sine', 140, 55, 0.14, 0.4 * v, { g: 'wiz', rev: 0.15, pan }); hiss(t, 0.08, 0.25 * v, { type: 'lowpass', f0: 2500, g: 'wiz', pan }); grunt(t, 180, 150, 0.12, 0.12 * v, { a: 700, b: 1200, pan }); };
-    S.jump = (pan = 0, v = 1) => { const t = now(); hiss(t, 0.14, 0.1 * v, { f0: 700, f1: 1800, q: 1.2, g: 'wiz', pan }); grunt(t, 210, 260, 0.1, 0.08 * v, { a: 600, b: 1700, pan }); };
-    S.land = (pan = 0, v = 1) => { const t = now(); osc(t, 'sine', 110, 50, 0.12, 0.3 * v, { g: 'wiz', rev: 0.1, pan }); hiss(t, 0.16, 0.1 * v, { type: 'lowpass', f0: 1200, f1: 400, g: 'wiz', pan }); };
-    S.knock = (pan = 0, v = 1) => { const t = now(); S.land(pan, v * 1.3); grunt(t + 0.02, 200, 110, 0.3, 0.3 * v, { a: 600, b: 1000, pan }); };   // "oof"
+    RAW.burst = () => { const t = now(), st = ST();
+      if (st !== 2) hiss(t, 0.8, 0.16, { f0: 300, f1: 7000, q: 1, at: 0.55, g: 'magic', rev: 0.6 });
+      if (st === 0) choir(t + 0.5, [0, 4, 7, 11, 14], 261.6, 2.4, 0.05);
+      if (st !== 2) for (let i = 0; i < 8; i++) bell(t + 0.55 + i * 0.07, pitch(i, 1046.5), 1.6, st ? 0.06 : 0.045, { pan: (i % 2 ? 0.5 : -0.5), ratio: 2.01 });
+      if (st === 2) { osc(t, 'sine', 60, 28, 2.2, 0.5, { g: 'magic', rev: 0.8 }); hiss(t, 2.5, 0.3, { type: 'lowpass', f0: 1500, f1: 80, at: 0.03, g: 'magic', rev: 0.9 }); }   // thunder
+    };
+    RAW.dive = (pan = 0, v = 1) => { const t = now(), st = ST();
+      if (st === 0) hiss(t, 0.32, 0.26 * v, { f0: 900, f1: 280, q: 1.3, g: 'wiz', rev: 0.15, pan, pan1: -pan });
+      if (st === 1) hiss(t, 0.14, 0.3 * v, { f0: 1400, f1: 600, q: 1, g: 'wiz', rev: 0.1, pan });   // cloth
+      if (st === 2) { hiss(t, 0.35, 0.15 * v, { f0: 700, f1: 3000, q: 1.5, g: 'wiz', rev: 0.4, pan, pan1: -pan }); bell(t + 0.05, 1318.5, 0.4, 0.03 * v, { g: 'wiz', pan }); }
+    };
+    RAW.tackle = (pan = 0, v = 1) => { const t = now(), st = ST();
+      if (st === 0 || st === 1) { osc(t, 'sine', 140, 55, 0.14, 0.4 * v, { g: 'wiz', rev: 0.15, pan }); hiss(t, 0.08, 0.25 * v, { type: 'lowpass', f0: 2500, g: 'wiz', pan }); }
+      if (st === 0 || st === 2) grunt(t, 180, 150, st ? 0.2 : 0.12, (st ? 0.25 : 0.12) * v, { a: 700, b: 1200, pan });
+    };
+    RAW.jump = (pan = 0, v = 1) => { const t = now(), st = ST();
+      if (st === 0) { hiss(t, 0.14, 0.1 * v, { f0: 700, f1: 1800, q: 1.2, g: 'wiz', pan }); grunt(t, 210, 260, 0.1, 0.08 * v, { a: 600, b: 1700, pan }); }
+      if (st === 1) osc(t, 'triangle', 220, 520, 0.14, 0.08 * v, { g: 'wiz', pan, rev: 0.2 });   // a boing
+      if (st === 2) hiss(t, 0.2, 0.12 * v, { f0: 900, f1: 2600, q: 1, g: 'wiz', pan });
+    };
+    RAW.land = (pan = 0, v = 1) => { const t = now(), st = ST();
+      if (st === 0) { osc(t, 'sine', 110, 50, 0.12, 0.3 * v, { g: 'wiz', rev: 0.1, pan }); hiss(t, 0.16, 0.1 * v, { type: 'lowpass', f0: 1200, f1: 400, g: 'wiz', pan }); }
+      if (st === 1) hiss(t, 0.35, 0.16 * v, { type: 'lowpass', f0: 1800, f1: 500, q: 0.8, g: 'wiz', pan, rev: 0.2 });   // dust
+      if (st === 2) { osc(t, 'sine', 150, 80, 0.06, 0.2 * v, { g: 'wiz', pan }); hiss(t, 0.04, 0.12 * v, { f0: 1500, q: 1.5, g: 'wiz', pan }); }   // a step
+    };
+    RAW.knock = (pan = 0, v = 1) => { const t = now(), st = ST();
+      const was = C; C = { ...C, style: 0 }; RAW.land(pan, v * 1.3); C = was;
+      if (st === 0) grunt(t + 0.02, 200, 110, 0.3, 0.3 * v, { a: 600, b: 1000, pan });   // "oof"
+      if (st === 2) grunt(t + 0.02, 420, 300, 0.22, 0.25 * v, { a: 800, b: 1500, pan });   // a yelp
+    };
+    E.styles = { throw: ['WHOOSH', 'MAGIC', 'SWISH', 'HEAVY'], catch: ['THUMP + BELL', 'THUMP', 'BELL', 'SLAP'], perfect: ['CHIME', 'SPARKLE', 'GONG'],
+      tick: ['CLICK', 'WOOD', 'TICK-TOCK', 'TWINKLE'], cancel: ['BLIP', 'PUFF'], fizzle: ['SPARKLES', 'DEFLATE', 'CRACKLE'], morph: ['SHIMMER', 'WHOOSH', 'BELLS'],
+      hit: ['THUD', 'CRUNCH', 'SLAP', 'BOOM'], super: ['CHOIR', 'ROAR', 'LASER'], spit: ['WET', 'HISS', 'BLOB'], splat: ['SPLAT', 'SIZZLE'],
+      down: ['FALL', 'COLLAPSE', 'WAIL'], burst: ['CHOIR', 'BELLS', 'THUNDER'], dive: ['SWOOSH', 'CLOTH', 'MAGIC'], tackle: ['PUNCH', 'THUMP', 'GRUNT'],
+      jump: ['HUP', 'BOING', 'AIR'], land: ['THUD', 'DUST', 'STEP'], knock: ['OOF', 'THUD', 'YELP'], roar: ['ROAR', 'HISS'] };
+    E.params = {};   // name -> { style, pitch (semitones), len, vol, room }
+    const use = (name) => { const P = E.params[name] || {}; return { pf: Math.pow(2, (P.pitch || 0) / 12), lf: P.len || 1, vf: P.vol ?? 1, rf: P.room ?? 1, style: P.style || 0 }; };
+    const S = E.sfx = {};
+    for (const k in RAW) S[k] = (...a) => { const c = use(k); if (c.vf <= 0) return; const was = C; C = c; try { RAW[k](...a); } finally { C = was; } };
 
-    // ---- the wind-up: tiny, light clicks, like winding a toy; one each time the power steps up, a touch higher each time.
-    // Nothing while the power isn't changing.
-    E.tick = (k, pan = 0) => { const t = now();
-      hiss(t, 0.005, 0.012, { type: 'highpass', f0: 5200 + k * 140, q: 0.8, g: 'wind', rev: 0.06, pan, at: 0.0008 });
-      osc(t, 'sine', 2600 + k * 90, 2600 + k * 90, 0.016, 0.004, { g: 'wind', rev: 0.08, pan, at: 0.0008 });
-    };
+    // ---- the wind-up clicks: one each time the power steps up, nothing while it isn't changing
+    E.tick = (k, pan) => S.tick(k, pan);
     E.charge = (c) => {   // c: 0..1 while winding up; null stops
       if (c == null) { E._step = null; return; }
       const st = Math.floor(c * 16);
       if (E._step == null) { E._step = st; return; }
       if (st !== E._step) { E.tick(st); E._step = st; }
     };
+    // ---- the fire breath: held while it pours
     E.roar = (on) => {
       if (!on) { if (E._roar) { const r = E._roar; E._roar = null; r.e.gain.setTargetAtTime(0.0001, now(), 0.15); r.stop(now() + 0.8); } return; }
       if (E._roar) return;
+      const c = use('roar'); if (c.vf <= 0) return;
       const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain(), growl = ctx.createOscillator(), gf = ctx.createBiquadFilter(), gg = ctx.createGain();
-      s.buffer = noiseBuf; s.loop = true; f.type = 'lowpass'; f.frequency.value = 900; f.Q.value = 2; lfo.frequency.value = 9; lg.gain.value = 400;
-      growl.type = 'sawtooth'; growl.frequency.value = 55; gf.type = 'lowpass'; gf.frequency.value = 320; gg.gain.value = 0.5;
-      lfo.connect(lg).connect(f.frequency); s.connect(f).connect(e); growl.connect(gf).connect(gg).connect(e); out(e, 'demon', 0.45);
-      e.gain.value = 0.0001; e.gain.setTargetAtTime(0.4, now(), 0.1); s.start(); lfo.start(); growl.start();
+      s.buffer = noiseBuf; s.loop = true; f.type = c.style ? 'highpass' : 'lowpass'; f.frequency.value = (c.style ? 3000 : 900) * c.pf; f.Q.value = 2; lfo.frequency.value = 9 / c.lf; lg.gain.value = 400 * c.pf;
+      growl.type = 'sawtooth'; growl.frequency.value = 55 * c.pf; gf.type = 'lowpass'; gf.frequency.value = 320; gg.gain.value = c.style ? 0 : 0.5;
+      lfo.connect(lg).connect(f.frequency); s.connect(f).connect(e); growl.connect(gf).connect(gg).connect(e);
+      const was = C; C = c; out(e, 'demon', 0.45); C = was;
+      e.gain.value = 0.0001; e.gain.setTargetAtTime(0.4 * c.vf * (c.style ? 0.6 : 1), now(), 0.1); s.start(); lfo.start(); growl.start();
       E._roar = { e, stop: (t) => { s.stop(t); lfo.stop(t); growl.stop(t); } };
     };
 
@@ -255,6 +310,7 @@ LAB.shelf('sound', 'Sound', (game) => {
     E.set({ volume: get('volume', 0.8), room: get('room', 0.5), crunch: get('crunch', 0),
       vols: { ball: get('ball', 1), magic: get('magic', 1), hits: get('hits', 1), demon: get('demon', 1), wiz: get('wiz', 1), wind: get('wind', 1), music: get('music', 0) * (get('on', 0) || get('music', 0) ? 1 : 0) } });
     if (!get('on', 0)) for (const k of ['ball', 'magic', 'hits', 'demon', 'wiz', 'wind']) E.groups[k].vol.gain.value = 0;
+    for (const [k] of SOUNDS) E.params[k] = { style: get(k + 'Style', 0), pitch: get(k + 'Pitch', 0), len: get(k + 'Len', 1), vol: get(k + 'Vol', 1) };
     music();
   }
   function music() {   // books notes ahead on a timer while Music is up
@@ -319,6 +375,37 @@ LAB.shelf('sound', 'Sound', (game) => {
     if (E && get('music', 0)) { const d = game.demon, k = !(d.alive && !d.dying) ? 0 : o.res >= 3 ? 2 : 1; if (k !== mood) { mood = k; E.music.intensity(k); } }
   }, 'lab');
 
+  // ---- every sound's own knobs: its style, pitch, length and volume; changing one plays it
+  const SOUNDS = [['throw', 'Throw'], ['catch', 'Catch'], ['perfect', 'Perfect catch'], ['tick', 'Wind-up'], ['cancel', 'Cancel'], ['fizzle', 'Fizzle'],
+    ['morph', 'Shape change'], ['hit', 'Hit'], ['super', 'Super shot'], ['spit', 'Spit'], ['splat', 'Splat'], ['roar', 'Fire breath'], ['down', 'Centipede falls'],
+    ['burst', 'Capture'], ['dive', 'Dive'], ['tackle', 'Tackle'], ['jump', 'Jump'], ['land', 'Land'], ['knock', 'Knocked down']];
+  LAB.soundList = SOUNDS;
+  let ready = false, previewAt = 0;
+  function preview(k) {
+    if (!ready || !live() || performance.now() - previewAt < 120) return; previewAt = performance.now();
+    const S = E.sfx;
+    if (k === 'tick') { const t0 = ctx.currentTime; for (let i = 0; i < 8; i++) { E.at = t0 + i * 0.09; S.tick(i + 4); } E.at = null; return; }
+    if (k === 'roar') { E.roar(true); setTimeout(() => E.roar(false), 1200); return; }
+    const play = { throw: () => S.throw(0.7), catch: () => S.catch(3), hit: () => S.hit(1), super: () => S.super() }[k];
+    if (play) play(); else if (S[k]) S[k]();
+  }
+  const SOUND_KNOBS = [];
+  for (const [k, name] of SOUNDS) {
+    const after = () => { mix(); preview(k); };
+    const n = ({ throw: 4, catch: 4, perfect: 3, tick: 4, cancel: 2, fizzle: 3, morph: 3, hit: 4, super: 3, spit: 3, splat: 2, roar: 2, down: 3, burst: 3, dive: 3, tackle: 3, jump: 3, land: 3, knock: 3 })[k];
+    const NAMES = { throw: ['WHOOSH', 'MAGIC', 'SWISH', 'HEAVY'], catch: ['THUMP + BELL', 'THUMP', 'BELL', 'SLAP'], perfect: ['CHIME', 'SPARKLE', 'GONG'],
+      tick: ['CLICK', 'WOOD', 'TICK-TOCK', 'TWINKLE'], cancel: ['BLIP', 'PUFF'], fizzle: ['SPARKLES', 'DEFLATE', 'CRACKLE'], morph: ['SHIMMER', 'WHOOSH', 'BELLS'],
+      hit: ['THUD', 'CRUNCH', 'SLAP', 'BOOM'], super: ['CHOIR', 'ROAR', 'LASER'], spit: ['WET', 'HISS', 'BLOB'], splat: ['SPLAT', 'SIZZLE'], roar: ['ROAR', 'HISS'],
+      down: ['FALL', 'COLLAPSE', 'WAIL'], burst: ['CHOIR', 'BELLS', 'THUNDER'], dive: ['SWOOSH', 'CLOTH', 'MAGIC'], tackle: ['PUNCH', 'THUMP', 'GRUNT'],
+      jump: ['HUP', 'BOING', 'AIR'], land: ['THUD', 'DUST', 'STEP'], knock: ['OOF', 'THUD', 'YELP'] }[k];
+    SOUND_KNOBS.push(
+      { id: k + 'Style', label: name + ': style', help: 'Which kind of ' + name.toLowerCase() + ' sound (changing it plays it)', min: 0, max: n - 1, step: 1, value: 0, dice: true, fmt: (x) => NAMES[x], apply: after },
+      { id: k + 'Pitch', label: name + ': pitch', help: 'Higher or lower, in semitones', min: -12, max: 12, step: 1, value: 0, dice: true, fmt: (x) => (x > 0 ? '+' : '') + x, apply: after },
+      { id: k + 'Len', label: name + ': length', help: 'Shorter or longer', min: 0.5, max: 2, step: 0.1, value: 1, dice: true, fmt: (x) => x.toFixed(1) + '×', apply: after },
+      { id: k + 'Vol', label: name + ': volume', help: 'How loud this one sound is (0 turns it off)', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF'), apply: after });
+  }
+  FX.on('frame', () => { ready = true; }, 'lab');
+
   const pct = (x) => Math.round(x * 100) + '%';
   return [
     { id: 'on', label: 'Sound', help: 'Sound effects, in the style of PS1 and PS2 games (on an iPhone, tap the screen once to let them play)', kind: 'onoff', value: 0, dice: false,
@@ -333,6 +420,7 @@ LAB.shelf('sound', 'Sound', (game) => {
     { id: 'demon', label: 'Centipede', help: 'Spit, splats, fire breath and its fall', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
     { id: 'wiz', label: 'Wizards', help: 'Dives, tackles, hops, landings and grunts', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: pct, apply: mix },
     { id: 'room', label: 'Room', help: 'How much the sounds ring out in the console-style reverb', min: 0, max: 1, step: 0.05, value: 0.5, dice: true, fmt: pct, apply: mix },
-    { id: 'crunch', label: 'Crunch', help: 'Rougher and duller, toward the PS1', min: 0, max: 4, step: 1, value: 0, dice: true, fmt: (x) => (x ? x + '' : 'OFF'), apply: mix }
+    { id: 'crunch', label: 'Crunch', help: 'Rougher and duller, toward the PS1', min: 0, max: 4, step: 1, value: 0, dice: true, fmt: (x) => (x ? x + '' : 'OFF'), apply: mix },
+    ...SOUND_KNOBS
   ];
 });
