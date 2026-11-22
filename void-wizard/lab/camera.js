@@ -12,7 +12,7 @@ LAB.shelf('camera', 'Camera', (game) => {
     const gp = game.pad; if (!gp) return;
     const dz = (a) => (Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8);
     const rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
-    if (rx) yaw -= rx * dt * 2.4 * (LAB.get('camera.stickSpeed') ?? 1);
+    if (rx && !(game.you && game.you.labLocked)) yaw -= rx * dt * 2.4 * (LAB.get('camera.stickSpeed') ?? 1);   // locked on, it picks targets instead
     if (ry && !(game.you && game.you.labAiming && game.you.labAimStick)) zoom = Math.min(2.2, Math.max(0.5, zoom * Math.exp(-ry * dt * 1.4)));
     if (gp.buttons[11] && gp.buttons[11].pressed) { yaw = 0; zoom = 1; }
     game.MOD.turn = yaw;
@@ -21,6 +21,8 @@ LAB.shelf('camera', 'Camera', (game) => {
   // It only moves the camera, never turns it, so tilt, orbit and the right stick all stay as they are.
   let lx = 0, lz = 0, lp = 0, lt = 0;
   const fw = new T.Vector3();
+  // last of all: Ball play's lock-on view, when it's on (it sets game.labLockView)
+  function finish(cam, look) { lean(cam, look); if (game.labLockView) game.labLockView(cam, look); }
   function lean(cam, look) {
     const v = LAB.get('camera.lean') || 0, now = performance.now() / 1000;
     if (!v || game.DUEL) { lx = lz = lp = 0; lt = 0; return; }
@@ -32,11 +34,11 @@ LAB.shelf('camera', 'Camera', (game) => {
     cam.getWorldDirection(fw); cam.position.x += lx; cam.position.z += lz; cam.position.addScaledVector(fw, -lp);
   }
   window.FEATURES.on('camera', (cam, look) => {
-    if (!yaw && zoom === 1) return lean(cam, look);
+    if (!yaw && zoom === 1) return finish(cam, look);
     off.subVectors(cam.position, look).applyAxisAngle(UP, yaw).divideScalar(zoom); cam.position.copy(look).add(off);
     cam.lookAt(look);
     cam.rotateZ((LAB.get('camera.tilt') || 0) * Math.PI / 180 + (LAB.get('camera.spin') ? spin : 0));   // Tilt and Spin (applied before) again
-    lean(cam, look);
+    finish(cam, look);
   }, 'lab');
   return [
     { id: 'stick', label: 'Right stick', help: 'Turns the camera (and your controls); up and down zoom; click it to reset', kind: 'onoff', value: 1, dice: false },

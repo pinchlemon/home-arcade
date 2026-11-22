@@ -15,7 +15,7 @@ feature('lab', ({ game, on }) => {
     ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
     ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.courage party.shoot party.shotRange party.accuracy party.think party.toYou']]],
-    ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.power ball.cancel ball.windup ball.aim ball.aimMove ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
+    ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.lock ball.arcBy ball.power ball.cancel ball.windup ball.aim ball.aimMove ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
       ['Catching', 'ball.perfect ball.window ball.bonus ball.oop ball.ring ball.ringTime'], ['Resonance', 'ball.resHold ball.resFade ball.resAim'], ['Own solids', 'ball.own ball.ownYou ball.ownMate ball.ownGreen ball.ownPurple ball.ownGold'], ['On fire', 'ball.fire ball.super ball.superHow ball.superPower ball.superRes ball.superDmg']]],
     ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
       ...['Blue', 'Red', 'Green', 'Purple', 'Gold'].map(n => [n + ' wizard', ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + n.toLowerCase() + '.' + s).join(' ')])]],
