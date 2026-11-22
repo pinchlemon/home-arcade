@@ -113,7 +113,7 @@ LAB.shelf('attacks', 'Attacks', (game) => {
   function breathe(dt) {
     if (!breath) return;
     const B = breath;
-    if (!D.alive || D.dying || D.stunT > 0 || B.t >= B.len) { breath = null; game.labBreathing = false; return; }
+    if (!D.alive || D.dying || D.stunT > 0 || B.t >= B.len) { breath = null; game.labBreathing = false; game.labFlame = null; return; }
     B.t += dt;
     D.state = 'recover'; D.atkT = Math.max(D.atkT, 0.35);   // it stays put (head low) until the breath ends
     // turn toward the target: the game turns it a little; Sweep adds more (or holds it still at 0)
@@ -125,6 +125,7 @@ LAB.shelf('attacks', 'Attacks', (game) => {
     const reach = get('breathReach', 6), wide = get('breathWidth', 0.3), grow = Math.min(1, B.t / 0.3), fade = Math.min(1, (B.len - B.t) / 0.25);
     const fx = Math.sin(D.yaw), fz = Math.cos(D.yaw), sc = D.scale || 1;
     game.headCenter(mouth); mouth.x += fx * 0.45 * sc; mouth.z += fz * 0.45 * sc;
+    game.labFlame = { x: mouth.x, z: mouth.z, fx, fz, reach, wide };   // where the flame pours: the Party shelf's teammates keep out of it
     const life = 0.55, sp = reach * 2.6;   // with the drag, a flame travels about its reach before it burns out
     B.acc += dt * 110 * (0.4 + 0.6 * grow);
     while (B.acc > 1) {

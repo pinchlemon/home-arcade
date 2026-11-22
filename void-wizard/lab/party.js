@@ -107,6 +107,15 @@ LAB.shelf('party', 'Party', (game) => {
     }
     return best;
   }
+  // who goes for a loose Solid: the nearest, but once someone's going they keep going for a moment, unless another is clearly
+  // closer (so two teammates don't twitch between going and not going)
+  let chaser = null, chaserT = 0;
+  function chaserFor(p) {
+    const n = nearestTo(p), t = game.time;
+    if (!chaser || chaser.downT > 0 || !game.ALL.includes(chaser) || !n) { chaser = n; chaserT = t; return chaser; }
+    if (n !== chaser && t - chaserT > 0.7 && hd(n.pos, p) < hd(chaser.pos, p) - 1.5) { chaser = n; chaserT = t; }
+    return chaser;
+  }
   function nearestTo(p) { let b = null, bd = 1e9; for (const W of game.ALL) if (W.downT <= 0) { const d = hd(W.pos, p); if (d < bd) { bd = d; b = W; } } return b; }
   function pass(W, m) {
     const o = game.orb, sp = game.MOD.passSpeed, d0 = hd(m.pos, o.p), Tt = (0.6 + d0 * 0.036) * game.solid.hang / sp;
@@ -129,6 +138,7 @@ LAB.shelf('party', 'Party', (game) => {
       S = order === 'spread' ? get('spacing', 9) * 1.7 : order === 'regroup' ? Math.max(2.5, get('spacing', 9) * 0.4) : get('spacing', 9), dn = live ? game.demonNearest(W.pos) : null;
     let target = null, arrive = 0.3, run = true, fetching = false;
     W.faceTarget = null;
+    if (o.state === 'held') chaser = null;
     if (o.state === 'held' && o.holder === W) {
       ai.hold += dt;
       const threat = dn && dn.d < K;
@@ -156,7 +166,7 @@ LAB.shelf('party', 'Party', (game) => {
       const forMe = o.state === 'air' && o.labTo === W;
       const forOther = o.state === 'air' && o.labTo && o.labTo !== W && o.labTo.downT <= 0;
       if (o.state === 'held' || (grab && (grab.downT > 0 || !game.ALL.includes(grab)))) grab = null;
-      const chase = LAB.dpad ? grab === W : nearestTo(spot) === W;   // with orders on, only the one told to (D-pad up)
+      const chase = LAB.dpad ? grab === W : chaserFor(spot) === W;   // with orders on, only the one told to (D-pad up)
       if (forMe || (o.state !== 'held' && !forOther && chase)) { target = spot; arrive = 0.1; fetching = true; }
       else {
         // get open: spread out to the sides of whoever has it (or you), so the team fans out around the demon,
@@ -184,17 +194,66 @@ LAB.shelf('party', 'Party', (game) => {
             slot.set(D.pos.x + Math.cos(a2) * ring, 0, D.pos.z + Math.sin(a2) * ring);
           }
           const sd = game.demonNearest(slot); if (sd.d < K + 2) { const ax = slot.x - sd.x, az = slot.z - sd.z, ad = Math.hypot(ax, az) || 1; slot.x += ax / ad * (K + 2 - sd.d); slot.z += az / ad * (K + 2 - sd.d); }
-          if (hd(W.pos, slot) > 1.2) { target = slot; arrive = 0.8; run = hd(W.pos, slot) > 5; }
+          // the spot follows the swaying demon smoothly, and a teammate only sets off once it's clearly away from it and
+          // settles once it's clearly there, so it doesn't shuffle on the spot
+          if (!ai.slot) ai.slot = slot.clone(); else ai.slot.lerp(slot, 1 - Math.exp(-dt / 0.35));
+          const sd2 = hd(W.pos, ai.slot); if (sd2 > 1.6) ai.moving = true; else if (sd2 < 0.6) ai.moving = false;
+          if (ai.moving) { target = ai.slot; arrive = 0.5; run = sd2 > 5; }
           W.faceTarget = o.p;
         }
       }
     }
-    // keep out of the demon's reach, unless going for the Solid
-    if (dn && dn.d < K && !fetching) { const ax = W.pos.x - dn.x, az = W.pos.z - dn.z, ad = Math.hypot(ax, az) || 1; target = away.set(W.pos.x + ax / ad * 3, 0, W.pos.z + az / ad * 3); arrive = 0.2; run = true; }
-    if (target) {
-      const dx = target.x - W.pos.x, dz = target.z - W.pos.z, d = Math.hypot(dx, dz);
-      if (d > arrive) { const k = Math.min(1, (d - arrive) / 0.6); inp.ix = dx / d * k; inp.iz = dz / d * k; inp.run = run && d > 3; }
+    return steer(W, ai, inp, target, arrive, run, fetching, live, K, dt);
+  }
+
+  // ---- moving: one blend of where it wants to go and what it keeps away from, smoothed, so it glides instead of
+  // flipping between rules. Courage sets how close it lets danger come.
+  function steer(W, ai, inp, target, arrive, run, fetching, live, K, dt) {
+    let vx = 0, vz = 0, dist = 0, flee = 0;
+    if (target) { const dx = target.x - W.pos.x, dz = target.z - W.pos.z; dist = Math.hypot(dx, dz);
+      if (dist > arrive) { const k = Math.min(1, (dist - arrive) / 0.8); vx = dx / dist * k; vz = dz / dist * k; } }
+    const sx = vx, sz = vz, brave = get('courage', 0.5), scare = 1.5 - brave;
+    let px = 0, pz = 0;   // everything pushing it away
+    if (live) {   // the centipede's body: a push that grows the closer it gets
+      const reach = K * (1.3 - 0.6 * brave) + 1.5;
+      for (const q of game.demonParts()) {
+        const ax = W.pos.x - q.x, az = W.pos.z - q.z, c = Math.hypot(ax, az) || 1, d = c - q.r;
+        if (d < reach) { const w = Math.pow(1 - Math.max(0, d) / reach, 2) * (fetching ? 0.7 : 2.4); px += ax / c * w; pz += az / c * w; }
+      }
     }
+    for (const V of game.venoms) {   // spit on its way down: get out from under where it lands
+      if (V.alive) { const y0 = V.g.position.y, vy = V.v.y, t = (vy + Math.sqrt(Math.max(0, vy * vy + 36 * y0))) / 18;
+        if (t < 1.2) { const lx = V.g.position.x + V.v.x * t, lz = V.g.position.z + V.v.z * t, ax = W.pos.x - lx, az = W.pos.z - lz, c = Math.hypot(ax, az) || 0.01, r = 2.6 * (V.r || 1);
+          if (c < r) { const w = (1 - c / r) * 3 * scare; px += ax / c * w; pz += az / c * w; flee = Math.max(flee, w); } } }
+      const P = V.puddle; if (P && P.visible && (V.labHot > 0 || P.material.opacity > 0.35)) {   // puddles: step out
+        const ax = W.pos.x - P.position.x, az = W.pos.z - P.position.z, c = Math.hypot(ax, az) || 0.01, r = 0.45 * P.scale.x + 0.7;
+        if (c < r + 0.8) { const w = Math.min(1, (r + 0.8 - c) / 0.8) * 2.2 * scare; px += ax / c * w; pz += az / c * w; flee = Math.max(flee, w); } }
+    }
+    const F = game.labFlame;   // the fire breath: out of the cone, sideways
+    if (F) { const rx = W.pos.x - F.x, rz = W.pos.z - F.z, along = rx * F.fx + rz * F.fz, side = rx * F.fz - rz * F.fx;
+      if (along > -0.5 && along < F.reach + 2) { const half = Math.max(0, along) * Math.tan(F.wide * 0.9 + 0.15) + 1.2;
+        if (Math.abs(side) < half) { const s2 = side >= 0 ? 1 : -1, w = (1 - Math.abs(side) / half) * 3.5 * scare; px += F.fz * s2 * w; pz += -F.fx * s2 * w; flee = Math.max(flee, w); } } }
+    for (const w2 of game.ALL) {   // and a little room from teammates
+      if (w2 === W) continue; const ax = W.pos.x - w2.pos.x, az = W.pos.z - w2.pos.z, c = Math.hypot(ax, az);
+      if (c < 2.4 && c > 0.01) { const w = (1 - c / 2.4) * 1.1; px += ax / c * w; pz += az / c * w; }
+    }
+    // if danger is straight in the way, slide around it rather than stopping dead in front of it
+    const pm = Math.hypot(px, pz), sm = Math.hypot(sx, sz);
+    if (pm > 0.2 && sm > 0.2 && (sx * px + sz * pz) / (pm * sm) < -0.5) {
+      if (!ai.round) ai.round = (sx * pz - sz * px) > 0 ? 1 : -1;   // pick a side once and keep it
+      vx += -sz * ai.round * 0.9; vz += sx * ai.round * 0.9;
+    } else ai.round = 0;
+    vx += px; vz += pz;
+    // stuck: pushing but going nowhere for half a second, so step sideways for a moment
+    const want = Math.hypot(vx, vz), speed = Math.hypot(W.vel.x, W.vel.z);
+    if (want > 0.5 && speed < 0.6 && W.grounded && !W.charging) ai.stuckT = (ai.stuckT || 0) + dt; else ai.stuckT = Math.max(0, (ai.stuckT || 0) - dt * 2);
+    if (ai.stuckT > 0.5) { ai.sideT = 0.7; ai.side = Math.random() < 0.5 ? 1 : -1; ai.stuckT = 0; }
+    if (ai.sideT > 0) { ai.sideT -= dt; const m = want || 1, ox = vx, oz = vz; vx += -oz / m * ai.side * 1.2; vz += ox / m * ai.side * 1.2; }
+    let m = Math.hypot(vx, vz); if (m > 1) { vx /= m; vz /= m; m = 1; }
+    // smoothed: quick when it's going for the Solid, gentler otherwise
+    const k = 1 - Math.exp(-dt * (fetching ? 22 : 9)); ai.vx = (ai.vx || 0) + (vx - (ai.vx || 0)) * k; ai.vz = (ai.vz || 0) + (vz - (ai.vz || 0)) * k;
+    if (Math.hypot(ai.vx, ai.vz) > 0.08) { inp.ix = ai.vx; inp.iz = ai.vz; }
+    inp.run = (run && dist > 3) || flee > 1;
     return inp;
   }
 
@@ -226,6 +285,7 @@ LAB.shelf('party', 'Party', (game) => {
     { id: 'team', label: 'Team brain', help: 'Your buddy plays like the extra wizards: spreads out, gets open, passes to whoever is free (always on with extra wizards)', kind: 'onoff', value: 0, dice: false, apply: sync },
     { id: 'spacing', label: 'Spacing', help: 'How far apart teammates spread', min: 4, max: 18, step: 1, value: 9 },
     { id: 'keepAway', label: 'Keep away', help: 'How close they let the demon come before backing off', min: 1, max: 10, step: 0.5, value: 4 },
+    { id: 'courage', label: 'Courage', help: 'How close teammates let danger come: the centipede, its spit, puddles and fire breath', min: 0, max: 1, step: 0.1, value: 0.5, dice: true, fmt: (x) => Math.round(x * 100) + '%' },
     { id: 'shoot', label: 'Shoot or pass', help: '0 always passes, 1 shoots whenever the demon is in range', min: 0, max: 1, step: 0.05, value: 0.5 },
     { id: 'shotRange', label: 'Shot range', help: 'How near the demon has to be before they shoot', min: 6, max: 28, step: 1, value: 16 },
     { id: 'accuracy', label: 'Accuracy', help: 'How true their passes and shots fly', min: 0, max: 1, step: 0.05, value: 0.7 },
