@@ -168,20 +168,20 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (needSkip !== skipTrig) { skipTrig = needSkip; LAB.skip('aimtrig', needSkip ? [4, 5] : null); }   // the game's tackle and run (read from LT and RT)
   }
 
-  // ---- Triangle cancels a throw you're winding up or aiming: you keep the Solid, and its shape doesn't change
+  // ---- X cancels a throw you're winding up or aiming: you keep the Solid, and its shape doesn't change
   let circleWas = {}, skipCircle = false;
   function cancelCheck() {
     let need = false;
     for (const W of game.ALL) {
       if (!W.human || !W.gp) continue;
-      const i = W.gp.index, now = btn(W.gp, 3), was = !!circleWas[i]; circleWas[i] = now;
+      const i = W.gp.index, now = btn(W.gp, 0), was = !!circleWas[i]; circleWas[i] = now;
       if (W.charging && now && !was && !game.blockPad) {
         W.charging = false; W.charge = 0; W.labAiming = false; W.labR1 = false; W.labBtn = null; W.ctl.castHeld = false; W.ctl.castPressed = false;
         game.popup('CANCEL', W.pos, '#9aa4b8'); FX.emit('throwCancel', W);
       }
-      if (W.charging || (now && (was || skipCircle))) need = true;   // keep Triangle from the game until it's let go, so the shape doesn't change
+      if (W.charging || (now && (was || skipCircle))) need = true;   // keep X from the game until it's let go, so you don't jump
     }
-    if (need !== skipCircle) { skipCircle = need; LAB.skip('cancel', need ? [3] : null); }
+    if (need !== skipCircle) { skipCircle = need; LAB.skip('cancel', need ? [0] : null); }
   }
 
   // ---- aiming while you wind up: turn toward the stick at a limited speed (a light push turns slowly), let go to hold the aim
@@ -206,7 +206,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   // ---- lock-on: R1 picks what you're facing (the centipede or a teammate), the right stick flicks to the next one left
   // or right, the camera keeps you both in view, a little triangle bobs over the target, and you aim at it while winding up
-  let lock = null, lockK = 0, r1Was = false, flick = 0, marker = null, bob = 0;
+  let lock = null, lockK = 0, r1Was = false, flick = 0, marker = null, bob = 0, r1T = 0, held = false, before = null;
+  const superLock = () => lock === 'demon' && (held || get('lock', 0) === 2);   // the super shot: only while R1 is held on the centipede
   const lockPos = (L, out) => {   // where the target is (the demon's head, or a wizard's chest); false when it's gone
     if (L === 'demon') { const d = game.demon; if (!d.alive || d.dying) return false; game.headCenter(out); return true; }
     if (!game.ALL.includes(L) || L === game.you) return false; out.set(L.pos.x, (L.y || 0) + 1, L.pos.z); return true;
@@ -218,6 +219,12 @@ LAB.shelf('ball', 'Ball play', (game) => {
       const sc = (dx * fx + dz * fz) / d - d * 0.004 + (L === 'demon' ? 0.15 : 0); if (sc > bs) { bs = sc; best = L; } }
     return best;
   }
+  function enemies() { const d = game.demon; return d.alive && !d.dying ? ['demon'] : []; }   // more go here when there are more
+  function pickCenter() {   // the enemy nearest the middle of the screen
+    let best = null, bs = 9;
+    for (const L of enemies()) { if (!lockPos(L, v2)) continue; v2.project(game.camera); if (v2.z > 1) continue; const sc = v2.x * v2.x + v2.y * v2.y; if (sc < bs) { bs = sc; best = L; } }
+    return best;
+  }
   function cycle(dir) {   // the next target to the right (1) or left (-1) on screen
     const cam = game.camera, me = game.you; if (!lockPos(lock, v2)) return;
     const cur = v2.clone().project(cam).x; let best = null, bd = 9;
@@ -227,9 +234,13 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
   function lockTick(dt) {
     const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad;
-    if (!mode || game.DUEL || !sports()) lock = null;
+    if (!mode || game.DUEL || !sports()) { lock = null; held = false; before = null; }
     else {
-      if (mode === 1 && r1 && !r1Was) lock = lock ? null : pickFacing();   // press: on, press again: off
+      if (mode === 1) {   // a quick press locks on (press again: off); hold R1 and it locks onto the enemy nearest the middle until you let go
+        if (r1 && !r1Was) r1T = 0;
+        if (r1) { r1T += dt; if (!held && r1T >= get('holdTime', 0.22)) { const c = pickCenter(); if (c) { before = lock; lock = c; held = true; } } }
+        if (!r1 && r1Was) { if (held) { lock = before && lockPos(before, v1) ? before : null; held = false; before = null; } else if (r1T < get('holdTime', 0.22)) lock = lock ? null : pickFacing(); }
+      }
       if (mode === 2) { if (r1 && !lock) lock = pickFacing(); if (!r1) lock = null; }   // hold
       if (lock && !lockPos(lock, at)) lock = lock !== 'demon' && targets().includes('demon') ? 'demon' : null;   // its target's gone
       const rx = (gp && gp.axes[2]) || 0;   // right stick: flick left or right for the next target
@@ -257,7 +268,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
     const me = game.you, off = v1.copy(cam.position).sub(look), hdist = Math.hypot(off.x, off.z), up = off.y, was = Math.atan2(off.x, off.z);
     const dx = sp.x - me.pos.x, dz = sp.z - me.pos.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
     lk.set(me.pos.x + dx * 0.3, 1 + (sp.y - 1) * 0.3, me.pos.z + dz * 0.3);   // between you and it, nearer you
-    lp.set(me.pos.x - ux * hdist * 0.75, lk.y + up * 0.85, me.pos.z - uz * hdist * 0.75);
+    const side = get('lockSide', 0.4) * hdist;   // over the shoulder, so the arc is seen from the side
+    lp.set(me.pos.x - ux * hdist * 0.75 - uz * side, lk.y + up * 0.85, me.pos.z - uz * hdist * 0.75 + ux * side);
     cam.position.lerp(lp, lockK); v2.copy(look).lerp(lk, lockK); cam.lookAt(v2);
     // turn the left stick with the camera, so up still means away from you on screen
     let t = Math.atan2(cam.position.x - v2.x, cam.position.z - v2.z) - was; t = Math.atan2(Math.sin(t), Math.cos(t));
@@ -317,7 +329,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (0.2 - C.catchT > get('window', 0.12) + 1 / 60) return;
     o.res = Math.min(5, o.res + get('bonus', 1)); perfectFlash = 1; FX.emit('perfectCatch', W);
     game.popup('PERFECT!', W.pos, '#ffffff', true); game.sparkBurst(o.p, 18, 3.2, 0.7); game.rumble(W, 0.2, 0.7, 90); game.shake(0.08);
-    if (sports() && (get('lock', 0) ? lock === 'demon' : modOf(W) < 0) && o.res >= get('oop', 3)) oneTimer = W;
+    if (sports() && (get('lock', 0) ? superLock() : modOf(W) < 0) && o.res >= get('oop', 3)) oneTimer = W;
   }, 'lab');
   function fireOneTimer() {
     const W = oneTimer; oneTimer = null;
@@ -430,7 +442,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
-    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (W.human && (get('lock', 0) ? lock === 'demon' && W === game.you : modOf(W) < 0)) W.labR1 = true; }
+    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (get('lock', 0)) W.labR1 = W.human && W === game.you && superLock(); else if (W.human && modOf(W) < 0) W.labR1 = true; }
     if (get('lock', 0) || lock) lockTick(dt);
     if (get('power', 0) || skipTrig) aimPower(dt);
     if (get('cancel', 0) || skipCircle) cancelCheck();
@@ -452,14 +464,17 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'jump', label: 'Jump', help: 'With Sports buttons, X jumps', kind: 'onoff', value: 0, dice: false, apply: buttons },
     { id: 'slider', label: 'Hold to throw', help: 'How long you hold sets only how fast it goes (so how far); the arc is set by the shoulder buttons',
       kind: 'onoff', value: 0, dice: false, apply: hook },
-    { id: 'lock', label: 'Lock-on', help: (x) => x ? 'R1 locks onto what you face (the centipede or a teammate): the camera frames you both, you aim at it, the right stick flicks to the next target' + (x === 2 ? ' (hold R1)' : ' (press R1 again to let go)') : 'R1 throws lower',
-      min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'R1 PRESS', 'R1 HOLD'][x], apply: () => { aimOn(); if (!get('lock', 0)) lock = null; } },
+    { id: 'lock', label: 'Lock-on', help: (x) => x === 1 ? 'Tap R1: lock onto what you face (the centipede or a teammate), tap again to let go. Hold R1: lock onto the enemy nearest the middle of the screen until you let go; throwing then is your super shot. The right stick flicks to the next target'
+      : x === 2 ? 'Hold R1: lock onto what you face; on the centipede, throwing is your super shot. The right stick flicks to the next target' : 'R1 throws lower',
+      min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'TAP + HOLD', 'R1 HOLD'][x], apply: () => { aimOn(); if (!get('lock', 0)) { lock = null; held = false; } } },
+    { id: 'holdTime', label: 'Lock-on hold', help: 'With TAP + HOLD: how long you hold R1 before it counts as a hold (seconds)', min: 0.1, max: 0.6, step: 0.02, value: 0.22, fmt: (x) => x.toFixed(2) + 's', dice: false },
+    { id: 'lockSide', label: 'Lock-on side', help: 'Locked on, the camera sits this far to your right, so you see the throw arc from the side instead of end-on (0: straight behind)', min: 0, max: 1, step: 0.05, value: 0.4, fmt: (x) => x.toFixed(2), dice: false },
     { id: 'arcBy', label: 'Arc by', help: (x) => x ? 'While winding up, the left stick ' + (x === 1 ? 'up throws higher, down lower' : 'down throws higher, up lower') + '; left and right turn you; you stand still' : 'L1 throws higher, R1 lower',
       min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['SHOULDERS', 'STICK, UP = HIGH', 'STICK, UP = LOW'][x], apply: aimOn },
     { id: 'power', label: 'Distance', help: (x) => x === 2 ? 'Hold Square to aim, RT throws farther and LT shorter, let go of Square to throw (Sports buttons)'
       : x ? 'Tap Square to aim, right stick up and down sets how far, tap Square again to throw (Sports buttons)' : 'Hold the throw longer to throw farther',
       min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['HOLD', 'RIGHT STICK', 'TRIGGERS'][x] },
-    { id: 'cancel', label: 'Triangle cancels', help: 'While winding up or aiming a throw, Triangle cancels it (you keep the Solid; its shape does not change)', kind: 'onoff', value: 0, dice: false },
+    { id: 'cancel', label: 'X cancels', help: 'While winding up or aiming a throw, X (Cross) cancels it (you keep the Solid)', kind: 'onoff', value: 0, dice: false },
     { id: 'windup', label: 'Wind up', help: 'How long a full-power throw takes to build, as times the Studio setting (Throwing > Wind up); higher is slower',
       min: 0.3, max: 4, step: 0.1, value: 1, dice: false, fmt: (x) => x.toFixed(1) + '×', apply: (x) => { game.MOD.windup = x; } },
     { id: 'arc', label: 'Normal arc', help: 'The angle a plain throw leaves at', min: 10, max: 70, step: 2, value: 38, dice: false, fmt: (x) => x + '°' },
