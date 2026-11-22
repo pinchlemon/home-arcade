@@ -33,6 +33,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
         W.labBtn = 'throw'; C.castHeld = true; C.castPressed = true;
         if (holding && get('power', 0)) { W.labAiming = true; W.labPower = lastPower; W.labBtn = 'aim'; }   // Distance: RIGHT STICK, the first tap starts aiming
       }
+      // still holding Square from the catch: aim from here, so the triggers (or right stick) set the distance
+      if (now && was && holding && W.labBtn === 'throw' && !W.labAiming && get('power', 0)) { W.labAiming = true; W.labPower = lastPower; W.labBtn = 'aim'; C.castHeld = true; C.castPressed = true; }
       if (!now && was && W.labBtn === 'throw') { C.castHeld = false; W.labBtn = null; }
       else if (!now && was && W.labAiming && get('power', 0) === 2) { W.charge = W.labPower; W.labFire = W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // TRIGGERS: letting go of Square throws
     }
@@ -236,6 +238,9 @@ LAB.shelf('ball', 'Ball play', (game) => {
     r1Was = r1;
     for (const W of game.ALL) W.labLocked = W === me && !!lock;
     lockK += ((lock ? 1 : 0) - lockK) * (1 - Math.exp(-dt * 6));
+    // the camera follows a smoothed copy of the target, so switching glides over instead of jumping
+    if (lock && lockPos(lock, at)) { if (!spOn) { sp.copy(at); spOn = true; } else sp.lerp(at, 1 - Math.exp(-dt * 7)); }
+    else if (!lock && lockK < 0.01) spOn = false;
     // the marker: a little upside-down triangle bobbing over the target
     if (lock && !marker) {
       marker = new T.Mesh(new T.ConeGeometry(0.38, 0.7, 3), new T.MeshBasicMaterial({ color: 0xffd36a, transparent: true, depthTest: false }));
@@ -245,15 +250,18 @@ LAB.shelf('ball', 'Ball play', (game) => {
       if (marker.visible) { bob += dt; marker.position.set(at.x, at.y + (lock === 'demon' ? 1.6 : 1.4) + Math.abs(Math.sin(bob * 4.5)) * 0.25, at.z); marker.rotation.y += dt * 2; } }
   }
   // the camera, last of all: behind you, looking past you at the target
-  const lp = new T.Vector3(), lk = new T.Vector3();
+  const lp = new T.Vector3(), lk = new T.Vector3(), sp = new T.Vector3(); let spOn = false;
+  const unturn = () => { if (game.labLockTurn) { game.labLockTurn = 0; game.MOD.turn = game.labCamYaw || 0; } };
   game.labLockView = (cam, look) => {   // the Camera shelf calls this after its own moves
-    if (lockK < 0.01) return;
-    const me = game.you; if (!lock || !lockPos(lock, at)) { if (lockK < 0.02) lockK = 0; return; }
-    const off = v1.copy(cam.position).sub(look), hdist = Math.hypot(off.x, off.z), up = off.y;
-    const dx = at.x - me.pos.x, dz = at.z - me.pos.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
-    lk.set(me.pos.x + dx * 0.3, 1 + (at.y - 1) * 0.3, me.pos.z + dz * 0.3);   // between you and it, nearer you
+    if (lockK < 0.01 || !spOn) return unturn();
+    const me = game.you, off = v1.copy(cam.position).sub(look), hdist = Math.hypot(off.x, off.z), up = off.y, was = Math.atan2(off.x, off.z);
+    const dx = sp.x - me.pos.x, dz = sp.z - me.pos.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
+    lk.set(me.pos.x + dx * 0.3, 1 + (sp.y - 1) * 0.3, me.pos.z + dz * 0.3);   // between you and it, nearer you
     lp.set(me.pos.x - ux * hdist * 0.75, lk.y + up * 0.85, me.pos.z - uz * hdist * 0.75);
     cam.position.lerp(lp, lockK); v2.copy(look).lerp(lk, lockK); cam.lookAt(v2);
+    // turn the left stick with the camera, so up still means away from you on screen
+    let t = Math.atan2(cam.position.x - v2.x, cam.position.z - v2.z) - was; t = Math.atan2(Math.sin(t), Math.cos(t));
+    game.labLockTurn = t; game.MOD.turn = (game.labCamYaw || 0) + t;
   };
 
   // ---- switch on throw: take over whoever is nearest where it will come down
