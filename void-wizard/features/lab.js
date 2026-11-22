@@ -173,7 +173,7 @@ feature('lab', ({ game, on }) => {
   // Lab fetches the latest, and saving, updating or deleting one sends that change straight to GitHub with the token
   // from Settings > GitHub (same site, so the game can read it). Without a token, changes wait on this device and go up
   // the next time the Lab opens with one. The last list seen is kept on the device for playing offline.
-  const CK = 'ha.lab.presets.' + folder, PK = 'ha.lab.presetsPending.' + folder;
+  const CK = 'ha.lab.presets.' + folder, PK = 'ha.lab.presetsPending.' + folder, MK = 'ha.lab.presetsMine.' + folder;
   const readLS = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   let cloud = readLS(CK, null);
@@ -198,9 +198,18 @@ feature('lab', ({ game, on }) => {
     if (op.del) return list.filter((x) => x.id !== op.del);
     const i = list.findIndex((x) => x.id === op.p.id); const out = list.slice(); if (i >= 0) out[i] = op.p; else out.push(op.p); return out;
   };
+  // changes made on this device stay on top of any list from GitHub until a list from GitHub shows them: an answer
+  // that set off before the change (the sync when the Lab opens, GitHub a moment behind) can't take it away again
+  let mine = readLS(MK, []);
+  const shows = (list, op) => (op.del ? !list.some((x) => x.id === op.del) : list.some((x) => x.id === op.p.id && (x.made || 0) >= (op.p.made || 0)));
+  function fromGitHub(list) { mine = mine.filter((op) => !shows(list, op)); writeLS(MK, mine); return mine.reduce(applyOp, list); }
+  let status = '';   // how the last sync went, under New preset
+  const clock = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function sendOps(ops) {   // apply the changes to the newest file on GitHub and write it back (again if someone wrote in between)
     const g = ghSettings(); if (!g.token) throw new Error('no token');
-    for (let tries = 0; tries < 3; tries++) {
+    for (let tries = 0; tries < 6; tries++) {
+      if (tries) await sleep(700 * tries);   // GitHub can be a moment behind its own last write: give it time
       const f = await ghFile(); let list = f.list || (await siteList()) || (Array.isArray(data.presets) ? data.presets : []);
       for (const op of ops) list = applyOp(list, op);
       const body = { message: 'Lab presets (' + folder + '): ' + ops.map((o) => (o.del ? 'delete ' + (o.name || o.del) : (o.update ? 'update ' : 'save ') + o.p.name)).join(', '),
@@ -221,24 +230,26 @@ feature('lab', ({ game, on }) => {
       let pending = readLS(PK, []);
       if (oldList) pending = [...oldList.map((p) => ({ p })), ...pending];
       if (pending.length && ghSettings().token) {
-        cloud = await sendOps(pending); writeLS(PK, []);
+        cloud = fromGitHub(await sendOps(pending)); writeLS(PK, []);
         if (oldList) { delete old.overrides['lab.presets']; writeLS('ha.game.' + folder, old); }
         if (!quiet) say('Presets sent to GitHub');
       } else {
         let list = null;
         try { list = (await ghFile()).list || (await siteList()); }
         catch (e) { list = await siteList(); if (!list) throw e; }   // offline: the copy the site came with
-        if (Array.isArray(list)) cloud = pending.reduce(applyOp, list);
+        if (Array.isArray(list)) cloud = pending.reduce(applyOp, fromGitHub(list));
       }
-      writeLS(CK, cloud); draw();
-    } catch (e) { if (!quiet) say(e.message === 'no token' ? 'Kept on this device: add a GitHub token in Settings to share presets' : 'Presets: ' + e.message); }
+      writeLS(CK, cloud); status = (ghSettings().token ? 'Shared through GitHub' : 'No GitHub token on this device: presets stay here') + ' · checked ' + clock(); draw();
+    } catch (e) { status = 'Could not reach GitHub (' + e.message + ') · ' + clock(); draw(); if (!quiet) say(e.message === 'no token' ? 'Kept on this device: add a GitHub token in Settings to share presets' : 'Presets: ' + e.message); }
     finally { syncing = false; }
   }
   function keepPresetOp(op) {   // change the list here at once, then send it
-    cloud = applyOp(cloud, op); writeLS(CK, cloud);
-    if (!ghSettings().token) { writeLS(PK, [...readLS(PK, []), op]); say('Kept on this device: add a GitHub token in Settings to share presets'); return; }
-    sendOps([op]).then((list) => { cloud = list; writeLS(CK, cloud); say((op.del ? (op.name || 'Preset') + ' deleted' : op.p.name + (op.update ? ' updated' : ' saved')) + ' · on all your devices'); draw(); })
-      .catch((e) => { writeLS(PK, [...readLS(PK, []), op]); say('Could not reach GitHub (' + e.message + '): it will go up next time'); });
+    mine = [...mine, op]; writeLS(MK, mine); cloud = applyOp(cloud, op); writeLS(CK, cloud); draw();
+    const what = op.del ? (op.name || 'Preset') + ' deleted' : op.p.name + (op.update ? ' updated' : ' saved');
+    if (!ghSettings().token) { writeLS(PK, [...readLS(PK, []), op]); status = what + ' on this device only: add a GitHub token in Settings to share it'; draw(); return; }
+    status = 'Sending ' + (op.del ? op.name || 'the change' : op.p.name) + ' to GitHub…'; draw();
+    sendOps([op]).then((list) => { cloud = fromGitHub(list); writeLS(CK, cloud); status = what + ' · on GitHub ' + clock(); say(what + ' · on all your devices'); draw(); })
+      .catch((e) => { writeLS(PK, [...readLS(PK, []), op]); status = what + ' here, but GitHub said: ' + e.message + '. It goes up next time the Lab opens'; say('Could not reach GitHub (' + e.message + ')'); draw(); });
   }
   setTimeout(() => syncPresets(true), 1500);   // after the game has started
   LAB.presetsApi = { list: () => cloud, add: () => newPreset(), update: (i) => updatePreset(i), drop: (i) => dropPreset(i), sync: () => syncPresets(false) };   // for tests and other tools
@@ -444,7 +455,7 @@ feature('lab', ({ game, on }) => {
 
   let mini = false, shelfAt = 3, sel = 0, sayText = '', sayT = 0, unblockWhenUp = false, grid = false, gridAt = 0;
   function toggle(want) {
-    open = want === undefined ? !open : want; panel.hidden = !open; grid = false;
+    open = want === undefined ? !open : want; panel.hidden = !open; grid = false; if (open) syncPresets(true);   // the newest presets from your other devices
     if (open) { game.blockPad = true; unblockWhenUp = false; draw(); } else unblockWhenUp = true;   // the game gets the controller back once you let go
     syncPause();
   }
@@ -486,7 +497,7 @@ feature('lab', ({ game, on }) => {
         + `<div class="lab-row${lit(1)}" data-i="1"><span class="lb"><b>New prototype</b><i>Keeps the knobs as they are now. Prototypes also show in the Studio, under Lab.</i></span><button class="k acc" data-do="save">SAVE</button></div>`
         + (list.length > 2 ? '<div class="lab-head">Prototypes</div>' + list.slice(2).map((p, k) => `<div class="lab-row${lit(k + 2)}" data-i="${k + 2}"><button class="lb" data-load="${k}"><b>${esc(p.name)}</b><i class="clip">${esc(p.note || Object.values(p.labels || {}).join(' · ') || '')}</i></button><button class="k acc" data-load="${k}">${ic('play', '#ffd23f', '')}PLAY</button></div>`).join('') : '');
     } else if (sh.kind === 'presets') {
-      rows = `<div class="lab-row${lit(0)}" data-i="0"><span class="lb"><b>New preset</b><i>Keeps the knobs as they are now. While playing, D-pad left and right flip between presets.</i></span><button class="k acc" data-preset="new">SAVE</button></div>`
+      rows = `<div class="lab-row${lit(0)}" data-i="0"><span class="lb"><b>New preset</b><i>${esc(status || 'Keeps the knobs as they are now. While playing, D-pad left and right flip between presets.')}</i></span><button class="k acc" data-preset="new">SAVE</button></div>`
         + (list.length > 1 ? list.slice(1).map((p, k) => `<div class="lab-row${lit(k + 1)}" data-i="${k + 1}"><button class="lb" data-preset="${k}"><b${k === presetAt ? ' style="color:#7dff6a"' : ''}>${esc(p.name)}</b><i class="clip">${esc(Object.keys(p.values || {}).length + ' knobs: ' + Object.values(p.labels || {}).map(x => x.split(' · ').pop()).join(' · '))}</i></button><button class="k" data-pkeep="${k}" aria-label="Replace ${esc(p.name)} with the knobs as they are now">SET</button><button class="k ic" data-pdrop="${k}" aria-label="Delete ${esc(p.name)}">${ic('trash', '#e4e2dc', 'X')}</button><button class="k acc" data-preset="${k}">LOAD</button></div>`).join('')
           : '<div class="lab-empty">No presets yet. Turn some knobs, then SAVE here. Each preset is the whole mix: loading one puts every other knob back to normal.</div>');
     } else if (sh.kind === 'ideas') {
