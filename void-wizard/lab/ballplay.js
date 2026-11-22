@@ -359,7 +359,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (get('path', 0) || dots) preview(dt);
     if (morphFor) morph();
     if (oneTimer) fireOneTimer();
-    if (get('own', 0) && game.ALL.some((W) => W.labCloakOwn === undefined)) ownPaint();   // the Party shelf's extra wizards, once they're made
+    if (get('own', 0) && !game.DUEL) for (const W of game.ALL) { const hex = solidOf(W).color.getHex(); if (W.labCloakOwn !== hex) W.labCloakOwn = hex; }   // follows the solids' colours as they change (Colours shelf, start mix), and new wizards
     if (LAB.repaintWizard) for (const W of game.ALL) if (W.labCloakOwn !== undefined && W.labOwnPainted !== W.labCloakOwn) { W.labOwnPainted = W.labCloakOwn; LAB.repaintWizard(W); }   // the Colours shelf loads after this one
     const r = get('ring', 0); if (r || ring) showRing(r, dt);
     if (o.labSuper) superFly(dt);
