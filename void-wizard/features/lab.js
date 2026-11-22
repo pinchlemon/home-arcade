@@ -169,8 +169,79 @@ feature('lab', ({ game, on }) => {
 
   // presets: whole mixes to flip between while playing. Each stands alone: loading one puts every other knob back
   // to normal (not to the start mix). They are not prototypes and don't show in the Studio.
-  const presets = () => (Array.isArray(data.presets) ? data.presets : []);
-  function keepPresets(list) { data.presets = list; keep('lab.presets', list); }
+  // They live in their own file on GitHub (<game>/presets.json) and travel between devices by themselves: opening the
+  // Lab fetches the latest, and saving, updating or deleting one sends that change straight to GitHub with the token
+  // from Settings > GitHub (same site, so the game can read it). Without a token, changes wait on this device and go up
+  // the next time the Lab opens with one. The last list seen is kept on the device for playing offline.
+  const CK = 'ha.lab.presets.' + folder, PK = 'ha.lab.presetsPending.' + folder;
+  const readLS = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
+  const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  let cloud = readLS(CK, null);
+  if (!Array.isArray(cloud)) cloud = Array.isArray(data.presets) ? data.presets : [];   // before the first fetch (an old game.json may still carry some)
+  for (const p of cloud) if (!p.id) p.id = 's' + Math.random().toString(36).slice(2, 10);
+  const presets = () => cloud;
+  const ghSettings = () => { const st = readLS('ha.settings', {}); return { token: st.token || '', repo: st.repo || 'pinchlemon/home-arcade', branch: st.branch || 'main' }; };
+  const enc = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o, null, 2) + '\n')));
+  const dec = (b) => JSON.parse(decodeURIComponent(escape(atob(b.replace(/\s/g, '')))));
+  async function siteList() {   // the copy that came with the site (and is kept for offline)
+    try { const r = await fetch('presets.json', { cache: 'no-store' }); if (r.ok) { const d = await r.json(); return Array.isArray(d.presets) ? d.presets : null; } } catch (e) {}
+    return null;
+  }
+  async function ghFile() {   // the presets file on GitHub: { list, sha } (sha null when there is none yet)
+    const g = ghSettings(), h = { Accept: 'application/vnd.github+json' }; if (g.token) h.Authorization = 'Bearer ' + g.token;
+    const r = await fetch('https://api.github.com/repos/' + g.repo + '/contents/' + folder + '/presets.json?ref=' + g.branch + '&t=' + Date.now(), { headers: h, cache: 'no-store' });
+    if (r.status === 404) return { list: null, sha: null };
+    if (!r.ok) throw new Error('GitHub ' + r.status);
+    const j = await r.json(), d = dec(j.content); return { list: Array.isArray(d.presets) ? d.presets : [], sha: j.sha };
+  }
+  const applyOp = (list, op) => {   // one change to a list: add or replace a preset (by id), or delete one
+    if (op.del) return list.filter((x) => x.id !== op.del);
+    const i = list.findIndex((x) => x.id === op.p.id); const out = list.slice(); if (i >= 0) out[i] = op.p; else out.push(op.p); return out;
+  };
+  async function sendOps(ops) {   // apply the changes to the newest file on GitHub and write it back (again if someone wrote in between)
+    const g = ghSettings(); if (!g.token) throw new Error('no token');
+    for (let tries = 0; tries < 3; tries++) {
+      const f = await ghFile(); let list = f.list || (await siteList()) || (Array.isArray(data.presets) ? data.presets : []);
+      for (const op of ops) list = applyOp(list, op);
+      const body = { message: 'Lab presets (' + folder + '): ' + ops.map((o) => (o.del ? 'delete ' + (o.name || o.del) : (o.update ? 'update ' : 'save ') + o.p.name)).join(', '),
+        content: enc({ presets: list }), branch: g.branch }; if (f.sha) body.sha = f.sha;
+      const r = await fetch('https://api.github.com/repos/' + g.repo + '/contents/' + folder + '/presets.json', { method: 'PUT', cache: 'no-store',
+        headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + g.token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) return list;
+      if (r.status !== 409 && r.status !== 422) throw new Error(r.status === 401 ? 'GitHub did not accept the token' : 'GitHub ' + r.status);
+    }
+    throw new Error('GitHub was busy, try again');
+  }
+  let syncing = false;
+  async function syncPresets(quiet) {   // send anything waiting, then take GitHub's list as the one to show
+    if (syncing) return; syncing = true;
+    try {
+      // presets kept the old way (a phone edit of game.json lab.presets, not pushed yet) join the shared file once
+      const old = readLS('ha.game.' + folder, null), oldList = old && old.overrides && Array.isArray(old.overrides['lab.presets']) ? old.overrides['lab.presets'] : null;
+      let pending = readLS(PK, []);
+      if (oldList) pending = [...oldList.map((p) => ({ p })), ...pending];
+      if (pending.length && ghSettings().token) {
+        cloud = await sendOps(pending); writeLS(PK, []);
+        if (oldList) { delete old.overrides['lab.presets']; writeLS('ha.game.' + folder, old); }
+        if (!quiet) say('Presets sent to GitHub');
+      } else {
+        let list = null;
+        try { list = (await ghFile()).list || (await siteList()); }
+        catch (e) { list = await siteList(); if (!list) throw e; }   // offline: the copy the site came with
+        if (Array.isArray(list)) cloud = pending.reduce(applyOp, list);
+      }
+      writeLS(CK, cloud); draw();
+    } catch (e) { if (!quiet) say(e.message === 'no token' ? 'Kept on this device: add a GitHub token in Settings to share presets' : 'Presets: ' + e.message); }
+    finally { syncing = false; }
+  }
+  function keepPresetOp(op) {   // change the list here at once, then send it
+    cloud = applyOp(cloud, op); writeLS(CK, cloud);
+    if (!ghSettings().token) { writeLS(PK, [...readLS(PK, []), op]); say('Kept on this device: add a GitHub token in Settings to share presets'); return; }
+    sendOps([op]).then((list) => { cloud = list; writeLS(CK, cloud); say((op.del ? (op.name || 'Preset') + ' deleted' : op.p.name + (op.update ? ' updated' : ' saved')) + ' · on all your devices'); draw(); })
+      .catch((e) => { writeLS(PK, [...readLS(PK, []), op]); say('Could not reach GitHub (' + e.message + '): it will go up next time'); });
+  }
+  setTimeout(() => syncPresets(true), 1500);   // after the game has started
+  LAB.presetsApi = { list: () => cloud, add: () => newPreset(), update: (i) => updatePreset(i), drop: (i) => dropPreset(i), sync: () => syncPresets(false) };   // for tests and other tools
   let presetAt = -1;   // the preset loaded last
   function newPreset() {
     const vals = changed();
@@ -178,17 +249,16 @@ feature('lab', ({ game, on }) => {
     const name = prompt('Name this preset', 'Preset ' + (presets().length + 1));
     if (name === null || !name.trim()) return;
     const p = { id: 's' + Date.now().toString(36), name: name.trim().slice(0, 40), values: vals, labels: labelsOf(vals), made: Date.now() };
-    keepPresets([...presets(), p]); presetAt = presets().length - 1; playing = p.name; say('Preset ' + p.name + ' kept');
+    keepPresetOp({ p }); presetAt = presets().length - 1; playing = p.name; say('Preset ' + p.name + ' kept');
   }
   function updatePreset(i) {
     const p = presets()[i], vals = changed(); if (!p) return;
     if (!confirm('Replace ' + p.name + ' with the knobs as they are now?')) return;
-    const list = presets().slice(); list[i] = { ...p, values: vals, labels: labelsOf(vals), made: Date.now() };
-    keepPresets(list); presetAt = i; playing = p.name; say(p.name + ' updated');
+    keepPresetOp({ p: { ...p, values: vals, labels: labelsOf(vals), made: Date.now() }, update: true }); presetAt = i; playing = p.name; say(p.name + ' updated');
   }
   function dropPreset(i) {
     const p = presets()[i]; if (!p || !confirm('Delete the preset ' + p.name + '?')) return;
-    keepPresets(presets().filter((x, k) => k !== i)); if (presetAt === i) presetAt = -1; else if (presetAt > i) presetAt--;
+    keepPresetOp({ del: p.id, name: p.name }); if (presetAt === i) presetAt = -1; else if (presetAt > i) presetAt--;
     say(p.name + ' deleted');
   }
   function loadPreset(i) {

@@ -88,3 +88,7 @@ Any game can have features:
 - set `FEATURES.game` to what features may touch;
 - call `FEATURES.emit(...)` where things happen;
 - give `studio.json` a `features` list (an empty list is fine).
+
+## Lab presets travel by themselves
+
+Presets are not in game.json any more: they live in `<game>/presets.json` (`{ presets: [...] }`). The Lab fetches the newest from GitHub when it opens (the contents API, with the token from Settings > GitHub if there is one; offline it uses the last list it saw, then the site's own copy), and every save, update or delete is sent straight up as its own commit to that file, applied to whatever is there at that moment, so two devices don't overwrite each other. Without a token the change waits on the device (`ha.lab.presetsPending.<game>`) and goes up the next time the Lab opens with one. Presets kept the old way (a phone edit of `lab.presets`) are folded into the file once and the edit is dropped.
