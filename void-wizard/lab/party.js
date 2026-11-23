@@ -260,7 +260,7 @@ LAB.shelf('party', 'Party', (game) => {
   // pass magnet: a pass (helped, or a teammate's) bends toward whoever it's for and arrives as it comes down
   function magnet(dt, v) {
     const o = game.orb, m = o.labTo;
-    if (o.state !== 'air' || !m || o.touched || m.downT > 0 || !game.ALL.includes(m)) return;
+    if (o.state !== 'air' || !m || o.touched || o.labMadden || m.downT > 0 || !game.ALL.includes(m)) return;   // a Madden pass goes where it was thrown
     const g = 24 * game.solid.grav, h = o.p.y - (m.y + 0.6), vy = o.v.y;
     const t = Math.max(0.12, (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * h))) / g);
     const wx = (m.pos.x + m.vel.x * t * 0.6 - o.p.x) / t, wz = (m.pos.z + m.vel.z * t * 0.6 - o.p.z) / t, k = Math.min(1, v * 5 * dt);
