@@ -141,6 +141,7 @@ LAB.shelf('attacks', 'Attacks', (game) => {
     const r = reach * Math.min(1, B.t / 0.4) * fade;   // the flames take a moment to get there
     for (const W of game.ALL) {
       if (B.hit.has(W) || W.downT > 0 || W.diveT > 0 || W.y > 1.3) continue;
+      if (LAB.blocked && LAB.blocked(mouth, W.pos)) continue;   // behind a Build block or a Wall (Abilities shelf)
       const dx = W.pos.x - mouth.x, dz = W.pos.z - mouth.z, d = Math.hypot(dx, dz);
       if (d > r || d < 0.01) continue;
       const cosA = (dx * fx + dz * fz) / d;
