@@ -147,7 +147,7 @@
   // big moments start them
   window.FEATURES.on('demonDown', () => { if (v('moments.onDown', 0)) transition(); if (v('moments.impact', 0)) impact(); }, 'lab');
   window.FEATURES.on('knockdown', (W) => { if (v('moments.impact', 0) && W && W.human) impact(); }, 'lab');
-  window.FEATURES.on('demonHit', (dmg) => { if (v('moments.impact', 0) && dmg >= v('moments.impactMin', 12)) impact(); }, 'lab');
+  window.FEATURES.on('demonHit', (dmg) => { if (v('moments.impact', 0) && dmg >= v('moments.impactMin', 12) && !(game.orb.labShot && !game.orb.labSuper)) impact(); }, 'lab');   // a straight shot only gets it when it's a super shot
   LAB.impact = impact; LAB.transition = transition;   // for the rules
 
   const sync = () => { if (!ready) want(); LAB.screen.sync(); };
