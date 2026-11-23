@@ -922,6 +922,24 @@
   },
   "Studio|Settings": {
    "title": "Adjustments"
+  },
+  "Arcade|Crab Platformer": {
+   "sub": "Canvas; 97 KB"
+  },
+  "Arcade|Void Wizard": {
+   "sub": "three.js; 97 KB"
+  },
+  "Arcade|Phosphor": {
+   "sub": "Canvas; 239 KB"
+  },
+  "Arcade|Purgatory Bowl": {
+   "sub": "three.js & cannon; 287 KB"
+  },
+  "Arcade|Circuit Crush": {
+   "sub": "Canvas; 371 KB"
+  },
+  "Arcade|Night Rack": {
+   "sub": "three.js; 1.2 MB"
   }
  },
  "ha.order": {
