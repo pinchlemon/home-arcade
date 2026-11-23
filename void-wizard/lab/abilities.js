@@ -71,10 +71,12 @@ LAB.shelf('abilities', 'Abilities', (game) => {
 
   // ---------------------------------------------------------------- blocks (Build and Wall): boxes the demon, its spit and its breath can't pass
   const blocks = [];
+  const see = () => get('opacity', 0.3);   // the cube's blocks and walls are see-through
   function blockMesh(w, h, d, hex) {
     const g = new T.Group();
-    const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshLambertMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.35, transparent: true, opacity: 0.92 }));
-    const e = new T.LineSegments(new T.EdgesGeometry(m.geometry), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 }));
+    const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshLambertMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.5, transparent: true, opacity: see(), depthWrite: false, side: T.DoubleSide }));
+    const e = new T.LineSegments(new T.EdgesGeometry(m.geometry), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }));
+    m.renderOrder = 3; e.renderOrder = 4;
     g.add(m, e); game.scene.add(g); return g;
   }
   function addBlock(x, z, y0, w, h, d, yaw, life, hex) {
@@ -105,7 +107,7 @@ LAB.shelf('abilities', 'Abilities', (game) => {
       const b = blocks[i]; b.t += dt;
       const grow = Math.min(1, b.t / 0.25), fade = b.life - b.t;
       b.g.scale.y = Math.max(0.01, grow); b.g.position.y = b.y0 + b.h / 2 * grow;
-      if (fade < 0.6) b.g.children.forEach(c => { c.material.opacity = Math.max(0, fade / 0.6) * (c.isMesh ? 0.92 : 0.8); });
+      if (fade < 0.6) b.g.children.forEach(c => { c.material.opacity = Math.max(0, fade / 0.6) * (c.isMesh ? see() : 0.9); });
       if (b.t >= b.life) dropBlock(b);
     }
     if (!blocks.length) return;
@@ -338,6 +340,7 @@ LAB.shelf('abilities', 'Abilities', (game) => {
     { id: 'expose', label: 'Exposed (d20)', help: 'Seconds a 10 to 19 on the d20 leaves it Exposed', min: 1, max: 15, step: 1, value: 6, dice: false, fmt: (x) => x + ' S' },
     { id: 'confused', label: 'Confused (20)', help: 'Seconds a natural 20 leaves it Confused, unable to attack', min: 5, max: 40, step: 1, value: 20, dice: false, fmt: (x) => x + ' S' },
     { id: 'slam', label: 'Slam', help: 'Damage when the d20 slams it down', min: 0, max: 60, step: 2, value: 12, dice: false },
+    { id: 'opacity', label: 'Wall opacity', help: 'How solid Build blocks and Walls look (lower is more see-through)', min: 0.1, max: 1, step: 0.05, value: 0.3, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
     { id: 'maxBlocks', label: 'Most blocks', help: 'Blocks at once (the oldest goes)', min: 3, max: 40, step: 1, value: 18, dice: false }
   ];
 });
