@@ -600,16 +600,6 @@
     ],
     "ideas": [
       {
-        "id": "imwsq8ma7",
-        "text": "holding R1 should always be a straight shot. like a super shot, but it needs to build up before it's a \"super shot\". and there needs to be a visual indicator for the build up (which is built up by holding the throw button - R1 just puts it into \"shoot\" mode and focuses on the enemy). doesn't need to be an arc when holding R1. just like the ball obviously powering up / getting brighter as the player holds throw down. this could also be the case when locked on to the enemy from tapping R1.",
-        "made": 1795405769935
-      },
-      {
-        "id": "imws1gc6m",
-        "text": "when the camera is locked on to my teammate and i throw it, after he catches it, the lock on should turn off",
-        "made": 1795364139694
-      },
-      {
         "id": "imwcu8xae",
         "text": "different options for player indicator (for which player you are currently playing as)",
         "made": 1794445043846
@@ -673,7 +663,9 @@
       "imwcuiua5",
       "imwcuchzb",
       "imwcu7z2u",
-      "imwculokw"
+      "imwculokw",
+      "imwsq8ma7",
+      "imws1gc6m"
     ],
     "start": {
       "values": {

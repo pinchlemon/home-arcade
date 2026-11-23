@@ -28,7 +28,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
       const C = W.ctl;
       if (game.blockPad) { if (W.labBtn) { C.castHeld = false; W.labBtn = null; } continue; }
       const holding = o.state === 'held' && o.holder === W;
-      if (now && !was && W.labAiming) { W.charge = W.labPower; W.labFire = W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // second tap throws
+      if (now && !was && W.labAiming) { W.charge = W.labFire = shooting(W) ? W.labShoot || 0 : W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // second tap throws
       else if (now && !was && !C.castHeld) {
         W.labBtn = 'throw'; C.castHeld = true; C.castPressed = true;
         if (holding && get('power', 0)) { W.labAiming = true; W.labPower = lastPower; W.labBtn = 'aim'; }   // Distance: RIGHT STICK, the first tap starts aiming
@@ -36,7 +36,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
       // still holding Square from the catch: aim from here, so the triggers (or right stick) set the distance
       if (now && was && holding && W.labBtn === 'throw' && !W.labAiming && get('power', 0)) { W.labAiming = true; W.labPower = lastPower; W.labBtn = 'aim'; C.castHeld = true; C.castPressed = true; }
       if (!now && was && W.labBtn === 'throw') { C.castHeld = false; W.labBtn = null; }
-      else if (!now && was && W.labAiming && get('power', 0) === 2) { W.charge = W.labPower; W.labFire = W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // TRIGGERS: letting go of Square throws
+      else if (!now && was && W.labAiming && get('power', 0) === 2) { W.charge = W.labFire = shooting(W) ? W.labShoot || 0 : W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // TRIGGERS: letting go of Square throws
     }
   }
   let hintWas = null;
@@ -75,6 +75,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
   function holdThrow(W) {
     const c = W.labFire != null ? W.labFire : W.charge, L = launch(W, c); W.labFire = null;
     game.throwOrb(W, c, L.dx, L.dz, L.vh, L.vy, true);
+    if (shooting(W)) { straightShot(W, c); W.labR1 = false; FX.emit('holdThrow', W, c, -1); return; }
     if (L.mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
     const r1 = L.mod < 0 || W.labR1; W.labR1 = false;   // R1 counts if it was pressed at any point in the wind-up
     if (get('super', 0) && (r1 || get('superHow', 0) === 1) && c >= get('superPower', 0.75) && o.res >= get('superRes', 4)) superShot(W);
@@ -83,8 +84,10 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   // ---- super shot: a full low throw at full resonance. Faster, it bends onto the centipede, hits much harder, and bursts
   let superHit = false;
-  function superShot(W) {
+  function superShot(W, keepDir) {
     o.labSuper = true; o.labMul = get('superDmg', 2.5); o.fast = true;
+    if (keepDir) { o.v.multiplyScalar(Math.max(1, 26 / (o.v.length() || 1))); game.popup('SUPER SHOT!', W.pos, '#ffd36a', true); game.shake(0.25); game.rumble(W, 0.5, 1, 260);
+      game.fxRing(W.pos.x, W.pos.z, game.solid.col, 4.5, 0.45); game.sparkBurst(o.p, 30, 6, 0.9); return; }
     // it flies flat and fast whatever arc was aimed: straight at the head when that's roughly ahead, otherwise forward
     const sp = Math.max(26, o.v.length() * 1.4), d = game.demon, fx = Math.sin(W.yaw), fz = Math.cos(W.yaw);
     let dir = v1.set(fx, 0.1, fz);
@@ -115,6 +118,37 @@ LAB.shelf('ball', 'Ball play', (game) => {
     game.fxBurst(at, col, 60, 14); game.shake(0.5); game.popup('SUPER!', at, '#ffffff', true);
   }, 'lab');
 
+  // ---- shoot mode (Idea 8): locked onto an enemy (hold R1, or a tap lock when Shoot on tap is on), Square builds up the shot
+  // instead of setting distance: the Solid swells and burns brighter, and when it's full it's a super shot. It flies straight.
+  const shooting = (W) => !!(get('shoot', 1) && get('lock', 0) && sports() && W === game.you && lock === 'demon' && (held || get('lock', 0) === 2 || get('shootTap', 1)));
+  let readyFor = null, straight = false;
+  function shootTick(dt) {
+    const W = game.you; if (!W) return;
+    if (!W.charging || !shooting(W)) { W.labShoot = 0; readyFor = null; return; }
+    W.labShoot = Math.min(1, (W.labShoot || 0) + dt / get('shootTime', 1.2)); W.charge = W.labShoot;
+    const S = game.solid, k = W.labShoot;
+    game.orbMesh.scale.multiplyScalar(1 + k * 0.5);   // swells as it builds (on top of the game's own charge swell)
+    if (k >= 1) {   // full: a white-hot pulse, and once, a flash and READY
+      const pl = 0.5 + 0.5 * Math.sin(performance.now() / 1000 * 18);
+      S.coreMat.color.copy(WHITE); S.lineMat.color.lerp(WHITE, 0.6 + pl * 0.4); S.fillMat.opacity = Math.min(0.9, S.fillMat.opacity + 0.15 + pl * 0.2); game.orbLight.intensity += 2 + pl * 2;
+      if (readyFor !== W) { readyFor = W; game.popup('READY', W.pos, '#ffd36a'); game.fxRing(o.p.x, o.p.z, 0xffffff, 2.2, 0.3, 0.05); game.sparkBurst(o.p, 18, 3, 0.7); }
+    } else game.orbLight.intensity += k * 1.5;
+  }
+  function straightShot(W, c) {
+    const d = game.demon; if (!d.alive || d.dying) return;
+    game.headCenter(aim); v2.copy(aim).sub(o.p).normalize();
+    const lo = get('shootSlow', 16), sp = lo + (get('shootFast', 30) - lo) * c;
+    o.v.copy(v2).multiplyScalar(sp); o.fast = c >= 0.5; straight = true;
+    if (c >= 1) superShot(W, true);
+  }
+  function straightFly(dt) {   // no drop: undo gravity, and keep it on the head
+    if (o.state !== 'air' || o.touched) { straight = false; return; }
+    o.v.y += game.G * game.solid.grav * dt;
+    const d = game.demon; if (!d.alive || d.dying || o.labSuper) return;
+    const sp = o.v.length(); game.headCenter(aim); aim.sub(o.p).normalize();
+    if (aim.dot(v1.copy(o.v).divideScalar(sp || 1)) > 0.5) { v1.lerp(aim, Math.min(1, dt * 4)).normalize(); o.v.copy(v1).multiplyScalar(sp); }
+  }
+
   // ---- flight arc: a dotted line showing where the throw will go, while you hold it
   let dots = null, march = 0;
   const dc = new T.Color();
@@ -125,7 +159,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
   function preview(dt) {
     const W = game.you;
-    const show = get('path', 0) && get('slider', 0) && !game.DUEL && W.charging && o.state === 'held' && o.holder === W && W.crouchK <= 0.5;
+    const show = get('path', 0) && get('slider', 0) && !game.DUEL && !shooting(W) && W.charging && o.state === 'held' && o.holder === W && W.crouchK <= 0.5;
     if (!show) { if (dots) for (const d of dots) d.visible = false; return; }
     if (!dots) makeDots();
     const L = launch(W, W.labAiming ? W.labPower : W.charge), g = game.G * game.solid.grav, gap = 0.6, col = game.solid.color, h = 1 / 120;
@@ -159,6 +193,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
       W.labAimStick = mode === 1;
       const holding = o.state === 'held' && o.holder === W;
       if (!W.human || !holding || (!W.charging && !W.ctl.castPressed) || game.blockPad) { W.labAiming = false; W.ctl.castHeld = false; W.labBtn = null; continue; }
+      if (shooting(W)) continue;   // shoot mode: the hold builds the shot, the triggers wait
       let push = 0;
       if (mode === 2) push = trig(W.gp, 7) - trig(W.gp, 6);   // RT farther, LT shorter, by how hard they're pressed
       else { const a = (W.gp && W.gp.axes[3]) || 0; push = -(Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8); }   // stick up is farther
@@ -206,6 +241,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
 
   // ---- lock-on: R1 picks what you're facing (the centipede or a teammate), the right stick flicks to the next one left
   // or right, the camera keeps you both in view, a little triangle bobs over the target, and you aim at it while winding up
+  let lockWas = null, lockHas = false;
   let lock = null, lockK = 0, r1Was = false, flick = 0, marker = null, bob = 0, r1T = 0, held = false, before = null;
   const superLock = () => lock === 'demon' && (held || get('lock', 0) === 2);   // the super shot: only while R1 is held on the centipede
   const lockPos = (L, out) => {   // where the target is (the demon's head, or a wizard's chest); false when it's gone
@@ -242,6 +278,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
         if (!r1 && r1Was) { if (held) { lock = before && lockPos(before, v1) ? before : null; held = false; before = null; } else if (r1T < get('holdTime', 0.22)) lock = lock ? null : pickFacing(); }
       }
       if (mode === 2) { if (r1 && !lock) lock = pickFacing(); if (!r1) lock = null; }   // hold
+      if (lock !== lockWas) { lockWas = lock; lockHas = lock !== 'demon' && !!lock && o.state === 'held' && o.holder === lock; }
+      if (lock && lock !== 'demon') { const has = o.state === 'held' && o.holder === lock; if ((has && !lockHas) || lock === game.you) { lock = null; held = false; before = null; } lockHas = has; }
       if (lock && !lockPos(lock, at)) lock = lock !== 'demon' && targets().includes('demon') ? 'demon' : null;   // its target's gone
       const rx = (gp && gp.axes[2]) || 0;   // right stick: flick left or right for the next target
       if (lock && !flick && Math.abs(rx) > 0.6) { flick = Math.sign(rx); cycle(flick); } else if (Math.abs(rx) < 0.3) flick = 0;
@@ -407,7 +445,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     fire = { m, mat, sats };
   }
   function burn(dt, v) {
-    heat += ((o.labSuper ? 1.2 : v && o.res ? 0.15 + o.res * 0.17 : 0) - heat) * (1 - Math.exp(-5 * dt));   // eases up and down, so a fizzle fades out
+    heat += (Math.max(o.labSuper ? 1.2 : v && o.res ? 0.15 + o.res * 0.17 : 0, game.you && game.you.labShoot ? game.you.labShoot : 0) - heat) * (1 - Math.exp(-5 * dt));   // eases up and down, so a fizzle fades out
     if (!fire && heat < 0.01) return;
     if (!fire) makeFire();
     const k = heat * v, on = k > 0.01 && game.orbMesh.visible;
@@ -442,9 +480,11 @@ LAB.shelf('ball', 'Ball play', (game) => {
   FX.on('frame', (dt) => {
     if (sports()) { readButtons(); if (hintWas == null) hint(1); }
     if (switchFrom) doSwitch();
-    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (get('lock', 0)) W.labR1 = W.human && W === game.you && superLock(); else if (W.human && modOf(W) < 0) W.labR1 = true; }
+    if (sports()) for (const W of game.ALL) { if (!W.charging) W.labR1 = false; else if (get('lock', 0)) W.labR1 = W.human && W === game.you && superLock() && !shooting(W); else if (W.human && modOf(W) < 0) W.labR1 = true; }
     if (get('lock', 0) || lock) lockTick(dt);
     if (get('power', 0) || skipTrig) aimPower(dt);
+    if (lock) shootTick(dt); else if (game.you && game.you.labShoot) { game.you.labShoot = 0; readyFor = null; }
+    if (straight) straightFly(dt);
     if (get('cancel', 0) || skipCircle) cancelCheck();
     if (get('path', 0) || dots) preview(dt);
     if (morphFor) morph();
@@ -467,6 +507,11 @@ LAB.shelf('ball', 'Ball play', (game) => {
     { id: 'lock', label: 'Lock-on', help: (x) => x === 1 ? 'Tap R1: lock onto what you face (the centipede or a teammate), tap again to let go. Hold R1: lock onto the enemy nearest the middle of the screen until you let go; throwing then is your super shot. The right stick flicks to the next target'
       : x === 2 ? 'Hold R1: lock onto what you face; on the centipede, throwing is your super shot. The right stick flicks to the next target' : 'R1 throws lower',
       min: 0, max: 2, step: 1, value: 0, dice: false, fmt: (x) => ['OFF', 'TAP + HOLD', 'R1 HOLD'][x], apply: () => { aimOn(); if (!get('lock', 0)) { lock = null; held = false; } } },
+    { id: 'shoot', label: 'Shoot mode', help: 'Locked onto the centipede, the throw is a straight shot: hold Square to build it up (the Solid swells and burns brighter), full is a super shot', kind: 'onoff', value: 1, dice: false },
+    { id: 'shootTap', label: 'Shoot on tap lock', help: (x) => x ? 'A tap lock on the centipede is shoot mode too' : 'Only holding R1 is shoot mode', kind: 'onoff', value: 1, dice: false },
+    { id: 'shootTime', label: 'Shot build-up', help: 'Seconds of holding Square to build a full (super) shot', min: 0.3, max: 3, step: 0.1, value: 1.2, dice: false, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'shootSlow', label: 'Shot speed (tap)', help: 'How fast a barely built straight shot flies', min: 6, max: 30, step: 1, value: 16, dice: false },
+    { id: 'shootFast', label: 'Shot speed (full)', help: 'How fast a fully built straight shot flies', min: 12, max: 50, step: 1, value: 30, dice: false },
     { id: 'holdTime', label: 'Lock-on hold', help: 'With TAP + HOLD: how long you hold R1 before it counts as a hold (seconds)', min: 0.1, max: 0.6, step: 0.02, value: 0.22, fmt: (x) => x.toFixed(2) + 's', dice: false },
     { id: 'lockSide', label: 'Lock-on side', help: 'Locked on, the camera sits this far to your right, so you see the throw arc from the side instead of end-on (0: straight behind)', min: 0, max: 1, step: 0.05, value: 0.4, fmt: (x) => x.toFixed(2), dice: false },
     { id: 'arcBy', label: 'Arc by', help: (x) => x ? 'While winding up, the left stick ' + (x === 1 ? 'up throws higher, down lower' : 'down throws higher, up lower') + '; left and right turn you; you stand still' : 'L1 throws higher, R1 lower',
