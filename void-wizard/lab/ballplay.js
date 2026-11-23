@@ -28,6 +28,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
       const C = W.ctl;
       if (game.blockPad) { if (W.labBtn) { C.castHeld = false; W.labBtn = null; } continue; }
       const holding = o.state === 'held' && o.holder === W;
+      if (W.labMadden) { if (W.labBtn) { C.castHeld = false; W.labBtn = null; } W.labAiming = false; continue; }   // Madden passing has the face buttons while you hold it
       if (now && !was && W.labAiming) { W.charge = W.labFire = shooting(W) ? W.labShoot || 0 : W.labPower; W.labAiming = false; C.castHeld = false; W.labBtn = null; }   // second tap throws
       else if (now && !was && !C.castHeld) {
         W.labBtn = 'throw'; C.castHeld = true; C.castPressed = true;
@@ -98,6 +99,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     game.fxRing(W.pos.x, W.pos.z, col, 4.5, 0.45); game.fxRing(W.pos.x, W.pos.z, 0xffffff, 2.6, 0.3, 0.05); game.sparkBurst(o.p, 30, 6, 0.9);
   }
   const aim = new T.Vector3();
+  LAB.superShot = superShot;   // Madden passing's shot
   function superFly(dt) {
     if (o.state !== 'air' || o.touched || superHit) { o.labSuper = false; o.labMul = undefined; superHit = false; return; }
     const d = game.demon, sp = o.v.length();
@@ -271,7 +273,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (best) { lock = best; game.popup(best === 'demon' ? 'CENTIPEDE' : 'TEAMMATE', me.pos, '#ffd36a'); }
   }
   function lockTick(dt) {
-    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad;
+    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad && !(me && me.labMadden);   // Madden passing: R1 shoots while you hold it
     if (!mode || game.DUEL || !sports()) { lock = null; held = false; before = null; }
     else {
       if (mode === 1) {   // a quick press locks on (press again: off); hold R1 and it locks onto the enemy nearest the middle until you let go
@@ -343,7 +345,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
   // ---- own solids: every wizard has a solid of their own and a cloak in its colour; whoever catches the Solid turns it into theirs
   const OWN = [['ownYou', 4], ['ownMate', 0], ['ownGreen', 1], ['ownPurple', 3], ['ownGold', 2]];   // blue (you), red, then the Party shelf's extra wizards
   const KEYS = { you: 0, buddy: 1, green: 2, purple: 3, gold: 4 };   // the Colours shelf's name for each wizard
-  const solidOf = (W) => { const i = KEYS[W.labKey] ?? game.ALL.indexOf(W), S = game.SOLIDS, k = OWN[i];
+  const solidOf = LAB.solidOf = (W) => { const i = KEYS[W.labKey] ?? game.ALL.indexOf(W), S = game.SOLIDS, k = OWN[i];
     return S[(k ? get(k[0], k[1]) : i) % S.length]; };
   let morphFor = null;
   FX.on('catch', (W) => { if (get('own', 0) && !game.DUEL) morphFor = W; }, 'lab');
