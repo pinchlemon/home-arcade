@@ -9,7 +9,7 @@ LAB.shelf('health', 'Health', (game) => {
   .lab-hp.hurt i{background:#fff}`;
   document.head.appendChild(css);
   const bars = new Map();
-  const maxOf = (W) => (W === game.player ? LAB.get('health.you') : LAB.get('health.buddy')) ?? 5;
+  const maxOf = (W) => W.labMaxOverride ?? (W === game.player ? LAB.get('health.you') : LAB.get('health.buddy')) ?? 5;   // labMaxOverride: the Match shelf ties the captain's health to the team's lives
   // the wizard's colour, or his recoloured cloak (lifted toward white if it's too dark to see on the void)
   const tmp = new T.Color(), HSL = {};
   const colOf = (W) => {

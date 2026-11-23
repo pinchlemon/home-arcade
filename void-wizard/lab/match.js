@@ -4,8 +4,9 @@
 //     next to a downed teammate it revives them, and costs a life;
 //     anywhere else it arms the Solid, and the next hit on a demon at its capture point (20% health or less) captures it.
 //   The demon can't die any other way: its health stops at 1 until it is captured. Capturing it wins the match.
-//   If the captain (whoever's own solid is the dodecahedron) is down, any wizard with a full-resonance Solid can revive
-//   them, for more lives (2). Everyone down at once loses the match.
+//   The captain (whoever's own solid is the dodecahedron) has the team's lives as health: every hit on the captain
+//   takes a life, and every revive takes one from the captain. A revive can't spend the captain's last life.
+//   The captain going down, or everyone down at once, loses the match.
 //   Dice: every Pentacle rolls the dodecahedron's d12; a 12 revives for free.
 //   Uses the Health shelf for health (turns it on), and the game's spawnDemon and demonMax.
 LAB.shelf('match', 'Match', (game) => {
@@ -108,6 +109,15 @@ LAB.shelf('match', 'Match', (game) => {
     if (W.downT > 0) W.downT = 0.01;   // the game stands him up next frame
   }
   function loseLives(n) { const before = st.lives; st.lives = Math.max(0, st.lives - n); livesKey = ''; drawLives(before - st.lives); }
+  // the captain's health is the lives: a hit on the captain takes a life, a revive takes the captain's health
+  function tieCaptain() {
+    const C = captain();
+    for (const W of game.ALL) W.labMaxOverride = W === C ? get('lives', 5) : undefined;
+    if (!C || st.over) return;
+    if (C.labDown) { if (st.lives) loseLives(st.lives); st.over = 'lose'; st.why = 'captain'; st.overAt = performance.now(); return; }
+    if (C.labHp != null && C.labMax === get('lives', 5) && C.labHp < st.lives) loseLives(st.lives - C.labHp);
+    C.labHp = st.lives;
+  }
   function roll(n) { return 1 + Math.floor(Math.random() * n); }
 
   // L1 with the Solid in hand
@@ -120,14 +130,14 @@ LAB.shelf('match', 'Match', (game) => {
     let D = null, dd = get('reach', 3);
     for (const W of game.ALL) if (W !== Y && W.labDown) { const d = hd(W.pos, Y.pos); if (d < dd) { dd = d; D = W; } }
     if (D) {
-      const cap = D === captain(), cost = dode ? 1 : cap ? get('capCost', 2) : 0;
-      if (!dode && !cap) { pop('NEEDS THE DODECAHEDRON', at, '#ffffff'); return; }
+      const cost = 1;
+      if (!dode) { pop('NEEDS THE DODECAHEDRON', at, '#ffffff'); return; }
       if (!full) { pop('RESONANCE ' + (o.res || 0) + ' / ' + need, at, '#ffffff'); return; }
       let pay = cost, face = 0;
       if (dode && get('dice', 1)) { face = roll(12); if (face === 12) pay = 0; }
-      if (st.lives < pay) { pop('NO LIVES LEFT', at, '#ff6a5a'); return; }
+      if (st.lives - pay < (captain() ? 1 : 0)) { pop(captain() ? 'THE CAPTAIN NEEDS THAT LIFE' : 'NO LIVES LEFT', at, '#ff6a5a'); return; }
       o.res = 0;
-      loseLives(pay); st.revives++;
+      loseLives(pay); st.revives++; tieCaptain();
       const col = dodecaCol(), hex = parseInt(col.slice(1), 16);
       pentacle(D.pos.x, D.pos.z, 1.7, hex, 1.6); pentacle(D.pos.x, D.pos.z, 2.6, 0xffffff, 1.2);
       game.fxPillar(D.pos.x, D.pos.z, hex, 7, 0.9, 0.9); game.fxRing(D.pos.x, D.pos.z, hex, 4, 0.7);
@@ -177,7 +187,7 @@ LAB.shelf('match', 'Match', (game) => {
     if (end) end.remove();
     end = document.createElement('div'); end.className = 'mt-end';
     const m = Math.floor(st.t / 60), s = Math.floor(st.t % 60);
-    end.innerHTML = `<h1 style="color:${win ? dodecaCol() : '#ff6a5a'}">${win ? 'DEMON CAPTURED' : 'THE TEAM HAS FALLEN'}</h1>`
+    end.innerHTML = `<h1 style="color:${win ? dodecaCol() : '#ff6a5a'}">${win ? 'DEMON CAPTURED' : st.why === 'captain' ? 'THE CAPTAIN HAS FALLEN' : 'THE TEAM HAS FALLEN'}</h1>`
       + `<p>TIME ${m}:${String(s).padStart(2, '0')} · LIVES LEFT ${st.lives} · REVIVES ${st.revives}</p>`
       + `<p class="go">PRESS X TO PLAY AGAIN</p>`;
     end.addEventListener('pointerdown', (e) => { e.preventDefault(); restart(); });
@@ -187,7 +197,7 @@ LAB.shelf('match', 'Match', (game) => {
   function restart() {
     if (end) { end.remove(); end = null; }
     game.blockPad = false;
-    st.lives = get('lives', 5); st.t = 0; st.over = null; st.overAt = 0; st.revives = 0; st.armed = false; showBadge(false); livesKey = '';
+    st.lives = get('lives', 5); st.why = null; st.t = 0; st.over = null; st.overAt = 0; st.revives = 0; st.armed = false; showBadge(false); livesKey = '';
     for (const W of game.ALL) standUp(W);
     const d = game.demon;
     if (d.alive && !d.dying) game.spawnDemon();   // a fresh demon where it stands
@@ -199,6 +209,7 @@ LAB.shelf('match', 'Match', (game) => {
   function tick(dt) {
     const d = game.demon, Y = game.you;
     st.t += st.over ? 0 : dt;
+    tieCaptain();
     // downed wizards stay down
     for (const W of game.ALL) if (W.labDown && W.downT > 0) W.downT = Math.max(W.downT, 0.5);
     // you went down: take over the nearest teammate still standing
@@ -254,6 +265,7 @@ LAB.shelf('match', 'Match', (game) => {
   function off() {
     hud.style.display = 'none'; if (end) { end.remove(); end = null; game.blockPad = false; }
     st.armed = false; showBadge(false);
+    for (const W of game.ALL) W.labMaxOverride = undefined;
     for (const W of game.ALL) if (W.labDown) { W.labDown = false; if (W.downT > 0) W.downT = 0.01; }
     const d = game.demon; if (!d.alive && !d.dying && d.spawnT > 5) d.spawnT = 1;
     if (d.alive && d.hp < 1) d.hp = 1;
@@ -262,11 +274,10 @@ LAB.shelf('match', 'Match', (game) => {
   return [
     { id: 'on', label: 'Match', help: 'One fight with stakes: shared lives, revives, and a capture to win', kind: 'onoff', value: 0, dice: false,
       frame: (dt) => tick(dt), apply: (v) => { if (v) { if (!LAB.get('health.on')) LAB.set('health.on', 1); restart(); } else off(); } },
-    { id: 'lives', label: 'Lives', help: 'Shared by the team. A revive spends one', min: 1, max: 12, step: 1, value: 5, dice: false, apply: () => { if (on()) { st.lives = Math.min(st.lives, get('lives', 5)); livesKey = ''; } } },
+    { id: 'lives', label: 'Lives', help: 'The captain\'s health, shared by the team. A hit on the captain or a revive spends one', min: 1, max: 12, step: 1, value: 5, dice: false, apply: () => { if (on()) { st.lives = Math.min(st.lives, get('lives', 5)); livesKey = ''; } } },
     { id: 'capture', label: 'Capture point', help: 'The demon can be captured at this much health or less', min: 0.05, max: 0.6, step: 0.05, value: 0.2, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
     { id: 'res', label: 'Pentacle needs', help: 'Resonance the Solid needs for a revive or a capture', min: 1, max: 5, step: 1, value: 5, dice: false },
     { id: 'reach', label: 'Revive reach', help: 'How close you stand to a downed teammate', min: 1, max: 8, step: 0.5, value: 3, dice: false },
-    { id: 'capCost', label: 'Captain revive', help: 'Lives it costs to revive the captain without the dodecahedron', min: 1, max: 5, step: 1, value: 2, dice: false },
     { id: 'dice', label: 'd12', help: 'Every pentacle rolls a d12: a 12 revives for free', kind: 'onoff', value: 1, dice: false },
     { id: 'bar', label: 'Demon bar', help: 'The demon\'s health at the top, with the capture point marked', kind: 'onoff', value: 1, dice: false }
   ];
