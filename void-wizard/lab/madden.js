@@ -141,14 +141,15 @@ LAB.shelf('madden', 'Passing', (game) => {
       if (!show || b === undefined || !W.root.visible) { e.style.display = 'none'; continue; }
       if (e.dataset.b !== String(b)) { e.dataset.b = String(b); e.innerHTML = GLYPH[b]; }
       e.classList.toggle('down', W.downT > 0); e.classList.toggle('on', !!press && press.to === W);
-      const s = screen(cam, W.pos.x, W.y + 2.5 * (W.root.scale.y || 1), W.pos.z);
+      const s = screen(cam, W.pos.x, W.y + 1.9 * (W.root.scale.y || 1), W.pos.z);   // the same spot as the health bar, then just above it
       if (!s) { e.style.display = 'none'; continue; }
-      e.style.display = 'flex'; e.style.transform = `translate(${s[0].toFixed(1)}px,${s[1].toFixed(1)}px) translate(-50%,-100%)`;
+      e.style.display = 'flex'; e.style.transform = `translate(${s[0].toFixed(1)}px,${(s[1] - 4 - (barsOn() ? 10 : 0)).toFixed(1)}px) translate(-50%,-100%)`;
     }
     const Y = game.you;
     if (press && Y) {
-      const s = screen(cam, Y.pos.x, Y.y + 2.6, Y.pos.z);
+      const s = screen(cam, Y.pos.x, Y.y + 1.9 * (Y.root.scale.y || 1), Y.pos.z);
       if (s) {
+        s[1] -= 4 + (barsOn() ? 10 : 0);
         const k = press.to === 'shot' ? Math.min(1, press.t / get('bullet', 0.5)) : kindOf(press.t);
         const fill = press.to === 'shot' ? k : Math.min(1, press.t / (get('bullet', 0.5) + 0.6));
         mLabel.textContent = press.to === 'shot' ? (k >= 1 ? 'FULL SHOT' : 'SHOT') : press.t > get('bullet', 0.5) + 0.6 ? 'TOO LONG' : k <= 0 ? 'LOB' : k >= 1 ? 'BULLET' : 'TOUCH';
@@ -158,11 +159,15 @@ LAB.shelf('madden', 'Passing', (game) => {
       } else meter.style.display = 'none';
     } else meter.style.display = 'none';
   }
-  FX.on('camera', (cam) => { if (LAB.get('madden.on')) place(cam); }, 'lab');
+  // placed after every camera move of the frame: hooked on the first frame, so it comes after the Camera and Feel shelves
+  // (which hook the camera event when their files load) and the health bars, like they are
+  let hooked = false;
+  const hook = () => { if (hooked) return; hooked = true; FX.on('camera', (cam) => { if (LAB.get('madden.on')) place(cam); }, 'lab'); };
+  const barsOn = () => !!LAB.get('health.on');
   FX.on('catch', () => { o.labMadden = false; }, 'lab');
   return [
     { id: 'on', label: 'Madden passing', help: 'Holding the Solid, each face button passes to one teammate (their button shows over them); R1 shoots', kind: 'onoff', value: 0, dice: false,
-      frame: () => tick(), apply: (v) => { if (!v) { clear(); wasHolding = false; o.labMadden = false; } } },
+      frame: () => { hook(); tick(); }, apply: (v) => { if (!v) { clear(); wasHolding = false; o.labMadden = false; } } },
     { id: 'tap', label: 'Lob below', help: 'A press shorter than this is a lob: high and soft', min: 0.05, max: 0.5, step: 0.05, value: 0.15, dice: false, fmt: (x) => x.toFixed(2) + ' S' },
     { id: 'bullet', label: 'Bullet at', help: 'Hold this long for a full bullet: fast and flat (in between is a touch pass)', min: 0.2, max: 1.5, step: 0.05, value: 0.5, dice: false, fmt: (x) => x.toFixed(2) + ' S' },
     { id: 'lobSpeed', label: 'Lob speed', help: 'How fast a lob travels (slower floats higher)', min: 5, max: 16, step: 0.5, value: 9, dice: false },
