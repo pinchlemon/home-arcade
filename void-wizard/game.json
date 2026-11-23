@@ -174,7 +174,8 @@
       "ps1",
       "ps2",
       "rules",
-      "health"
+      "health",
+      "match"
     ],
     "prototypes": [
       {

@@ -1274,7 +1274,8 @@
         "rules.then1": 1,
         "rules.for1": 0.5,
         "health.on": 1,
-        "health.contact": 1
+        "health.contact": 1,
+        "match.on": 1
       },
       "labels": {
         "world.solidGravity": "Solids · Solid gravity 1.5",
@@ -1380,7 +1381,8 @@
         "rules.then1": "Rules · Rule 1: then SLOW-MO",
         "rules.for1": "Rules · Rule 1: for 0.5 S",
         "health.on": "Wizards · Health ON",
-        "health.contact": "Demon · Centipede hurts ON"
+        "health.contact": "Demon · Centipede hurts ON",
+        "match.on": "Match · Match ON"
       },
       "made": 1795405475494
     }
