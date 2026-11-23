@@ -125,6 +125,7 @@ LAB.shelf('match', 'Match', (game) => {
     const Y = game.you, o = game.orb;
     if (!(o.state === 'held' && o.holder === Y)) return;
     const need = get('res', 5), full = (o.res || 0) >= need, dode = isDodeca(game.solid);
+    if (!dode) return;   // the other solids' L1 is the Abilities shelf's
     const at = new T.Vector3(Y.pos.x, Y.y + 2.2, Y.pos.z);
     // the nearest downed teammate in reach
     let D = null, dd = get('reach', 3);

@@ -1276,7 +1276,8 @@
         "health.on": 1,
         "health.contact": 1,
         "match.on": 1,
-        "madden.on": 1
+        "madden.on": 1,
+        "abilities.on": 1
       },
       "labels": {
         "world.solidGravity": "Solids · Solid gravity 1.5",
@@ -1384,7 +1385,8 @@
         "health.on": "Wizards · Health ON",
         "health.contact": "Demon · Centipede hurts ON",
         "match.on": "Match · Match ON",
-        "madden.on": "Passing · Madden passing ON"
+        "madden.on": "Passing · Madden passing ON",
+        "abilities.on": "Abilities · Abilities ON"
       },
       "made": 1795405475494
     }
