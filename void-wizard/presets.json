@@ -1185,6 +1185,8 @@
         "party.accuracy": 1,
         "ball.buttons": 1,
         "ball.slider": 1,
+        "ball.lock": 1,
+        "ball.arcBy": 1,
         "ball.power": 2,
         "ball.cancel": 1,
         "ball.windup": 1.5,
@@ -1289,6 +1291,8 @@
         "party.accuracy": "Party · Accuracy 1.00",
         "ball.buttons": "Ball play · Buttons SPORTS",
         "ball.slider": "Ball play · Hold to throw ON",
+        "ball.lock": "Ball play · Lock-on TAP + HOLD",
+        "ball.arcBy": "Ball play · Arc by STICK, UP = HIGH",
         "ball.power": "Ball play · Distance TRIGGERS",
         "ball.cancel": "Ball play · X cancels ON",
         "ball.windup": "Ball play · Wind up 1.5×",
@@ -1378,7 +1382,7 @@
         "health.on": "Wizards · Health ON",
         "health.contact": "Demon · Centipede hurts ON"
       },
-      "made": 1795327050148
+      "made": 1795405475494
     }
   ]
 }
