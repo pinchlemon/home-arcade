@@ -121,7 +121,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
   // ---- shoot mode (Idea 8): locked onto an enemy (hold R1, or a tap lock when Shoot on tap is on), Square builds up the shot
   // instead of setting distance: the Solid swells and burns brighter, and when it's full it's a super shot. It flies straight.
   const shooting = (W) => !!(get('shoot', 1) && get('lock', 0) && sports() && W === game.you && lock === 'demon' && (held || get('lock', 0) === 2 || get('shootTap', 1)));
-  let readyFor = null, straight = false;
+  let readyFor = null, straight = false, straightT = 0;
+  FX.on('demonHit', () => { straight = false; }, 'lab');   // it bounces off like any throw, and falls again
   function shootTick(dt) {
     const W = game.you; if (!W) return;
     if (!W.charging || !shooting(W)) { W.labShoot = 0; readyFor = null; return; }
@@ -138,11 +139,12 @@ LAB.shelf('ball', 'Ball play', (game) => {
     const d = game.demon; if (!d.alive || d.dying) return;
     game.headCenter(aim); v2.copy(aim).sub(o.p).normalize();
     const lo = get('shootSlow', 16), sp = lo + (get('shootFast', 30) - lo) * c;
-    o.v.copy(v2).multiplyScalar(sp); o.fast = c >= 0.5; straight = true;
+    o.v.copy(v2).multiplyScalar(sp); o.fast = c >= 0.5; straight = true; straightT = 0; o.labShot = true;
     if (c >= 1) superShot(W, true);
   }
   function straightFly(dt) {   // no drop: undo gravity, and keep it on the head
-    if (o.state !== 'air' || o.touched) { straight = false; return; }
+    straightT += dt;
+    if (o.state !== 'air' || o.touched || straightT > 3) { straight = false; return; }
     o.v.y += game.G * game.solid.grav * dt;
     const d = game.demon; if (!d.alive || d.dying || o.labSuper) return;
     const sp = o.v.length(); game.headCenter(aim); aim.sub(o.p).normalize();
@@ -484,7 +486,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (get('lock', 0) || lock) lockTick(dt);
     if (get('power', 0) || skipTrig) aimPower(dt);
     if (lock) shootTick(dt); else if (game.you && game.you.labShoot) { game.you.labShoot = 0; readyFor = null; }
-    if (straight) straightFly(dt);
+    if (straight) straightFly(dt); else if (o.labShot) o.labShot = false;
     if (get('cancel', 0) || skipCircle) cancelCheck();
     if (get('path', 0) || dots) preview(dt);
     if (morphFor) morph();
