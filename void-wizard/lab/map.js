@@ -183,7 +183,7 @@ LAB.shelf('map', 'Map', (game) => {
     root.add(hall);
     game.scene.add(root);
     root.traverse(c => c.layers.set(2));   // drawn with the world, like the stars, but left out of the Solid's depth pass, so a wall never hides the Solid
-    // grass detail: low-poly tufts (three crossed blades) and a few small flowers, one instanced draw each, swaying a little
+    // grass: soft blades over the whole field
     tufts(R);
     // blob shadows (the void has none): wizards, the Solid, the demon's segments
     const shTex = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(0,0,0,0.55)'); r.addColorStop(0.7, 'rgba(0,0,0,0.3)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
@@ -191,52 +191,86 @@ LAB.shelf('map', 'Map', (game) => {
     for (let i = 0; i < 24; i++) { const b = new T.Mesh(shGeo, shMat); b.rotation.x = -Math.PI / 2; b.renderOrder = 1; b.visible = false; b.layers.set(2); root.add(b); blobs.push(b); }
     root.userData.R = R;
   }
-  const WIND = { uWind: { value: 0 } };
-  function swaying(m) {   // the blades' tips move with a slow breeze, each tuft a little out of step
-    m.userData.labKey = (m.userData.labKey || '') + '|grass';
-    m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
-    const before = m.onBeforeCompile;
-    m.onBeforeCompile = (sh, r) => {
-      if (before) before.call(m, sh, r);
-      sh.uniforms.uWind = WIND.uWind;
-      sh.vertexShader = 'uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  // ---------------------------------------------------------------- grass: soft, dense blades over the whole field, the ground's own green
+  // Each instance is a clump of six thin blades. A blade's base takes the colour of the mowed stripe under it and
+  // its tip is a little lighter; every blade is lit as if it were the ground (normals straight up), so up close it's
+  // blades and from afar it melts into the lawn. A slow breeze rolls across in waves (the tips catch a little light
+  // as it passes), and blades bend away from wizards, the Solid and the demon moving through them.
+  const GR = { uWind: { value: 0 }, uPush: { value: Array.from({ length: 12 }, () => new T.Vector3(0, 0, 0)) } };
+  const STRIPES = [new T.Color('#4aab3a'), new T.Color('#3f9e30')];
+  function grassMat() {
+    const m = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
+    m.userData.labKey = '|grass2'; m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
+    m.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, GR);
+      sh.vertexShader = 'uniform float uWind; uniform vec3 uPush[12];\n' + sh.vertexShader
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
   #ifdef USE_INSTANCING
-  { vec3 at = instanceMatrix[3].xyz; float w = sin(uWind * 1.7 + at.x * 0.31 + at.z * 0.23) + 0.4 * sin(uWind * 3.1 + at.z * 0.7);
-    transformed.x += w * 0.07 * position.y; transformed.z += w * 0.04 * position.y; }
-  #endif`);
+  {
+    float h = position.y;                                   // 0 at the root, about 1 at the tip (before the clump's scale)
+    vec3 at = (instanceMatrix * vec4(position, 1.0)).xyz;   // where this point of the blade is on the field
+    float k = h * h;
+    // the breeze: two long waves crossing the field, and a quick flutter
+    float wave = sin(uWind * 0.9 + at.x * 0.16 + at.z * 0.07) * 0.6 + sin(uWind * 1.45 - at.z * 0.21 + at.x * 0.05) * 0.4;
+    float flutter = sin(uWind * 4.3 + at.x * 2.1 + at.z * 1.7) * 0.12;
+    vec2 bend = vec2(0.85, 0.5) * (0.18 + wave * 0.22 + flutter) * k;
+    // pushed aside by whatever stands in it
+    for (int i = 0; i < 12; i++) {
+      vec3 p = uPush[i];
+      if (p.z <= 0.0) continue;
+      vec2 d = at.xz - p.xy; float r = length(d);
+      float f = clamp(1.0 - r / p.z, 0.0, 1.0);
+      bend += (r > 0.001 ? d / r : vec2(0.0)) * f * f * 0.9 * k;
+    }
+    // bend in the blade's own frame: undo the clump's turn and scale for the offset
+    vec3 wb = vec3(bend.x, -dot(bend, bend) * 0.35, bend.y);
+    mat3 im = mat3(instanceMatrix);   // turn and scale only: back into the clump's own frame (works in any GLSL)
+    transformed += vec3(dot(im[0], wb) / dot(im[0], im[0]), dot(im[1], wb) / dot(im[1], im[1]), dot(im[2], wb) / dot(im[2], im[2]));
+    vGrassGust = clamp(wave, 0.0, 1.0) * h;
+  }
+  #endif`)
+        .replace('void main() {', 'varying float vGrassGust;\nvoid main() {');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('void main() {', 'varying float vGrassGust;\nvoid main() {')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 1.0 + vGrassGust * 0.12;');   // a soft sheen where the breeze passes
     };
     return m;
   }
   function tufts(R) {
-    // one tuft: three thin blades leaning out from the middle, dark at the root and light at the tip
-    const pos = [], col = [], dark = [0.16, 0.42, 0.12], light = [0.45, 0.78, 0.3];
-    for (let b = 0; b < 3; b++) {
-      const a = b / 3 * Math.PI * 2 + 0.3, ca = Math.cos(a), sa = Math.sin(a), lean = 0.12, w = 0.07;
-      const base1 = [-sa * w, 0, ca * w], base2 = [sa * w, 0, -ca * w], tip = [ca * lean, 1, sa * lean];
-      pos.push(...base1, ...base2, ...tip); col.push(...dark, ...dark, ...light);
+    // the clump: six blades, each a narrow triangle, leaning a little and turned every which way
+    const pos = [], col = [], nrm = [];
+    for (let b = 0; b < 6; b++) {
+      const a = rnd(b * 9 + 1) * Math.PI * 2, r = 0.05 + rnd(b * 9 + 2) * 0.28, ox = Math.cos(a) * r, oz = Math.sin(a) * r;
+      const turn = rnd(b * 9 + 3) * Math.PI, w = 0.04 + rnd(b * 9 + 4) * 0.025, h = 0.75 + rnd(b * 9 + 5) * 0.5, lean = (rnd(b * 9 + 6) - 0.5) * 0.25;
+      const cx = Math.cos(turn) * w, cz = Math.sin(turn) * w;
+      pos.push(ox - cx, 0, oz - cz, ox + cx, 0, oz + cz, ox + lean, h, oz + lean * 0.5);
+      col.push(0.96, 0.96, 0.96, 0.96, 0.96, 0.96, 1.18, 1.2, 1.08);   // the root a shade under the ground, the tip lighter
+      nrm.push(0, 1, 0, 0, 1, 0, 0, 1, 0);
     }
-    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
-    const N = Math.round(get('grass', 1) * R * R * 2.2), mat = swaying(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide }));
-    if (N > 0) {
-      const im = new T.InstancedMesh(g, mat, N), m = new T.Matrix4(), qq = new T.Quaternion(), sc = new T.Vector3(), p = new T.Vector3(), c = new T.Color();
-      for (let i = 0; i < N; i++) {
-        const r = Math.sqrt(rnd(i * 3 + 1)) * (R - 0.8), a = rnd(i * 3 + 2) * Math.PI * 2, h = 0.22 + rnd(i * 3 + 3) * 0.32;
-        p.set(Math.cos(a) * r, -0.03, Math.sin(a) * r); qq.setFromAxisAngle(up, rnd(i * 7) * Math.PI * 2); sc.set(1 + h, h, 1 + h);
-        m.compose(p, qq, sc); im.setMatrixAt(i, m); im.setColorAt(i, c.setHSL(0.27 + rnd(i * 5) * 0.06, 0.55, 0.42 + rnd(i * 11) * 0.2));
-      }
-      im.frustumCulled = false; root.add(im);
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nrm, 3));
+    const N = Math.round(get('grass', 1) * Math.PI * R * R * 5.5);
+    if (N <= 0) return;
+    const im = new T.InstancedMesh(g, grassMat(), N), m = new T.Matrix4(), qq = new T.Quaternion(), sc = new T.Vector3(), p = new T.Vector3(), c = new T.Color();
+    for (let i = 0; i < N; i++) {
+      const r = Math.sqrt(rnd(i * 3 + 1)) * (R - 0.25), a = rnd(i * 3 + 2) * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const h = 0.17 + rnd(i * 3 + 3) * 0.12;   // ankle height: up to about a third of a wizard's hem
+      p.set(x, -0.03, z); qq.setFromAxisAngle(up, rnd(i * 7) * Math.PI * 2); sc.set(1, h, 1);
+      m.compose(p, qq, sc); im.setMatrixAt(i, m);
+      // the stripe under it, the way the lawn texture lays them out (12 across the field)
+      const u = (x / (R + 0.05) + 1) / 2, stripe = Math.floor(u * 12) % 2;
+      im.setColorAt(i, c.copy(STRIPES[stripe]).multiplyScalar(0.97 + rnd(i * 11) * 0.06));
     }
-    // flowers: a few white and yellow dots on short stems, scattered
-    const F = Math.round(get('grass', 1) * R * R * 0.06);
-    if (F > 0) {
-      const fg = new T.OctahedronGeometry(0.09, 0); fg.translate(0, 0.22, 0);
-      const fm = new T.InstancedMesh(fg, swaying(new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 })), F), m = new T.Matrix4(), p = new T.Vector3(), c = new T.Color();
-      for (let i = 0; i < F; i++) {
-        const r = Math.sqrt(rnd(i * 13 + 5)) * (R - 1.5), a = rnd(i * 13 + 6) * Math.PI * 2;
-        m.makeTranslation(Math.cos(a) * r, -0.03, Math.sin(a) * r); fm.setMatrixAt(i, m); fm.setColorAt(i, c.set(rnd(i * 17) < 0.6 ? 0xf4f2e6 : 0xffd94a));
-      }
-      fm.frustumCulled = false; root.add(fm);
-    }
+    im.frustumCulled = false; im.name = 'grass'; root.add(im);
+  }
+  // what pushes the grass aside this frame
+  function pushers() {
+    const P = GR.uPush.value; let k = 0;
+    const put = (x, z, r) => { if (k < P.length) P[k++].set(x, z, r); };
+    for (const W of game.ALL) if (W.root.visible && W.y < 1.2) put(W.pos.x, W.pos.z, 0.9 * (W.root.scale.y || 1));
+    if (o.state !== 'held' && o.p.y < 1) put(o.p.x, o.p.z, 0.7);
+    if (D.alive && !D.dying && D.scale > 0.3) { const ps = game.demonParts(); for (let i = 0; i < ps.length && k < P.length; i += 3) put(ps[i].x, ps[i].z, ps[i].r * 1.6); }
+    for (; k < P.length; k++) P[k].set(0, 0, 0);
   }
   function clear() {
     if (!root) return;
@@ -349,7 +383,7 @@ LAB.shelf('map', 'Map', (game) => {
   }
   function tick(dt) {
     if (!dome()) return;
-    hook(); WIND.uWind.value = performance.now() / 1000;
+    hook(); GR.uWind.value = performance.now() / 1000; pushers();
     if (!root || built !== get('size', 38)) set(true);
     const b = root.getObjectByName('bloom'); if (b) b.material.opacity = get('bloom', 0.55);
     const F = game.scene.fog; if (F && F.color.getHex() !== 0xc9ced6) { fogWas = F; F.color.set(0xc9ced6); }   // fog in here is a light haze, not the void's black
@@ -360,7 +394,7 @@ LAB.shelf('map', 'Map', (game) => {
     { id: 'pick', label: 'Map', help: 'Where the match is played: the Void, or the Practice Dome (an indoor grass field)', min: 0, max: NAMES.length - 1, step: 1, value: 0, dice: false,
       fmt: (v) => NAMES[Math.round(v)] || '?', frame: (dt) => tick(dt), apply: (v) => set(Math.round(v) === 1) },
     { id: 'size', label: 'Dome size', help: 'How far it is from the centre of the field to the curb', min: 24, max: 60, step: 2, value: 38, dice: false, apply: () => { if (dome()) set(true); } },
-    { id: 'grass', label: 'Grass detail', help: 'Tufts and little flowers in the dome\'s grass (0 is a plain lawn)', min: 0, max: 2, step: 0.25, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF'), apply: () => { if (dome()) { build(); built = get('size', 38); set(true); } } },
+    { id: 'grass', label: 'Grass detail', help: 'How thick the grass is (0 is a plain mowed lawn)', min: 0, max: 2, step: 0.25, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF'), apply: () => { if (dome()) { build(); built = get('size', 38); set(true); } } },
     { id: 'bloom', label: 'Light glow', help: 'How much the dome lights glow', min: 0, max: 1.2, step: 0.05, value: 0.55, dice: false, fmt: (x) => Math.round(x * 100) + '%' }
   ];
 });
