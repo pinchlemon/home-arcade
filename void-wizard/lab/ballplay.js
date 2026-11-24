@@ -273,7 +273,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (best) { lock = best; game.popup(best === 'demon' ? 'CENTIPEDE' : 'TEAMMATE', me.pos, '#ffd36a'); }
   }
   function lockTick(dt) {
-    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad && !(me && me.labMadden);   // Madden passing: R1 shoots while you hold it
+    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad && !(me && (me.labMadden || me.labSword));   // Madden passing: R1 shoots; Swords: R1 swings   // Madden passing: R1 shoots while you hold it
     if (!mode || game.DUEL || !sports()) { lock = null; held = false; before = null; }
     else {
       if (mode === 1) {   // a quick press locks on (press again: off); hold R1 and it locks onto the enemy nearest the middle until you let go

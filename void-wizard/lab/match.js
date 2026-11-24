@@ -121,11 +121,19 @@ LAB.shelf('match', 'Match', (game) => {
   function roll(n) { return 1 + Math.floor(Math.random() * n); }
 
   // L1 with the Solid in hand
+  // with a full dodecahedron in your hands: is there a teammate down next to you, or a demon to capture?
+  LAB.pentacleWants = () => {
+    const Y = game.you, o = game.orb;
+    if (!on() || st.over || !(o.state === 'held' && o.holder === Y) || !isDodeca(game.solid) || (o.res || 0) < get('res', 5)) return false;
+    if (game.ALL.some(W => W !== Y && W.labDown && hd(W.pos, Y.pos) < get('reach', 3))) return true;
+    return capturable() && !st.armed;
+  };
   function pentacleButton() {
     const Y = game.you, o = game.orb;
     if (!(o.state === 'held' && o.holder === Y)) return;
     const need = get('res', 5), full = (o.res || 0) >= need, dode = isDodeca(game.solid);
     if (!dode) return;   // the other solids' L1 is the Abilities shelf's
+    if (LAB.get('swords.on') && !LAB.pentacleWants()) return;   // with Swords, L1 powers up the sword unless there's a revive or a capture to do
     const at = new T.Vector3(Y.pos.x, Y.y + 2.2, Y.pos.z);
     // the nearest downed teammate in reach
     let D = null, dd = get('reach', 3);
