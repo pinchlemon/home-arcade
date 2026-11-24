@@ -444,7 +444,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     const m = new T.Mesh(new T.PlaneGeometry(1, 1), mat); m.frustumCulled = false; m.renderOrder = 5; game.scene.add(m);
     const sats = [];
     const geo = new T.IcosahedronGeometry(0.055, 0);
-    for (let i = 0; i < 10; i++) { const s = new T.Mesh(geo, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: T.AdditiveBlending, depthWrite: false }));
+    for (let i = 0; i < 15; i++) { const s = new T.Mesh(geo, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: T.AdditiveBlending, depthWrite: false }));
       s.visible = false; game.scene.add(s); sats.push(s); }
     fire = { m, mat, sats };
   }
@@ -468,11 +468,14 @@ LAB.shelf('ball', 'Ball play', (game) => {
     fire.m.position.copy(at).addScaledVector(v1, 0.35 * v2.x); fire.m.scale.setScalar(3.2);
     fire.mat.uniforms.t.value += dt; fire.mat.uniforms.k.value = Math.min(1, k); fire.mat.uniforms.col.value.copy(S.color);
     // sparks orbiting, more and faster as it builds
-    const n = Math.min(10, Math.round(o.res * 2 * Math.min(1, v))); spin += dt * (1.6 + o.res * 1.5) * Math.max(0.5, v);
+    // Solid look shelf: how many a resonance level (1 shows the resonance exactly: one spark a level, evenly round
+    // one ring), their size, speed and distance
+    const per = LAB.get('solid.sparks') ?? 2, sz = LAB.get('solid.sparkSize') ?? 1, sp = LAB.get('solid.sparkSpeed') ?? 1, dist = LAB.get('solid.sparkDist') ?? 1;
+    const n = per === 1 ? Math.min(15, o.res) : Math.min(15, Math.round(o.res * per * Math.min(1, v))); spin += dt * (1.6 + o.res * 1.5) * Math.max(0.5, v) * sp;
     for (let i = 0; i < n; i++) {
-      const s = fire.sats[i], a = spin * (i % 2 ? 1 : -0.8) + i * 2.399, tilt = i * 0.7, r = 0.42 + o.res * 0.05;
+      const s = fire.sats[i], even = per === 1, a = even ? spin + i * Math.PI * 2 / n : spin * (i % 2 ? 1 : -0.8) + i * 2.399, tilt = even ? 0.45 : i * 0.7, r = (0.42 + o.res * 0.05) * dist;
       s.visible = true; s.position.set(at.x + Math.cos(a) * r, at.y + Math.sin(a) * r * Math.sin(tilt), at.z + Math.sin(a) * r * Math.cos(tilt));
-      s.material.color.copy(S.color).lerp(WHITE, 0.4 + 0.1 * (i % 3)); s.scale.setScalar(0.8 + k * 0.8);
+      s.material.color.copy(S.color).lerp(WHITE, 0.4 + 0.1 * (i % 3)); s.scale.setScalar((0.8 + k * 0.8) * sz);
     }
     // embers drifting up once it's really going
     if (o.res >= 3) { emberAcc += dt * (o.res - 2) * 10 * v;
