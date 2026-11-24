@@ -183,11 +183,60 @@ LAB.shelf('map', 'Map', (game) => {
     root.add(hall);
     game.scene.add(root);
     root.traverse(c => c.layers.set(2));   // drawn with the world, like the stars, but left out of the Solid's depth pass, so a wall never hides the Solid
+    // grass detail: low-poly tufts (three crossed blades) and a few small flowers, one instanced draw each, swaying a little
+    tufts(R);
     // blob shadows (the void has none): wizards, the Solid, the demon's segments
     const shTex = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(0,0,0,0.55)'); r.addColorStop(0.7, 'rgba(0,0,0,0.3)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
     const shMat = new T.MeshBasicMaterial({ map: shTex, transparent: true, depthWrite: false }), shGeo = new T.PlaneGeometry(1, 1);
     for (let i = 0; i < 24; i++) { const b = new T.Mesh(shGeo, shMat); b.rotation.x = -Math.PI / 2; b.renderOrder = 1; b.visible = false; b.layers.set(2); root.add(b); blobs.push(b); }
     root.userData.R = R;
+  }
+  const WIND = { uWind: { value: 0 } };
+  function swaying(m) {   // the blades' tips move with a slow breeze, each tuft a little out of step
+    m.userData.labKey = (m.userData.labKey || '') + '|grass';
+    m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
+    const before = m.onBeforeCompile;
+    m.onBeforeCompile = (sh, r) => {
+      if (before) before.call(m, sh, r);
+      sh.uniforms.uWind = WIND.uWind;
+      sh.vertexShader = 'uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  #ifdef USE_INSTANCING
+  { vec3 at = instanceMatrix[3].xyz; float w = sin(uWind * 1.7 + at.x * 0.31 + at.z * 0.23) + 0.4 * sin(uWind * 3.1 + at.z * 0.7);
+    transformed.x += w * 0.07 * position.y; transformed.z += w * 0.04 * position.y; }
+  #endif`);
+    };
+    return m;
+  }
+  function tufts(R) {
+    // one tuft: three thin blades leaning out from the middle, dark at the root and light at the tip
+    const pos = [], col = [], dark = [0.16, 0.42, 0.12], light = [0.45, 0.78, 0.3];
+    for (let b = 0; b < 3; b++) {
+      const a = b / 3 * Math.PI * 2 + 0.3, ca = Math.cos(a), sa = Math.sin(a), lean = 0.12, w = 0.07;
+      const base1 = [-sa * w, 0, ca * w], base2 = [sa * w, 0, -ca * w], tip = [ca * lean, 1, sa * lean];
+      pos.push(...base1, ...base2, ...tip); col.push(...dark, ...dark, ...light);
+    }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+    const N = Math.round(get('grass', 1) * R * R * 2.2), mat = swaying(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide }));
+    if (N > 0) {
+      const im = new T.InstancedMesh(g, mat, N), m = new T.Matrix4(), qq = new T.Quaternion(), sc = new T.Vector3(), p = new T.Vector3(), c = new T.Color();
+      for (let i = 0; i < N; i++) {
+        const r = Math.sqrt(rnd(i * 3 + 1)) * (R - 0.8), a = rnd(i * 3 + 2) * Math.PI * 2, h = 0.22 + rnd(i * 3 + 3) * 0.32;
+        p.set(Math.cos(a) * r, -0.03, Math.sin(a) * r); qq.setFromAxisAngle(up, rnd(i * 7) * Math.PI * 2); sc.set(1 + h, h, 1 + h);
+        m.compose(p, qq, sc); im.setMatrixAt(i, m); im.setColorAt(i, c.setHSL(0.27 + rnd(i * 5) * 0.06, 0.55, 0.42 + rnd(i * 11) * 0.2));
+      }
+      im.frustumCulled = false; root.add(im);
+    }
+    // flowers: a few white and yellow dots on short stems, scattered
+    const F = Math.round(get('grass', 1) * R * R * 0.06);
+    if (F > 0) {
+      const fg = new T.OctahedronGeometry(0.09, 0); fg.translate(0, 0.22, 0);
+      const fm = new T.InstancedMesh(fg, swaying(new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 })), F), m = new T.Matrix4(), p = new T.Vector3(), c = new T.Color();
+      for (let i = 0; i < F; i++) {
+        const r = Math.sqrt(rnd(i * 13 + 5)) * (R - 1.5), a = rnd(i * 13 + 6) * Math.PI * 2;
+        m.makeTranslation(Math.cos(a) * r, -0.03, Math.sin(a) * r); fm.setMatrixAt(i, m); fm.setColorAt(i, c.set(rnd(i * 17) < 0.6 ? 0xf4f2e6 : 0xffd94a));
+      }
+      fm.frustumCulled = false; root.add(fm);
+    }
   }
   function clear() {
     if (!root) return;
@@ -254,16 +303,45 @@ LAB.shelf('map', 'Map', (game) => {
       if (game.motes) game.motes.visible = false;
     } else {
       if (root) root.visible = false;
-      relight(false);
+      relight(false); camOut();
       if (fogWas) { fogWas.color.set(0x000000); fogWas = null; }
       if (game.motes) game.motes.visible = true;
     }
   }
+  // the camera stays inside: if the wall or the ceiling is between you and it, it comes in along that line and waits
+  // there, against the wall, with everything else just getting closer; it eases back out when there's room again.
+  // Coming in, its lens widens a little so you still see around you.
+  const look0 = new T.Vector3(), want = new T.Vector3(), tryP = new T.Vector3();
+  let armK = 1, camT = 0, baseNear = game.camera.near;
+  function inside(p, R) {
+    const RW = R + 1.6, H = 9, CAP = R * 0.62, r = Math.hypot(p.x, p.z), m = 1.8;
+    if (r > RW - m || p.y < 0.5) return false;
+    if (p.y <= H) return true;
+    const rr = r / (RW - m); if (rr >= 1) return false;
+    return p.y < H + (CAP - m) * Math.sqrt(1 - rr * rr);
+  }
+  function keepIn(cam, look) {
+    const R = root.userData.R, now = performance.now() / 1000, dt = camT ? Math.min(0.1, now - camT) : 0; camT = now;
+    look0.copy(look); if (!inside(look0, R)) { look0.y = Math.max(0.6, look0.y); }
+    want.copy(cam.position);
+    let k = 1;
+    if (!inside(want, R)) { let lo = 0, hi = 1; for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; tryP.lerpVectors(look0, want, mid); if (inside(tryP, R)) lo = mid; else hi = mid; } k = lo; }
+    armK = k < armK ? k : Math.min(k, armK + dt * 1.5);   // in at once, out gently
+    cam.position.lerpVectors(look0, want, armK);
+    // a wider lens when pulled in, so the view around you doesn't shrink to nothing
+    const base = LAB.get('camera.fov') ?? 30, f = armK < 0.999 ? Math.min(78, 2 * Math.atan(Math.tan(base * Math.PI / 360) * Math.pow(1 / Math.max(0.05, armK), 0.6)) * 180 / Math.PI) : base;
+    if (Math.abs(cam.fov - f) > 0.05 || cam.near !== 0.3) { cam.fov = f; cam.near = 0.3; cam.updateProjectionMatrix(); }
+  }
+  function camOut() {   // leaving the dome: the lens and near plane as they were
+    const c = game.camera; armK = 1; camT = 0;
+    c.fov = LAB.get('camera.fov') ?? c.fov; c.near = baseNear; c.updateProjectionMatrix();
+  }
   let hooked = false;
   function hook() {
     if (hooked) return; hooked = true;   // after the Camera shelf has moved the camera
-    window.FEATURES.on('camera', (cam) => {
+    window.FEATURES.on('camera', (cam, look) => {
       if (!dome() || !root) return;
+      keepIn(cam, look);
       const x = cam.position.x, z = cam.position.z, r = Math.hypot(x, z);
       CUT.uCut.value = r > root.userData.R + 1 ? 1 : 0;
       if (r > 0.01) CUT.uCamDir.value.set(x / r, z / r);
@@ -271,7 +349,7 @@ LAB.shelf('map', 'Map', (game) => {
   }
   function tick(dt) {
     if (!dome()) return;
-    hook();
+    hook(); WIND.uWind.value = performance.now() / 1000;
     if (!root || built !== get('size', 38)) set(true);
     const b = root.getObjectByName('bloom'); if (b) b.material.opacity = get('bloom', 0.55);
     const F = game.scene.fog; if (F && F.color.getHex() !== 0xc9ced6) { fogWas = F; F.color.set(0xc9ced6); }   // fog in here is a light haze, not the void's black
@@ -282,6 +360,7 @@ LAB.shelf('map', 'Map', (game) => {
     { id: 'pick', label: 'Map', help: 'Where the match is played: the Void, or the Practice Dome (an indoor grass field)', min: 0, max: NAMES.length - 1, step: 1, value: 0, dice: false,
       fmt: (v) => NAMES[Math.round(v)] || '?', frame: (dt) => tick(dt), apply: (v) => set(Math.round(v) === 1) },
     { id: 'size', label: 'Dome size', help: 'How far it is from the centre of the field to the curb', min: 24, max: 60, step: 2, value: 38, dice: false, apply: () => { if (dome()) set(true); } },
+    { id: 'grass', label: 'Grass detail', help: 'Tufts and little flowers in the dome\'s grass (0 is a plain lawn)', min: 0, max: 2, step: 0.25, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF'), apply: () => { if (dome()) { build(); built = get('size', 38); set(true); } } },
     { id: 'bloom', label: 'Light glow', help: 'How much the dome lights glow', min: 0, max: 1.2, step: 0.05, value: 0.55, dice: false, fmt: (x) => Math.round(x * 100) + '%' }
   ];
 });
