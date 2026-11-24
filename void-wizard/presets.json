@@ -1623,6 +1623,9 @@
       "values": {
         "world.solidGravity": 1.5,
         "map.pick": 1,
+        "map.size": 60,
+        "map.grass": 2,
+        "map.bloom": 0,
         "throws.spiral": 2,
         "party.aim": 3,
         "party.passSpeed": 1.1,
@@ -1695,12 +1698,12 @@
         "colours.youCloak": 19,
         "colours.youTrim": 27,
         "colours.trimH": 3,
-        "colours.buddyTrim": 6,
-        "colours.solid0": 24,
-        "colours.solid1": 6,
-        "colours.solid2": 4,
+        "colours.buddyTrim": 11,
+        "colours.solid0": 25,
+        "colours.solid1": 30,
+        "colours.solid2": 27,
         "colours.solid3": 12,
-        "colours.solid4": 9,
+        "colours.solid4": 10,
         "colours.shell": 26,
         "colours.rim": 27,
         "colours.bone": 27,
@@ -1730,6 +1733,9 @@
       "labels": {
         "world.solidGravity": "Solids · Solid gravity 1.5",
         "map.pick": "Map · Map PRACTICE DOME",
+        "map.size": "Map · Dome size 60",
+        "map.grass": "Map · Grass detail 200%",
+        "map.bloom": "Map · Light glow 0%",
         "throws.spiral": "Solids · Spiral throws ALL SOLIDS",
         "party.aim": "Party · Pass help ANY WAY",
         "party.passSpeed": "Party · Pass speed 1.1",
@@ -1802,12 +1808,12 @@
         "colours.youCloak": "Colours · Your cloak CHARCOAL",
         "colours.youTrim": "Colours · Your trim AMBER",
         "colours.trimH": "Colours · Trim height 4×",
-        "colours.buddyTrim": "Colours · Buddy's trim GREEN",
-        "colours.solid0": "Colours · Tetrahedron CORAL",
-        "colours.solid1": "Colours · Cube GREEN",
-        "colours.solid2": "Colours · Octahedron YELLOW",
+        "colours.buddyTrim": "Colours · Buddy's trim INDIGO",
+        "colours.solid0": "Colours · Tetrahedron CRIMSON",
+        "colours.solid1": "Colours · Cube FOREST",
+        "colours.solid2": "Colours · Octahedron AMBER",
         "colours.solid3": "Colours · Dodecahedron PURPLE",
-        "colours.solid4": "Colours · Icosahedron SKY",
+        "colours.solid4": "Colours · Icosahedron BLUE",
         "colours.shell": "Colours · Centipede shell MAROON",
         "colours.rim": "Colours · Centipede rims AMBER",
         "colours.bone": "Colours · Centipede bone AMBER",
@@ -1834,7 +1840,7 @@
         "health.contact": "Demon · Centipede hurts ON",
         "match.on": "Match · Match ON"
       },
-      "made": 1795556534711
+      "made": 1795557277251
     }
   ]
 }
