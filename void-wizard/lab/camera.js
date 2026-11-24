@@ -12,7 +12,7 @@ LAB.shelf('camera', 'Camera', (game) => {
     if (!(LAB.get('camera.stick') ?? 1) || game.DUEL) { if (yaw || zoom !== 1 || pitch) { yaw = 0; zoom = 1; pitch = 0; game.MOD.turn = game.labLockTurn || 0; } game.labCamYaw = 0; return; }
     const gp = game.pad; if (!gp) return;
     const dz = (a) => (Math.abs(a) < 0.2 ? 0 : (a - Math.sign(a) * 0.2) / 0.8);
-    const rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
+    const rx = dz(gp.axes[2] || 0) * (LAB.get('camera.invertX') ? -1 : 1), ry = dz(gp.axes[3] || 0) * (LAB.get('camera.invertY') ? -1 : 1);   // Invert left/right, Invert up/down
     if (rx && !(game.you && game.you.labLocked)) yaw -= rx * dt * 2.4 * (LAB.get('camera.stickSpeed') ?? 1);   // locked on, it picks targets instead
     const aimY = game.you && game.you.labAiming && game.you.labAimStick;
     if (ry && !aimY) {
@@ -52,6 +52,8 @@ LAB.shelf('camera', 'Camera', (game) => {
     { id: 'stick', label: 'Right stick', help: 'Turns the camera (and your controls); up and down zoom or tilt; click it to reset', kind: 'onoff', value: 1, dice: false },
     { id: 'stickY', label: 'Stick up / down', help: 'ZOOM moves the camera in and out; TILT raises it over you or brings it down low, for full control around you', min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (v) => (v ? 'TILT' : 'ZOOM'),
       apply: (v) => { if (!v) pitch = 0; } },
+    { id: 'invertX', label: 'Invert left / right', help: 'Swap which way the right stick turns the camera', kind: 'onoff', value: 0, dice: false },
+    { id: 'invertY', label: 'Invert up / down', help: 'Swap which way the right stick tilts (or zooms) the camera', kind: 'onoff', value: 0, dice: false },
     { id: 'stickSpeed', label: 'Stick speed', help: 'How fast the right stick turns the camera', min: 0.2, max: 3, step: 0.1, value: 1, dice: false },
     { id: 'height', label: 'Height', help: 'Lower brings the camera down toward the ground', min: 0.2, max: 1.8, step: 0.05, value: 1, dice: false,
       fmt: (v) => Math.round(v * 100) + '%',
