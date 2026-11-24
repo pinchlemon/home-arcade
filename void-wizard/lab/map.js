@@ -292,7 +292,7 @@ LAB.shelf('map', 'Map', (game) => {
         else if (s.L.isDirectionalLight && s.L.color.getHex() === 0xffffff) { s.L.intensity = 0.5; }
         else if (s.L.isDirectionalLight) { s.L.color.set(0xdfe6ff); s.L.intensity = 0.22; }
       }
-      const hemi = new T.HemisphereLight(0xfffaf0, 0x5f9a48, 0.35); hemi.name = 'domeHemi'; game.scene.add(hemi); lights.push(hemi);
+      const hemi = new T.HemisphereLight(0xfffaf0, 0x9aa592, 0.35);   // the bounce off the grass, kept nearly grey so the ceiling doesn't turn green hemi.name = 'domeHemi'; game.scene.add(hemi); lights.push(hemi);
     }
     if (!on && saved) {
       for (const s of saved) { s.L.color.copy(s.c); s.L.intensity = s.i; }

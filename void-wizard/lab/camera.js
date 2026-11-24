@@ -16,7 +16,7 @@ LAB.shelf('camera', 'Camera', (game) => {
     if (rx && !(game.you && game.you.labLocked)) yaw -= rx * dt * 2.4 * (LAB.get('camera.stickSpeed') ?? 1);   // locked on, it picks targets instead
     const aimY = game.you && game.you.labAiming && game.you.labAimStick;
     if (ry && !aimY) {
-      if (LAB.get('camera.stickY')) pitch = Math.max(-1.2, Math.min(1.2, pitch - ry * dt * 1.6 * (LAB.get('camera.stickSpeed') ?? 1)));   // TILT: up raises the camera over you, down brings it toward the ground
+      if (LAB.get('camera.stickY')) pitch = Math.max(-1.1, Math.min(1.2, pitch - ry * dt * 1.6 * (LAB.get('camera.stickSpeed') ?? 1)));   // TILT: up raises the camera over you, down brings it toward the ground
       else zoom = Math.min(2.2, Math.max(0.5, zoom * Math.exp(-ry * dt * 1.4)));
     }
     if (LAB.btn(game.you || { gp }, 'camReset', 11)) { yaw = 0; zoom = 1; pitch = 0; }
@@ -27,7 +27,7 @@ LAB.shelf('camera', 'Camera', (game) => {
   let lx = 0, lz = 0, lp = 0, lt = 0;
   const fw = new T.Vector3();
   // last of all: Ball play's lock-on view, when it's on (it sets game.labLockView)
-  function finish(cam, look) { lean(cam, look); if (game.labLockView) game.labLockView(cam, look); }
+  function finish(cam, look) { lean(cam, look); if (game.labLockView) game.labLockView(cam, look); fitNear(cam, look); }
   function lean(cam, look) {
     const v = LAB.get('camera.lean') || 0, now = performance.now() / 1000;
     if (!v || game.DUEL) { lx = lz = lp = 0; lt = 0; return; }
@@ -38,13 +38,28 @@ LAB.shelf('camera', 'Camera', (game) => {
     lx += (ox - lx) * k; lz += (oz - lz) * k; lp += (pull - lp) * k;
     cam.getWorldDirection(fw); cam.position.x += lx; cam.position.z += lz; cam.position.addScaledVector(fw, -lp);
   }
+  const near0 = game.camera.near, aim = new T.Vector3();
+  function fitNear(cam, look) {   // a close camera needs a near plane closer than the game's 12, or it cuts into you
+    const d = cam.position.distanceTo(look), n = Math.max(0.3, Math.min(near0, d * 0.4));
+    if (Math.abs(cam.near - n) > 0.05) { cam.near = n; cam.updateProjectionMatrix(); }
+  }
   window.FEATURES.on('camera', (cam, look) => {
     if (!yaw && zoom === 1 && !pitch) return finish(cam, look);
     off.subVectors(cam.position, look).applyAxisAngle(UP, yaw).divideScalar(zoom);
-    if (pitch) { const L = off.length(), h = Math.hypot(off.x, off.z) || 1e-6, e = Math.max(0.03, Math.min(1.45, Math.atan2(off.y, h) + pitch));   // the camera's height angle over you
-      off.set(off.x / h * Math.cos(e) * L, Math.sin(e) * L, off.z / h * Math.cos(e) * L); }
+    let lookUp = 0;
+    if (pitch) {
+      const L = off.length(), h = Math.hypot(off.x, off.z) || 1e-6, e0 = Math.atan2(off.y, h), want = Math.min(1.45, e0 + pitch);
+      // tilting below where it starts, the camera also comes in toward you (Close when low); past the ground it stays
+      // low and looks up at you instead of going under
+      const GROUND = 0.03, u = want < e0 ? Math.min(1, (e0 - want) / (e0 + 0.45)) : 0, f = 1 - (LAB.get('camera.lowClose') ?? 0.65) * u * (2 - u);
+      const e = Math.max(GROUND, want);
+      lookUp = Math.min(0.18, Math.max(0, GROUND - want));   // how far past the ground you've pushed (capped so you stay in the picture)
+      off.set(off.x / h * Math.cos(e) * L * f, Math.sin(e) * L * f, off.z / h * Math.cos(e) * L * f);
+    }
     cam.position.copy(look).add(off);
-    cam.lookAt(look);
+    if (cam.position.y < 0.45) cam.position.y = 0.45;   // never under the floor
+    aim.copy(look); if (lookUp) aim.y += lookUp * off.length() * 0.9;   // a copy: the game's own look point stays put
+    cam.lookAt(aim);
     cam.rotateZ((LAB.get('camera.tilt') || 0) * Math.PI / 180 + (LAB.get('camera.spin') ? spin : 0));   // Tilt and Spin (applied before) again
     finish(cam, look);
   }, 'lab');
@@ -54,6 +69,7 @@ LAB.shelf('camera', 'Camera', (game) => {
       apply: (v) => { if (!v) pitch = 0; } },
     { id: 'invertX', label: 'Invert left / right', help: 'Swap which way the right stick turns the camera', kind: 'onoff', value: 0, dice: false },
     { id: 'invertY', label: 'Invert up / down', help: 'Swap which way the right stick tilts (or zooms) the camera', kind: 'onoff', value: 0, dice: false },
+    { id: 'lowClose', label: 'Close when low', help: 'Tilting the camera down toward the ground also brings it in toward you (0 keeps the distance)', min: 0, max: 0.9, step: 0.05, value: 0.65, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
     { id: 'stickSpeed', label: 'Stick speed', help: 'How fast the right stick turns the camera', min: 0.2, max: 3, step: 0.1, value: 1, dice: false },
     { id: 'height', label: 'Height', help: 'Lower brings the camera down toward the ground', min: 0.2, max: 1.8, step: 0.05, value: 1, dice: false,
       fmt: (v) => Math.round(v * 100) + '%',
