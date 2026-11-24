@@ -18,6 +18,7 @@ feature('lab', ({ game, on }) => {
     ['swords', 'Swords', [['Swords', 'swords.on swords.length swords.damage swords.maxHits'], ['Fire', 'swords.fireBoost swords.perLevel swords.maxLevel swords.cooldown']]],
     ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.courage party.shoot party.shotRange party.accuracy party.think party.toYou']]],
+    ['controls', 'Controls', [['Controls', 'controls.on'], ['Holding the Solid', 'controls.w0 controls.w1 controls.w2 controls.w3 controls.w4 controls.w5 controls.w6 controls.w7 controls.w10 controls.w11'], ['Without the Solid', 'controls.f0 controls.f1 controls.f2 controls.f3 controls.f4 controls.f5 controls.f6 controls.f7 controls.f10 controls.f11']]],
     ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.lock ball.holdTime ball.lockSide ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast ball.arcBy ball.power ball.cancel ball.windup ball.aim ball.aimMove ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
       ['Madden passing', 'madden.on madden.tap madden.bullet madden.lobSpeed madden.bulletSpeed madden.lead madden.follow madden.runErr madden.pressure madden.control madden.icons'],
       ['Catching', 'ball.perfect ball.window ball.bonus ball.oop ball.ring ball.ringTime'], ['Resonance', 'ball.resHold ball.resFade ball.resAim'], ['Own solids', 'ball.own ball.ownYou ball.ownMate ball.ownGreen ball.ownPurple ball.ownGold'], ['On fire', 'ball.fire ball.super ball.superHow ball.superPower ball.superRes ball.superDmg']]],
@@ -97,6 +98,11 @@ feature('lab', ({ game, on }) => {
   const skips = {};
   const made = [];   // the shelves the files made, in order (the panel regroups them)
   window.LAB = {
+    // btn(W, action, button): is this job's button down for wizard W? Without the Controls shelf it's just the button
+    btn: (W, act, i) => { const gp = W && W.gp; return !!(gp && i != null && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.3)); },
+    tops: {},
+    // btnName(job, button, W): the name of the button that job is on now ('L1', '✕'), for hints; null when it's on none
+    btnName: (act, i) => ({ 0: '✕', 1: '○', 2: '□', 3: '△', 4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2', 10: 'L3', 11: 'R3' })[i] || null,   // tops[shelfId](selectedRow): html shown above that shelf's rows
     game, get, set, boost, hitstop: 1, base: (id) => values[id],   // base: the knob itself, without a rule's boost
     // skip(owner, buttons): controller buttons a shelf takes from the game (null gives them back); every shelf's together
     skip(owner, list) { if (list && list.length) skips[owner] = list; else delete skips[owner];
@@ -510,7 +516,7 @@ feature('lab', ({ game, on }) => {
     } else if (!list.length) {
       rows = `<div class="lab-empty">${sh.kind === 'pinned' ? 'Nothing pinned yet. Pick a knob on any shelf and press its pin (L3 on the controller): it shows up here.' : 'Everything is normal. Knobs you turn show up here, so you can see what is on and put things back.'}</div>`;
     } else {
-      rows = list.map((t, i) => (sh.heads && sh.heads[i] ? `<div class="lab-head">${esc(sh.heads[i])}</div>` : '') + knobRow(t, i, i === sel)).join('');
+      rows = (LAB.tops[sh.id] ? LAB.tops[sh.id](sel) : '') + list.map((t, i) => (sh.heads && sh.heads[i] ? `<div class="lab-head">${esc(sh.heads[i])}</div>` : '') + knobRow(t, i, i === sel)).join('');
     }
     const fresh = performance.now() - sayT < 2500 ? sayText : (playing ? 'Playing ' + playing : '');
     const oldRows = panel.querySelector('.lab-rows'), keepTop = oldRows && panel.dataset.shelf === sh.id ? oldRows.scrollTop : 0;

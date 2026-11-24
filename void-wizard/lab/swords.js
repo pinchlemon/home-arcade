@@ -110,7 +110,7 @@ LAB.shelf('swords', 'Swords', (game) => {
     for (const W of game.ALL) W.labSword = W === H && W === Y;
     // buttons: only you, with the Solid in your hands
     const mine = H && H === Y && Y.downT <= 0 && !game.blockPad;
-    const l1Now = !!Y && (btn(Y.gp, 4) || game.keys.has('KeyV')), r1Now = !!Y && (btn(Y.gp, 5) || game.keys.has('KeyO'));
+    const l1Now = !!Y && (LAB.btn(Y, 'power', 4) || game.keys.has('KeyV')), r1Now = !!Y && (LAB.btn(Y, 'swing', 5) || game.keys.has('KeyO'));
     if (mine && l1Now && !l1 && !(LAB.pentacleWants && LAB.pentacleWants())) powerUp(Y);
     if (mine && r1Now && !r1) swing(Y);
     l1 = l1Now; r1 = r1Now;
@@ -147,7 +147,8 @@ LAB.shelf('swords', 'Swords', (game) => {
     }
     // the line at the bottom
     if (H === Y) {
-      const t = `R1 SWING · L1 POWER UP (1)` + (lv ? `   SWORD LV ${lv} · ${Math.ceil(s.t)}S` : '');
+      const sw = LAB.btnName('swing', 5, Y), pw = LAB.btnName('power', 4, Y);   // the buttons the Controls shelf has them on
+      const t = [sw && sw + ' SWING', pw && pw + ' POWER UP (1)'].filter(Boolean).join(' · ') + (lv ? `   SWORD LV ${lv} · ${Math.ceil(s.t)}S` : '');
       if (statusEl.textContent !== t) statusEl.textContent = t;
       statusEl.style.display = '';
     } else statusEl.style.display = 'none';

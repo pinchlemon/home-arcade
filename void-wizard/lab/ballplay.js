@@ -19,12 +19,12 @@ LAB.shelf('ball', 'Ball play', (game) => {
   const prev = {};
   const btn = (gp, i) => !!(gp && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.3));
   const sports = () => get('buttons', 0) === 1 && !game.DUEL;
-  const modOf = (W) => { const hi = btn(W.gp, 4), lo = !get('lock', 0) && btn(W.gp, 5); return hi === lo ? 0 : hi ? 1 : -1; };   // L1 higher, R1 lower (R1 locks on instead, with Lock-on)
+  const modOf = (W) => { const hi = LAB.btn(W, 'higher', 4), lo = !get('lock', 0) && LAB.btn(W, 'lower', 5); return hi === lo ? 0 : hi ? 1 : -1; };   // L1 higher, R1 lower (R1 locks on instead, with Lock-on)
   const stickY = (W) => { const a = (W.gp && W.gp.axes[1]) || 0; return Math.abs(a) < 0.15 ? 0 : -(a - Math.sign(a) * 0.15) / 0.85; };   // + up
   function readButtons() {   // Square: the game's throw-and-catch button, pressed and let go
     for (const W of game.ALL) {
       const gp = W.human && W.gp; if (!gp) continue;
-      const now = btn(gp, 2), was = !!prev[gp.index]; prev[gp.index] = now;
+      const now = LAB.btn(W, 'throw', 2), was = !!prev[gp.index]; prev[gp.index] = now;
       const C = W.ctl;
       if (game.blockPad) { if (W.labBtn) { C.castHeld = false; W.labBtn = null; } continue; }
       const holding = o.state === 'held' && o.holder === W;
@@ -213,7 +213,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     let need = false;
     for (const W of game.ALL) {
       if (!W.human || !W.gp) continue;
-      const i = W.gp.index, now = btn(W.gp, 0), was = !!circleWas[i]; circleWas[i] = now;
+      const i = W.gp.index, now = LAB.btn(W, 'cancel', 0), was = !!circleWas[i]; circleWas[i] = now;
       if (W.charging && now && !was && !game.blockPad) {
         W.charging = false; W.charge = 0; W.labAiming = false; W.labR1 = false; W.labBtn = null; W.ctl.castHeld = false; W.ctl.castPressed = false;
         game.popup('CANCEL', W.pos, '#9aa4b8'); FX.emit('throwCancel', W);
@@ -273,7 +273,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     if (best) { lock = best; game.popup(best === 'demon' ? 'CENTIPEDE' : 'TEAMMATE', me.pos, '#ffd36a'); }
   }
   function lockTick(dt) {
-    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = btn(gp, 5) && !game.blockPad && !(me && (me.labMadden || me.labSword));   // Madden passing: R1 shoots; Swords: R1 swings   // Madden passing: R1 shoots while you hold it
+    const mode = get('lock', 0), me = game.you, gp = me && me.gp, r1 = !!gp && LAB.btn(me, 'lock', 5) && !game.blockPad && !(me && (me.labMadden || me.labSword));   // Madden passing: R1 shoots; Swords: R1 swings   // Madden passing: R1 shoots while you hold it
     if (!mode || game.DUEL || !sports()) { lock = null; held = false; before = null; }
     else {
       if (mode === 1) {   // a quick press locks on (press again: off); hold R1 and it locks onto the enemy nearest the middle until you let go

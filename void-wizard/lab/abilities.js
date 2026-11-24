@@ -277,7 +277,7 @@ LAB.shelf('abilities', 'Abilities', (game) => {
     const Y = game.you; if (!Y) return;
     if (LAB.get('swords.on')) { st.l1 = false; return; }   // Swords mode has no abilities
     const holding = o.state === 'held' && o.holder === Y && Y.downT <= 0 && !game.blockPad;
-    const down = btn(Y.gp, 4) || game.keys.has('KeyV');
+    const down = LAB.btn(Y, 'ability', 4) || game.keys.has('KeyV');
     const now = performance.now() / 1000;
     if (down && !st.l1) { st.l1T = now; st.fired = false; }
     if (holding && ABIL[game.solid.name]) {
@@ -311,7 +311,8 @@ LAB.shelf('abilities', 'Abilities', (game) => {
     // the line at the bottom: what you can do now, and how the demon is
     const Y = game.you, A = ABIL[game.solid.name], holding = Y && o.state === 'held' && o.holder === Y;
     const parts = [];
-    if (holding && A && !LAB.get('swords.on')) { const r = o.res || 0; parts.push(`L1 ${A[0]}${r >= get('small', 3) ? '' : ' (' + get('small', 3) + ')'} · HOLD ${A[1]}${r >= get('big', 5) ? '' : ' (' + get('big', 5) + ')'}`); }
+    const AB = LAB.btnName('ability', 4, Y);   // the button the Controls shelf has it on
+    if (holding && A && AB && !LAB.get('swords.on')) { const r = o.res || 0; parts.push(`${AB} ${A[0]}${r >= get('small', 3) ? '' : ' (' + get('small', 3) + ')'} · HOLD ${A[1]}${r >= get('big', 5) ? '' : ' (' + get('big', 5) + ')'}`); }
     const c = []; if (st.burnT > 0) c.push('BURNING'); if (st.exposeT > 0) c.push('EXPOSED'); if (st.frozenT > 0) c.push('FROZEN'); if (st.confuseT > 0) c.push('CONFUSED ' + Math.ceil(st.confuseT));
     if (c.length && live()) parts.push('DEMON: ' + c.join(' · '));
     if (st.armed) parts.push(st.armed.kind === 'blast' ? 'BLAST READY' : 'IGNITE READY'); if (st.thread) parts.push('THREAD READY');

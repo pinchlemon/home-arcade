@@ -14,7 +14,7 @@ LAB.shelf('camera', 'Camera', (game) => {
     const rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
     if (rx && !(game.you && game.you.labLocked)) yaw -= rx * dt * 2.4 * (LAB.get('camera.stickSpeed') ?? 1);   // locked on, it picks targets instead
     if (ry && !(game.you && game.you.labAiming && game.you.labAimStick)) zoom = Math.min(2.2, Math.max(0.5, zoom * Math.exp(-ry * dt * 1.4)));
-    if (gp.buttons[11] && gp.buttons[11].pressed) { yaw = 0; zoom = 1; }
+    if (LAB.btn(game.you || { gp }, 'camReset', 11)) { yaw = 0; zoom = 1; }
     game.labCamYaw = yaw; game.MOD.turn = yaw + (game.labLockTurn || 0);   // lock-on adds its own turn
   }, 'lab');
   // Ball lean: after everything else, slide the view toward the Solid and back off to keep you both in it.
