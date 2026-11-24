@@ -156,6 +156,7 @@
     "shelves": [
       "time",
       "world",
+      "map",
       "throws",
       "party",
       "controls",
