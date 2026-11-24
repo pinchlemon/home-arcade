@@ -1277,7 +1277,8 @@
         "health.contact": 1,
         "match.on": 1,
         "madden.on": 1,
-        "abilities.on": 1
+        "abilities.on": 1,
+        "camera.stickY": 1
       },
       "labels": {
         "world.solidGravity": "Solids · Solid gravity 1.5",
@@ -1386,7 +1387,8 @@
         "health.contact": "Demon · Centipede hurts ON",
         "match.on": "Match · Match ON",
         "madden.on": "Passing · Madden passing ON",
-        "abilities.on": "Abilities · Abilities ON"
+        "abilities.on": "Abilities · Abilities ON",
+        "camera.stickY": "Camera · Stick up / down TILT"
       },
       "made": 1795405475494
     },
@@ -1500,7 +1502,8 @@
         "health.contact": 1,
         "match.on": 1,
         "madden.on": 1,
-        "swords.on": 1
+        "swords.on": 1,
+        "camera.stickY": 1
       },
       "labels": {
         "world.solidGravity": "Solids · Solid gravity 1.5",
@@ -1609,7 +1612,8 @@
         "health.contact": "Demon · Centipede hurts ON",
         "match.on": "Match · Match ON",
         "madden.on": "Passing · Madden passing ON",
-        "swords.on": "Swords · Swords ON"
+        "swords.on": "Swords · Swords ON",
+        "camera.stickY": "Camera · Stick up / down TILT"
       },
       "made": 1795493364306
     },
@@ -1721,7 +1725,8 @@
         "glow.bloom": 0.4,
         "glow.threshold": 0.85,
         "tone.sat": 0.15,
-        "tone.con": 0.1
+        "tone.con": 0.1,
+        "camera.stickY": 1
       },
       "labels": {
         "world.solidGravity": "Solids · Solid gravity 1.5",
@@ -1828,7 +1833,8 @@
         "glow.bloom": "Film · Bloom 0.4",
         "glow.threshold": "Film · Bloom from 0.85",
         "tone.sat": "Colour grade · Saturation 0.15",
-        "tone.con": "Colour grade · Contrast 0.1"
+        "tone.con": "Colour grade · Contrast 0.1",
+        "camera.stickY": "Camera · Stick up / down TILT"
       },
       "made": 1795554744530
     }
