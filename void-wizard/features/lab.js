@@ -35,7 +35,7 @@ feature('lab', ({ game, on }) => {
     ['solid', 'Solid', [['Flight', 'world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'], ['Resonance', 'ball.resHold ball.resFade ball.resAim'],
       ['Extra solids', 'spawn.count spawn.size spawn.bounce spawn.kick spawn.pickup spawn.power spawn.damage']]],
     ['solidLook', 'Solid look', [['Colours', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
-      ['Shape', 'bodies.solid solid.size0 solid.size1 solid.size2 solid.size3 solid.size4 solid.core solid.shell'], ['Frame', 'solid.edges solid.thick solid.frameGlow'],
+      ['Shape', 'bodies.solid solid.size0 solid.size1 solid.size2 solid.size3 solid.size4 solid.core solid.coreBright solid.shell'], ['Frame', 'solid.edges solid.thick solid.frameGlow'],
       ['Glow', 'solid.glow solid.light ball.fire'], ['Orbiting sparks', 'solid.sparks solid.sparkSize solid.sparkSpeed solid.sparkDist'], ['Motion', 'throws.spiral solid.spin solid.trail solid.trailLen']]],
     ['abilities', 'Abilities', [['Abilities', 'abilities.on abilities.dice abilities.small abilities.big abilities.hold'], ['Tetrahedron', 'abilities.burn abilities.blast'], ['Cube', 'abilities.blockTime abilities.wallLen abilities.wallTime abilities.opacity abilities.maxBlocks'], ['Icosahedron', 'abilities.freeze abilities.expose abilities.confused abilities.slam']]],
     ['swords', 'Swords', [['Swords', 'swords.on swords.length swords.damage swords.maxHits swords.cooldown'], ['Fire', 'swords.fireBoost swords.perLevel swords.maxLevel']]],
