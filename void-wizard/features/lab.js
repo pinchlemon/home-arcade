@@ -18,7 +18,7 @@ feature('lab', ({ game, on }) => {
     ['swords', 'Swords', [['Swords', 'swords.on swords.length swords.damage swords.maxHits'], ['Fire', 'swords.fireBoost swords.perLevel swords.maxLevel swords.cooldown']]],
     ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.courage party.shoot party.shotRange party.accuracy party.think party.toYou']]],
-    ['map', 'Map', [['Map', 'map.pick map.size map.grass map.bloom']]],
+    ['map', 'Map', [['Map', 'map.pick map.size map.grass map.sway map.bloom']]],
     ['controls', 'Controls', [['Controls', 'controls.on'], ['Holding the Solid', 'controls.w0 controls.w1 controls.w2 controls.w3 controls.w4 controls.w5 controls.w6 controls.w7 controls.w10 controls.w11'], ['Without the Solid', 'controls.f0 controls.f1 controls.f2 controls.f3 controls.f4 controls.f5 controls.f6 controls.f7 controls.f10 controls.f11']]],
     ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.lock ball.holdTime ball.lockSide ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast ball.arcBy ball.power ball.cancel ball.windup ball.aim ball.aimMove ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
       ['Madden passing', 'madden.on madden.tap madden.bullet madden.lobSpeed madden.bulletSpeed madden.lead madden.follow madden.runErr madden.pressure madden.control madden.icons'],

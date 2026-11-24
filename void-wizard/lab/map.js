@@ -196,14 +196,14 @@ LAB.shelf('map', 'Map', (game) => {
   // its tip is a little lighter; every blade is lit as if it were the ground (normals straight up), so up close it's
   // blades and from afar it melts into the lawn. A slow breeze rolls across in waves (the tips catch a little light
   // as it passes), and blades bend away from wizards, the Solid and the demon moving through them.
-  const GR = { uWind: { value: 0 }, uPush: { value: Array.from({ length: 12 }, () => new T.Vector3(0, 0, 0)) } };
+  const GR = { uWind: { value: 0 }, uSway: { value: 1 }, uPush: { value: Array.from({ length: 12 }, () => new T.Vector3(0, 0, 0)) } };
   const STRIPES = [new T.Color('#4aab3a'), new T.Color('#3f9e30')];
   function grassMat() {
     const m = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
     m.userData.labKey = '|grass3'; m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, GR);
-      sh.vertexShader = 'uniform float uWind; uniform vec3 uPush[12];\n' + sh.vertexShader
+      sh.vertexShader = 'uniform float uWind; uniform float uSway; uniform vec3 uPush[12];\n' + sh.vertexShader
         .replace('#include <begin_vertex>', `#include <begin_vertex>
   #ifdef USE_INSTANCING
   {
@@ -213,7 +213,7 @@ LAB.shelf('map', 'Map', (game) => {
     // the breeze: two long waves crossing the field, and a quick flutter
     float wave = sin(uWind * 0.9 + at.x * 0.16 + at.z * 0.07) * 0.6 + sin(uWind * 1.45 - at.z * 0.21 + at.x * 0.05) * 0.4;
     float flutter = sin(uWind * 4.3 + at.x * 2.1 + at.z * 1.7) * 0.12;
-    vec2 bend = vec2(0.85, 0.5) * (0.18 + wave * 0.22 + flutter) * k;
+    vec2 bend = vec2(0.85, 0.5) * (0.18 + (wave * 0.22 + flutter) * uSway) * k;   // uSway: Grass sway, 0 holds it still
     // pushed aside by whatever stands in it
     for (int i = 0; i < 12; i++) {
       vec3 p = uPush[i];
@@ -226,7 +226,7 @@ LAB.shelf('map', 'Map', (game) => {
     vec3 wb = vec3(bend.x, -dot(bend, bend) * 0.35, bend.y);
     mat3 im = mat3(instanceMatrix);   // turn and scale only: back into the clump's own frame (works in any GLSL)
     transformed += vec3(dot(im[0], wb) / dot(im[0], im[0]), dot(im[1], wb) / dot(im[1], im[1]), dot(im[2], wb) / dot(im[2], im[2]));
-    vGrassGust = clamp(wave, 0.0, 1.0) * h;
+    vGrassGust = clamp(wave, 0.0, 1.0) * h * min(uSway, 1.0);
   }
   #endif`)
         .replace('void main() {', 'varying float vGrassGust;\nvoid main() {');
@@ -292,7 +292,7 @@ LAB.shelf('map', 'Map', (game) => {
         else if (s.L.isDirectionalLight && s.L.color.getHex() === 0xffffff) { s.L.intensity = 0.5; }
         else if (s.L.isDirectionalLight) { s.L.color.set(0xdfe6ff); s.L.intensity = 0.22; }
       }
-      const hemi = new T.HemisphereLight(0xfffaf0, 0x9aa592, 0.35);   // the bounce off the grass, kept nearly grey so the ceiling doesn't turn green hemi.name = 'domeHemi'; game.scene.add(hemi); lights.push(hemi);
+      const hemi = new T.HemisphereLight(0xfffaf0, 0x5f9a48, 0.35); hemi.name = 'domeHemi'; game.scene.add(hemi); lights.push(hemi);
     }
     if (!on && saved) {
       for (const s of saved) { s.L.color.copy(s.c); s.L.intensity = s.i; }
@@ -387,7 +387,7 @@ LAB.shelf('map', 'Map', (game) => {
   }
   function tick(dt) {
     if (!dome()) return;
-    hook(); GR.uWind.value = performance.now() / 1000; pushers();
+    hook(); GR.uWind.value = performance.now() / 1000; GR.uSway.value = get('sway', 1); pushers();
     if (!root || built !== get('size', 38)) set(true);
     const b = root.getObjectByName('bloom'); if (b) b.material.opacity = get('bloom', 0.55);
     const F = game.scene.fog; if (F && F.color.getHex() !== 0xc9ced6) { fogWas = F; F.color.set(0xc9ced6); }   // fog in here is a light haze, not the void's black
@@ -399,6 +399,7 @@ LAB.shelf('map', 'Map', (game) => {
       fmt: (v) => NAMES[Math.round(v)] || '?', frame: (dt) => tick(dt), apply: (v) => set(Math.round(v) === 1) },
     { id: 'size', label: 'Dome size', help: 'How far it is from the centre of the field to the curb', min: 24, max: 60, step: 2, value: 38, dice: false, apply: () => { if (dome()) set(true); } },
     { id: 'grass', label: 'Grass detail', help: 'How thick the grass is (0 is a plain mowed lawn)', min: 0, max: 2, step: 0.25, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF'), apply: () => { if (dome()) { build(); built = get('size', 38); set(true); } } },
+    { id: 'sway', label: 'Grass sway', help: 'How much the breeze moves the grass (0 holds it still; it still parts around you)', min: 0, max: 2, step: 0.1, value: 1, dice: false, fmt: (x) => (x ? Math.round(x * 100) + '%' : 'OFF') },
     { id: 'bloom', label: 'Light glow', help: 'How much the dome lights glow', min: 0, max: 1.2, step: 0.05, value: 0.55, dice: false, fmt: (x) => Math.round(x * 100) + '%' }
   ];
 });
