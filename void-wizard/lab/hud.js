@@ -7,7 +7,7 @@ LAB.shelf('hud', 'Screen', (game) => {
   const flag = (cls) => (v) => document.body.classList.toggle(cls, !v);
   return [
     { id: 'text', label: 'Words', help: 'Title, score, buddy mode, controls, tips and the mode link', kind: 'onoff', value: 1, dice: false, apply: flag('lab-notext') },
-    { id: 'bars', label: 'Centipede bar', help: "The demon's health bar (the wizards' bars come with Health, on the Health shelf)", kind: 'onoff', value: 1, dice: false,
+    { id: 'bars', label: 'Classic demon bar', help: "The game's own health bar for the demon (Match has one with the capture point; the wizards' bars come with Health, on the Wizards shelf)", kind: 'onoff', value: 1, dice: false,
       frame: () => { game.hpBar.visible = false; } },
     { id: 'badge', label: 'Solid badge', help: 'The big spinning solid and its name in the corner', kind: 'onoff', value: 1, dice: false, apply: (v) => { flag('lab-nobadge')(v); game.hudOff = !v; } }   // hidden, it isn't drawn either
   ];

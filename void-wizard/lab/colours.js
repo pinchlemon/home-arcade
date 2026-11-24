@@ -109,19 +109,19 @@ LAB.shelf('colours', 'Colours', (game) => {
 
   const row = (id, label, help, apply) => ({ id, label, help, min: 0, max: PAL.length, step: 1, value: 0, fmt: name, dice: true, apply });
   return [
-    row('youCloak', 'Your cloak', 'The blue wizard', wizard(game.player)),
-    row('youTrim', 'Your trim', 'The band at the bottom of your cloak', wizard(game.player)),
+    row('youCloak', 'Blue cloak (you)', 'The wizard you start as.' + " With Own solids on, it takes its solid's colour instead", wizard(game.player)),
+    row('youTrim', 'Blue trim (you)', 'The band at the bottom of your cloak', wizard(game.player)),
     { id: 'trimH', label: 'Trim height', help: 'How tall the band at the bottom of every cloak is', min: 0, max: TRIM.length - 1, step: 1, value: 0, dice: false,
       fmt: (x) => (x ? (TRIM[x] / 0.04) + '×' : 'NORMAL'), apply: trimHeight },
-    row('buddyCloak', "Buddy's cloak", 'The red wizard', wizard(game.buddy)),
-    row('buddyTrim', "Buddy's trim", 'The band at the bottom of his cloak', wizard(game.buddy)),
+    row('buddyCloak', 'Red cloak', 'Your first teammate.' + " With Own solids on, it takes its solid's colour instead", wizard(game.buddy)),
+    row('buddyTrim', 'Red trim', 'The band at the bottom of his cloak', wizard(game.buddy)),
     // new knobs go at the end of the list (the panel's LAYOUT puts them with the wizards)
 
-    row('solid0', 'Tetrahedron', 'Fire', solid(0)),
-    row('solid1', 'Cube', 'Earth', solid(1)),
-    row('solid2', 'Octahedron', 'Air', solid(2)),
-    row('solid3', 'Dodecahedron', 'Aether', solid(3)),
-    row('solid4', 'Icosahedron', 'Water', solid(4)),
+    row('solid0', 'Tetrahedron', 'Fire. Its colour, and with Own solids its wizard\'s cloak', solid(0)),
+    row('solid1', 'Cube', 'Earth. Its colour, and with Own solids its wizard\'s cloak', solid(1)),
+    row('solid2', 'Octahedron', 'Air. Its colour, and with Own solids its wizard\'s cloak', solid(2)),
+    row('solid3', 'Dodecahedron', 'Aether. Its colour, and with Own solids its wizard\'s cloak', solid(3)),
+    row('solid4', 'Icosahedron', 'Water. Its colour, and with Own solids its wizard\'s cloak', solid(4)),
     row('shell', 'Centipede shell', 'Its head and the plates on its back', demonPart('shell')),
     row('rim', 'Centipede rims', 'The edge under each plate, and its jaws', demonPart('rim')),
     row('bone', 'Centipede bone', 'Its face, antlers and jaw hooks', demonPart('bone')),
@@ -129,7 +129,7 @@ LAB.shelf('colours', 'Colours', (game) => {
     row('spots', 'Centipede spots', 'The dots along its sides', demonPart('spots')),
     row('eyes', 'Centipede eyes', 'Its glowing pupils', (x) => D.eyeMat.color.set(pick(x, eye0))),
     ...[['green', 'Green'], ['purple', 'Purple'], ['gold', 'Gold']].flatMap(([k, n]) => [
-      row(k + 'Cloak', n + ' cloak', 'The ' + n.toLowerCase() + ' wizard (Party shelf, Extra wizards)', extra(k)),
+      row(k + 'Cloak', n + ' cloak', 'The ' + n.toLowerCase() + ' wizard (Team shelf, Extra wizards).' + " With Own solids on, it takes its solid's colour instead", extra(k)),
       row(k + 'Trim', n + ' trim', 'The band at the bottom of the ' + n.toLowerCase() + " wizard's cloak", extra(k))])
   ];
 });

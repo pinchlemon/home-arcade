@@ -8,6 +8,6 @@ LAB.shelf('time', 'Time', (game) => {
   return [
     { id: 'speed', label: 'Game speed', help: 'Below 1 is slow motion', min: 0.1, max: 3, step: 0.1, value: 1, apply: () => retime() },
     { id: 'wobble', label: 'Time wobble', help: 'Speeds up and slows down in waves', min: 0, max: 1, step: 0.05, value: 0, apply: () => retime(), frame: (dt, v, now) => retime(now) },
-    { id: 'freeze', label: 'Freeze', help: 'Everything holds still', kind: 'onoff', value: 0, dice: false, apply: () => retime() }
+    { id: 'freeze', label: 'Stop time', help: 'Everything holds still', kind: 'onoff', value: 0, dice: false, apply: () => retime() }
   ];
 });
