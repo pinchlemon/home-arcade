@@ -80,7 +80,7 @@ LAB.shelf('health', 'Health', (game) => {
     { id: 'on', label: 'Health', help: 'Health bars over the wizards', kind: 'onoff', value: 0, dice: true,
       frame: (dt) => tick(dt), apply: (v) => { if (!v) off(); } },
     { id: 'you', label: 'Your health', help: 'Hits you can take', min: 1, max: 20, step: 1, value: 5 },
-    { id: 'buddy', label: 'Buddy health', help: 'Your buddy (and the party wizards)', min: 1, max: 20, step: 1, value: 5 },
+    { id: 'buddy', label: 'Teammates\' health', help: 'Everyone else on your team', min: 1, max: 20, step: 1, value: 5 },
     { id: 'contact', label: 'Centipede hurts', help: 'Touching it costs health (with Health on)', kind: 'onoff', value: 0, dice: true },
     { id: 'contactDmg', label: 'Touch damage', help: 'Health lost per touch', min: 1, max: 5, step: 1, value: 1 },
     { id: 'knock', label: 'Knockdown damage', help: 'Health lost when knocked over', min: 0, max: 5, step: 1, value: 1 }

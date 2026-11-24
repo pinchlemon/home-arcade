@@ -289,6 +289,6 @@ LAB.shelf('match', 'Match', (game) => {
     { id: 'res', label: 'Pentacle needs', help: 'Resonance the Solid needs for a revive or a capture', min: 1, max: 5, step: 1, value: 5, dice: false },
     { id: 'reach', label: 'Revive reach', help: 'How close you stand to a downed teammate', min: 1, max: 8, step: 0.5, value: 3, dice: false },
     { id: 'dice', label: 'd12', help: 'Every pentacle rolls a d12: a 12 revives for free', kind: 'onoff', value: 1, dice: false },
-    { id: 'bar', label: 'Demon bar', help: 'The demon\'s health at the top, with the capture point marked', kind: 'onoff', value: 1, dice: false }
+    { id: 'bar', label: 'Match demon bar', help: 'The demon\'s health at the top, with the capture point marked (with Match on)', kind: 'onoff', value: 1, dice: false }
   ];
 });

@@ -343,7 +343,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
 
   // ---- own solids: every wizard has a solid of their own and a cloak in its colour; whoever catches the Solid turns it into theirs
-  const OWN = [['ownYou', 4], ['ownMate', 0], ['ownGreen', 1], ['ownPurple', 3], ['ownGold', 2]];   // blue (you), red, then the Party shelf's extra wizards
+  const OWN = [['ownYou', 4], ['ownMate', 0], ['ownGreen', 1], ['ownPurple', 3], ['ownGold', 2]];   // blue (you), red, then the extra wizards (Team shelf)'s extra wizards
   const KEYS = { you: 0, buddy: 1, green: 2, purple: 3, gold: 4 };   // the Colours shelf's name for each wizard
   const solidOf = LAB.solidOf = (W) => { const i = KEYS[W.labKey] ?? game.ALL.indexOf(W), S = game.SOLIDS, k = OWN[i];
     return S[(k ? get(k[0], k[1]) : i) % S.length]; };
@@ -559,9 +559,9 @@ LAB.shelf('ball', 'Ball play', (game) => {
       kind: 'onoff', value: 0, dice: false, apply: ownPaint },
     { id: 'ownYou', label: 'Your solid', help: 'The solid of the wizard you start as', min: 0, max: 4, step: 1, value: 4, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
     { id: 'ownMate', label: "Red teammate's solid", help: 'The solid of the wizard who starts as your teammate (red)', min: 0, max: 4, step: 1, value: 0, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
-    { id: 'ownGreen', label: "Green teammate's solid", help: 'The solid of the green extra wizard (Party > Extra wizards)', min: 0, max: 4, step: 1, value: 1, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
-    { id: 'ownPurple', label: "Purple teammate's solid", help: 'The solid of the purple extra wizard (Party > Extra wizards)', min: 0, max: 4, step: 1, value: 3, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
-    { id: 'ownGold', label: "Gold teammate's solid", help: 'The solid of the gold extra wizard (Party > Extra wizards)', min: 0, max: 4, step: 1, value: 2, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
+    { id: 'ownGreen', label: "Green teammate's solid", help: 'The solid of the green extra wizard (Team > Extra wizards)', min: 0, max: 4, step: 1, value: 1, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
+    { id: 'ownPurple', label: "Purple teammate's solid", help: 'The solid of the purple extra wizard (Team > Extra wizards)', min: 0, max: 4, step: 1, value: 3, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
+    { id: 'ownGold', label: "Gold teammate's solid", help: 'The solid of the gold extra wizard (Team > Extra wizards)', min: 0, max: 4, step: 1, value: 2, dice: false, apply: ownPaint, fmt: (x) => game.SOLIDS[x].name.toUpperCase() },
     { id: 'fire', label: 'Fire aura', help: 'The Solid burns brighter as resonance builds: light, orbiting sparks, flames, embers', min: 0, max: 2, step: 0.1, value: 0, dice: true }
   ].map((t) => (t.kind === 'onoff' && !t.fmt ? { ...t, fmt: OFFON } : t));
 });

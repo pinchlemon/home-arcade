@@ -2021,7 +2021,7 @@ FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){re
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
   lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
   G,playerThrow,throwOrb,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;},get padAlias(){return padAlias;},set padAlias(v){padAlias=v||null;},get padHook(){return padHook;},set padHook(f){padHook=f||null;},
-  spawnDemon,get demonMax(){return DEMON_HP*MOD.hp;},legGroup,
+  spawnDemon,get demonMax(){return DEMON_HP*MOD.hp;},legGroup,orbMark,orbLight,
   get shakeHook(){return shakeHook;},set shakeHook(f){shakeHook=f||null;},get aimHook(){return aimHook;},set aimHook(f){aimHook=f||null;}};
 requestAnimationFrame(frame);
 })();

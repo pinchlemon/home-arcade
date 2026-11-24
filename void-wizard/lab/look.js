@@ -202,7 +202,7 @@
     { id: 'sat', label: 'Saturation', help: 'Grey at -1, loud above 0', min: -1, max: 2, step: 0.1, value: 0 },
     { id: 'con', label: 'Contrast', help: 'Flat below 0, punchy above', min: -1, max: 2, step: 0.1, value: 0 },
     { id: 'bri', label: 'Brightness', help: 'Darker or lighter', min: -1, max: 1, step: 0.05, value: 0 },
-    { id: 'glow', label: 'Glow', help: 'Bright things bleed light', min: 0, max: 2, step: 0.1, value: 0 },
+    { id: 'glow', label: 'Soft glow', help: 'Bright things bleed light (a cheaper look than Film > Bloom)', min: 0, max: 2, step: 0.1, value: 0 },
     { id: 'outline', label: 'Outline', help: "Only the edges, in the solid's colour", min: 0, max: 1, step: 0.05, value: 0 }
   ]));
   LAB.shelf('screen', 'Screen', () => reg('screen', [

@@ -11,32 +11,46 @@ feature('lab', ({ game, on }) => {
   // ---------------------------------------------------------------- how the panel groups the knobs
   // [shelf id, name, [[heading, 'toy ids'], ...]]. Knob ids never change (saved mixes use them), so moving a knob
   // to another shelf is only a change here.
+  // The order follows how you'd think about a match: the fight, the place, the people, the ball, the enemy, then how it
+  // looks, feels and sounds. A heading can be a function (worked out each time the shelf is drawn).
+  const SOLID_NAMES = ['Tetrahedron', 'Cube', 'Octahedron', 'Dodecahedron', 'Icosahedron'];
+  const WIZ = { you: ['Blue', 'ownYou', 4, 'you'], red: ['Red', 'ownMate', 0, 'teammate'], green: ['Green', 'ownGreen', 1, 'extra'], purple: ['Purple', 'ownPurple', 3, 'extra'], gold: ['Gold', 'ownGold', 2, 'extra'] };
+  // a wizard's name as you see them: with Own solids on, by their solid (their cloak is its colour); otherwise by cloak
+  const wizName = (k) => { const [col, key, d, role] = WIZ[k]; const own = get('ball.own'); return (own ? SOLID_NAMES[(get('ball.' + key) ?? d) % 5] : col) + ' wizard' + (role === 'you' ? ' (you start as)' : role === 'teammate' ? ' (your first teammate)' : ''); };
   const LAYOUT = [
-    ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
-    ['match', 'Match', [['Match', 'match.on match.lives match.capture match.res'], ['Pentacle', 'match.reach match.dice'], ['On screen', 'match.bar']]],
-    ['abilities', 'Abilities', [['Abilities', 'abilities.on abilities.dice abilities.small abilities.big abilities.hold'], ['Tetrahedron', 'abilities.burn abilities.blast'], ['Cube', 'abilities.blockTime abilities.wallLen abilities.wallTime abilities.opacity abilities.maxBlocks'], ['Icosahedron', 'abilities.freeze abilities.expose abilities.confused abilities.slam']]],
-    ['swords', 'Swords', [['Swords', 'swords.on swords.length swords.damage swords.maxHits'], ['Fire', 'swords.fireBoost swords.perLevel swords.maxLevel swords.cooldown']]],
-    ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
+    ['match', 'Match', [['Match', 'match.on match.lives match.capture match.res'], ['Pentacle', 'match.reach match.dice']]],
+    ['map', 'Map', [['Map', 'map.pick'], ['Practice Dome', 'map.size map.grass map.sway map.bloom'], ['The Void', 'stars.bright stars.amount stars.size stars.colours stars.twinkle']]],
+    ['team', 'Team', [['Team', 'party.wizards party.team party.orders'], ['Who you control', 'party.switch party.pick ball.switch madden.control'],
       ['Teammate brains', 'party.spacing party.keepAway party.courage party.shoot party.shotRange party.accuracy party.think party.toYou']]],
-    ['map', 'Map', [['Map', 'map.pick map.size map.grass map.sway map.bloom']]],
-    ['controls', 'Controls', [['Controls', 'controls.on'], ['Holding the Solid', 'controls.w0 controls.w1 controls.w2 controls.w3 controls.w4 controls.w5 controls.w6 controls.w7 controls.w10 controls.w11'], ['Without the Solid', 'controls.f0 controls.f1 controls.f2 controls.f3 controls.f4 controls.f5 controls.f6 controls.f7 controls.f10 controls.f11']]],
-    ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.lock ball.holdTime ball.lockSide ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast ball.arcBy ball.power ball.cancel ball.windup ball.aim ball.aimMove ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
-      ['Madden passing', 'madden.on madden.tap madden.bullet madden.lobSpeed madden.bulletSpeed madden.lead madden.follow madden.runErr madden.pressure madden.control madden.icons'],
-      ['Catching', 'ball.perfect ball.window ball.bonus ball.oop ball.ring ball.ringTime'], ['Resonance', 'ball.resHold ball.resFade ball.resAim'], ['Own solids', 'ball.own ball.ownYou ball.ownMate ball.ownGreen ball.ownPurple ball.ownGold'], ['On fire', 'ball.fire ball.super ball.superHow ball.superPower ball.superRes ball.superDmg']]],
-    ['wizards', 'Wizards', [['Size', 'bodies.wizard bodies.buddy'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
-      ...['Blue', 'Red', 'Green', 'Purple', 'Gold'].map(n => [n + ' wizard', ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + n.toLowerCase() + '.' + s).join(' ')])]],
-    ['solids', 'Solids', [['Flight', 'throws.spiral bodies.solid world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'],
+    ['wizards', 'Wizards', [['Moving', 'world.speed world.jump world.gravity world.endless'], ['Health', 'health.on health.you health.buddy health.knock world.safe'],
+      ['Own solids', 'ball.own ball.ownYou ball.ownMate ball.ownGreen ball.ownPurple ball.ownGold'], ['Size', 'bodies.wizard bodies.buddy'],
+      ['Look', 'colours.youCloak colours.youTrim colours.buddyCloak colours.buddyTrim colours.greenCloak colours.greenTrim colours.purpleCloak colours.purpleTrim colours.goldCloak colours.goldTrim colours.trimH']]],
+    ['stats', 'Wizard stats', ['you', 'red', 'green', 'purple', 'gold'].map(k => [() => wizName(k), ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + (k === 'you' ? 'blue' : k) + '.' + s).join(' ')])],
+    ['throwing', 'Throwing', [['Buttons', 'ball.buttons ball.jump ball.cancel'], ['Throw', 'ball.slider ball.arcBy ball.power ball.windup ball.tap ball.full ball.arc ball.high ball.low ball.aim ball.aimMove'],
+      ['Lock-on', 'ball.lock ball.holdTime ball.lockSide'], ['Straight shots', 'ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast'],
+      ['Super shot', 'ball.super ball.superHow ball.superPower ball.superRes ball.superDmg']]],
+    ['passing', 'Passing', [['Pass help', 'party.aim party.passSpeed party.magnet'],
+      ['Madden passing', 'madden.on madden.tap madden.bullet madden.lobSpeed madden.bulletSpeed madden.lead madden.follow madden.runErr madden.pressure']]],
+    ['catching', 'Catching', [['Catching', 'party.autoCatch'], ['Perfect catch', 'ball.perfect ball.window ball.bonus ball.oop']]],
+    ['solid', 'Solid', [['Flight', 'world.solidGravity world.bounce'], ['Homing', 'throws.homing throws.cone'], ['Resonance', 'ball.resHold ball.resFade ball.resAim'],
       ['Extra solids', 'spawn.count spawn.size spawn.bounce spawn.kick spawn.pickup spawn.power spawn.damage']]],
-    ['demon', 'Demon', [['How it acts', 'bodies.demon demon.aggression demon.health'], ['Look', 'demon.poly'], ['Hurting you', 'health.contact health.contactDmg'],
-      ['When hit', 'demon.flash demon.flashLen demon.flashRate'], ['Spit', 'attacks.attack attacks.spitCount attacks.spitSpread attacks.spitSize attacks.puddles'],
+    ['solidLook', 'Solid look', [['Colours', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
+      ['Shape', 'bodies.solid solid.core solid.shell solid.edges'], ['Glow', 'solid.glow solid.light ball.fire'], ['In flight', 'throws.spiral']]],
+    ['abilities', 'Abilities', [['Abilities', 'abilities.on abilities.dice abilities.small abilities.big abilities.hold'], ['Tetrahedron', 'abilities.burn abilities.blast'], ['Cube', 'abilities.blockTime abilities.wallLen abilities.wallTime abilities.opacity abilities.maxBlocks'], ['Icosahedron', 'abilities.freeze abilities.expose abilities.confused abilities.slam']]],
+    ['swords', 'Swords', [['Swords', 'swords.on swords.length swords.damage swords.maxHits swords.cooldown'], ['Fire', 'swords.fireBoost swords.perLevel swords.maxLevel']]],
+    ['controls', 'Controls', [['Controls', 'controls.on'], ['Holding the Solid', 'controls.w0 controls.w1 controls.w2 controls.w3 controls.w4 controls.w5 controls.w6 controls.w7 controls.w10 controls.w11'], ['Without the Solid', 'controls.f0 controls.f1 controls.f2 controls.f3 controls.f4 controls.f5 controls.f6 controls.f7 controls.f10 controls.f11']]],
+    ['demon', 'Demon', [['How it acts', 'demon.aggression demon.health'], ['Hurting you', 'health.contact health.contactDmg'],
+      ['Spit', 'attacks.attack attacks.spitCount attacks.spitSpread attacks.spitSize attacks.puddles'],
       ['Fire breath', 'attacks.breathLen attacks.breathReach attacks.breathWidth attacks.breathSweep attacks.breathCol'],
-      ['When beaten', 'demon.absorb demon.absorbLen demon.burst demon.dissolve demon.dissolveLen demon.dissolveCol']]],
+      ['When hit', 'demon.flash demon.flashLen demon.flashRate'], ['When beaten', 'demon.absorb demon.absorbLen demon.burst demon.dissolve demon.dissolveLen demon.dissolveCol'],
+      ['Look', 'bodies.demon demon.poly colours.shell colours.rim colours.bone colours.legs colours.spots colours.eyes']]],
     ['rules', 'Rules', [1, 2, 3, 4].map(n => ['Rule ' + n, `rules.when${n} rules.then${n} rules.for${n}`])],
-    ['colours', 'Colours', [['Wizards', 'colours.youCloak colours.youTrim colours.buddyCloak colours.buddyTrim colours.greenCloak colours.greenTrim colours.purpleCloak colours.purpleTrim colours.goldCloak colours.goldTrim colours.trimH'],
-      ['Solids', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
-      ['Centipede', 'colours.shell colours.rim colours.bone colours.legs colours.spots colours.eyes'],
-      ['Stars', 'stars.bright stars.amount stars.size stars.colours stars.twinkle']]],
-    ['camera', 'Camera', [['Camera', 'camera.height camera.lean camera.stick camera.stickY camera.invertX camera.invertY camera.lowClose camera.stickSpeed camera.orbit camera.zoom camera.fov camera.tilt camera.spin'], ['On screen', 'hud.text hud.bars hud.badge']]],
+    ['camera', 'Camera', [['Camera', 'camera.height camera.zoom camera.fov camera.lean camera.tilt camera.spin'],
+      ['Right stick', 'camera.stick camera.stickY camera.invertX camera.invertY camera.lowClose camera.stickSpeed']]],
+    ['screen', 'On screen', [['Words', 'hud.text hud.badge'], ['Health bars', 'hud.bars match.bar'], ['Guides', 'ball.path ball.ring ball.ringTime madden.icons']]],
+    ['feel', 'Feel & time', [['Time', 'time.speed time.wobble time.freeze'], ['Shake', 'feel.strength feel.style feel.length'], ['Hits', 'feel.freeze feel.punch'],
+      ['Final blow', 'feel.slow feel.slowLen'], ['Wizards', 'feel.squash']]],
+    ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown']]],
     ['distort', 'Distort', [['Bend', 'look.warp look.warpSpeed look.swirl look.bulge look.mirror look.kaleido look.pixelate'],
       ['Echo', 'look.trails echo.zoom echo.spin echo.hue look.split echo.glitch echo.pulse']]],
     ['grade', 'Colour grade', [['Colour', 'colour.levels colour.dither colour.ditherSize colour.tint colour.hue colour.invert'],
@@ -44,13 +58,10 @@ feature('lab', ({ game, on }) => {
     ['film', 'Film', [['Screen', 'colour.scan screen.crt screen.vignette screen.grain screen.halftone screen.dotSize'],
       ['Glow', 'glow.bloom glow.radius glow.threshold glow.tilt glow.focus glow.glitch'],
       ['Print', 'print.techni print.bleach print.dots print.halftone print.radius print.shape']]],
-    ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown'],
-      ['Shake', 'feel.strength feel.style feel.length'], ['Hits', 'feel.freeze feel.punch'],
-      ['Final blow', 'feel.slow feel.slowLen'], ['Wizards', 'feel.squash']]],
-    ['sound', 'Sound', [['Sound', 'sound.on sound.music sound.volume'], ['Mix', 'sound.ball sound.wind sound.magic sound.hits sound.demon sound.wiz'], ['Character', 'sound.room sound.crunch'],
-      ['Throw', 'sound.throwStyle sound.throwPitch sound.throwLen sound.throwVol'], ['Catch', 'sound.catchStyle sound.catchPitch sound.catchLen sound.catchVol'], ['Perfect catch', 'sound.perfectStyle sound.perfectPitch sound.perfectLen sound.perfectVol'], ['Wind-up', 'sound.tickStyle sound.tickPitch sound.tickLen sound.tickVol'], ['Cancel', 'sound.cancelStyle sound.cancelPitch sound.cancelLen sound.cancelVol'], ['Fizzle', 'sound.fizzleStyle sound.fizzlePitch sound.fizzleLen sound.fizzleVol'], ['Shape change', 'sound.morphStyle sound.morphPitch sound.morphLen sound.morphVol'], ['Hit', 'sound.hitStyle sound.hitPitch sound.hitLen sound.hitVol'], ['Super shot', 'sound.superStyle sound.superPitch sound.superLen sound.superVol'], ['Spit', 'sound.spitStyle sound.spitPitch sound.spitLen sound.spitVol'], ['Splat', 'sound.splatStyle sound.splatPitch sound.splatLen sound.splatVol'], ['Fire breath', 'sound.roarStyle sound.roarPitch sound.roarLen sound.roarVol'], ['Centipede falls', 'sound.downStyle sound.downPitch sound.downLen sound.downVol'], ['Capture', 'sound.burstStyle sound.burstPitch sound.burstLen sound.burstVol'], ['Dive', 'sound.diveStyle sound.divePitch sound.diveLen sound.diveVol'], ['Tackle', 'sound.tackleStyle sound.tacklePitch sound.tackleLen sound.tackleVol'], ['Jump', 'sound.jumpStyle sound.jumpPitch sound.jumpLen sound.jumpVol'], ['Land', 'sound.landStyle sound.landPitch sound.landLen sound.landVol'], ['Knocked down', 'sound.knockStyle sound.knockPitch sound.knockLen sound.knockVol']]],
     ['ps1', 'PS1', [['Models', 'ps1.snap ps1.wobble ps1.lowpoly ps1.gouraud'], ['Picture', 'ps1.depth ps1.fog']]],
-    ['ps2', 'PS2', [['Console', 'ps2.res ps2.c16 ps2.bloom ps2.wash ps2.rays ps2.blur'], ['TV', 'ps2.inter ps2.comp']]]
+    ['ps2', 'PS2', [['Console', 'ps2.res ps2.c16 ps2.bloom ps2.wash ps2.rays ps2.blur'], ['TV', 'ps2.inter ps2.comp']]],
+    ['sound', 'Sound', [['Sound', 'sound.on sound.music sound.volume'], ['Mix', 'sound.ball sound.wind sound.magic sound.hits sound.demon sound.wiz'], ['Character', 'sound.room sound.crunch'],
+      ['Throw', 'sound.throwStyle sound.throwPitch sound.throwLen sound.throwVol'], ['Catch', 'sound.catchStyle sound.catchPitch sound.catchLen sound.catchVol'], ['Perfect catch', 'sound.perfectStyle sound.perfectPitch sound.perfectLen sound.perfectVol'], ['Wind-up', 'sound.tickStyle sound.tickPitch sound.tickLen sound.tickVol'], ['Cancel', 'sound.cancelStyle sound.cancelPitch sound.cancelLen sound.cancelVol'], ['Fizzle', 'sound.fizzleStyle sound.fizzlePitch sound.fizzleLen sound.fizzleVol'], ['Shape change', 'sound.morphStyle sound.morphPitch sound.morphLen sound.morphVol'], ['Hit', 'sound.hitStyle sound.hitPitch sound.hitLen sound.hitVol'], ['Super shot', 'sound.superStyle sound.superPitch sound.superLen sound.superVol'], ['Spit', 'sound.spitStyle sound.spitPitch sound.spitLen sound.spitVol'], ['Splat', 'sound.splatStyle sound.splatPitch sound.splatLen sound.splatVol'], ['Fire breath', 'sound.roarStyle sound.roarPitch sound.roarLen sound.roarVol'], ['Centipede falls', 'sound.downStyle sound.downPitch sound.downLen sound.downVol'], ['Capture', 'sound.burstStyle sound.burstPitch sound.burstLen sound.burstVol'], ['Dive', 'sound.diveStyle sound.divePitch sound.diveLen sound.diveVol'], ['Tackle', 'sound.tackleStyle sound.tacklePitch sound.tackleLen sound.tackleVol'], ['Jump', 'sound.jumpStyle sound.jumpPitch sound.jumpLen sound.jumpVol'], ['Land', 'sound.landStyle sound.landPitch sound.landLen sound.landVol'], ['Knocked down', 'sound.knockStyle sound.knockPitch sound.knockLen sound.knockVol']]]
   ];
 
   // ---------------------------------------------------------------- toys and their values
@@ -517,7 +528,7 @@ feature('lab', ({ game, on }) => {
     } else if (!list.length) {
       rows = `<div class="lab-empty">${sh.kind === 'pinned' ? 'Nothing pinned yet. Pick a knob on any shelf and press its pin (L3 on the controller): it shows up here.' : 'Everything is normal. Knobs you turn show up here, so you can see what is on and put things back.'}</div>`;
     } else {
-      rows = (LAB.tops[sh.id] ? LAB.tops[sh.id](sel) : '') + list.map((t, i) => (sh.heads && sh.heads[i] ? `<div class="lab-head">${esc(sh.heads[i])}</div>` : '') + knobRow(t, i, i === sel)).join('');
+      rows = (LAB.tops[sh.id] ? LAB.tops[sh.id](sel) : '') + list.map((t, i) => (sh.heads && sh.heads[i] ? `<div class="lab-head">${esc(typeof sh.heads[i] === 'function' ? sh.heads[i]() : sh.heads[i])}</div>` : '') + knobRow(t, i, i === sel)).join('');
     }
     const fresh = performance.now() - sayT < 2500 ? sayText : (playing ? 'Playing ' + playing : '');
     const oldRows = panel.querySelector('.lab-rows'), keepTop = oldRows && panel.dataset.shelf === sh.id ? oldRows.scrollTop : 0;
