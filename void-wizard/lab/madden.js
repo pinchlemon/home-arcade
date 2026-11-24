@@ -116,6 +116,7 @@ LAB.shelf('madden', 'Passing', (game) => {
       const d = down(b);
       if (stale.has(b)) { if (!d) stale.delete(b); continue; }
       if (d && !press) {
+        if (b === 5 && LAB.get('swords.on')) continue;   // with Swords, R1 swings the sword
         const to = b === 5 ? 'shot' : map.byBtn[b];
         if (to && (to === 'shot' || !(to.downT > 0))) press = { b, t: 0, to };
       }

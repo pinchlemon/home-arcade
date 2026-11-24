@@ -15,6 +15,7 @@ feature('lab', ({ game, on }) => {
     ['game', 'Game', [['Time', 'time.speed time.wobble time.freeze'], ['Moving', 'world.gravity world.speed world.jump world.endless']]],
     ['match', 'Match', [['Match', 'match.on match.lives match.capture match.res'], ['Pentacle', 'match.reach match.dice'], ['On screen', 'match.bar']]],
     ['abilities', 'Abilities', [['Abilities', 'abilities.on abilities.dice abilities.small abilities.big abilities.hold'], ['Tetrahedron', 'abilities.burn abilities.blast'], ['Cube', 'abilities.blockTime abilities.wallLen abilities.wallTime abilities.opacity abilities.maxBlocks'], ['Icosahedron', 'abilities.freeze abilities.expose abilities.confused abilities.slam']]],
+    ['swords', 'Swords', [['Swords', 'swords.on swords.length swords.damage swords.maxHits'], ['Fire', 'swords.fireBoost swords.perLevel swords.maxLevel swords.cooldown']]],
     ['party', 'Party', [['Team', 'party.wizards party.team party.orders'], ['Passing', 'party.aim party.passSpeed party.magnet party.autoCatch'], ['Control', 'party.switch party.pick'],
       ['Teammate brains', 'party.spacing party.keepAway party.courage party.shoot party.shotRange party.accuracy party.think party.toYou']]],
     ['ball', 'Ball play', [['Buttons', 'ball.buttons ball.jump'], ['Throwing', 'ball.slider ball.lock ball.holdTime ball.lockSide ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast ball.arcBy ball.power ball.cancel ball.windup ball.aim ball.aimMove ball.path ball.arc ball.high ball.low ball.tap ball.full ball.switch'],
