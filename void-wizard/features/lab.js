@@ -36,7 +36,7 @@ feature('lab', ({ game, on }) => {
       ['Solids', 'colours.solid0 colours.solid1 colours.solid2 colours.solid3 colours.solid4'],
       ['Centipede', 'colours.shell colours.rim colours.bone colours.legs colours.spots colours.eyes'],
       ['Stars', 'stars.bright stars.amount stars.size stars.colours stars.twinkle']]],
-    ['camera', 'Camera', [['Camera', 'camera.height camera.lean camera.stick camera.stickY camera.invertX camera.invertY camera.stickSpeed camera.orbit camera.zoom camera.fov camera.tilt camera.spin'], ['On screen', 'hud.text hud.bars hud.badge']]],
+    ['camera', 'Camera', [['Camera', 'camera.height camera.lean camera.stick camera.stickY camera.invertX camera.invertY camera.lowClose camera.stickSpeed camera.orbit camera.zoom camera.fov camera.tilt camera.spin'], ['On screen', 'hud.text hud.bars hud.badge']]],
     ['distort', 'Distort', [['Bend', 'look.warp look.warpSpeed look.swirl look.bulge look.mirror look.kaleido look.pixelate'],
       ['Echo', 'look.trails echo.zoom echo.spin echo.hue look.split echo.glitch echo.pulse']]],
     ['grade', 'Colour grade', [['Colour', 'colour.levels colour.dither colour.ditherSize colour.tint colour.hue colour.invert'],
