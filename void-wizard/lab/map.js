@@ -200,7 +200,7 @@ LAB.shelf('map', 'Map', (game) => {
   const STRIPES = [new T.Color('#4aab3a'), new T.Color('#3f9e30')];
   function grassMat() {
     const m = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
-    m.userData.labKey = '|grass2'; m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
+    m.userData.labKey = '|grass3'; m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, GR);
       sh.vertexShader = 'uniform float uWind; uniform vec3 uPush[12];\n' + sh.vertexShader
@@ -230,7 +230,11 @@ LAB.shelf('map', 'Map', (game) => {
   }
   #endif`)
         .replace('void main() {', 'varying float vGrassGust;\nvoid main() {');
+      // both sides of a blade lit like its front (the ground): three.js lights a blade's back with its normal flipped
+      // downward, which left every blade turned away from the light nearly black
       sh.fragmentShader = sh.fragmentShader
+        .replace('( gl_FrontFacing ) ? vLightFront : vLightBack', 'vLightFront')
+        .replace('( gl_FrontFacing ) ? vIndirectFront : vIndirectBack', 'vIndirectFront')
         .replace('void main() {', 'varying float vGrassGust;\nvoid main() {')
         .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 1.0 + vGrassGust * 0.12;');   // a soft sheen where the breeze passes
     };
