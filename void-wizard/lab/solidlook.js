@@ -2,8 +2,8 @@
 // shelf files but shown with these on the Solid look shelf). Every solid is drawn the same way: a frame of bright
 // edges, a small solid core in the middle, a faint see-through shell, a glow on the ground under it, and a light it
 // casts on the wizards.
-//   Frame: Thickness swaps the hairline edges for real bars (a merged mesh per solid, turning with it); Frame glow
-//   puts a soft halo round every bar and runs them toward white, so they read as giving off light (and feed Bloom).
+//   Frame: Thickness swaps the hairline edges for real bars with a round joint on every corner (a merged mesh per
+//   solid, turning with it); Frame glow lights the lines up in their own colour and adds to the light the Solid casts.
 //   Orbiting sparks (they show with the Fire aura, on Ball play's code): how many a resonance level (1 = exactly the
 //   resonance, evenly round one ring), size, speed and distance.
 //   Spin: how fast it turns in your hands. Trail: a fading ribbon behind a thrown Solid. Each solid's own size.
@@ -18,20 +18,30 @@ LAB.shelf('solidlook', 'Solid look', (game) => {
   // ---------------------------------------------------------------- the frame as bars, and its glow
   // one merged mesh of bars per solid (and a wider one for the glow), built when the thickness changes
   function barsFor(s, r) {
-    const pos = s.geo.index ? s.geo.toNonIndexed() : s.geo, eg = new T.EdgesGeometry(s.geo), p = eg.attributes.position, out = [], m = new T.Matrix4(), q = new T.Quaternion(), a = new T.Vector3(), b = new T.Vector3(), mid = new T.Vector3(), Z = new T.Vector3(0, 1, 0);
+    // a bar along each edge, ending exactly at its corners, and the same round joint on every corner, so all corners
+    // look alike (bars running past their ends used to pile up there)
+    const eg = new T.EdgesGeometry(s.geo), p = eg.attributes.position, out = [], m = new T.Matrix4(), q = new T.Quaternion(), a = new T.Vector3(), b = new T.Vector3(), mid = new T.Vector3(), Z = new T.Vector3(0, 1, 0), one = new T.Vector3(1, 1, 1);
     for (let i = 0; i < p.count; i += 2) {
       a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1);
-      const len = a.distanceTo(b), g = new T.CylinderGeometry(r, r, len + r * 1.6, 6, 1, false);
-      q.setFromUnitVectors(Z, mid.subVectors(b, a).normalize()); m.compose(mid.addVectors(a, b).multiplyScalar(0.5), q, new T.Vector3(1, 1, 1));
+      const g = new T.CylinderGeometry(r, r, a.distanceTo(b), 8, 1, true);
+      q.setFromUnitVectors(Z, mid.subVectors(b, a).normalize()); m.compose(mid.addVectors(a, b).multiplyScalar(0.5), q, one);
       g.applyMatrix4(m); out.push(g.toNonIndexed());
     }
-    eg.dispose(); if (pos !== s.geo) pos.dispose();
+    for (const v of s.verts) { const g = new T.SphereGeometry(r, 8, 6); g.translate(v.x, v.y, v.z); out.push(g.toNonIndexed()); }
+    eg.dispose();
     const merged = new T.BufferGeometry(); let total = 0; for (const g of out) total += g.attributes.position.array.length;
     const buf = new Float32Array(total); let k = 0; for (const g of out) { buf.set(g.attributes.position.array, k); k += g.attributes.position.array.length; g.dispose(); }
     merged.setAttribute('position', new T.BufferAttribute(buf, 3));
     return merged;
   }
   let builtThick = -1;
+  const lit = new T.Color(), HSL = {};
+  // the frame's lines lit up: their own colour, lighter and brighter the more glow (still their colour, not a sleeve)
+  function glowColour(src, glow) {
+    if (!glow) return src;
+    lit.copy(src); lit.getHSL(HSL); lit.setHSL(HSL.h, Math.min(1, HSL.s + glow * 0.15), Math.min(0.72, HSL.l + glow * 0.14));   // brighter, never paler
+    return lit;
+  }
   function frame() {
     const th = get('thick', 0), glow = get('frameGlow', 0);
     if (th !== builtThick) {
@@ -39,22 +49,21 @@ LAB.shelf('solidlook', 'Solid look', (game) => {
       for (const s of S) {
         for (const k of ['labBars', 'labHalo']) if (s[k]) { s.g.remove(s[k]); s[k].geometry.dispose(); s[k].material.dispose(); s[k] = null; }
         if (th > 0) {
-          const layers = lines(s).layers.mask;
-          s.labBars = new T.Mesh(barsFor(s, th), new T.MeshBasicMaterial({ color: s.col, transparent: true }));
-          s.labHalo = new T.Mesh(barsFor(s, th * 2.6 + 0.015), new T.MeshBasicMaterial({ color: s.col, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false }));
-          for (const m of [s.labBars, s.labHalo]) { m.layers.mask = layers; s.g.add(m); }
+          s.labBars = new T.Mesh(barsFor(s, th), new T.MeshBasicMaterial({ color: s.col }));
+          s.labBars.layers.mask = lines(s).layers.mask; s.g.add(s.labBars);
         }
       }
     }
-    // without bars, the hairline edges carry the glow by running toward white
     for (const s of S) {
       const e = get('edges', 1), bars = s.labBars;
       lines(s).visible = e > 0 && !bars;
       if (bars) {
-        bars.visible = e > 0; bars.material.opacity = e; bars.material.color.copy(s.lineMat.color).lerp(WHITE, Math.min(0.85, glow * 0.3));
-        s.labHalo.visible = glow > 0 && e > 0; s.labHalo.material.opacity = Math.min(0.9, glow * 0.22) * e; s.labHalo.material.color.copy(s.lineMat.color);
-      } else if (glow > 0) s.lineMat.color.lerp(WHITE, Math.min(0.85, glow * 0.3));
+        bars.visible = e > 0; bars.material.transparent = e < 1; bars.material.opacity = e;
+        bars.material.color.copy(glowColour(s.lineMat.color, glow));
+      } else if (glow > 0) s.lineMat.color.copy(glowColour(s.lineMat.color, glow));
     }
+    // lit-up lines light up what's around them too
+    if (glow > 0) game.orbLight.intensity *= 1 + glow;
   }
   function shape() {
     const c = get('core', 0.42), e = get('edges', 1);
@@ -115,7 +124,7 @@ LAB.shelf('solidlook', 'Solid look', (game) => {
     { id: 'solid.shell', label: 'Shell', help: 'The faint see-through skin; it brightens as resonance builds', min: 0, max: 4, step: 0.25, value: 1, dice: true, fmt: pct },
     { id: 'solid.edges', label: 'Frame', help: 'How strong the frame of edges is (0 hides it)', min: 0, max: 1, step: 0.1, value: 1, dice: true, fmt: pct, apply: shape },
     { id: 'solid.thick', label: 'Frame thickness', help: 'HAIRLINE is the thin line; anything more draws the frame as solid bars this thick', min: 0, max: 0.08, step: 0.005, value: 0, dice: true, fmt: (x) => (x ? (x * 100).toFixed(1) : 'HAIRLINE') },
-    { id: 'solid.frameGlow', label: 'Frame glow', help: 'How much light the frame gives off: it runs toward white, and with some thickness a soft halo glows round each bar', min: 0, max: 3, step: 0.1, value: 0, dice: true, fmt: pct },
+    { id: 'solid.frameGlow', label: 'Frame glow', help: 'How much light the frame\'s lines give off: they light up in their own colour and light up what\'s around them (with Bloom on, they glow)', min: 0, max: 3, step: 0.1, value: 0, dice: true, fmt: pct },
     { id: 'solid.glow', label: 'Ground glow', help: 'The glow on the ground under it, which also shows where a throw will land', min: 0, max: 3, step: 0.25, value: 1, dice: true, fmt: pct },
     { id: 'solid.light', label: 'Light', help: 'The coloured light it casts on the wizards and the demon close by', min: 0, max: 3, step: 0.25, value: 1, dice: true, fmt: pct },
     { id: 'solid.sparks', label: 'Orbiting sparks', help: 'Sparks circling it as resonance builds (with Fire aura on): how many for each level of resonance. 1 shows your resonance exactly, one spark a level', min: 0, max: 3, step: 1, value: 2, dice: true, fmt: (x) => (x ? x + ' A LEVEL' : 'OFF') },
