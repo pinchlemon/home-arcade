@@ -16,6 +16,7 @@ LAB.shelf('madden', 'Passing', (game) => {
   const btn = (gp, i) => !!(gp && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.3));
   const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const KEY = { 3: 'KeyI', 2: 'KeyJ', 0: 'KeyK', 1: 'KeyL', 5: 'KeyO' };
+  const NAME = { 4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2', 10: 'L3', 11: 'R3' };
   const BTN_OF = { tetrahedron: 3, cube: 2, octahedron: 0, icosahedron: 1 };
   // the buttons' shapes, drawn small, in the usual colours
   const GLYPH = {
@@ -101,17 +102,17 @@ LAB.shelf('madden', 'Passing', (game) => {
   function tick() {
     const now = performance.now() / 1000, rdt = Math.min(0.1, now - (lastNow || now)); lastNow = now;   // real time: slow motion doesn't change the hold
     if (o.state !== 'air') o.labMadden = false;
-    const Y = game.you, holding = !!Y && o.state === 'held' && o.holder === Y && Y.downT <= 0 && !game.blockPad && !game.DUEL;
+    const Y = game.you, down = (b) => LAB.btn(Y, b === 5 ? 'shoot' : 'pass' + b, b) || game.keys.has(KEY[b]);   // with the Controls shelf, the passes and the shot can be on any button
+    const holding = !!Y && o.state === 'held' && o.holder === Y && Y.downT <= 0 && !game.blockPad && !game.DUEL;
     for (const W of game.ALL) W.labMadden = holding && W === Y;
     if (!holding) { if (wasHolding) clear(); wasHolding = false; return; }
     if (!wasHolding) {   // just got it: buttons already down (the catch) don't count until they're let go
-      stale = new Set(); for (const b of [0, 1, 2, 3, 5]) if (btn(Y.gp, b) || game.keys.has(KEY[b])) stale.add(b);
+      stale = new Set(); for (const b of [0, 1, 2, 3, 5]) if (down(b)) stale.add(b);
       press = null; Y.charging = false; Y.ctl.castHeld = false;
     }
     wasHolding = true;
     LAB.skip('madden', [0, 1, 2, 3]);   // the game doesn't see the face buttons while you hold it
     map = assign(Y);
-    const down = (b) => btn(Y.gp, b) || game.keys.has(KEY[b]);
     for (const b of [0, 1, 2, 3, 5]) {
       const d = down(b);
       if (stale.has(b)) { if (!d) stale.delete(b); continue; }
@@ -138,9 +139,10 @@ LAB.shelf('madden', 'Passing', (game) => {
     cam.updateMatrixWorld();
     const show = get('icons', 1);
     for (const W of game.ALL) {
-      const e = icon(W), b = map.ofW.get(W);
-      if (!show || b === undefined || !W.root.visible) { e.style.display = 'none'; continue; }
-      if (e.dataset.b !== String(b)) { e.dataset.b = String(b); e.innerHTML = GLYPH[b]; }
+      const e = icon(W), slot = map.ofW.get(W);
+      const b = slot === undefined ? null : LAB.buttonFor ? LAB.buttonFor('pass' + slot, slot, game.you) : slot;   // the Controls shelf can move the pass to another button
+      if (!show || b == null || !W.root.visible) { e.style.display = 'none'; continue; }
+      if (e.dataset.b !== String(b)) { e.dataset.b = String(b); e.innerHTML = GLYPH[b] || `<span style="font:9px var(--font-pixel,monospace);color:#fff">${NAME[b] || '?'}</span>`; }
       e.classList.toggle('down', W.downT > 0); e.classList.toggle('on', !!press && press.to === W);
       const s = screen(cam, W.pos.x, W.y + 1.9 * (W.root.scale.y || 1), W.pos.z);   // the same spot as the health bar, then just above it
       if (!s) { e.style.display = 'none'; continue; }

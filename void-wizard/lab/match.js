@@ -241,7 +241,7 @@ LAB.shelf('match', 'Match', (game) => {
     }
     // L1 (or V): the pentacle
     if (!st.over && Y) {
-      const l1 = btn(Y.gp, 4), key = game.keys.has('KeyV');
+      const l1 = LAB.btn(Y, 'pentacle', 4), key = game.keys.has('KeyV');
       if ((l1 && !st.lastL1) || (key && !st.lastKey)) pentacleButton();
       st.lastL1 = l1; st.lastKey = key;
     }
@@ -266,9 +266,10 @@ LAB.shelf('match', 'Match', (game) => {
     if (st.over) h = '';
     else if (holding && isDodeca(game.solid) && (o.res || 0) >= need) {
       const near = game.ALL.some(W => W !== Y && W.labDown && hd(W.pos, Y.pos) < get('reach', 3));
-      h = near ? 'L1 · REVIVE' : st.armed ? 'PENTACLE READY · HIT THE DEMON' : cap ? 'L1 · PENTACLE TO CAPTURE' : '';
+      const L = LAB.btnName('pentacle', 4, Y) || 'L1';   // the button the Controls shelf has it on
+      h = near ? L + ' · REVIVE' : st.armed ? 'PENTACLE READY · HIT THE DEMON' : cap ? L + ' · PENTACLE TO CAPTURE' : '';
     } else if (game.ALL.some(W => W.labDown)) h = 'TEAMMATE DOWN · BRING A FULL DODECAHEDRON';
-    else if (cap) h = 'CAPTURE IT · FULL DODECAHEDRON + L1';
+    else if (cap) h = 'CAPTURE IT · FULL DODECAHEDRON + ' + (LAB.btnName('pentacle', 4, Y) || 'L1');
     hint(st.armed && !holding ? 'PENTACLE READY' : h);
   }
   function off() {
