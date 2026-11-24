@@ -1,6 +1,6 @@
 // Lab shelf: Solid look. How the Solid itself is drawn (its colours, overall size, fire aura and spiral are on other
 // shelf files but shown with these on the Solid look shelf). Every solid is drawn the same way: a frame of bright
-// edges, a small solid core in the middle, a faint see-through shell, a glow on the ground under it, and a light it
+// edges, a small solid core in the middle (its size and brightness), a faint see-through shell, a glow on the ground under it, and a light it
 // casts on the wizards.
 //   Frame: Thickness swaps the hairline edges for real bars with a round joint on every corner (a merged mesh per
 //   solid, turning with it); Frame glow lights the lines up in their own colour and adds to the light the Solid casts.
@@ -65,6 +65,16 @@ LAB.shelf('solidlook', 'Solid look', (game) => {
     // lit-up lines light up what's around them too
     if (glow > 0) game.orbLight.intensity *= 1 + glow;
   }
+  // the core's brightness: below 100% it dims toward black, above it lights up in its own colour (the game sets the
+  // shown solid's core colour again every frame, so this only touches the one on show and never builds up)
+  function coreBright() {
+    const b = get('coreBright', 1); if (b === 1) return;
+    for (const s of S) if (s.g.visible) {
+      const m = s.coreMat.color;
+      if (b < 1) m.multiplyScalar(b);
+      else { m.getHSL(HSL); m.setHSL(HSL.h, Math.min(1, HSL.s + (b - 1) * 0.1), Math.min(0.9, HSL.l + (b - 1) * 0.2)); }
+    }
+  }
   function shape() {
     const c = get('core', 0.42), e = get('edges', 1);
     for (const s of S) {
@@ -113,14 +123,15 @@ LAB.shelf('solidlook', 'Solid look', (game) => {
     if (sh !== 1) for (const s of S) s.fillMat.opacity = Math.min(1, s.fillMat.opacity * sh);
     if (li !== 1) game.orbLight.intensity *= li;
     if (spin !== 1 && o.state === 'held') game.orbSpin.rotation.y += dtGame * 1.4 * (spin - 1);   // the game turns it at 1.4 a second in your hands
-    frame(); tickTrail(dt);
+    coreBright(); frame(); tickTrail(dt);
   }, 'lab');
   // the ground glow is set after the frame event, so it's scaled when the camera moves (later in the same frame)
   window.FEATURES.on('camera', () => { const g = get('glow', 1); if (g !== 1) game.orbMark.material.opacity = Math.min(1, game.orbMark.material.opacity * g); }, 'lab');
   const pct = (x) => (x ? Math.round(x * 100) + '%' : 'OFF');
   const NAMES = ['Tetrahedron', 'Cube', 'Octahedron', 'Dodecahedron', 'Icosahedron'];
   return [
-    { id: 'solid.core', label: 'Core', help: 'The small solid shape in the middle (0 is none: just the frame and shell)', min: 0, max: 1, step: 0.02, value: 0.42, dice: true, fmt: pct, apply: shape },
+    { id: 'solid.core', label: 'Core size', help: 'The small solid shape in the middle (0 is none: just the frame and shell)', min: 0, max: 1, step: 0.02, value: 0.42, dice: true, fmt: pct, apply: shape },
+    { id: 'solid.coreBright', label: 'Core brightness', help: 'How bright the small shape in the middle is: below 100% it dims, above it lights up in its own colour', min: 0, max: 3, step: 0.1, value: 1, dice: true, fmt: pct },
     { id: 'solid.shell', label: 'Shell', help: 'The faint see-through skin; it brightens as resonance builds', min: 0, max: 4, step: 0.25, value: 1, dice: true, fmt: pct },
     { id: 'solid.edges', label: 'Frame', help: 'How strong the frame of edges is (0 hides it)', min: 0, max: 1, step: 0.1, value: 1, dice: true, fmt: pct, apply: shape },
     { id: 'solid.thick', label: 'Frame thickness', help: 'HAIRLINE is the thin line; anything more draws the frame as solid bars this thick', min: 0, max: 0.08, step: 0.005, value: 0, dice: true, fmt: (x) => (x ? (x * 100).toFixed(1) : 'HAIRLINE') },
