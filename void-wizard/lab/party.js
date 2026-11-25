@@ -297,7 +297,7 @@ LAB.shelf('party', 'Party', (game) => {
       apply: (x) => { if (!x && mark) mark.visible = false; }, frame: marker },
     { id: 'pick', label: 'Change player', help: 'Triangle (when you are not holding the Solid) takes over the teammate your stick points at, or with the stick let go, the one nearest the Solid. Off: Triangle sets the buddy to follow, stay or wander',
       kind: 'onoff', value: 0, dice: false, frame: (dt) => { if (!LAB.get('party.switch')) marker(dt, 1); }, apply: (x) => { if (!x && mark && !LAB.get('party.switch')) mark.visible = false; } },
-    { id: 'orders', label: 'Team orders', help: 'D-pad while playing: up attack (or, with the Solid loose, the nearest teammate grabs it), down fall back, left surround, right group up (again: as you were). Nobody chases a loose Solid unless told. Select opens the Lab, Select + left or right flips presets',
+    { id: 'orders', label: 'Team orders', help: 'D-pad while playing: up attack (or, with the Solid loose, the nearest teammate grabs it), down fall back, left surround, right group up (again: as you were). Nobody chases a loose Solid unless told. Start opens the Lab, Select + left or right flips presets',
       kind: 'onoff', value: 0, dice: false, setting: true, apply: orders },   // a setting: presets and Reset leave it alone
     { id: 'wizards', label: 'Extra wizards', help: 'Green, purple and gold join your team', min: 0, max: 3, step: 1, value: 0, dice: false, apply: crew },
     { id: 'team', label: 'Team brain', help: 'Your buddy plays like the extra wizards: spreads out, gets open, passes to whoever is free (always on with extra wizards)', kind: 'onoff', value: 0, dice: false, apply: sync },

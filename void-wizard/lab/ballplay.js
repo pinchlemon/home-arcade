@@ -7,7 +7,7 @@
 //   Perfect catch: press catch just as the Solid arrives for extra resonance. With Sports buttons, a perfect catch with
 //     R1 held, once the Solid has enough resonance, shoots at the demon at once: a one-timer, scored as an alley-oop.
 //   Catch ring: a ring on the ground where the Solid will come down, closing as it arrives (it flashes in the perfect window),
-//     just over the grass tips (wizards still stand in front of it). Size, thickness, brightness, colour, a fill that grows as it arrives, a drop line from the
+//     on the ground with the dome's grass pressed flat under it (wizards stand in front of it). Size, thickness, brightness, colour, a fill that grows as it arrives, a drop line from the
 //     Solid down to it, and ticks that speed up (through the Sound shelf's LAB.sfx).
 //   Fire aura: the Solid burns brighter as resonance builds: light, orbiting sparks, a flame aura, embers at the top.
 // Nothing here runs or is made until one of these is switched on (new three.js objects use Math.random).
@@ -385,7 +385,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     game.popup('ONE-TIMER!', W.pos, '#ffd36a', true);
   }
 
-  // ---- the catch ring (it sits just over the grass tips, so the grass never hides it, and wizards still stand in front of it)
+  // ---- the catch ring: on the ground, under the wizards; the dome's grass lies flat under it (LAB.grassFlat) so it shows
   let ring = null;
   const RING_COLS = [null, 0xffffff, 0xffd23f, 0x6af0ff];
   function makeRing() {
@@ -398,7 +398,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3));
     const beam = new T.Line(bg, new T.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.8, blending: T.AdditiveBlending }));
     beam.frustumCulled = false; beam.renderOrder = 50; beam.layers.set(2); beam.visible = false; game.scene.add(beam);
-    ring = { g, inner, outer, fill, beam, thick: -1, step: -1, y: 0.06, look: 0 };
+    ring = { g, inner, outer, fill, beam, thick: -1, step: -1 };
   }
   function ringThick(k) {   // rebuild the two rings at this line width
     if (ring.thick === k) return; ring.thick = k;
@@ -422,15 +422,15 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
   function showRing(mode, dt) {
     const p = mode ? predict(mode) : null;
-    if (!p) { if (ring) ring.g.visible = ring.beam.visible = false; if (ring) ring.step = -1; return; }
+    if (!p) { if (ring) { ring.g.visible = ring.beam.visible = false; ring.step = -1; if (LAB.grassFlat) LAB.grassFlat(0, 0, 0); } return; }
     if (!ring) makeRing();
     const [t, x, z] = p, lead = get('ringTime', 0.9), u = Math.min(1, t / lead);
     const size = get('ringSize', 1), br = get('ringBright', 1), ci = get('ringColour', 0);
     ringThick(get('ringThick', 1));
     const hot = get('perfect', 0) && t <= get('window', 0.12), coming = t <= lead;
     const col = hot ? WHITE : RING_COLS[ci] ? v1c.setHex(RING_COLS[ci]) : game.solid.color;
-    if (--ring.look <= 0) { ring.look = 60; ring.y = game.scene.getObjectByName('grass') ? 0.3 : 0.06; }   // the dome's grass is up to about 0.27 tall
-    ring.g.visible = true; ring.g.position.set(x, ring.y, z); ring.g.scale.setScalar(size);
+    ring.g.visible = true; ring.g.position.set(x, 0.05, z);
+    if (LAB.grassFlat) LAB.grassFlat(x, z, size * (0.56 + 1.9 * u) + 0.1); ring.g.scale.setScalar(size);
     ring.outer.scale.setScalar(0.56 + 1.9 * u);
     const op = (a) => Math.min(1, a * br), boost = Math.max(1, br * 0.7);
     for (const m of [ring.outer, ring.inner, ring.fill]) m.material.color.copy(col).multiplyScalar(boost);
@@ -441,7 +441,7 @@ LAB.shelf('ball', 'Ball play', (game) => {
     // the drop line
     const b = get('ringBeam', 0); ring.beam.visible = !!b;
     if (b) {
-      const a = ring.beam.geometry.attributes.position; a.setXYZ(0, o.p.x, o.p.y, o.p.z); a.setXYZ(1, x, ring.y, z); a.needsUpdate = true;
+      const a = ring.beam.geometry.attributes.position; a.setXYZ(0, o.p.x, o.p.y, o.p.z); a.setXYZ(1, x, 0.05, z); a.needsUpdate = true;
       ring.beam.computeLineDistances(); ring.beam.material.color.copy(col); ring.beam.material.opacity = op(coming ? 0.9 : 0.4);
     }
     // ticks, quicker as it comes (with Sound on)
