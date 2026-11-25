@@ -2,10 +2,11 @@
 LAB.shelf('throws', 'Throws', (game) => {
   const T = game.THREE, to = new T.Vector3();
   // homing: a thrown solid curves toward the demon's head, as long as the demon is roughly ahead of it
-  // (so passes to your buddy still go to your buddy)
+  // (so passes to your buddy still go to your buddy: a pass never homes)
   function home(dt, v) {
     const o = game.orb;
     if (o.state !== 'air' || o.touched || !o.last || !game.demon.alive || (game.DUEL && !game.PARTY)) return;
+    if (o.labTo && !(o.labShotAt || o.labShot || o.labSuper)) return;   // a pass goes to its teammate, never to the demon
     const parts = game.demonParts(); if (!parts.length) return;
     to.set(parts[0].x - o.p.x, parts[0].y - o.p.y, parts[0].z - o.p.z);
     const sp = Math.hypot(o.v.x, o.v.z), d = Math.hypot(to.x, to.z);
@@ -39,7 +40,7 @@ LAB.shelf('throws', 'Throws', (game) => {
   return [
     { id: 'spiral', label: 'Spiral throws', help: 'Thrown solids fly point first, spinning like a football, so they read as flying straight', min: 0, max: 2, step: 1, value: 0,
       fmt: (x) => ['OFF', 'TETRAHEDRON', 'ALL SOLIDS'][x], frame: spiral },
-    { id: 'homing', label: 'Homing', help: 'Throws curve toward the demon', min: 0, max: 3, step: 0.1, value: 0, frame: home },
+    { id: 'homing', label: 'Homing', help: 'Shots curve toward the demon (passes never do; the pass magnet is for teammates)', min: 0, max: 3, step: 0.1, value: 0, frame: home },
     { id: 'cone', label: 'Homing reach', help: 'How far off target it still homes (degrees)', min: 10, max: 180, step: 10, value: 60, fmt: (v) => v + '°' }
   ];
 });

@@ -78,6 +78,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
   function holdThrow(W) {
     const c = W.labFire != null ? W.labFire : W.charge, L = launch(W, c); W.labFire = null;
     game.throwOrb(W, c, L.dx, L.dz, L.vh, L.vy, true);
+    // a shot, not a pass: R1 (low, or pressed in the wind-up) or locked onto the centipede. The pass magnet leaves it alone
+    o.labShotAt = !!((sports() && !get('arcBy', 0) && L.mod < 0) || W.labR1 || lock === 'demon');
     if (shooting(W)) { straightShot(W, c); W.labR1 = false; FX.emit('holdThrow', W, c, -1); return; }
     if (L.mod < 0 && c >= 0.6) o.fast = true;   // a hard low throw is a shot: it streaks and hits harder
     const r1 = L.mod < 0 || W.labR1; W.labR1 = false;   // R1 counts if it was pressed at any point in the wind-up
@@ -384,6 +386,8 @@ LAB.shelf('ball', 'Ball play', (game) => {
     W.charge = 1; game.playerThrow(W, true); o.oop = true;
     game.popup('ONE-TIMER!', W.pos, '#ffd36a', true);
   }
+
+  FX.on('throw', () => { o.labShotAt = false; }, 'lab');   // every throw starts out not a shot (holdThrow marks one after)
 
   // ---- the catch ring: on the ground, under the wizards; the dome's grass lies flat under it (LAB.grassFlat) so it shows
   let ring = null;
