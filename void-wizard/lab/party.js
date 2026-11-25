@@ -257,21 +257,39 @@ LAB.shelf('party', 'Party', (game) => {
     return inp;
   }
 
-  // pass magnet: a pass (helped, or a teammate's) bends toward whoever it's for and arrives as it comes down
+  // pass magnet: a pass (helped, or a teammate's) bends toward whoever it's for and arrives as it comes down.
+  // Strength 5 locks on. Height also fixes how high it arrives (chest height). Any throw: a plain throw that comes
+  // down near a teammate counts as a pass to them too.
+  const mg = (k, d) => LAB.get('party.' + k) ?? d;
+  function magnetTarget(o) {
+    if (o.labTo) return o.labTo;
+    if (!mg('magnetAll', 0) || !o.last || o.touched) return null;
+    const g = 24 * game.solid.grav, vy = o.v.y, t = (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * Math.max(0, o.p.y - 0.6)))) / g;
+    const lx = o.p.x + o.v.x * t, lz = o.p.z + o.v.z * t, R = mg('magnetRange', 6);
+    let best = null, bd = R;
+    for (const W of game.ALL) if (W !== o.last && W.team === o.last.team && W.downT <= 0) { const d = Math.hypot(W.pos.x - lx, W.pos.z - lz); if (d < bd) { bd = d; best = W; } }
+    return best;
+  }
   function magnet(dt, v) {
-    const o = game.orb, m = o.labTo;
-    if (o.state !== 'air' || !m || o.touched || o.labMadden || m.downT > 0 || !game.ALL.includes(m)) return;   // a Madden pass goes where it was thrown
+    const o = game.orb;
+    if (o.state !== 'air' || o.touched || o.labMadden) return;   // a Madden pass goes where it was thrown
+    const m = magnetTarget(o); if (!m || m.downT > 0 || !game.ALL.includes(m)) return;
     const g = 24 * game.solid.grav, h = o.p.y - (m.y + 0.6), vy = o.v.y;
     const t = Math.max(0.12, (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * h))) / g);
-    const wx = (m.pos.x + m.vel.x * t * 0.6 - o.p.x) / t, wz = (m.pos.z + m.vel.z * t * 0.6 - o.p.z) / t, k = Math.min(1, v * 5 * dt);
+    const wx = (m.pos.x + m.vel.x * t * 0.6 - o.p.x) / t, wz = (m.pos.z + m.vel.z * t * 0.6 - o.p.z) / t, k = v >= 5 ? 1 : Math.min(1, v * 5 * dt);
     o.v.x += (wx - o.v.x) * k; o.v.z += (wz - o.v.z) * k;
+    if (mg('magnetUp', 0) && vy < 0) { const want = (0.5 * g * t * t - h) / t; o.v.y += (want - o.v.y) * k; }   // on the way down, arrive at chest height
   }
 
   return [
     { id: 'aim', label: 'Pass help', help: 'A standing throw goes to the teammate you face, leading them', min: 0, max: 3, step: 1, value: 0, dice: false,
       fmt: (x) => ['OFF', 'A LITTLE', 'LOTS', 'ANY WAY'][x], apply: (x) => { MOD.passCone = CONES[x]; } },
     { id: 'passSpeed', label: 'Pass speed', help: 'Helped passes fly flatter and faster', min: 0.5, max: 2.5, step: 0.1, value: 1, apply: (x) => { MOD.passSpeed = x; } },
-    { id: 'magnet', label: 'Pass magnet', help: 'Passes bend toward whoever they are for, so they arrive', min: 0, max: 1, step: 0.1, value: 0, dice: false, frame: magnet },
+    { id: 'magnet', label: 'Pass magnet', help: 'Passes bend toward whoever they are for, so they arrive. 5 locks on: it always reaches them', min: 0, max: 5, step: 0.1, value: 0, dice: false, frame: magnet,
+      fmt: (x) => (!x ? 'OFF' : x >= 5 ? 'LOCK ON' : Math.round(x * 100) + '%') },
+    { id: 'magnetUp', label: 'Magnet height', help: 'The magnet also fixes how high it comes in, so it arrives at chest height instead of over their head or at their feet', kind: 'onoff', value: 0, dice: false },
+    { id: 'magnetAll', label: 'Magnet any throw', help: 'Not just passes: any throw that comes down near a teammate bends to them', kind: 'onoff', value: 0, dice: false },
+    { id: 'magnetRange', label: 'Magnet reach', help: 'With Magnet any throw: how near a teammate it has to come down', min: 2, max: 20, step: 1, value: 6, dice: false, fmt: (x) => x + ' M' },
     { id: 'autoCatch', label: 'Auto catch', help: 'You catch the Solid without pressing anything', kind: 'onoff', value: 0, dice: false, apply: (x) => { MOD.autoCatch = x; } },
     { id: 'switch', label: 'Switch to', help: (x) => ['You always play the same wizard', 'You take over whoever you pass to, as soon as you pass (needs Pass help)',
       'Both: you take over whoever you pass to, and whoever gets the Solid', 'You take over a teammate only once they have the Solid'][x],
