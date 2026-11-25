@@ -1862,7 +1862,10 @@
         "solid.trail": 0.4,
         "party.aim": 3,
         "party.passSpeed": 2.2,
-        "party.magnet": 1,
+        "party.magnet": 2.6,
+        "party.magnetUp": 1,
+        "party.magnetAll": 1,
+        "party.magnetRange": 8,
         "party.switch": 2,
         "party.pick": 1,
         "party.wizards": 3,
@@ -1963,7 +1966,6 @@
         "moments.impact": 1,
         "moments.impactLen": 0.1,
         "moments.impactMin": 10,
-        "ps1.snap": 0.25,
         "ps1.lowpoly": 1,
         "ps1.gouraud": 1,
         "rules.when1": 9,
@@ -1991,7 +1993,10 @@
         "solid.trail": "Solid look · Trail 40%",
         "party.aim": "Passing · Pass help ANY WAY",
         "party.passSpeed": "Passing · Pass speed 2.2",
-        "party.magnet": "Passing · Pass magnet 1.0",
+        "party.magnet": "Passing · Pass magnet 260%",
+        "party.magnetUp": "Passing · Magnet height ON",
+        "party.magnetAll": "Passing · Magnet any throw ON",
+        "party.magnetRange": "Passing · Magnet reach 8 M",
         "party.switch": "Team · Switch to BOTH",
         "party.pick": "Team · Change player ON",
         "party.wizards": "Team · Extra wizards 3",
@@ -2012,7 +2017,7 @@
         "ball.aim": "Throwing · Aim speed 70°/S",
         "ball.path": "On screen · Flight arc ON",
         "ball.switch": "Team · Switch on throw ON",
-        "ball.ring": "On screen · Catch ring EVERY THROW",
+        "ball.ring": "Catching · Catch ring EVERY THROW",
         "ball.super": "Throwing · Super shot ON",
         "ball.superPower": "Throwing · Super power 80%",
         "ball.resHold": "Solid · Resonance holds 6 S",
@@ -2092,7 +2097,6 @@
         "moments.impact": "Moments · Impact frames ON",
         "moments.impactLen": "Moments · Impact length 0.10",
         "moments.impactMin": "Moments · Impact from 10",
-        "ps1.snap": "PS1 · Snap 0.25",
         "ps1.lowpoly": "PS1 · Low poly ON",
         "ps1.gouraud": "PS1 · Soft shading ON",
         "rules.when1": "Rules · Rule 1: when DEMON HIT",
@@ -2103,7 +2107,7 @@
         "health.contact": "Demon · Centipede hurts ON",
         "match.on": "Match · Match ON"
       },
-      "made": 1795565837625
+      "made": 1795568548267
     }
   ]
 }
