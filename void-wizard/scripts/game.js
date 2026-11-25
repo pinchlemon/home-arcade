@@ -589,7 +589,7 @@ function playerThrow(W,shot){ // shot: a hard flat throw at the demon, as if jum
   // duel: a standing lob goes to a teammate you're roughly facing
   if(DUEL&&!PARTY){let m=null,ms=-9;for(const o of ALL){if(o===W||o.team!==W.team||o.capT>0)continue;const mx=o.pos.x-W.pos.x,mz=o.pos.z-W.pos.z,md=Math.hypot(mx,mz)||1,dot=(mx*dx+mz*dz)/md;
     if(dot>0.8&&md<28&&dot-md*0.01>ms){ms=dot-md*0.01;m=o;}}
-    if(m){lobTo(W,c,m.pos.x+m.vel.x*0.4,m.pos.z+m.vel.z*0.4);return;}}
+    if(m){lobTo(W,c,m.pos.x+m.vel.x*0.4,m.pos.z+m.vel.z*0.4);FX.emit('pass',W,m);return;}}
   // the Lab's pass help: a standing throw goes to the teammate you're facing, leading them
   if(!DUEL&&MOD.passCone<1){const m=passTarget(W,dx,dz);if(m){
     const d0=hdist(m.pos,orb.p),T=(0.6+d0*0.036)*cur.hang/MOD.passSpeed;
