@@ -89,7 +89,7 @@ LAB.shelf('party', 'Party', (game) => {
   const sync = () => { game.brain = extras.some(W => game.ALL.includes(W)) || get('team', 0) ? think : null; };
   const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const spot = new T.Vector3(), slot = new T.Vector3(), away = new T.Vector3();
-  window.FEATURES.on('throw', () => { game.orb.labTo = null; }, 'lab');
+  window.FEATURES.on('throw', () => { game.orb.labTo = null; game.orb.labAim = undefined; }, 'lab');
   window.FEATURES.on('pass', (W, to) => { game.orb.labTo = to; }, 'lab');
   // how open a teammate is: room from the demon, nearness, whether the demon sits in the way, and whether it's you
   function bestMate(W) {
@@ -257,12 +257,28 @@ LAB.shelf('party', 'Party', (game) => {
     return inp;
   }
 
-  // pass magnet: a pass (helped, or a teammate's) bends toward whoever it's for and arrives as it comes down.
+  // pass magnet: a pass (helped, a teammate's, or any throw aimed at a teammate) bends toward whoever it's for and arrives as it comes down.
   // Strength 5 locks on. Height also fixes how high it arrives (chest height). Any throw: a plain throw that comes
   // down near a teammate counts as a pass to them too.
   const mg = (k, d) => LAB.get('party.' + k) ?? d;
+  // a throw aimed at a teammate is a pass to them, whatever button threw it: worked out once, from the way it was
+  // thrown, the teammate nearest its line (within about 25 degrees), nearer ones first
+  function aimedAt(o) {
+    if (o.labAim !== undefined) return o.labAim;
+    o.labAim = null;
+    const W0 = o.last, sp = Math.hypot(o.v.x, o.v.z); if (!W0 || sp < 0.5) return null;
+    const ux = o.v.x / sp, uz = o.v.z / sp; let bs = -1;
+    for (const W of game.ALL) {
+      if (W === W0 || W.team !== W0.team || W.downT > 0 || W.capT > 0) continue;
+      const dx = W.pos.x - o.p.x, dz = W.pos.z - o.p.z, d = Math.hypot(dx, dz); if (d < 1.5 || d > 45) continue;
+      const cos = (dx * ux + dz * uz) / d; if (cos < 0.9) continue;
+      const sc = cos - d * 0.004; if (sc > bs) { bs = sc; o.labAim = W; }
+    }
+    return o.labAim;
+  }
   function magnetTarget(o) {
     if (o.labTo) return o.labTo;
+    const a = aimedAt(o); if (a) return a;
     if (!mg('magnetAll', 0) || !o.last || o.touched) return null;
     const g = 24 * game.solid.grav, vy = o.v.y, t = (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * Math.max(0, o.p.y - 0.6)))) / g;
     const lx = o.p.x + o.v.x * t, lz = o.p.z + o.v.z * t, R = mg('magnetRange', 6);
