@@ -48,7 +48,7 @@ feature('lab', ({ game, on }) => {
     ['rules', 'Rules', [1, 2, 3, 4].map(n => ['Rule ' + n, `rules.when${n} rules.then${n} rules.for${n}`])],
     ['camera', 'Camera', [['Camera', 'camera.height camera.zoom camera.fov camera.lean camera.tilt camera.spin'],
       ['Right stick', 'camera.stick camera.stickY camera.invertX camera.invertY camera.lowClose camera.stickSpeed']]],
-    ['screen', 'On screen', [['Words', 'hud.text hud.badge'], ['Health bars', 'hud.bars match.bar'], ['Guides', 'ball.path madden.icons']]],
+    ['screen', 'On screen', [['Words', 'hud.text hud.badge'], ['Health bars', 'hud.bars match.bar'], ['Guides', 'ball.path madden.icons hud.youRing']]],
     ['feel', 'Feel & time', [['Time', 'time.speed time.wobble time.freeze'], ['Shake', 'feel.strength feel.style feel.length'], ['Hits', 'feel.freeze feel.punch'],
       ['Final blow', 'feel.slow feel.slowLen'], ['Wizards', 'feel.squash']]],
     ['moments', 'Moments', [['Impact frames', 'moments.impact moments.impactLook moments.impactLen moments.impactMin'], ['Transitions', 'moments.transition moments.transLen moments.onDown']]],
@@ -133,6 +133,7 @@ feature('lab', ({ game, on }) => {
       made.push(sh);
     }
   };
+  LAB.skip('lab', [8, 9]);   // Start (the Lab, which pauses) and Select (the pixel filter) are the Lab's, not the game's
 
   on('frame', (dt) => {
     const now = performance.now() / 1000;
@@ -540,7 +541,7 @@ feature('lab', ({ game, on }) => {
       <div class="lab-rows">${rows}</div>${gridHtml}
       <div class="lab-say">${esc(fresh)}</div>
       <div class="lab-act"><button class="k" data-do="dice">${ic('dice', '#ffd23f', '')}DICE</button><button class="k" data-do="back">${ic('undo', '#e4e2dc', '')}UNDO</button><button class="k" data-do="reset">${ic('reset', '#e4e2dc', '')}RESET</button><button class="k" data-do="save">SAVE</button><button class="k" data-do="idea">IDEA</button></div>
-      <div class="lab-hint">Up down pick · Left right turn (hold R2: ×5, L2: to the end) · L1 R1 shelf, hold for all · Cross switch, play · Square back to normal · L3 pin · R3 small · Triangle dice · Select undo · Start idea · Circle close</div>`;
+      <div class="lab-hint">Up down pick · Left right turn (hold R2: ×5, L2: to the end) · L1 R1 shelf, hold for all · Cross switch, play · Square back to normal · L3 pin · R3 small · Triangle dice · Select undo · Start or Circle close</div>`;
     panel.querySelector('.lab-rows').scrollTop = keepTop;   // a change further down keeps the list where it was
     const onRow = panel.querySelector('.lab-row.on'); if (onRow) onRow.scrollIntoView({ block: 'nearest' });
     const onTile = panel.querySelector('.lab-grid .k.lit'); if (onTile) onTile.scrollIntoView({ block: 'nearest' });
@@ -588,12 +589,14 @@ feature('lab', ({ game, on }) => {
     for (const i of [4, 5]) if (down(i)) downAt[i] = now;
     if (!open) {
       if (unblockWhenUp && ![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(b)) { game.blockPad = false; unblockWhenUp = false; }
-      if (LAB.dpad) {   // the D-pad gives orders (the Party shelf's Team orders): Select opens the Lab, Select + left/right flips presets
-        if (down(8)) selUsed = false;
-        if (b(8)) { if (down(14)) { stepPreset(-1); selUsed = true; } if (down(15)) { stepPreset(1); selUsed = true; } }
-        else for (const [i, d] of [[12, 'up'], [13, 'down'], [14, 'left'], [15, 'right']]) if (down(i)) LAB.dpad(d);
-        if (up(8) && !selUsed) toggle(true);
-      } else {
+      // Start opens the Lab (and pauses); a tap of Select changes the pixel filter; Select + left/right flips presets
+      if (down(9)) toggle(true);
+      if (down(8)) selUsed = false;
+      if (b(8)) { if (down(14)) { stepPreset(-1); selUsed = true; } if (down(15)) { stepPreset(1); selUsed = true; } }
+      if (up(8) && !selUsed) { const px = document.getElementById('pxBtn'); if (px) px.click(); }
+      if (LAB.dpad) {   // the D-pad gives orders (the Party shelf's Team orders)
+        if (!b(8)) for (const [i, d] of [[12, 'up'], [13, 'down'], [14, 'left'], [15, 'right']]) if (down(i)) LAB.dpad(d);
+      } else if (!b(8)) {
         if (down(13)) toggle(true);
         if (down(14)) stepPreset(-1);
         if (down(15)) stepPreset(1);
@@ -636,7 +639,7 @@ feature('lab', ({ game, on }) => {
         if (down(11)) { mini = !mini; draw(); }
         if (down(3)) dice();
         if (down(8)) back();
-        if (down(9)) idea();
+        if (down(9)) toggle(false);
       }
     }
     for (let i = 0; i < 17; i++) prev[i] = b(i);

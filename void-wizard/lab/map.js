@@ -196,14 +196,14 @@ LAB.shelf('map', 'Map', (game) => {
   // its tip is a little lighter; every blade is lit as if it were the ground (normals straight up), so up close it's
   // blades and from afar it melts into the lawn. A slow breeze rolls across in waves (the tips catch a little light
   // as it passes), and blades bend away from wizards, the Solid and the demon moving through them.
-  const GR = { uWind: { value: 0 }, uSway: { value: 1 }, uPush: { value: Array.from({ length: 12 }, () => new T.Vector3(0, 0, 0)) } };
+  const GR = { uWind: { value: 0 }, uSway: { value: 1 }, uFlat: { value: new T.Vector3(0, 0, 0) }, uPush: { value: Array.from({ length: 12 }, () => new T.Vector3(0, 0, 0)) } };
   const STRIPES = [new T.Color('#4aab3a'), new T.Color('#3f9e30')];
   function grassMat() {
     const m = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
-    m.userData.labKey = '|grass3'; m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
+    m.userData.labKey = '|grass4'; m.customProgramCacheKey = () => 'lab' + m.userData.labKey;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, GR);
-      sh.vertexShader = 'uniform float uWind; uniform float uSway; uniform vec3 uPush[12];\n' + sh.vertexShader
+      sh.vertexShader = 'uniform float uWind; uniform float uSway; uniform vec3 uFlat; uniform vec3 uPush[12];\n' + sh.vertexShader
         .replace('#include <begin_vertex>', `#include <begin_vertex>
   #ifdef USE_INSTANCING
   {
@@ -226,6 +226,8 @@ LAB.shelf('map', 'Map', (game) => {
     vec3 wb = vec3(bend.x, -dot(bend, bend) * 0.35, bend.y);
     mat3 im = mat3(instanceMatrix);   // turn and scale only: back into the clump's own frame (works in any GLSL)
     transformed += vec3(dot(im[0], wb) / dot(im[0], im[0]), dot(im[1], wb) / dot(im[1], im[1]), dot(im[2], wb) / dot(im[2], im[2]));
+    // pressed flat under the catch ring (uFlat: x, z, radius), so the ring lies on the ground and shows
+    if (uFlat.z > 0.0) { float fl = 1.0 - smoothstep(uFlat.z, uFlat.z + 0.35, length(at.xz - uFlat.xy)); transformed.y *= 1.0 - fl * 0.85; transformed.xz *= 1.0 + fl * 0.6; }
     vGrassGust = clamp(wave, 0.0, 1.0) * h * min(uSway, 1.0);
   }
   #endif`)
@@ -267,6 +269,7 @@ LAB.shelf('map', 'Map', (game) => {
     }
     im.frustumCulled = false; im.name = 'grass'; root.add(im);
   }
+  LAB.grassFlat = (x, z, r) => GR.uFlat.value.set(x, z, r || 0);   // the catch ring presses the grass flat under it (0 lets it go)
   // what pushes the grass aside this frame
   function pushers() {
     const P = GR.uPush.value; let k = 0;

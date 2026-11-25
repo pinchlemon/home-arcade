@@ -2012,7 +2012,7 @@ function frame(now){
 }
 if(DUEL){if(WATCH)player.human=false;duelReset();duelScore();}
 // what features can reach (see engine/features.md): the scene, the wizards, the solid, the demon, effects and multipliers
-FX.game={THREE,scene,camera,player,buddy,get you(){return player;},get mate(){return buddy;},ALL, // player and buddy: the blue and red wizards; you and mate: whoever you control now, and the other one
+FX.game={THREE,scene,camera,player,buddy,get youRing(){return youRing;},get nextRing(){return nextRing;},get you(){return player;},get mate(){return buddy;},ALL, // player and buddy: the blue and red wizards; you and mate: whoever you control now, and the other one
  orb,demon,SOLIDS,MOD,keys,DUEL,PARTY,
   get solid(){return cur;},setSolid(S){if(S&&S!==cur){orb.nextSolid=S;swapSolid();}},get time(){return time;},get pad(){return player.gp;},
   spark,sparkBurst,spawnPuffs,popup,rumble,knockDown,pushBack,fxRing,fxPillar,fxSphere,fxBurst,
