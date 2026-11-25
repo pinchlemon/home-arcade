@@ -27,7 +27,7 @@ feature('lab', ({ game, on }) => {
       ['Look', 'colours.youCloak colours.youTrim colours.buddyCloak colours.buddyTrim colours.greenCloak colours.greenTrim colours.purpleCloak colours.purpleTrim colours.goldCloak colours.goldTrim colours.trimH']]],
     ['stats', 'Wizard stats', ['you', 'red', 'green', 'purple', 'gold'].map(k => [() => wizName(k), ['speed', 'jump', 'catch', 'throw', 'strength'].map(s => 'stats.' + (k === 'you' ? 'blue' : k) + '.' + s).join(' ')])],
     ['throwing', 'Throwing', [['Buttons', 'ball.buttons ball.jump ball.cancel'], ['Throw', 'ball.slider ball.arcBy ball.power ball.windup ball.tap ball.full ball.arc ball.high ball.low ball.aim ball.aimMove'],
-      ['Shooting', 'throws.homing throws.cone'], ['Lock-on', 'ball.lock ball.holdTime ball.lockSide'], ['Straight shots', 'ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast'],
+      ['Shooting', 'madden.shotSpeed throws.homing throws.cone'], ['Lock-on', 'ball.lock ball.holdTime ball.lockSide'], ['Straight shots', 'ball.shoot ball.shootTap ball.shootTime ball.shootSlow ball.shootFast'],
       ['Super shot', 'ball.super ball.superHow ball.superPower ball.superRes ball.superDmg']]],
     ['passing', 'Passing', [['Pass help', 'ball.path party.aim party.passSpeed'], ['Pass magnet', 'party.magnet party.magnetUp party.magnetAll party.magnetRange'],
       ['Madden passing', 'madden.on madden.tap madden.bullet madden.lobSpeed madden.bulletSpeed madden.lead madden.follow madden.runErr madden.pressure']]],

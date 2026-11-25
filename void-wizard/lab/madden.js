@@ -87,7 +87,13 @@ LAB.shelf('madden', 'Passing', (game) => {
   function shot(Y, h) {
     const p = Math.max(0.25, Math.min(1, h / Math.max(0.1, get('bullet', 0.5))));
     if (!game.demon.alive || game.demon.dying) return;
-    Y.charge = p; game.shootAt(Y);
+    Y.charge = p;
+    // straight and fast at the demon: a flat line, only the little lift gravity needs to get there (the game's own shot
+    // is slow, so it had to be lobbed)
+    const t = game.demonAim(Y).pos, dx = t.x - o.p.x, dz = t.z - o.p.z, d = Math.max(0.5, Math.hypot(dx, dz));
+    const fv = get('shotSpeed', 30) * (0.75 + 0.25 * p) * (Y.stThrow || 1), T = d / fv, g = game.G * game.solid.grav;
+    game.throwOrb(Y, p, dx / d, dz / d, fv, (t.y - o.p.y + 0.5 * g * T * T) / T, true);
+    o.fast = true; o.labShotAt = true;   // a shot: it streaks, and the pass magnet leaves it alone
     if (LAB.superShot && LAB.get('ball.super') && (o.res || 0) >= (LAB.get('ball.superRes') ?? 4) && p >= (LAB.get('ball.superPower') ?? 0.75)) LAB.superShot(Y, true);
   }
 
@@ -172,6 +178,7 @@ LAB.shelf('madden', 'Passing', (game) => {
     { id: 'on', label: 'Madden passing', help: 'Holding the Solid, each face button passes to one teammate (their button shows over them); R1 shoots', kind: 'onoff', value: 0, dice: false,
       frame: () => { hook(); tick(); }, apply: (v) => { if (!v) { clear(); wasHolding = false; o.labMadden = false; } } },
     { id: 'tap', label: 'Lob below', help: 'A press shorter than this is a lob: high and soft', min: 0.05, max: 0.5, step: 0.05, value: 0.15, dice: false, fmt: (x) => x.toFixed(2) + ' S' },
+    { id: 'shotSpeed', label: 'Shot speed', help: 'How fast R1 shoots the Solid at the demon. Faster is flatter: it flies in a straight line', min: 12, max: 50, step: 1, value: 30, dice: false, fmt: (x) => x + ' M/S' },
     { id: 'bullet', label: 'Bullet at', help: 'Hold this long for a full bullet: fast and flat (in between is a touch pass)', min: 0.2, max: 1.5, step: 0.05, value: 0.5, dice: false, fmt: (x) => x.toFixed(2) + ' S' },
     { id: 'lobSpeed', label: 'Lob speed', help: 'How fast a lob travels (slower floats higher)', min: 5, max: 16, step: 0.5, value: 9, dice: false },
     { id: 'bulletSpeed', label: 'Bullet speed', help: 'How fast a bullet travels', min: 12, max: 40, step: 1, value: 22, dice: false },
