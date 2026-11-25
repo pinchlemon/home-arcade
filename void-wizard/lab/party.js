@@ -288,7 +288,7 @@ LAB.shelf('party', 'Party', (game) => {
   }
   function magnet(dt, v) {
     const o = game.orb;
-    if (o.state !== 'air' || o.touched || o.labMadden) return;   // a Madden pass goes where it was thrown
+    if (o.state !== 'air' || o.touched) return;   // Madden passes too: the magnet finishes what the pass started
     if (o.labShotAt || o.labShot || o.labSuper) return;   // a shot at the centipede (R1, lock-on, straight or super shot) is never a pass
     const m = magnetTarget(o); if (!m || m.downT > 0 || !game.ALL.includes(m)) return;
     const g = 24 * game.solid.grav, h = o.p.y - (m.y + 0.6), vy = o.v.y;
