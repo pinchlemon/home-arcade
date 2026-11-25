@@ -318,6 +318,7 @@ LAB.shelf('sound', 'Sound', (game) => {
     if (on && !timer) { E.music.next = 0; timer = setInterval(() => { if (ctx && ctx.state === 'running') E.music.tick(); }, 60); }
     if (!on && timer) { clearInterval(timer); timer = null; }
   }
+  LAB.sfx = (k, ...a) => { if (E && get('on', 0) && E.sfx[k]) E.sfx[k](...a); };   // other shelves play a sound (Sound on)
   const wake = () => { if (!anyOn()) return; if (wantEngine() && ctx.state !== 'running') ctx.resume(); };
   for (const ev of ['pointerdown', 'touchend', 'keydown', 'mousedown']) window.addEventListener(ev, wake, { passive: true, capture: true });
   function showChip() {

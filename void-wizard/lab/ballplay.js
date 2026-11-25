@@ -6,14 +6,16 @@
 //   Switch on throw: after a throw you take over whoever is nearest where it comes down (you stay if that's you).
 //   Perfect catch: press catch just as the Solid arrives for extra resonance. With Sports buttons, a perfect catch with
 //     R1 held, once the Solid has enough resonance, shoots at the demon at once: a one-timer, scored as an alley-oop.
-//   Catch ring: a ring on the ground where the Solid will come down, closing as it arrives (it flashes in the perfect window).
+//   Catch ring: a ring on the ground where the Solid will come down, closing as it arrives (it flashes in the perfect window),
+//     drawn over the grass. Size, thickness, brightness, colour, a fill that grows as it arrives, a drop line from the
+//     Solid down to it, and ticks that speed up (through the Sound shelf's LAB.sfx).
 //   Fire aura: the Solid burns brighter as resonance builds: light, orbiting sparks, a flame aura, embers at the top.
 // Nothing here runs or is made until one of these is switched on (new three.js objects use Math.random).
 LAB.shelf('ball', 'Ball play', (game) => {
   const T = game.THREE, FX = window.FEATURES, o = game.orb;
   const get = (id, n) => LAB.get('ball.' + id) ?? n;
   const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-  const v1 = new T.Vector3(), v2 = new T.Vector3(), at = new T.Vector3(), WHITE = new T.Color(1, 1, 1);
+  const v1c = new T.Color(), v1 = new T.Vector3(), v2 = new T.Vector3(), at = new T.Vector3(), WHITE = new T.Color(1, 1, 1);
 
   // ---- buttons
   const prev = {};
@@ -383,13 +385,26 @@ LAB.shelf('ball', 'Ball play', (game) => {
     game.popup('ONE-TIMER!', W.pos, '#ffd36a', true);
   }
 
-  // ---- the catch ring
+  // ---- the catch ring (drawn over the grass, never hidden by it)
   let ring = null;
+  const RING_COLS = [null, 0xffffff, 0xffd23f, 0x6af0ff];
   function makeRing() {
-    const mat = (op) => new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide });
+    const mat = (op) => new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, side: T.DoubleSide });
     const g = new T.Group(), inner = new T.Mesh(new T.RingGeometry(0.46, 0.56, 48), mat(0.5)), outer = new T.Mesh(new T.RingGeometry(0.92, 1, 64), mat(0.8));
-    inner.rotation.x = outer.rotation.x = -Math.PI / 2; g.add(inner, outer); g.visible = false; game.scene.add(g);
-    ring = { g, inner, outer };
+    const fill = new T.Mesh(new T.CircleGeometry(1, 48), mat(0.3));
+    for (const m of [inner, outer, fill]) { m.rotation.x = -Math.PI / 2; m.renderOrder = 50; }
+    g.add(fill, inner, outer); g.visible = false; game.scene.add(g); g.traverse((c) => c.layers.set(2));
+    // the drop line: from the Solid straight down to the spot
+    const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3));
+    const beam = new T.Line(bg, new T.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.8, depthTest: false, blending: T.AdditiveBlending }));
+    beam.frustumCulled = false; beam.renderOrder = 50; beam.layers.set(2); beam.visible = false; game.scene.add(beam);
+    ring = { g, inner, outer, fill, beam, thick: -1, step: -1 };
+  }
+  function ringThick(k) {   // rebuild the two rings at this line width
+    if (ring.thick === k) return; ring.thick = k;
+    ring.inner.geometry.dispose(); ring.outer.geometry.dispose();
+    ring.inner.geometry = new T.RingGeometry(Math.max(0.05, 0.56 - 0.1 * k), 0.56, 48);
+    ring.outer.geometry = new T.RingGeometry(Math.max(0.05, 1 - 0.08 * k), 1, 64);
   }
   const sim = new T.Vector3(), simV = new T.Vector3();
   function predict(mode, land) {   // where and when the Solid comes down: [time, x, z] or null (land: ignore who's in the way)
@@ -407,14 +422,30 @@ LAB.shelf('ball', 'Ball play', (game) => {
   }
   function showRing(mode, dt) {
     const p = mode ? predict(mode) : null;
-    if (!p) { if (ring) ring.g.visible = false; return; }
+    if (!p) { if (ring) ring.g.visible = ring.beam.visible = false; if (ring) ring.step = -1; return; }
     if (!ring) makeRing();
     const [t, x, z] = p, lead = get('ringTime', 0.9), u = Math.min(1, t / lead);
-    const col = game.solid.color, hot = get('perfect', 0) && t <= get('window', 0.12);
-    ring.g.visible = true; ring.g.position.set(x, 0.04, z);
+    const size = get('ringSize', 1), br = get('ringBright', 1), ci = get('ringColour', 0);
+    ringThick(get('ringThick', 1));
+    const hot = get('perfect', 0) && t <= get('window', 0.12), coming = t <= lead;
+    const col = hot ? WHITE : RING_COLS[ci] ? v1c.setHex(RING_COLS[ci]) : game.solid.color;
+    ring.g.visible = true; ring.g.position.set(x, 0.06, z); ring.g.scale.setScalar(size);
     ring.outer.scale.setScalar(0.56 + 1.9 * u);
-    ring.outer.material.color.copy(hot ? WHITE : col); ring.inner.material.color.copy(hot ? WHITE : col);
-    ring.outer.material.opacity = t > lead ? 0.35 : 0.85; ring.inner.material.opacity = hot ? 0.9 : 0.45;
+    const op = (a) => Math.min(1, a * br), boost = Math.max(1, br * 0.7);
+    for (const m of [ring.outer, ring.inner, ring.fill]) m.material.color.copy(col).multiplyScalar(boost);
+    ring.outer.material.opacity = op(coming ? 0.85 : 0.35); ring.inner.material.opacity = op(hot ? 0.9 : 0.45);
+    // the fill: grows from the middle and brightens as it arrives, full just as it lands
+    const f = get('ringFill', 0); ring.fill.visible = !!f && coming;
+    if (ring.fill.visible) { ring.fill.scale.setScalar(Math.max(0.01, 0.56 * (1 - u))); ring.fill.material.opacity = op(0.15 + 0.45 * (1 - u)); }
+    // the drop line
+    const b = get('ringBeam', 0); ring.beam.visible = !!b;
+    if (b) {
+      const a = ring.beam.geometry.attributes.position; a.setXYZ(0, o.p.x, o.p.y, o.p.z); a.setXYZ(1, x, 0.06, z); a.needsUpdate = true;
+      ring.beam.computeLineDistances(); ring.beam.material.color.copy(col); ring.beam.material.opacity = op(coming ? 0.9 : 0.4);
+    }
+    // ticks, quicker as it comes (with Sound on)
+    if (get('ringTicks', 0) && coming && LAB.sfx) { const st = Math.floor((1 - u) * 8); if (st !== ring.step) { if (ring.step >= 0) LAB.sfx('tick', st + 4); ring.step = st; } }
+    else if (!coming) ring.step = -1;
   }
 
   // ---- the fire aura
@@ -546,7 +577,14 @@ LAB.shelf('ball', 'Ball play', (game) => {
       min: 0, max: 5, step: 1, value: 3, dice: false, fmt: (x) => 'RES ' + x },
     { id: 'ring', label: 'Catch ring', help: 'A ring where the Solid comes down, closing as it arrives; white in the perfect window', min: 0, max: 2, step: 1, value: 0, dice: false,
       fmt: (x) => ['OFF', 'PASSES TO YOU', 'EVERY THROW'][x] },
-    { id: 'ringTime', label: 'Ring time', help: 'How long before it arrives the ring starts closing', min: 0.3, max: 2, step: 0.1, value: 0.9, dice: false, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'ringTime', label: 'Ring time', help: 'How long before it arrives the ring starts closing', min: 0.3, max: 3, step: 0.1, value: 0.9, dice: false, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'ringSize', label: 'Ring size', help: 'How big the catch ring is', min: 0.5, max: 3, step: 0.1, value: 1, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
+    { id: 'ringThick', label: 'Ring thickness', help: 'How thick its lines are', min: 0.5, max: 5, step: 0.25, value: 1, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
+    { id: 'ringBright', label: 'Ring brightness', help: 'How bright and solid it is', min: 0.5, max: 4, step: 0.25, value: 1, dice: false, fmt: (x) => Math.round(x * 100) + '%' },
+    { id: 'ringColour', label: 'Ring colour', help: 'The Solid\'s own colour, or one that stands out on the grass', min: 0, max: 3, step: 1, value: 0, dice: false, fmt: (x) => ['SOLID\'S', 'WHITE', 'GOLD', 'CYAN'][x] },
+    { id: 'ringFill', label: 'Ring fill', help: 'The middle fills in as the Solid arrives, full just as it lands', kind: 'onoff', value: 0, dice: false },
+    { id: 'ringBeam', label: 'Drop line', help: 'A dotted line from the Solid straight down to the ring, so you can see how high it still is', kind: 'onoff', value: 0, dice: false },
+    { id: 'ringTicks', label: 'Ring ticks', help: 'Ticks that speed up as it arrives (needs Sound on)', kind: 'onoff', value: 0, dice: false },
     { id: 'super', label: 'Super shot', help: 'A hard throw with R1 (pressed any time in the wind-up) once the Solid has built resonance: flies flat at the centipede, hits much harder', kind: 'onoff', value: 0, dice: false },
     { id: 'superHow', label: 'Super with', help: (x) => x ? 'Any throw at enough power, once the Solid has enough resonance' : 'Press R1 at any point while winding up (or aiming) a throw at enough power',
       min: 0, max: 1, step: 1, value: 0, dice: false, fmt: (x) => (x ? 'ANY HARD THROW' : 'R1') },
