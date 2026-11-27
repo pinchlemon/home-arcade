@@ -79,14 +79,14 @@ LAB.shelf('demon', 'Demon', (game) => {
   LAB.patchDissolve = (m) => { if (patched) patchOne(m); };   // for materials made later (PS1 soft shading)
   // the game hides the body piece by piece as it dies; while it dissolves it stays whole instead
   const parts = () => { const o = [D.g]; for (const S of D.segs) { o.push(S.g); for (const L of S.legs) o.push(L.femur, L.tibia, L.knee); } return o; };
-  window.FEATURES.on('demonDown', () => { if (LAB.get('demon.dissolve') && !LAB.get('demon.absorb')) { patch(); disT = performance.now() / 1000; } }, 'lab');
+  window.FEATURES.on('demonDown', () => { if (!game.bossHook && LAB.get('demon.dissolve') && !LAB.get('demon.absorb')) { patch(); disT = performance.now() / 1000; } }, 'lab');
 
   // absorb: a beaten centipede is pulled into the Solid piece by piece, tail first, each piece spiralling in and
   // shrinking, glowing in the Solid's colour; when the head goes in, the Solid flares. (Takes over from Dissolve.)
   const V = () => new game.THREE.Vector3();
   const tgt = V(), st = V(), sv = V(), glow = new game.THREE.Color();
   let ab = null;
-  window.FEATURES.on('demonDown', () => { if (LAB.get('demon.absorb')) startAbsorb(); }, 'lab');
+  window.FEATURES.on('demonDown', () => { if (!game.bossHook && LAB.get('demon.absorb')) startAbsorb(); }, 'lab');   // the Archon comes apart its own way
   function startAbsorb() {
     const n = D.segs.length, pieces = [], mats = new Map();
     const keep = (o) => o.traverse(c => { const m = c.material; if (m && m.emissive && !mats.has(m)) mats.set(m, m.emissive.clone()); });
