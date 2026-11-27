@@ -7,6 +7,7 @@ const cfg=(path,def)=>{let o=CFG;for(const k of path.split('.')){if(o==null||typ
 const FX=window.FEATURES||{emit(){},on(){}};
 // multipliers a feature can change (1 = normal)
 const MOD={speed:1,jump:1,gravity:1,time:1,demon:1,knock:1,hp:1,windup:1,resHold:1,resStep:1,resAim:0,turn:0,passCone:2,passSpeed:1,autoCatch:0}; // passCone: a standing throw goes to a teammate within this (cosine of the angle; 2 is off); passSpeed: those passes fly this much faster; autoCatch: you catch without pressing // hp: the demon's health times this; turn: your controls turned this far (radians), to follow a turned camera // demon: the demon's full size; knock 0: nobody gets knocked down
+let bossHook=null; // a feature's own boss in place of the centipede: {update(dt), spawn(), parts() (spheres {x, y, z, r, weak}, the weak spot first), mouth(out)}; null is the centipede
 const WZ=(k,d)=>cfg('wizard.'+k,d), MV=(k,d)=>cfg('moves.'+k,d), TH=(k,d)=>cfg('throw.'+k,d), DM=(k,d)=>cfg('demon.'+k,d);
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
@@ -978,7 +979,7 @@ function fxBeam(a,b,col,w,dur){const len=Math.max(0.1,a.distanceTo(b)),m=new THR
 function fxBurst(p,col,n,sp){for(let i=0;i<n;i++){randDir(rv).multiplyScalar(sp*(0.4+Math.random()));spark(p,rv,0.5+Math.random()*0.5,0.7,i%3?col:0xffffff,2.5);}}
 function boomFx(p){fxSphere(p,0xffd36a,4.2,0.5);fxRing(p.x,p.z,0xff8a4a,5.5,0.55);fxRing(p.x,p.z,0xffd36a,3.5,0.4,0.08);fxPillar(p.x,p.z,0xff8a4a,8,1.1,0.6);fxBurst(rv2.set(p.x,Math.max(0.4,p.y),p.z),0xff8a4a,70,6);}
 // the nearest-first list of the demon's body parts
-function demonParts(){const o=[];headCenter(lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.62*demon.scale});for(const S of demon.segs){segCenter(S,lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.5*S.w*demon.scale});}return o;}
+function demonParts(){if(bossHook)return bossHook.parts();const o=[];headCenter(lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.62*demon.scale});for(const S of demon.segs){segCenter(S,lO);o.push({x:lO.x,y:lO.y,z:lO.z,r:0.5*S.w*demon.scale});}return o;}
 function hurtDemon(q,dmg,col){
   if(!demon.alive||demon.dying)return;
   demon.hp-=dmg;FX.emit('demonHit',dmg);demon.flash=1;
@@ -1294,24 +1295,27 @@ const scoreEl=document.getElementById('score');
 const lH=new THREE.Vector3(),lD=new THREE.Vector3(),lK=new THREE.Vector3(),lF=new THREE.Vector3(),lP=new THREE.Vector3(),lO=new THREE.Vector3(),lI=new THREE.Vector3();
 function placeSeg(m,a,b,thick){m.position.copy(a);lD.subVectors(b,a);const len=lD.length()||0.001;m.quaternion.setFromUnitVectors(UP,lD.divideScalar(len));m.scale.set(thick,len,thick);}
 function segCenter(S,out){return out.set(S.pos.x,0.42*demon.scale+S.g.position.y,S.pos.z);}
-function headCenter(out){out.set(0,0.55,0.05);return demon.body.localToWorld(out);}
+function headCenter(out){if(bossHook)return bossHook.mouth(out);out.set(0,0.55,0.05);return demon.body.localToWorld(out);}
 // the nearest part of the body to a wizard, for aiming
 function demonPartAlong(W,dx,dz,cone){
   const sp=Math.hypot(demon.vel.x,demon.vel.z);let best=null,bestAng=cone;
   const consider=(x,y,z,vx,vz)=>{const bx=x-W.pos.x,bz=z-W.pos.z,bd=Math.hypot(bx,bz);if(bd<0.6||bd>28)return;
     const ang=Math.acos(clamp((dx*bx+dz*bz)/bd,-1,1));if(ang<bestAng){bestAng=ang;best=[x,y,z,vx,vz];}};
-  headCenter(lI);consider(lI.x,lI.y,lI.z,demon.vel.x,demon.vel.z);
-  for(const S of demon.segs){segCenter(S,lI);consider(lI.x,lI.y,lI.z,Math.sin(S.yaw)*sp,Math.cos(S.yaw)*sp);}
+  if(bossHook)for(const q of bossHook.parts())consider(q.x,q.y,q.z,0,0);
+  else{headCenter(lI);consider(lI.x,lI.y,lI.z,demon.vel.x,demon.vel.z);
+  for(const S of demon.segs){segCenter(S,lI);consider(lI.x,lI.y,lI.z,Math.sin(S.yaw)*sp,Math.cos(S.yaw)*sp);}}
   if(!best)return null;
   demon.aimObj.pos.set(best[0],best[1],best[2]);demon.aimObj.vel.set(best[3],0,best[4]);return demon.aimObj;
 }
 function demonAim(W){
+  if(bossHook){let b=null,bd=1e9;for(const q of bossHook.parts()){const d=Math.hypot(q.x-W.pos.x,q.z-W.pos.z)-(q.weak?2:0);if(d<bd){bd=d;b=q;}}if(b)demon.aimObj.pos.set(b.x,b.y,b.z);demon.aimObj.vel.set(0,0,0);return demon.aimObj;}
   let best=null,bd=hdist(demon.pos,W.pos);
   for(const S of demon.segs){const d=hdist(S.pos,W.pos);if(d<bd){bd=d;best=S;}}
   if(best)segCenter(best,demon.aimObj.pos);else headCenter(demon.aimObj.pos);
   return demon.aimObj;
 }
 function demonNearest(p){
+  if(bossHook){let bd=1e9,bx=demon.pos.x,bz=demon.pos.z;for(const q of bossHook.parts()){const d=Math.max(0.01,Math.hypot(q.x-p.x,q.z-p.z)-q.r+0.8);if(d<bd){bd=d;bx=q.x;bz=q.z;}}return {d:bd,x:bx,z:bz};}
   let bd=hdist(demon.pos,p),bx=demon.pos.x,bz=demon.pos.z;
   for(const S of demon.segs){const d=hdist(S.pos,p);if(d<bd){bd=d;bx=S.pos.x;bz=S.pos.z;}}
   return {d:bd,x:bx,z:bz};
@@ -1338,6 +1342,7 @@ function recordTrail(){
 }
 
 function spawnDemon(){
+  if(bossHook){bossHook.spawn();return;}
   const a=Math.random()*Math.PI*2, r=13+Math.random()*4;
   demon.pos.set(player.pos.x+Math.cos(a)*r,0,player.pos.z+Math.sin(a)*r);
   demon.yaw=Math.atan2(player.pos.x-demon.pos.x,player.pos.z-demon.pos.z);
@@ -1426,6 +1431,7 @@ function swatOrb(){
   shake=Math.max(shake,0.12);rumbleAll(0.4,0.5,140,orb.p,10);
 }
 function updateDemon(dt){
+  if(bossHook){bossHook.update(dt);return;}
   if(demon.dying){updateDying(dt);return;}
   if(!demon.alive){
     demon.disc.material.opacity=Math.max(0,demon.disc.material.opacity-dt*2);
@@ -1632,9 +1638,10 @@ function orbVsDemon(){
   if(!demon.alive||demon.dying||demon.scale<0.6||orb.hitCD>0)return;
   const sp=orb.v.length();if(sp<3)return;
   let hit=null,R=0;
-  headCenter(lI);
-  if(lI.distanceTo(orb.p)<0.62*demon.scale+cur.circ*0.7){hit='head';hcV.copy(lI);R=0.62*demon.scale;}
-  if(!hit)for(const S of demon.segs){segCenter(S,lI);const r=0.5*S.w*demon.scale;if(lI.distanceTo(orb.p)<r+cur.circ*0.7){hit=S;hcV.copy(lI);R=r;break;}}
+  if(bossHook){for(const q of bossHook.parts()){lI.set(q.x,q.y,q.z);if(lI.distanceTo(orb.p)<q.r+cur.circ*0.7){hit=q.weak?'head':q;hcV.copy(lI);R=q.r;break;}}}
+  else{headCenter(lI);
+  if(lI.distanceTo(orb.p)<0.62*demon.scale+cur.circ*0.7){hit='head';hcV.copy(lI);R=0.62*demon.scale;}}
+  if(!hit&&!bossHook)for(const S of demon.segs){segCenter(S,lI);const r=0.5*S.w*demon.scale;if(lI.distanceTo(orb.p)<r+cur.circ*0.7){hit=S;hcV.copy(lI);R=r;break;}}
   if(!hit)return;
   const head=hit==='head';
   if(orb.special==='fire')boomFx(hcV);if(orb.special==='aether'){fxSphere(hcV,0xff7ac8,3,0.4);fxPillar(hcV.x,hcV.z,0xff7ac8,8,1,0.6);}
@@ -2019,7 +2026,7 @@ FX.game={THREE,scene,camera,player,buddy,get youRing(){return youRing;},get next
   shake(k){shake=Math.max(shake,k);},
   motes,swapTo,passTarget,get stick(){return lastPin?{x:lastPin.ix,z:lastPin.iz}:{x:0,z:0};},get changeHook(){return changeHook;},set changeHook(f){changeHook=f||null;},
   makeWizard,joinCrew,leaveCrew,get brain(){return brain;},set brain(f){brain=f||null;},
-  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
+  lobTo,shootAt:buddyShoot,demonNearest,demonAim,solidSpot,LOB_MAX,CATCH_R,orbMesh:orbG,get resScale(){return resScale;},set resScale(v){resScale=v>0?v:1;resize();},get hudOff(){return hudOff;},set hudOff(v){hudOff=!!v;},venoms,headCenter,get spitHook(){return spitHook;},set spitHook(f){spitHook=f||null;},get bossHook(){return bossHook;},set bossHook(f){bossHook=f||null;},orbLight,orbMark,demonParts,hurtDemon,hpBar,get post(){return post;},set post(v){post=v||null;},get blockPad(){return padBlock;},set blockPad(v){padBlock=!!v;},get padSkip(){return padSkip;},set padSkip(v){padSkip=v||null;},
   G,playerThrow,throwOrb,get throwHook(){return throwHook;},set throwHook(f){throwHook=f||null;},get padAlias(){return padAlias;},set padAlias(v){padAlias=v||null;},get padHook(){return padHook;},set padHook(f){padHook=f||null;},
   spawnDemon,get demonMax(){return DEMON_HP*MOD.hp;},legGroup,orbMark,orbLight,orbSpin,
   get shakeHook(){return shakeHook;},set shakeHook(f){shakeHook=f||null;},get aimHook(){return aimHook;},set aimHook(f){aimHook=f||null;}};

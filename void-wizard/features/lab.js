@@ -45,6 +45,8 @@ feature('lab', ({ game, on }) => {
       ['Fire breath', 'attacks.breathLen attacks.breathReach attacks.breathWidth attacks.breathSweep attacks.breathCol'],
       ['When hit', 'demon.flash demon.flashLen demon.flashRate'], ['When beaten', 'demon.absorb demon.absorbLen demon.burst demon.dissolve demon.dissolveLen demon.dissolveCol'],
       ['Look', 'bodies.demon demon.poly colours.shell colours.rim colours.bone colours.legs colours.spots colours.eyes']]],
+    ['archon', 'Archon', [['Archon', 'archon.on archon.size archon.attacks'], ['Beam', 'archon.sweep archon.sweepTime archon.reach'],
+      ['Rhythm', 'archon.windup archon.opening archon.rest archon.waveSpeed archon.dodge']]],
     ['rules', 'Rules', [1, 2, 3, 4].map(n => ['Rule ' + n, `rules.when${n} rules.then${n} rules.for${n}`])],
     ['camera', 'Camera', [['Camera', 'camera.height camera.zoom camera.fov camera.lean camera.tilt camera.spin'],
       ['Right stick', 'camera.stick camera.stickY camera.invertX camera.invertY camera.lowClose camera.stickSpeed']]],
