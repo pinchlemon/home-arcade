@@ -118,6 +118,8 @@ LAB.shelf('match', 'Match', (game) => {
     if (C.labHp != null && C.labMax === get('lives', 5) && C.labHp < st.lives) loseLives(st.lives - C.labHp);
     C.labHp = st.lives;
   }
+  // another shelf ends the match as a loss (the Archon's Solid life: 'solid'); false when no match is on
+  LAB.matchLose = (why) => { if (!on() || st.over) return false; st.over = 'lose'; st.why = why; st.overAt = performance.now(); return true; };
   function roll(n) { return 1 + Math.floor(Math.random() * n); }
 
   // L1 with the Solid in hand
@@ -196,7 +198,7 @@ LAB.shelf('match', 'Match', (game) => {
     if (end) end.remove();
     end = document.createElement('div'); end.className = 'mt-end';
     const m = Math.floor(st.t / 60), s = Math.floor(st.t % 60);
-    end.innerHTML = `<h1 style="color:${win ? dodecaCol() : '#ff6a5a'}">${win ? 'DEMON CAPTURED' : st.why === 'captain' ? 'THE CAPTAIN HAS FALLEN' : 'THE TEAM HAS FALLEN'}</h1>`
+    end.innerHTML = `<h1 style="color:${win ? dodecaCol() : '#ff6a5a'}">${win ? 'DEMON CAPTURED' : st.why === 'captain' ? 'THE CAPTAIN HAS FALLEN' : st.why === 'solid' ? 'THE SOLID HAS SHATTERED' : 'THE TEAM HAS FALLEN'}</h1>`
       + `<p>TIME ${m}:${String(s).padStart(2, '0')} · LIVES LEFT ${st.lives} · REVIVES ${st.revives}</p>`
       + `<p class="go">PRESS X TO PLAY AGAIN</p>`;
     end.addEventListener('pointerdown', (e) => { e.preventDefault(); restart(); });

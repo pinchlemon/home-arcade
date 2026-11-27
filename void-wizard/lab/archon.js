@@ -15,6 +15,11 @@
 // passing lanes; when a pass is in the air the one that can get there first goes for it and swats it away (it loses
 // its resonance). Lobs that fly over their reach get past. A fast throw that hits one hurts it (and still bounces off):
 // break one and its lane is open until it comes back. With Shield on, the Archon takes half damage while any stand.
+// Solid life (an option): the Solid has health, the team's shared life. A defender that reaches a pass takes it
+// instead of swatting it: it holds it, drifting home, while it shakes and swells with light. Reach it in time (run into
+// it) and you tackle it free; if not, it lets out a pulse that hurts the Solid, knocks down anyone close, and throws
+// the Solid loose. Catches from a pass heal it a little. At zero the Solid shatters: with Match on the match is lost,
+// otherwise the Archon heals to full. While a defender holds it, the Solid's state is 'labHeld' (nobody can catch it).
 // Through the game's bossHook: the game asks it for the demon's parts, its mouth and its moves. Its health, death,
 // capture and respawn are the demon's own, so Match, Health, Abilities and Swords work on it unchanged.
 // Nothing is made until it is switched on (three.js uses Math.random to name new things).
@@ -126,7 +131,7 @@ LAB.shelf('archon', 'Archon', (game) => {
       if (!A) build();
       if (game.bossHook !== hook) { game.bossHook = hook; hideCentipede(); D.alive = false; D.dying = false; D.spawnT = 0.6; game.hpBar.visible = false; }
     } else if (game.bossHook === hook) {
-      game.bossHook = null; clearAttack(); clearOrbs(); A.root.visible = false; A.floor.visible = false; hideGuards();
+      game.bossHook = null; lifeEl.style.display = 'none'; clearAttack(); clearOrbs(); A.root.visible = false; A.floor.visible = false; hideGuards();
       D.alive = false; D.dying = false; D.spawnT = 0.8; D.state = 'walk'; game.hpBar.visible = false; game.labBreathing = false;
     }
   }
@@ -158,7 +163,8 @@ LAB.shelf('archon', 'Archon', (game) => {
     for (const W of game.ALL) { const dx = W.pos.x - D.pos.x, dz = W.pos.z - D.pos.z, d = Math.hypot(dx, dz) || 1; if (d < 6 * s) game.pushBack(W, dx / d, dz / d, 9); }
     game.fxRing(D.pos.x, D.pos.z, 0xffd890, 7 * s, 0.7); game.fxPillar(D.pos.x, D.pos.z, 0xffe0a0, 14, 2 * s, 0.9);
     game.spawnPuffs(20, 4 * s, tv.set(D.pos.x, 0, D.pos.z), 1.6); game.shake(0.2);
-    for (const Gd of G) { Gd.hp = get('guardHp', 3); Gd.backT = 0.6 + Gd.i * 0.25; Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; }
+    resetLife();
+    for (const Gd of G) { if (Gd.hold) letGo(Gd); Gd.hp = get('guardHp', 3); Gd.backT = 0.6 + Gd.i * 0.25; Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; }
   }
 
   // ---------------------------------------------------------------- attacks
@@ -315,8 +321,87 @@ LAB.shelf('archon', 'Archon', (game) => {
     return Gd;
   }
   LAB.archonGuards = () => G;   // the defenders, for other shelves (and tests)
-  const stats = LAB.archonStats = { swats: 0, breaks: 0, orbHits: 0 };   // counts, for tests
-  function hideGuards() { for (const Gd of G) { Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } }
+  const stats = LAB.archonStats = { swats: 0, breaks: 0, orbHits: 0, steals: 0, rescues: 0, pulses: 0, shatters: 0 };   // counts, for tests
+
+  // ---------------------------------------------------------------- Solid life: the team's shared health, on the Solid
+  const life = { hp: 10, max: 10, shown: '' };
+  const lifeOn = () => !!(get('solidLife', 0) && game.bossHook === hook);
+  const css = document.createElement('style');
+  css.textContent = `.ar-life{position:fixed;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;pointer-events:none;z-index:6;font-family:var(--font-pixel,monospace);font-size:9px;letter-spacing:1px;color:#fff;text-shadow:0 0 3px #000}
+  .ar-life i{width:9px;height:12px;background:#fff4dc;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);filter:drop-shadow(0 0 3px #ffb060)}
+  .ar-life i.off{background:#3a2a22;filter:none}
+  .ar-life i.hit{animation:arHit .8s steps(6) 1}
+  .ar-life.low i:not(.off){animation:arLow .5s steps(2) infinite}
+  @keyframes arHit{0%,50%{background:#ff4050}100%{background:#3a2a22}}
+  @keyframes arLow{50%{opacity:.35}}`;
+  document.head.appendChild(css);
+  const lifeEl = document.createElement('div'); lifeEl.className = 'ar-life'; lifeEl.style.display = 'none'; document.body.appendChild(lifeEl);
+  function drawLife(lost) {
+    const on = lifeOn(); lifeEl.style.display = on ? 'flex' : 'none'; if (!on) return;
+    const mt = document.querySelector('.mt-hud'), below = mt && mt.style.display !== 'none' ? mt.getBoundingClientRect().bottom + 6 : 10;
+    lifeEl.style.top = 'max(' + Math.round(below) + 'px, env(safe-area-inset-top))';
+    const k = life.max + ':' + life.hp + ':' + (lost || 0); if (k === life.shown && !lost) return; life.shown = k;
+    const n = Math.ceil(life.hp - 1e-6);
+    lifeEl.className = 'ar-life' + (life.hp <= life.max * 0.3 ? ' low' : '');
+    lifeEl.innerHTML = 'SOLID ' + Array.from({ length: life.max }, (_, i) => `<i class="${i < n ? '' : 'off'}${lost && i >= n && i < n + lost ? ' hit' : ''}"></i>`).join('');
+  }
+  function resetLife() { life.max = Math.round(get('solidHp', 10)); life.hp = life.max; life.shown = ''; drawLife(); }
+  window.FEATURES.on('catch', (W, caught) => { if (lifeOn() && caught && life.hp < life.max) { life.hp = Math.min(life.max, life.hp + get('heal', 0.5)); drawLife(); } }, 'lab');
+  function shatter() {
+    const o = game.orb; stats.shatters++;
+    game.fxSphere(o.p, 0xffffff, 6, 0.5); game.sparkBurst(o.p, 70, 9, 1, 3, 0xfff0c0); game.fxRing(o.p.x, o.p.z, 0xff4050, 9, 0.6); game.shake(0.5);
+    try { game.popup('THE SOLID SHATTERED', new T.Vector3(o.p.x, o.p.y + 2, o.p.z), '#ff6a5a', true); } catch (e) {}
+    if (!(LAB.matchLose && LAB.matchLose('solid'))) { D.hp = game.demonMax; A.flashT = 0.6; }   // without Match: the Archon is whole again
+    resetLife();
+  }
+  function loose(o, vx, vy, vz) {   // put the Solid back in the air, nobody's
+    o.state = 'air'; o.holder = null; o.v.set(vx, vy, vz); o.w.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+    o.res = 0; o.chain = null; o.special = null; o.fast = false; o.oop = false; o.bowl = false; o.hitCD = 0.35; o.last = null; o.touched = true;
+    o.labTo = null; o.labMadden = null; o.labSuper = null; o.labMul = null;
+  }
+  function letGo(Gd) { if (Gd.hold && game.orb.state === 'labHeld') loose(game.orb, 0, 5, 0); Gd.hold = null; if (Gd.aura) Gd.aura.visible = false; }
+  function take(Gd, o) {   // a defender takes the Solid
+    loose(o, 0, 0, 0); o.state = 'labHeld'; o.touched = false; Gd.hold = { t: 0 }; stats.steals++;
+    tv.set(Gd.pos.x, Gd.y, Gd.pos.z); game.fxRing(Gd.pos.x, Gd.pos.z, 0xff4050, 2.6, 0.4); game.sparkBurst(tv, 16, 3, 0.4, 2, 0xff6070); game.shake(0.12);
+    try { game.popup('TAKEN', new T.Vector3(Gd.pos.x, Gd.y + 2, Gd.pos.z), '#ff6a7a', true); } catch (e) {}
+  }
+  function holdFrame(Gd, dt) {   // returns true while it still holds the Solid
+    const o = game.orb;
+    if (o.state !== 'labHeld') { Gd.hold = null; if (Gd.aura) Gd.aura.visible = false; return false; }   // the game took it back (a reset)
+    const H = Gd.hold, len = get('stealTime', 1.4); H.t += dt; const k = Math.min(1, H.t / len);
+    // shaking in front of its eye, the light around it swelling
+    const j = 0.04 + k * 0.22;
+    o.p.set(Gd.pos.x + Math.sin(Gd.yaw) * 0.9 + (Math.random() - 0.5) * j, Gd.y + (Math.random() - 0.5) * j, Gd.pos.z + Math.cos(Gd.yaw) * 0.9 + (Math.random() - 0.5) * j);
+    o.v.set(0, 0, 0); game.orb.flash = k * 2;
+    if (!Gd.aura) { Gd.aura = new T.Mesh(new T.SphereGeometry(1, 16, 12), glow(0xffe0b0, 0, true)); game.scene.add(Gd.aura); }
+    Gd.aura.visible = true; Gd.aura.position.set(Gd.pos.x, Gd.y, Gd.pos.z); Gd.aura.scale.setScalar(0.8 + k * 1.5 + Math.sin(game.time * 40) * 0.08 * k); Gd.aura.material.opacity = 0.08 + k * 0.22;
+    if (Math.random() < 0.3 + k) { tv.copy(o.p); tv2.set((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4); game.spark(tv, tv2, 0.3, 0.5, Math.random() < 0.5 ? 0xfff0c0 : 0xff6070, 2); }
+    game.shake(0.02 + k * 0.05);
+    // run into it in time and it lets go
+    for (const W of game.ALL) {
+      if (W.downT > 0) continue;
+      if (Math.hypot(W.pos.x - Gd.pos.x, W.pos.z - Gd.pos.z) < 1.45) {
+        const dx = W.pos.x - Gd.pos.x, dz = W.pos.z - Gd.pos.z, dl = Math.hypot(dx, dz) || 1;
+        Gd.hold = null; Gd.aura.visible = false; Gd.stunT = 1.4; Gd.flash = 1; stats.rescues++;
+        o.p.set(Gd.pos.x + dx / dl * 0.6, Gd.y + 0.3, Gd.pos.z + dz / dl * 0.6); loose(o, dx / dl * 2, 5.5, dz / dl * 2); o.touched = false;
+        tv.copy(o.p); game.sparkBurst(tv, 22, 4, 0.5, 2.5, 0xffffff); game.shake(0.15);
+        try { game.popup('FREED', new T.Vector3(W.pos.x, 2.4, W.pos.z), '#ffffff', true); } catch (e) {}
+        return false;
+      }
+    }
+    if (H.t < len) return true;
+    // too late: the pulse
+    const dmg = get('stealDmg', 3); life.hp = Math.max(0, life.hp - dmg); stats.pulses++;
+    tv.set(Gd.pos.x, Gd.y, Gd.pos.z); game.fxSphere(tv, 0xfff0c0, 4.5, 0.4); game.fxRing(Gd.pos.x, Gd.pos.z, 0xffd0a0, 4.5, 0.5); game.sparkBurst(tv, 40, 7, 0.7, 3, 0xffe0b0); game.shake(0.35);
+    for (const W of game.ALL) { const dx = W.pos.x - Gd.pos.x, dz = W.pos.z - Gd.pos.z, d = Math.hypot(dx, dz) || 1; if (d < 3.6 && W.downT <= 0 && W.diveT <= 0) game.knockDown(W, dx / d, dz / d, 9); }
+    const ax = Gd.pos.x - D.pos.x, az = Gd.pos.z - D.pos.z, al = Math.hypot(ax, az) || 1;
+    loose(o, ax / al * 6, 8, az / al * 6);
+    Gd.hold = null; Gd.aura.visible = false; Gd.swatCD = 1.5;
+    drawLife(Math.min(dmg, life.max));
+    if (life.hp <= 0) shatter();
+    return false;
+  }
+  function hideGuards() { for (const Gd of G) { if (Gd.hold) letGo(Gd); Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } }
   function guardsUp() { let n = 0; const c = get('guards', 4); for (const Gd of G) if (Gd.i < c && Gd.up) n++; return n; }
   function shieldFx() { const n = guardsUp(); if (!n) return; A.core.getWorldPosition(tv); for (const Gd of G) if (Gd.up && Gd.i < get('guards', 4)) { tv2.set(Gd.pos.x, Gd.y, Gd.pos.z); const b = tv2.clone(); game.fxSphere(b, 0xff8a60, 0.9, 0.25); } game.fxSphere(tv, 0xff6a50, 3.2 * size(), 0.3); }
   function knockOff(Gd, o, hard) {   // the Solid bounces off a defender: it's loose, its resonance gone
@@ -351,18 +436,18 @@ LAB.shelf('archon', 'Archon', (game) => {
         if (py < 0.2) break;
         if (py > 3.2) continue;   // over their heads
         if (catcherNear(px, pz, o.last)) continue;   // a teammate's catch: theirs
-        for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0) continue; const d = Math.hypot(px - Gd.pos.x, pz - Gd.pos.z) - reachR; if (d <= speed * 1.6 * tt && tt < best) { best = tt; chaser = Gd; chaseAt = V(px, py, pz); } }
+        for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0 || Gd.hold) continue; const d = Math.hypot(px - Gd.pos.x, pz - Gd.pos.z) - reachR; if (d <= speed * 1.6 * tt && tt < best) { best = tt; chaser = Gd; chaseAt = V(px, py, pz); } }
         if (chaser) break;
       }
     }
     const used = new Set();
     if (chaser) used.add(chaser);
     for (const L of lanes) {   // each lane gets the nearest free defender
-      let b = null, bd = 1e9; for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0 || used.has(Gd)) continue; const d = Math.hypot(L.x - Gd.pos.x, L.z - Gd.pos.z); if (d < bd) { bd = d; b = Gd; } }
+      let b = null, bd = 1e9; for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0 || Gd.hold || used.has(Gd)) continue; const d = Math.hypot(L.x - Gd.pos.x, L.z - Gd.pos.z); if (d < bd) { bd = d; b = Gd; } }
       if (b) { used.add(b); b.goal = L; }
     }
     for (const Gd of G) {
-      if (Gd.i >= count) { if (Gd.up || Gd.g.visible) { Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } continue; }
+      if (Gd.i >= count) { if (Gd.hold) letGo(Gd); if (Gd.up || Gd.g.visible) { Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } continue; }
       if (!Gd.up) {   // gone: back after a while, out of the floor near its post
         Gd.backT -= dt; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false;
         if (Gd.backT <= 0 && D.alive && !D.dying && A.grow >= 1) {
@@ -376,7 +461,9 @@ LAB.shelf('archon', 'Archon', (game) => {
       // where it wants to be
       const home = Gd.i / Math.max(1, count) * Math.PI * 2 + t * 0.08;
       let gx = D.pos.x + Math.sin(home) * ring, gz = D.pos.z + Math.cos(home) * ring, sp = speed;
-      Gd.chase = Gd === chaser;
+      const holding = Gd.hold ? holdFrame(Gd, dt) : false;
+      Gd.chase = Gd === chaser && !holding;
+      if (holding) { const hx = Gd.pos.x - D.pos.x, hz = Gd.pos.z - D.pos.z, hl = Math.hypot(hx, hz) || 1; gx = D.pos.x + hx / hl * 5 * s; gz = D.pos.z + hz / hl * 5 * s; sp = speed * 0.45; }
       if (Gd.chase) { gx = chaseAt.x; gz = chaseAt.z; sp = speed * 1.6; }
       else if (Gd.goal && used.has(Gd)) { gx = Gd.goal.x; gz = Gd.goal.z; }
       Gd.goal = null;
@@ -391,16 +478,17 @@ LAB.shelf('archon', 'Archon', (game) => {
       for (const W of game.ALL) { if (W.y > Gd.y + 1) continue; const wx = W.pos.x - Gd.pos.x, wz = W.pos.z - Gd.pos.z, wd = Math.hypot(wx, wz) || 0.01; if (wd < 0.95) { W.pos.x += wx / wd * (0.95 - wd); W.pos.z += wz / wd * (0.95 - wd); } }
       // the Solid: swatted when it comes in reach; a fast throw hurts it
       Gd.hurtCD = Math.max(0, (Gd.hurtCD || 0) - dt);
-      if (o.state === 'air' && o.last && o.hitCD <= 0 && o.p.y > 0.2 && o.p.y < Gd.y + 1.6) {
+      if (!Gd.hold && o.state === 'air' && o.last && o.hitCD <= 0 && o.p.y > 0.2 && o.p.y < Gd.y + 1.6) {
         const ox = o.p.x - Gd.pos.x, oz = o.p.z - Gd.pos.z, od = Math.hypot(ox, oz), spd = o.v.length();
         const hard = spd > 17 && Gd.hurtCD <= 0, ready = Gd.stunT <= 0 && Gd.swatCD <= 0;
         // ready, it swats anything in its reach; hurt or busy, only a fast throw at its body connects
         if (((ready && od < reachR + 0.3) || (hard && od < 1.1 && Math.abs(o.p.y - Gd.y) < 1.1)) && !catcherNear(o.p.x, o.p.z, o.last)) {
+          if (!hard && lifeOn() && !G.some(H => H.hold)) { take(Gd, o); Gd.swatCD = 0.8; continue; }
           knockOff(Gd, o, hard); Gd.swatCD = 0.8; if (hard) Gd.hurtCD = 0.3; stats.swats++;
           if (hard) {
             Gd.hp--; Gd.stunT = 1.6; Gd.vel.set(-ox / (od || 1) * 6, 0, -oz / (od || 1) * 6);
             if (Gd.hp <= 0) {
-              Gd.up = false; Gd.backT = get('guardBack', 12); stats.breaks++; tv.set(Gd.pos.x, Gd.y, Gd.pos.z);
+              if (Gd.hold) letGo(Gd); Gd.up = false; Gd.backT = get('guardBack', 12); stats.breaks++; tv.set(Gd.pos.x, Gd.y, Gd.pos.z);
               game.fxSphere(tv, 0xfff0c0, 3, 0.4); game.fxPillar(Gd.pos.x, Gd.pos.z, 0xffe0a0, 8, 1.2, 0.6); game.sparkBurst(tv, 40, 6, 0.8, 3, 0xffe0a0); game.shake(0.3);
               Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; continue;
             }
@@ -409,7 +497,7 @@ LAB.shelf('archon', 'Archon', (game) => {
       }
       // how it looks: hovering, the ring turning, red and fast when it goes for a pass, wobbling when hurt
       Gd.y += ((Gd.stunT > 0 ? 0.9 : 1.6 + Math.sin(t * 2 + Gd.i) * 0.12) - Gd.y) * (1 - Math.exp(-4 * dt));
-      Gd.red += ((Gd.chase ? 1 : lanes.length && used.has(Gd) ? 0.35 : 0) - Gd.red) * (1 - Math.exp(-10 * dt));
+      Gd.red += ((Gd.chase || Gd.hold ? 1 : lanes.length && used.has(Gd) ? 0.35 : 0) - Gd.red) * (1 - Math.exp(-10 * dt));
       const face = Math.atan2(o.p.x - Gd.pos.x, o.p.z - Gd.pos.z); Gd.yaw = lerpAng(Gd.yaw, face, 1 - Math.exp(-8 * dt));
       Gd.g.position.set(Gd.pos.x, Gd.y * s, Gd.pos.z); Gd.g.scale.setScalar(s); Gd.g.rotation.set(0, Gd.yaw, 0);
       Gd.eye.rotation.x = clamp(-Math.atan2(o.p.y - Gd.y, Math.hypot(o.p.x - Gd.pos.x, o.p.z - Gd.pos.z) || 1), -0.8, 0.8);
@@ -430,7 +518,7 @@ LAB.shelf('archon', 'Archon', (game) => {
     if (!A) return;
     if (D.g.visible || (game.legGroup && game.legGroup.visible)) hideCentipede();
     const s = size(), t = game.time;
-    orbsFrame(dt); hops(dt); guardsFrame(dt);
+    orbsFrame(dt); hops(dt); guardsFrame(dt); drawLife();
     if (D.dying) { die(dt, s); return; }
     if (!D.alive) { A.root.visible = false; A.floor.visible = false; D.spawnT -= dt; if (D.spawnT <= 0) spawn(); return; }
     A.grow = Math.min(1, A.grow + dt / 1.4); D.scale = A.grow;
@@ -541,7 +629,7 @@ LAB.shelf('archon', 'Archon', (game) => {
   // ---------------------------------------------------------------- beaten: the rings fly apart, the eyes close, a burst of light
   function die(dt, s) {
     clearAttack(); game.hpBar.visible = false;
-    if (A.dieT === 0) { game.shake(0.3); for (const Gd of G) if (Gd.up) { Gd.up = false; Gd.backT = 99; tv.set(Gd.pos.x, Gd.y, Gd.pos.z); game.fxSphere(tv, 0xfff0c0, 2.5, 0.4); Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } }
+    if (A.dieT === 0) { game.shake(0.3); for (const Gd of G) if (Gd.up) { if (Gd.hold) letGo(Gd); Gd.up = false; Gd.backT = 99; tv.set(Gd.pos.x, Gd.y, Gd.pos.z); game.fxSphere(tv, 0xfff0c0, 2.5, 0.4); Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } }
     A.dieT += dt; const k = A.dieT;
     for (const R of A.rings) { R.ang += dt * 6; tq.setFromAxisAngle(R.axis, R.ang); R.g.quaternion.copy(tq); R.g.scale.setScalar(1 + k * 1.6); for (const E of R.eyes) E.ball.scale.set(1, Math.max(0.1, 1 - k * 1.2), 1); }
     A.body.position.y += dt * 0.8; A.body.rotation.y += dt * (2 + k * 6);
@@ -577,6 +665,12 @@ LAB.shelf('archon', 'Archon', (game) => {
     { id: 'guardRing', label: 'Guard distance', help: 'How far from the Archon they circle when there are no lanes to cover', min: 6, max: 26, step: 1, value: 13, fmt: (x) => x + ' M' },
     { id: 'guardHp', label: 'Defender toughness', help: 'Fast throws it takes to break one', min: 1, max: 8, step: 1, value: 3 },
     { id: 'guardBack', label: 'Defender return', help: 'How long a broken one stays gone', min: 2, max: 40, step: 1, value: 12, fmt: (x) => x + ' S' },
+    { id: 'solidLife', label: 'Solid life', help: 'The Solid has health, the team\'s life. A defender that reaches a pass takes it, then pulses and hurts it unless you run into it in time', kind: 'onoff', value: 0,
+      apply: (v) => { if (v) resetLife(); else { for (const Gd of G) if (Gd.hold) letGo(Gd); drawLife(); } } },
+    { id: 'solidHp', label: 'Solid health', help: 'How much the Solid can take before it shatters', min: 3, max: 20, step: 1, value: 10, apply: () => resetLife() },
+    { id: 'stealDmg', label: 'Pulse damage', help: 'What a defender\'s pulse takes from the Solid', min: 1, max: 10, step: 1, value: 3 },
+    { id: 'stealTime', label: 'Time to free it', help: 'How long a defender holds the Solid before it pulses: run into it before then', min: 0.4, max: 4, step: 0.1, value: 1.4, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'heal', label: 'Catch heals', help: 'Health a catch from a pass gives back to the Solid', min: 0, max: 3, step: 0.25, value: 0.5 },
     { id: 'shield', label: 'Shield', help: 'While any defender stands, the Archon takes half damage', kind: 'onoff', value: 0 }
   ];
 });
