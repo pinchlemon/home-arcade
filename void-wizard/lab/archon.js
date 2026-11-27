@@ -15,6 +15,10 @@
 // passing lanes; when a pass is in the air the one that can get there first goes for it and swats it away (it loses
 // its resonance). Lobs that fly over their reach get past. A fast throw that hits one hurts it (and still bounces off):
 // break one and its lane is open until it comes back. With Shield on, the Archon takes half damage while any stand.
+// Rushing the passer: hold the Solid too long and some defenders leave their lanes and rush you. How many depends on
+// where you are: close to the Archon most of them come, far out they hang back and cover your receivers. A rusher turns
+// red, shows "!" and runs at you; if it reaches you before you throw, you go down and lose the Solid (taken, with Solid
+// life on; knocked loose, without). A dive gets you past it.
 // Solid life (an option): the Solid has health, the team's shared life. A defender that reaches a pass takes it
 // instead of swatting it: it holds it, drifting home, while it shakes and swells with light. Reach it in time (run into
 // it) and you tackle it free; if not, it lets out a pulse that hurts the Solid, knocks down anyone close, and throws
@@ -321,7 +325,8 @@ LAB.shelf('archon', 'Archon', (game) => {
     return Gd;
   }
   LAB.archonGuards = () => G;   // the defenders, for other shelves (and tests)
-  const stats = LAB.archonStats = { swats: 0, breaks: 0, orbHits: 0, steals: 0, rescues: 0, pulses: 0, shatters: 0 };   // counts, for tests
+  const rush = { holder: null, set: new Set(), count: 0, after: 0, last: 0 };   // who's rushing the passer this hold
+  const stats = LAB.archonStats = { sacks: 0, swats: 0, breaks: 0, orbHits: 0, steals: 0, rescues: 0, pulses: 0, shatters: 0 };   // counts, for tests
 
   // ---------------------------------------------------------------- Solid life: the team's shared health, on the Solid
   const life = { hp: 10, max: 10, shown: '' };
@@ -442,6 +447,25 @@ LAB.shelf('archon', 'Archon', (game) => {
     }
     const used = new Set();
     if (chaser) used.add(chaser);
+    // rushing the passer: decided once per hold, from how close the holder is to the Archon
+    if (holder && get('rush', 1)) {
+      if (rush.holder !== holder || o.heldFor < rush.last) {   // a new hold
+        const dd = Math.hypot(holder.pos.x - D.pos.x, holder.pos.z - D.pos.z), near = get('rushNear', 10) * s, far = Math.max(near + 1, get('rushFar', 28) * s);
+        const p = clamp((far - dd) / (far - near), 0, 1), max = get('rushMax', 2);
+        rush.holder = holder; rush.set.clear(); rush.count = Math.min(max, Math.floor(p * max + Math.random() * Math.min(1, p * 2)));
+        rush.after = get('rushAfter', 1.2) * (0.7 + Math.random() * 0.6) * (1 - 0.35 * p);
+      }
+      rush.last = o.heldFor;
+      if (o.heldFor >= rush.after && rush.set.size < rush.count) {
+        const free = G.filter(Gd => Gd.i < count && Gd.up && Gd.stunT <= 0 && !Gd.hold && !rush.set.has(Gd) && Gd !== chaser)
+          .sort((a, b) => Math.hypot(a.pos.x - holder.pos.x, a.pos.z - holder.pos.z) - Math.hypot(b.pos.x - holder.pos.x, b.pos.z - holder.pos.z));
+        for (const Gd of free.slice(0, rush.count - rush.set.size)) {
+          rush.set.add(Gd); Gd.flash = 0.6;
+          try { game.popup('!', new T.Vector3(Gd.pos.x, Gd.y + 1.8, Gd.pos.z), '#ff4050', true); } catch (e) {}
+        }
+      }
+      for (const Gd of rush.set) used.add(Gd);
+    } else { rush.holder = null; rush.set.clear(); }
     for (const L of lanes) {   // each lane gets the nearest free defender
       let b = null, bd = 1e9; for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0 || Gd.hold || used.has(Gd)) continue; const d = Math.hypot(L.x - Gd.pos.x, L.z - Gd.pos.z); if (d < bd) { bd = d; b = Gd; } }
       if (b) { used.add(b); b.goal = L; }
@@ -464,7 +488,20 @@ LAB.shelf('archon', 'Archon', (game) => {
       const holding = Gd.hold ? holdFrame(Gd, dt) : false;
       Gd.chase = Gd === chaser && !holding;
       if (holding) { const hx = Gd.pos.x - D.pos.x, hz = Gd.pos.z - D.pos.z, hl = Math.hypot(hx, hz) || 1; gx = D.pos.x + hx / hl * 5 * s; gz = D.pos.z + hz / hl * 5 * s; sp = speed * 0.45; }
-      if (Gd.chase) { gx = chaseAt.x; gz = chaseAt.z; sp = speed * 1.6; }
+      Gd.rushing = !holding && holder && rush.set.has(Gd);
+      if (Gd.rushing) {
+        gx = holder.pos.x; gz = holder.pos.z; sp = speed * get('rushSpeed', 1.4);
+        // it gets there before the throw: down you go, and the Solid with you
+        const rx = holder.pos.x - Gd.pos.x, rz = holder.pos.z - Gd.pos.z, rd = Math.hypot(rx, rz) || 1;
+        if (rd < 1.2 && Gd.stunT <= 0 && holder.downT <= 0 && holder.diveT <= 0 && o.heldFor > 0.3) {
+          game.knockDown(holder, rx / rd, rz / rd, 8); stats.sacks++; rush.set.delete(Gd);
+          try { game.popup('SACKED', new T.Vector3(holder.pos.x, 2.4, holder.pos.z), '#ff4050', true); } catch (e) {}
+          o.p.set(holder.pos.x, 1.2, holder.pos.z);
+          if (lifeOn() && !G.some(H => H.hold)) take(Gd, o); else loose(o, rx / rd * 3, 6, rz / rd * 3);
+          Gd.swatCD = 1; game.shake(0.25);
+        }
+      }
+      else if (Gd.chase) { gx = chaseAt.x; gz = chaseAt.z; sp = speed * 1.6; }
       else if (Gd.goal && used.has(Gd)) { gx = Gd.goal.x; gz = Gd.goal.z; }
       Gd.goal = null;
       if (Gd.stunT > 0) sp *= 0.15;
@@ -497,7 +534,7 @@ LAB.shelf('archon', 'Archon', (game) => {
       }
       // how it looks: hovering, the ring turning, red and fast when it goes for a pass, wobbling when hurt
       Gd.y += ((Gd.stunT > 0 ? 0.9 : 1.6 + Math.sin(t * 2 + Gd.i) * 0.12) - Gd.y) * (1 - Math.exp(-4 * dt));
-      Gd.red += ((Gd.chase || Gd.hold ? 1 : lanes.length && used.has(Gd) ? 0.35 : 0) - Gd.red) * (1 - Math.exp(-10 * dt));
+      Gd.red += ((Gd.chase || Gd.hold || Gd.rushing ? 1 : lanes.length && used.has(Gd) ? 0.35 : 0) - Gd.red) * (1 - Math.exp(-10 * dt));
       const face = Math.atan2(o.p.x - Gd.pos.x, o.p.z - Gd.pos.z); Gd.yaw = lerpAng(Gd.yaw, face, 1 - Math.exp(-8 * dt));
       Gd.g.position.set(Gd.pos.x, Gd.y * s, Gd.pos.z); Gd.g.scale.setScalar(s); Gd.g.rotation.set(0, Gd.yaw, 0);
       Gd.eye.rotation.x = clamp(-Math.atan2(o.p.y - Gd.y, Math.hypot(o.p.x - Gd.pos.x, o.p.z - Gd.pos.z) || 1), -0.8, 0.8);
@@ -665,6 +702,12 @@ LAB.shelf('archon', 'Archon', (game) => {
     { id: 'guardRing', label: 'Guard distance', help: 'How far from the Archon they circle when there are no lanes to cover', min: 6, max: 26, step: 1, value: 13, fmt: (x) => x + ' M' },
     { id: 'guardHp', label: 'Defender toughness', help: 'Fast throws it takes to break one', min: 1, max: 8, step: 1, value: 3 },
     { id: 'guardBack', label: 'Defender return', help: 'How long a broken one stays gone', min: 2, max: 40, step: 1, value: 12, fmt: (x) => x + ' S' },
+    { id: 'rush', label: 'Rush the passer', help: 'Hold the Solid too long and defenders rush you: more of them the closer you are to the Archon', kind: 'onoff', value: 1 },
+    { id: 'rushAfter', label: 'Rush after', help: 'About how long you can hold the Solid before they come (sooner close to the Archon)', min: 0.3, max: 5, step: 0.1, value: 1.2, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'rushMax', label: 'Most rushers', help: 'How many can rush at once, close to the Archon', min: 1, max: 5, step: 1, value: 2 },
+    { id: 'rushNear', label: 'All-out within', help: 'Closer than this to the Archon, the most rushers come', min: 4, max: 30, step: 1, value: 10, fmt: (x) => x + ' M' },
+    { id: 'rushFar', label: 'Nobody past', help: 'Further than this from the Archon, they all stay back and cover', min: 8, max: 50, step: 1, value: 28, fmt: (x) => x + ' M' },
+    { id: 'rushSpeed', label: 'Rush speed', help: 'How fast a rusher runs, times Defender speed', min: 1, max: 2.5, step: 0.05, value: 1.4, fmt: (x) => x.toFixed(2) + '×' },
     { id: 'solidLife', label: 'Solid life', help: 'The Solid has health, the team\'s life. A defender that reaches a pass takes it, then pulses and hurts it unless you run into it in time', kind: 'onoff', value: 0,
       apply: (v) => { if (v) resetLife(); else { for (const Gd of G) if (Gd.hold) letGo(Gd); drawLife(); } } },
     { id: 'solidHp', label: 'Solid health', help: 'How much the Solid can take before it shatters', min: 3, max: 20, step: 1, value: 10, apply: () => resetLife() },
