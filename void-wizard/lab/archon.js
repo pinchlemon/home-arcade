@@ -2,15 +2,19 @@
 // arena. A great eye at its heart (the weak spot), three rings of eyes turning around it like a gyroscope, six wings.
 // Everything is plain geometry, so it needs no character animation.
 //   It stays in the middle and turns to face whoever has the Solid (or the nearest wizard). Every eye follows the Solid.
-//   Two attacks, each with a clear warning, then an opening:
-//     Gaze (beam): the rings fall into line and go red, and a red fan lights up on the ground: the beam will sweep
-//       across all of it, starting at its bright edge. Then a wall of light sweeps the fan. Jump over it, dive through
-//       it, or be somewhere else. The cube's blocks and walls stop it.
-//     Judgement (shockwave): it rises high, rings spread wide and red; then it slams down and a ring of light rolls out
-//       across the floor. Jump or dive as it passes.
+//   Its attacks, each with a clear warning, then an opening:
+//     Light orbs: the rings fall into line and go red while sparks gather into its eye; then it fires waves of glowing
+//       orbs across the floor at chest height. RING (full circles with gaps, each wave turned half a step), FAN (aimed
+//       at whoever has the Solid) or SPIRAL (two turning streams). Walk through the gaps, run, or dive. Blocks stop them.
+//     Gaze (beam): a red fan lights up on the ground; then a wall of light sweeps the fan, starting at its bright edge.
+//       Dive through it or be somewhere else. The cube's blocks and walls stop it.
 //   After each attack it sinks low and dims for a moment: the core hangs at throwing height. That's the opening.
 //   Hits on the core count as head hits; hits on a ring's eye make that eye blink shut. The cube's hit cancels a
 //   warning (as with the centipede), the icosahedron's slows it, Freeze and Confused stop it attacking.
+// Defenders: smaller wheels with one eye each, circling the Archon. While someone holds the Solid they slide into the
+// passing lanes; when a pass is in the air the one that can get there first goes for it and swats it away (it loses
+// its resonance). Lobs that fly over their reach get past. A fast throw that hits one hurts it (and still bounces off):
+// break one and its lane is open until it comes back. With Shield on, the Archon takes half damage while any stand.
 // Through the game's bossHook: the game asks it for the demon's parts, its mouth and its moves. Its health, death,
 // capture and respawn are the demon's own, so Match, Health, Abilities and Swords work on it unchanged.
 // Nothing is made until it is switched on (three.js uses Math.random to name new things).
@@ -20,16 +24,23 @@ LAB.shelf('archon', 'Archon', (game) => {
   const V = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const ease = (u) => u * u * (3 - 2 * u);
-  const RED = new T.Color(0xff2a40), GOLD = new T.Color(0xffc860), WHITE = new T.Color(1, 1, 1);
+  const RED = new T.Color(0xff2a40), GOLD = new T.Color(0xffc860);
   let A = null;        // the Archon's meshes
   const parts = [];    // the demon as spheres, for the game: the core first
   const tv = V(), tv2 = V(), tv3 = V(), ZAX = V(0, 0, 1), tq = new T.Quaternion(), tq2 = new T.Quaternion(), tm = new T.Matrix4(), UP = V(0, 1, 0);
   const FLAT = new T.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI / 2);   // a ring lying flat, like a halo
+  const ORB_Y = 1.0;   // light orbs fly at chest height
 
   // ---------------------------------------------------------------- the body
   function lambert(col, emi) { const m = new T.MeshLambertMaterial({ color: col, emissive: emi || 0x000000 }); m.userData.base = m.emissive.clone(); return m; }
   // add: glowing (adds light); otherwise painted on top, which reads better on the bright grass
   function glow(col, op, add) { return new T.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, blending: add ? T.AdditiveBlending : T.NormalBlending, side: T.DoubleSide }); }
+  let featherGeo = null;
+  function feathers() {
+    if (featherGeo) return featherGeo;
+    const sh = new T.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(0.16, 0.45, 0, 1); sh.quadraticCurveTo(-0.16, 0.45, 0, 0);
+    return (featherGeo = new T.ShapeGeometry(sh, 6));
+  }
   function build() {
     const root = new T.Group(), body = new T.Group(); root.add(body); root.visible = false; game.scene.add(root);
     const mats = [];
@@ -57,20 +68,18 @@ LAB.shelf('archon', 'Archon', (game) => {
         e.position.set(Math.cos(a) * R, Math.sin(a) * R, 0); g.add(e);
         const ball = new T.Mesh(eyeGeo, eyeMat); e.add(ball);
         const p = new T.Mesh(pupGeo, pupMat); e.add(p);
-        eyes.push({ e, ball, p, blink: 0, flash: 0, part: { x: 0, y: 0, z: 0, r: 0.5, weak: false, flash: 0 } });
+        eyes.push({ e, ball, p, blink: 0, part: { x: 0, y: 0, z: 0, r: 0.5, weak: false, flash: 0 } });
       }
       rings.push({ g, R, axis, sp, ang: i * 1.7, eyes });
     });
     // six wings: two up, two out, two down, behind the core
-    const featherShape = new T.Shape(); featherShape.moveTo(0, 0); featherShape.quadraticCurveTo(0.16, 0.45, 0, 1); featherShape.quadraticCurveTo(-0.16, 0.45, 0, 0);
-    const featherGeo = new T.ShapeGeometry(featherShape, 6);
     const wingMat = lambert(0x6a5f52, 0x000000); wingMat.side = T.DoubleSide; mats.push(wingMat);
     const wings = [];
     for (const [tilt, side] of [[0.55, 1], [0.55, -1], [1.45, 1], [1.45, -1], [2.45, 1], [2.45, -1]]) {
       const w = new T.Group(); w.position.set(side * 0.7, 0, -0.75); body.add(w);
       const fan = new T.Group(); w.add(fan);
       for (let f = 0; f < 7; f++) {
-        const m = new T.Mesh(featherGeo, wingMat), len = 3.1 - f * 0.28;
+        const m = new T.Mesh(feathers(), wingMat), len = 3.1 - f * 0.28;
         m.scale.set(1.5, len, 1); m.rotation.z = -side * (f * 0.13); m.position.z = -f * 0.02; fan.add(m);
       }
       wings.push({ w, fan, tilt, side });
@@ -80,7 +89,7 @@ LAB.shelf('archon', 'Archon', (game) => {
     const floor = new T.Group(); game.scene.add(floor); floor.visible = false;
     const disc = new T.Mesh(new T.CircleGeometry(1, 40), glow(0x000000, 0.3)); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.02; floor.add(disc);
     const circle = new T.Mesh(new T.RingGeometry(0.96, 1, 64), glow(0xc89030, 0.8)); circle.rotation.x = -Math.PI / 2; circle.position.y = 0.025; floor.add(circle);
-    // the warning fan, the beam and the shockwave (geometry made for each attack)
+    // the beam's warning fan and the beam itself (the fan's geometry is made for each attack)
     const fanMat = glow(0xe0102a, 0), fanMesh = new T.Mesh(new T.BufferGeometry(), fanMat); fanMesh.position.y = 0.04; fanMesh.visible = false; game.scene.add(fanMesh);
     const edgeMat = glow(0xff2030, 0), edge = new T.Mesh(new T.PlaneGeometry(1, 1), edgeMat); edge.visible = false; game.scene.add(edge);
     const beam = new T.Group(); beam.visible = false; game.scene.add(beam);
@@ -89,10 +98,18 @@ LAB.shelf('archon', 'Archon', (game) => {
     const wall = new T.Mesh(new T.PlaneGeometry(1, 1), glow(0xfff4d8, 0.85)), wallGlow = new T.Mesh(new T.PlaneGeometry(1, 1), glow(0xffa040, 0.25, true));
     const strip = new T.Mesh(new T.PlaneGeometry(1, 1), glow(0xd02010, 0.7));
     game.scene.add(wall, wallGlow, strip); wall.visible = wallGlow.visible = strip.visible = false;
-    const wave = new T.Mesh(new T.RingGeometry(0.95, 1, 96), glow(0xfff0c8, 0.95)); wave.rotation.x = -Math.PI / 2; wave.position.y = 0.06; wave.visible = false; game.scene.add(wave);
-    const waveGlow = new T.Mesh(new T.RingGeometry(0.88, 0.95, 96), glow(0xd02010, 0.6)); waveGlow.rotation.x = -Math.PI / 2; waveGlow.position.y = 0.05; waveGlow.visible = false; game.scene.add(waveGlow);
-    A = { root, body, look, core, iris, irisMat, halo, rings, wings, light, floor, disc, circle, fanMesh, fanMat, edge, edgeMat, beam, ray, rayGlow, wall, wallGlow, strip, wave, waveGlow, mats,
-      grow: 0, y: 3.8, dodge: new Map(), yaw: 0, pitch: 0, align: 0, spread: 1, glowK: 0, red: 0, dim: 0, flashT: 0, shock: null, struck: new Set(), sweep: null, dieT: 0 };
+    // light orbs: a white-hot core in a red-gold glow, with a shadow on the ground so you can tell where they are
+    const oCore = new T.SphereGeometry(0.26, 10, 8), oGlow = new T.SphereGeometry(0.44, 10, 8), oShadow = new T.CircleGeometry(0.42, 14);
+    const oCoreM = new T.MeshBasicMaterial({ color: 0xfff4dc }), oGlowM = glow(0xff5020, 0.4, true), oShadowM = glow(0x000000, 0.32);
+    const orbs = [];
+    for (let i = 0; i < 140; i++) {
+      const g = new T.Group(); g.add(new T.Mesh(oCore, oCoreM), new T.Mesh(oGlow, oGlowM)); g.visible = false; game.scene.add(g);
+      const sh = new T.Mesh(oShadow, oShadowM); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; sh.visible = false; game.scene.add(sh);
+      orbs.push({ g, sh, p: V(), v: V(), alive: false, d: 0 });
+    }
+    A = { root, body, look, core, iris, irisMat, halo, rings, wings, light, floor, disc, circle, fanMesh, fanMat, edge, edgeMat, beam, ray, rayGlow, wall, wallGlow, strip, mats,
+      orbs, orbNext: 0, volley: null, ringMat, eyeMat, pupMat,
+      grow: 0, y: 3.8, dodge: new Map(), yaw: 0, pitch: 0, align: 0, spread: 1, red: 0, dim: 0, flashT: 0, struck: new Set(), sweep: null, dieT: 0 };
     parts.length = 0; parts.push({ x: 0, y: 3, z: 0, r: 1.2, weak: true, flash: 0 });
     for (const R of rings) for (const E of R.eyes) parts.push(E.part);
   }
@@ -109,12 +126,16 @@ LAB.shelf('archon', 'Archon', (game) => {
       if (!A) build();
       if (game.bossHook !== hook) { game.bossHook = hook; hideCentipede(); D.alive = false; D.dying = false; D.spawnT = 0.6; game.hpBar.visible = false; }
     } else if (game.bossHook === hook) {
-      game.bossHook = null; clearAttack(); A.root.visible = false; A.floor.visible = false; A.wave.visible = A.waveGlow.visible = false; A.shock = null;
+      game.bossHook = null; clearAttack(); clearOrbs(); A.root.visible = false; A.floor.visible = false; hideGuards();
       D.alive = false; D.dying = false; D.spawnT = 0.8; D.state = 'walk'; game.hpBar.visible = false; game.labBreathing = false;
     }
   }
-  // the whole Archon flashes white when it's hit (the Demon shelf's White flash knobs)
-  window.FEATURES.on('demonHit', () => { if (A && game.bossHook === hook && LAB.get('demon.flash')) A.flashT = LAB.get('demon.flashLen') ?? 0.3; }, 'lab');
+  // the whole Archon flashes white when it's hit (the Demon shelf's White flash knobs); Shield gives back half
+  window.FEATURES.on('demonHit', (dmg) => {
+    if (!A || game.bossHook !== hook) return;
+    if (LAB.get('demon.flash')) A.flashT = LAB.get('demon.flashLen') ?? 0.3;
+    if (get('shield', 0) && D.alive && !D.dying && guardsUp() > 0 && dmg > 0) { D.hp += dmg * 0.5; if (D.hp > 0 && Math.random() < 0.5) shieldFx(); }
+  }, 'lab');
 
   // ---------------------------------------------------------------- where it is and who it watches
   const size = () => get('size', 1);
@@ -128,8 +149,8 @@ LAB.shelf('archon', 'Archon', (game) => {
     hideCentipede();
     D.pos.set(0, 0, 0); D.vel.set(0, 0, 0); D.yaw = 0;
     D.hp = game.demonMax; D.alive = true; D.dying = false; D.headGone = false; D.scale = 0.05; D.state = 'walk'; D.atkT = 0; D.cd = 2.5; D.mode = 'prowl'; D.modeT = 99; D.stunT = 0; D.slowT = 0; D.flash = 0;
-    A.root.visible = true; A.floor.visible = true; A.grow = 0; A.dieT = 0; A.y = 0.5; A.align = 0; A.spread = 1; A.dim = 0; A.red = 0; A.shock = null; A.wave.visible = A.waveGlow.visible = false;
-    clearAttack();
+    A.root.visible = true; A.floor.visible = true; A.grow = 0; A.dieT = 0; A.y = 0.5; A.align = 0; A.spread = 1; A.dim = 0; A.red = 0;
+    clearAttack(); clearOrbs();
     for (const R of A.rings) for (const E of R.eyes) { E.blink = 0; E.ball.scale.setScalar(1); E.e.visible = true; }
     A.core.scale.setScalar(1); A.look.scale.setScalar(1);
     // it rises out of the floor and blows back anyone standing in its place
@@ -137,13 +158,14 @@ LAB.shelf('archon', 'Archon', (game) => {
     for (const W of game.ALL) { const dx = W.pos.x - D.pos.x, dz = W.pos.z - D.pos.z, d = Math.hypot(dx, dz) || 1; if (d < 6 * s) game.pushBack(W, dx / d, dz / d, 9); }
     game.fxRing(D.pos.x, D.pos.z, 0xffd890, 7 * s, 0.7); game.fxPillar(D.pos.x, D.pos.z, 0xffe0a0, 14, 2 * s, 0.9);
     game.spawnPuffs(20, 4 * s, tv.set(D.pos.x, 0, D.pos.z), 1.6); game.shake(0.2);
+    for (const Gd of G) { Gd.hp = get('guardHp', 3); Gd.backT = 0.6 + Gd.i * 0.25; Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; }
   }
 
   // ---------------------------------------------------------------- attacks
   function clearAttack() {
     if (!A) return;
     A.fanMesh.visible = false; A.edge.visible = false; A.beam.visible = false; A.wall.visible = A.wallGlow.visible = A.strip.visible = false;
-    A.sweep = null; game.labBreathing = false;
+    A.sweep = null; A.volley = null; game.labBreathing = false;
   }
   // the warning fan: a flat ring sector on the ground, from angle a0 to a1 (angles as the game's yaw: 0 is +z)
   function makeFan(a0, a1, r0, r1) {
@@ -152,24 +174,27 @@ LAB.shelf('archon', 'Archon', (game) => {
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
     A.fanMesh.geometry.dispose(); A.fanMesh.geometry = g;
   }
-  // a flat strip on the ground from the centre out along angle a, from r0 to r1, w wide
+  // a strip from the centre out along angle a, from r0 to r1, w wide: flat on the ground, or standing up like a wall
   function layStrip(m, a, r0, r1, w, y, up) {
     const mid = (r0 + r1) / 2, sx = Math.sin(a), sz = Math.cos(a);
     m.position.set(D.pos.x + sx * mid, y, D.pos.z + sz * mid);
-    m.rotation.set(up ? 0 : -Math.PI / 2, a - Math.PI / 2, 0, 'YXZ');   // its length along the angle; standing up like a wall, or flat
+    m.rotation.set(up ? 0 : -Math.PI / 2, a - Math.PI / 2, 0, 'YXZ');
     m.scale.set(r1 - r0, w, 1);
   }
+  const PATTERNS = ['ring', 'fan', 'spiral'];
   function startAttack(Tg) {
-    const s = size(), mode = get('attacks', 0), dx = Tg.pos.x - D.pos.x, dz = Tg.pos.z - D.pos.z, d = Math.hypot(dx, dz);
-    let near = 0; for (const W of game.ALL) if (W.downT <= 0 && Math.hypot(W.pos.x - D.pos.x, W.pos.z - D.pos.z) < 9 * s) near++;
-    const slam = mode === 2 || (mode === 0 && (near >= 2 || (d < 8 * s && Math.random() < 0.6) || Math.random() < 0.25));
+    const s = size(), mode = get('attacks', 0), dx = Tg.pos.x - D.pos.x, dz = Tg.pos.z - D.pos.z;
+    const beam = mode === 1 || (mode === 2 && Math.random() < 0.45);
     A.dodge.clear(); for (const W of game.ALL) A.dodge.set(W, Math.random() < get('dodge', 0.75));
-    D.state = 'windup'; D.kind = slam ? 'slam' : 'beam'; D.atkT = get('windup', 1.3) * (slam ? 0.9 : 1); D.atkLen = D.atkT; A.struck.clear();
-    if (!slam) {
+    D.state = 'windup'; D.kind = beam ? 'beam' : 'orbs'; D.atkT = get('windup', 1.3); D.atkLen = D.atkT; A.struck.clear();
+    if (beam) {
       const mid = Math.atan2(dx, dz), sw = get('sweep', 110) * Math.PI / 180, dir = Math.random() < 0.5 ? 1 : -1;
       A.sweep = { a0: mid - dir * sw / 2, a1: mid + dir * sw / 2, dir, prev: mid - dir * sw / 2 };
       makeFan(A.sweep.a0, A.sweep.a1, 1.6 * s, get('reach', 24)); A.fanMesh.position.set(D.pos.x, 0.04, D.pos.z); A.fanMesh.visible = true; A.fanMat.opacity = 0;
       A.edge.visible = true; A.edgeMat.opacity = 0;
+    } else {
+      const pk = get('pattern', 0), kind = pk ? PATTERNS[pk - 1] : PATTERNS[Math.floor(Math.random() * 3)];
+      A.volley = { kind, t: 0, fired: 0, base: Math.random() * Math.PI * 2, dir: Math.random() < 0.5 ? 1 : -1 };
     }
     game.shake(0.05);
   }
@@ -206,23 +231,198 @@ LAB.shelf('archon', 'Archon', (game) => {
     S.prev = a;
   }
   // a teammate brain jumps it: a full jump (held), let go once it's in the air a while
-  function hop(W) { if (W.human || !W.grounded || W.crouchT > 0) return; W.jumpQ = true; W.jumpHeld = true; W.labHopT = 0.45; }
+  function hop(W) { if (W.human || !W.grounded || W.crouchT > 0 || W.downT > 0) return; W.jumpQ = true; W.jumpHeld = true; W.labHopT = 0.45; }
   function hops(dt) { for (const W of game.ALL) if (W.labHopT > 0) { W.labHopT -= dt; if (W.labHopT <= 0 && !W.human) W.jumpHeld = false; } }
-  function shockFrame(dt) {
-    const W0 = A.shock; if (!W0) return;
-    W0.r += W0.v * dt; const s = size(), reach = get('reach', 24) * 1.15, fade = clamp(1 - (W0.r - reach * 0.8) / (reach * 0.2), 0, 1);
-    A.wave.visible = A.waveGlow.visible = true;
-    A.wave.position.set(D.pos.x, 0.06, D.pos.z); A.waveGlow.position.set(D.pos.x, 0.05, D.pos.z);
-    A.wave.scale.setScalar(W0.r); A.waveGlow.scale.setScalar(W0.r); A.wave.material.opacity = 0.95 * fade; A.waveGlow.material.opacity = 0.6 * fade;
-    if (Math.random() < 0.8) { const a = Math.random() * Math.PI * 2; tv2.set(D.pos.x + Math.sin(a) * W0.r, 0.2, D.pos.z + Math.cos(a) * W0.r); tv.set(Math.sin(a) * 2, 2.5, Math.cos(a) * 2); game.spark(tv2, tv, 0.4, 0.5, 0xfff0c0, 2); }
-    for (const W of game.ALL) {
-      if (W0.hit.has(W) || W.downT > 0 || W.diveT > 0 || W.y > 0.5) continue;
-      const dx = W.pos.x - D.pos.x, dz = W.pos.z - D.pos.z, d = Math.hypot(dx, dz) || 1;
-      if (A.dodge.get(W) && d > W0.r && (d - W0.r) / W0.v < 0.34) hop(W);
-      if (Math.abs(d - W0.r) > 0.75) continue;
-      W0.hit.add(W); game.knockDown(W, dx / d, dz / d, 9); game.shake(0.2);
+
+  // ---------------------------------------------------------------- light orbs
+  function fire(a) {
+    const O = A.orbs[A.orbNext]; A.orbNext = (A.orbNext + 1) % A.orbs.length;
+    const s = size(), sp = get('orbSpeed', 8), r0 = 1.8 * s;
+    O.p.set(D.pos.x + Math.sin(a) * r0, ORB_Y, D.pos.z + Math.cos(a) * r0); O.v.set(Math.sin(a) * sp, 0, Math.cos(a) * sp);
+    O.alive = true; O.d = r0; O.g.visible = true; O.sh.visible = true; O.g.scale.setScalar(0.2);
+  }
+  function volleyFrame(dt) {   // during the strike: fires the waves of its pattern; returns true when it's done
+    const Vl = A.volley, n = Math.round(get('orbs', 14)); Vl.t += dt;
+    const shoot = (k) => { A.core.getWorldPosition(tv); game.fxSphere(tv, 0xffd0a0, 2.2, 0.2); game.shake(0.08); A.flashT = Math.max(A.flashT, 0.05); return k; };
+    if (Vl.kind === 'ring') {   // three full rings, each turned half a step, so the gaps move
+      while (Vl.fired < 3 && Vl.t >= Vl.fired * 0.55) { const off = Vl.base + (Vl.fired % 2) * Math.PI / n; for (let i = 0; i < n; i++) fire(off + i / n * Math.PI * 2); Vl.fired = shoot(Vl.fired + 1); }
+      return Vl.t > 1.3;
     }
-    if (W0.r > reach) { A.shock = null; A.wave.visible = A.waveGlow.visible = false; }
+    if (Vl.kind === 'fan') {    // four aimed sprays at whoever has the Solid
+      const Tg = target(), m = Math.max(3, Math.round(n / 2)), spread = 1.1;
+      while (Vl.fired < 4 && Vl.t >= Vl.fired * 0.4) {
+        const mid = Tg ? Math.atan2(Tg.pos.x - D.pos.x, Tg.pos.z - D.pos.z) : Vl.base;
+        for (let i = 0; i < m; i++) fire(mid - spread / 2 + spread * i / (m - 1) + (Vl.fired % 2 ? spread / (m - 1) / 2 : 0));
+        Vl.fired = shoot(Vl.fired + 1); A.yaw = lerpAng(A.yaw, mid, 0.6);
+      }
+      return Vl.t > 1.5;
+    }
+    // spiral: two streams turning around it
+    const len = 2.2, every = Math.max(0.05, 1.6 / n);
+    while (Vl.t >= Vl.fired * every && Vl.fired * every < len) {
+      const a = Vl.base + Vl.dir * Vl.fired * every * 2.2;
+      fire(a); fire(a + Math.PI); Vl.fired++; if (Vl.fired % 4 === 0) shoot(0);
+    }
+    return Vl.t > len;
+  }
+  function clearOrbs() { if (A) for (const O of A.orbs) { O.alive = false; O.g.visible = false; O.sh.visible = false; } }
+  function orbsFrame(dt) {
+    const reach = get('reach', 24) * 1.2, hitR = 0.75;
+    for (const O of A.orbs) {
+      if (!O.alive) continue;
+      tv3.copy(O.p); O.p.addScaledVector(O.v, dt); O.d += O.v.length() * dt;
+      const fade = clamp((reach - O.d) / (reach * 0.15), 0, 1);
+      O.g.position.copy(O.p); O.g.scale.setScalar(Math.min(1, O.g.scale.x + dt * 6) * (0.3 + 0.7 * fade) * (1 + Math.sin(game.time * 30 + O.d) * 0.08));
+      O.sh.position.set(O.p.x, 0.03, O.p.z); O.sh.scale.setScalar(0.4 + 0.6 * fade);
+      let pop = O.d > reach || (LAB.blocked && LAB.blocked(tv3, O.p));
+      if (!pop) for (const W of game.ALL) {
+        if (W.downT > 0) continue;
+        const dx = W.pos.x - O.p.x, dz = W.pos.z - O.p.z, d = Math.hypot(dx, dz);
+        if (!W.human && A.dodge.get(W) && d < 2.2 && (dx * O.v.x + dz * O.v.z) > 0) {   // a teammate sees one coming at them
+          const along = (dx * O.v.x + dz * O.v.z) / O.v.length(), side = Math.abs(dx * O.v.z - dz * O.v.x) / O.v.length();
+          if (side < hitR + 0.2 && along < 1.4) hop(W);
+        }
+        if (d > hitR || W.diveT > 0 || W.y > ORB_Y + 0.25) continue;
+        const l = O.v.length() || 1; game.knockDown(W, O.v.x / l, O.v.z / l, 8); stats.orbHits++; game.shake(0.18); pop = true; break;
+      }
+      if (pop) { O.alive = false; O.g.visible = false; O.sh.visible = false; if (O.d <= reach) { game.fxSphere(O.p, 0xffd0a0, 1.1, 0.25); game.sparkBurst(O.p, 8, 3, 0.4, 2, 0xffb060); } }
+    }
+  }
+
+  // ---------------------------------------------------------------- defenders
+  const G = [];
+  function buildGuard(i) {
+    const g = new T.Group(), spin = new T.Group(); g.add(spin); g.visible = false; game.scene.add(g);
+    const ringM = lambert(0xa87a28, 0x120a02), eyeM = lambert(0xe8e0d0, 0x202020), wingM = lambert(0x6a5f52, 0); wingM.side = T.DoubleSide;
+    spin.add(new T.Mesh(new T.TorusGeometry(0.85, 0.08, 6, 40), ringM));
+    const inner = new T.Mesh(new T.TorusGeometry(0.62, 0.05, 6, 32), ringM); spin.add(inner);
+    const eye = new T.Group(); g.add(eye);
+    eye.add(new T.Mesh(new T.SphereGeometry(0.42, 14, 10), eyeM));
+    const irisM = new T.MeshBasicMaterial({ color: 0xc8203a });
+    const iris = new T.Mesh(new T.CircleGeometry(0.24, 18), irisM); iris.position.z = 0.415; eye.add(iris);
+    const pup = new T.Mesh(new T.CircleGeometry(0.11, 12), new T.MeshBasicMaterial({ color: 0x050205 })); pup.position.z = 0.42; eye.add(pup);
+    const wings = [];
+    for (const side of [1, -1]) {
+      const w = new T.Group(); w.position.set(side * 0.55, 0.1, -0.2); g.add(w);
+      for (let f = 0; f < 4; f++) { const m = new T.Mesh(feathers(), wingM); m.scale.set(0.9, 1.3 - f * 0.18, 1); m.rotation.z = -side * (0.9 + f * 0.28); w.add(m); }
+      wings.push({ w, side });
+    }
+    const sh = new T.Mesh(new T.CircleGeometry(0.8, 18), glow(0x000000, 0.3)); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.025; sh.visible = false; game.scene.add(sh);
+    const ringFx = new T.Mesh(new T.RingGeometry(0.9, 1, 40), glow(0xff2a40, 0)); ringFx.rotation.x = -Math.PI / 2; ringFx.position.y = 0.035; ringFx.visible = false; game.scene.add(ringFx);
+    const Gd = { i, g, spin, inner, eye, iris, irisM, wings, sh, ringFx, mats: [ringM, eyeM, wingM], pos: V(Math.sin(i) * 12, 0, Math.cos(i) * 12), vel: V(), y: 1.6,
+      hp: 3, up: false, backT: 0, stunT: 0, swatCD: 0, flash: 0, red: 0, yaw: 0, chase: false };
+    for (const m of Gd.mats) m.userData.base = m.emissive.clone();
+    return Gd;
+  }
+  LAB.archonGuards = () => G;   // the defenders, for other shelves (and tests)
+  const stats = LAB.archonStats = { swats: 0, breaks: 0, orbHits: 0 };   // counts, for tests
+  function hideGuards() { for (const Gd of G) { Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } }
+  function guardsUp() { let n = 0; const c = get('guards', 4); for (const Gd of G) if (Gd.i < c && Gd.up) n++; return n; }
+  function shieldFx() { const n = guardsUp(); if (!n) return; A.core.getWorldPosition(tv); for (const Gd of G) if (Gd.up && Gd.i < get('guards', 4)) { tv2.set(Gd.pos.x, Gd.y, Gd.pos.z); const b = tv2.clone(); game.fxSphere(b, 0xff8a60, 0.9, 0.25); } game.fxSphere(tv, 0xff6a50, 3.2 * size(), 0.3); }
+  function knockOff(Gd, o, hard) {   // the Solid bounces off a defender: it's loose, its resonance gone
+    const hs = Math.hypot(o.v.x, o.v.z) || 1;
+    let ax = o.p.x - Gd.pos.x, az = o.p.z - Gd.pos.z; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
+    const side = Math.random() < 0.5 ? 1 : -1, bx = ax * 0.6 - o.v.z / hs * side * 0.5 - o.v.x / hs * 0.4, bz = az * 0.6 + o.v.x / hs * side * 0.5 - o.v.z / hs * 0.4, bl = Math.hypot(bx, bz) || 1;
+    const out = hard ? 4 : 5.5;
+    o.v.set(bx / bl * out, hard ? 9 : 7.5, bz / bl * out); o.w.set((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
+    o.p.set(Gd.pos.x + ax * 1.15, Math.max(o.p.y, Gd.y), Gd.pos.z + az * 1.15);
+    o.res = 0; o.chain = null; o.special = null; o.fast = false; o.oop = false; o.bowl = false; o.hitCD = 0.5; o.last = null; o.touched = false;
+    o.labTo = null; o.labMadden = null; o.labSuper = null; o.labMul = null;
+    tv.set(Gd.pos.x, Gd.y, Gd.pos.z); game.fxRing(Gd.pos.x, Gd.pos.z, 0xff4050, 2.4, 0.35); game.sparkBurst(tv, 18, 4, 0.5, 2.5, hard ? 0xffffff : 0xff6070);
+    Gd.flash = 1; game.shake(hard ? 0.2 : 0.12);
+  }
+  // a wizard (not the thrower) right there to catch it: the defenders leave that one alone
+  function catcherNear(x, z, thrower) { for (const W of game.ALL) if (W !== thrower && W.downT <= 0 && Math.hypot(W.pos.x - x, W.pos.z - z) < 2.2) return true; return false; }
+  function guardsFrame(dt) {
+    const count = A && D.alive && !D.dying && A.grow >= 1 ? Math.round(get('guards', 4)) : 0;
+    while (G.length < count) G.push(buildGuard(G.length));
+    const o = game.orb, s = size(), ring = get('guardRing', 13), speed = get('guardSpeed', 5.5), reachR = get('guardReach', 1.4), t = game.time;
+    const holder = o.state === 'held' ? o.holder : null;
+    // passing lanes: a point a little past halfway from the holder to each teammate who's up
+    const lanes = [];
+    if (holder) for (const W of game.ALL) { if (W === holder || W.downT > 0) continue; const dx = W.pos.x - holder.pos.x, dz = W.pos.z - holder.pos.z; if (Math.hypot(dx, dz) > 4) lanes.push(V(holder.pos.x + dx * 0.58, 0, holder.pos.z + dz * 0.58)); }
+    // a pass or shot in the air: the defender that can get under it first goes for it
+    let chaser = null, chaseAt = null;
+    const flying = o.state === 'air' && !o.touched && o.last && Math.hypot(o.v.x, o.v.z) > 2;
+    if (flying) {
+      let best = 1e9; const g = game.G * (game.solid.grav || 1);
+      for (let k = 1; k <= 24; k++) {
+        const tt = k * 0.06, px = o.p.x + o.v.x * tt, pz = o.p.z + o.v.z * tt, py = o.p.y + o.v.y * tt - 0.5 * g * tt * tt;
+        if (py < 0.2) break;
+        if (py > 3.2) continue;   // over their heads
+        if (catcherNear(px, pz, o.last)) continue;   // a teammate's catch: theirs
+        for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0) continue; const d = Math.hypot(px - Gd.pos.x, pz - Gd.pos.z) - reachR; if (d <= speed * 1.6 * tt && tt < best) { best = tt; chaser = Gd; chaseAt = V(px, py, pz); } }
+        if (chaser) break;
+      }
+    }
+    const used = new Set();
+    if (chaser) used.add(chaser);
+    for (const L of lanes) {   // each lane gets the nearest free defender
+      let b = null, bd = 1e9; for (const Gd of G) { if (Gd.i >= count || !Gd.up || Gd.stunT > 0 || used.has(Gd)) continue; const d = Math.hypot(L.x - Gd.pos.x, L.z - Gd.pos.z); if (d < bd) { bd = d; b = Gd; } }
+      if (b) { used.add(b); b.goal = L; }
+    }
+    for (const Gd of G) {
+      if (Gd.i >= count) { if (Gd.up || Gd.g.visible) { Gd.up = false; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } continue; }
+      if (!Gd.up) {   // gone: back after a while, out of the floor near its post
+        Gd.backT -= dt; Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false;
+        if (Gd.backT <= 0 && D.alive && !D.dying && A.grow >= 1) {
+          const a = Gd.i / Math.max(1, count) * Math.PI * 2 + t * 0.08; Gd.pos.set(D.pos.x + Math.sin(a) * ring, 0, D.pos.z + Math.cos(a) * ring); Gd.vel.set(0, 0, 0);
+          Gd.up = true; Gd.hp = get('guardHp', 3); Gd.y = 0.2; Gd.stunT = 0.6; Gd.flash = 1; Gd.g.visible = true; Gd.sh.visible = true;
+          game.fxPillar(Gd.pos.x, Gd.pos.z, 0xffd890, 5, 0.9, 0.5); game.fxRing(Gd.pos.x, Gd.pos.z, 0xffd890, 2.5, 0.5);
+        }
+        continue;
+      }
+      Gd.stunT = Math.max(0, Gd.stunT - dt); Gd.swatCD = Math.max(0, Gd.swatCD - dt); Gd.flash = Math.max(0, Gd.flash - dt * 3);
+      // where it wants to be
+      const home = Gd.i / Math.max(1, count) * Math.PI * 2 + t * 0.08;
+      let gx = D.pos.x + Math.sin(home) * ring, gz = D.pos.z + Math.cos(home) * ring, sp = speed;
+      Gd.chase = Gd === chaser;
+      if (Gd.chase) { gx = chaseAt.x; gz = chaseAt.z; sp = speed * 1.6; }
+      else if (Gd.goal && used.has(Gd)) { gx = Gd.goal.x; gz = Gd.goal.z; }
+      Gd.goal = null;
+      if (Gd.stunT > 0) sp *= 0.15;
+      const dx = gx - Gd.pos.x, dz = gz - Gd.pos.z, dl = Math.hypot(dx, dz);
+      const want = dl > 0.3 ? Math.min(sp, dl * 3) : 0, a = 1 - Math.exp(-(Gd.chase ? 9 : 5) * dt);
+      Gd.vel.x += ((dl ? dx / dl : 0) * want - Gd.vel.x) * a; Gd.vel.z += ((dl ? dz / dl : 0) * want - Gd.vel.z) * a;
+      // keep apart, out of the Archon's column, and off the wizards
+      for (const H of G) { if (H === Gd || !H.up || H.i >= count) continue; const hx = Gd.pos.x - H.pos.x, hz = Gd.pos.z - H.pos.z, hd = Math.hypot(hx, hz) || 0.01; if (hd < 2.2) { Gd.vel.x += hx / hd * (2.2 - hd) * 6 * dt; Gd.vel.z += hz / hd * (2.2 - hd) * 6 * dt; } }
+      Gd.pos.addScaledVector(Gd.vel, dt);
+      { const cx = Gd.pos.x - D.pos.x, cz = Gd.pos.z - D.pos.z, cd = Math.hypot(cx, cz) || 0.01, minR = 4.5 * s; if (cd < minR) { Gd.pos.x = D.pos.x + cx / cd * minR; Gd.pos.z = D.pos.z + cz / cd * minR; } }
+      for (const W of game.ALL) { if (W.y > Gd.y + 1) continue; const wx = W.pos.x - Gd.pos.x, wz = W.pos.z - Gd.pos.z, wd = Math.hypot(wx, wz) || 0.01; if (wd < 0.95) { W.pos.x += wx / wd * (0.95 - wd); W.pos.z += wz / wd * (0.95 - wd); } }
+      // the Solid: swatted when it comes in reach; a fast throw hurts it
+      Gd.hurtCD = Math.max(0, (Gd.hurtCD || 0) - dt);
+      if (o.state === 'air' && o.last && o.hitCD <= 0 && o.p.y > 0.2 && o.p.y < Gd.y + 1.6) {
+        const ox = o.p.x - Gd.pos.x, oz = o.p.z - Gd.pos.z, od = Math.hypot(ox, oz), spd = o.v.length();
+        const hard = spd > 17 && Gd.hurtCD <= 0, ready = Gd.stunT <= 0 && Gd.swatCD <= 0;
+        // ready, it swats anything in its reach; hurt or busy, only a fast throw at its body connects
+        if (((ready && od < reachR + 0.3) || (hard && od < 1.1 && Math.abs(o.p.y - Gd.y) < 1.1)) && !catcherNear(o.p.x, o.p.z, o.last)) {
+          knockOff(Gd, o, hard); Gd.swatCD = 0.8; if (hard) Gd.hurtCD = 0.3; stats.swats++;
+          if (hard) {
+            Gd.hp--; Gd.stunT = 1.6; Gd.vel.set(-ox / (od || 1) * 6, 0, -oz / (od || 1) * 6);
+            if (Gd.hp <= 0) {
+              Gd.up = false; Gd.backT = get('guardBack', 12); stats.breaks++; tv.set(Gd.pos.x, Gd.y, Gd.pos.z);
+              game.fxSphere(tv, 0xfff0c0, 3, 0.4); game.fxPillar(Gd.pos.x, Gd.pos.z, 0xffe0a0, 8, 1.2, 0.6); game.sparkBurst(tv, 40, 6, 0.8, 3, 0xffe0a0); game.shake(0.3);
+              Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; continue;
+            }
+          }
+        }
+      }
+      // how it looks: hovering, the ring turning, red and fast when it goes for a pass, wobbling when hurt
+      Gd.y += ((Gd.stunT > 0 ? 0.9 : 1.6 + Math.sin(t * 2 + Gd.i) * 0.12) - Gd.y) * (1 - Math.exp(-4 * dt));
+      Gd.red += ((Gd.chase ? 1 : lanes.length && used.has(Gd) ? 0.35 : 0) - Gd.red) * (1 - Math.exp(-10 * dt));
+      const face = Math.atan2(o.p.x - Gd.pos.x, o.p.z - Gd.pos.z); Gd.yaw = lerpAng(Gd.yaw, face, 1 - Math.exp(-8 * dt));
+      Gd.g.position.set(Gd.pos.x, Gd.y * s, Gd.pos.z); Gd.g.scale.setScalar(s); Gd.g.rotation.set(0, Gd.yaw, 0);
+      Gd.eye.rotation.x = clamp(-Math.atan2(o.p.y - Gd.y, Math.hypot(o.p.x - Gd.pos.x, o.p.z - Gd.pos.z) || 1), -0.8, 0.8);
+      Gd.spin.rotation.z += dt * (1.5 + Gd.red * 9); Gd.inner.rotation.y += dt * (2 + Gd.red * 6);
+      if (Gd.stunT > 0) Gd.g.rotation.z = Math.sin(t * 30) * 0.25 * Gd.stunT;
+      for (const Wg of Gd.wings) Wg.w.rotation.y = Wg.side * (0.3 + Math.sin(t * (8 + Gd.red * 10) + Gd.i) * 0.35);
+      const lit = Gd.flash > 0 && Math.floor(t * 24) % 2 === 0;
+      for (const m of Gd.mats) { if (lit) m.emissive.setRGB(1, 1, 1); else m.emissive.copy(m.userData.base).lerp(RED, Gd.red * 0.5); }
+      Gd.irisM.color.setRGB(0.78 + 0.22 * Gd.red, 0.13 * (1 - Gd.red), 0.23 * (1 - Gd.red));
+      Gd.g.visible = true; Gd.sh.visible = true; Gd.sh.position.set(Gd.pos.x, 0.025, Gd.pos.z);
+      // its reach, drawn on the ground while it's guarding a lane or going for a pass
+      Gd.ringFx.visible = Gd.red > 0.05; Gd.ringFx.position.set(Gd.pos.x, 0.035, Gd.pos.z); Gd.ringFx.scale.setScalar(reachR + 0.3); Gd.ringFx.material.opacity = 0.25 + 0.55 * Gd.red;
+    }
   }
 
   // ---------------------------------------------------------------- every frame (the game calls this in place of the centipede)
@@ -230,7 +430,7 @@ LAB.shelf('archon', 'Archon', (game) => {
     if (!A) return;
     if (D.g.visible || (game.legGroup && game.legGroup.visible)) hideCentipede();
     const s = size(), t = game.time;
-    shockFrame(dt); hops(dt);
+    orbsFrame(dt); hops(dt); guardsFrame(dt);
     if (D.dying) { die(dt, s); return; }
     if (!D.alive) { A.root.visible = false; A.floor.visible = false; D.spawnT -= dt; if (D.spawnT <= 0) spawn(); return; }
     A.grow = Math.min(1, A.grow + dt / 1.4); D.scale = A.grow;
@@ -246,32 +446,30 @@ LAB.shelf('archon', 'Archon', (game) => {
       if (stunned) { D.state = 'recover'; D.atkT = 1.1; clearAttack(); }
       else {
         D.atkT -= sdt; const k = clamp(1 - D.atkT / D.atkLen, 0, 1);
-        redGoal = k; alignGoal = 1; turn = D.kind === 'beam' ? 0 : 0.5;
+        redGoal = k; alignGoal = 1; turn = D.kind === 'beam' ? 0 : 0.8;
         if (D.kind === 'beam') {
-          yGoal = 3.8; A.fanMat.opacity = (0.22 + 0.33 * k) * (0.75 + 0.25 * Math.sin(t * (8 + 18 * k)));
+          A.fanMat.opacity = (0.22 + 0.33 * k) * (0.75 + 0.25 * Math.sin(t * (8 + 18 * k)));
           layStrip(A.edge, A.sweep.a0, 1.6 * s, get('reach', 24), 0.35, 0.05, false); A.edgeMat.opacity = 0.6 + 0.4 * k;
           A.yaw = lerpAng(A.yaw, A.sweep.a0, 1 - Math.exp(-4 * dt)); A.pitch += (0.55 - A.pitch) * (1 - Math.exp(-4 * dt));
-        } else { yGoal = 6.2; spreadGoal = 1.35; if (Math.random() < 0.5) { tv.set(D.pos.x, 0.1, D.pos.z); game.spawnPuffs(1, 3 * s, tv, 0.6); } }
+        } else {   // light gathers into the eye from the rings
+          spreadGoal = 1.25; yGoal = 3.2;
+          if (Math.random() < 0.4 + k) { A.core.getWorldPosition(tv); const a = Math.random() * Math.PI * 2, r = 3.5 * s; tv2.set(tv.x + Math.sin(a) * r, tv.y + (Math.random() - 0.5) * 2, tv.z + Math.cos(a) * r); tv3.subVectors(tv, tv2).multiplyScalar(2.2); game.spark(tv2, tv3, 0.45, 0.5, Math.random() < 0.5 ? 0xffd0a0 : 0xff6a30, 0); }
+        }
         A.light.intensity = 0.3 + 1.2 * k;
         if (D.atkT <= 0) {
           D.state = 'strike';
           if (D.kind === 'beam') { D.atkT = get('sweepTime', 1.6); D.atkLen = D.atkT; A.fanMesh.visible = false; A.edge.visible = false; game.labBreathing = true; game.shake(0.2); }
-          else { D.atkT = 0.18; D.atkLen = D.atkT; }
+          else { D.atkT = 9; D.atkLen = 9; }
         }
       }
     } else if (D.state === 'strike') {
       D.atkT -= sdt; const k = clamp(1 - D.atkT / D.atkLen, 0, 1); redGoal = 1; alignGoal = 1; turn = 0;
       if (D.kind === 'beam') {
-        yGoal = 3.8; beamFrame(dt, k); A.yaw = A.sweep.a0 + (A.sweep.a1 - A.sweep.a0) * k; A.pitch = 0.55; A.light.intensity = 1.5;
+        beamFrame(dt, k); A.yaw = A.sweep.a0 + (A.sweep.a1 - A.sweep.a0) * k; A.pitch = 0.55; A.light.intensity = 1.5;
         if (D.atkT <= 0) { clearAttack(); D.state = 'recover'; D.atkT = get('opening', 1.8); }
       } else {
-        yGoal = 1.2; spreadGoal = 1.5; A.y += (1.2 - A.y) * (1 - Math.exp(-30 * dt));
-        if (D.atkT <= 0) {
-          A.shock = { r: 2 * s, v: get('waveSpeed', 12), hit: new Set() }; game.shake(0.45);
-          game.fxRing(D.pos.x, D.pos.z, 0xfff0c0, 6 * s, 0.4); game.fxPillar(D.pos.x, D.pos.z, 0xffe0a0, 10, 2.5 * s, 0.5);
-          game.spawnPuffs(26, 5 * s, tv.set(D.pos.x, 0, D.pos.z), 2.2);
-          D.state = 'recover'; D.atkT = get('opening', 1.8);
-        }
+        spreadGoal = 1.25; yGoal = 3.2; turn = 0.8;
+        if (!A.volley || volleyFrame(sdt)) { clearAttack(); D.state = 'recover'; D.atkT = get('opening', 1.8); }
       }
     } else if (D.state === 'recover') {   // the opening: it sinks and dims, the core at throwing height
       clearAttack(); D.atkT -= sdt; yGoal = 1.7; dimGoal = 1; alignGoal = 1; turn = 0.3;
@@ -298,8 +496,8 @@ LAB.shelf('archon', 'Archon', (game) => {
       R.g.quaternion.slerpQuaternions(tq, tq2, ease(A.align));
       R.g.scale.setScalar(A.spread * (1 - A.dim * 0.12));
     }
-    // wings: slow beats, raised on the shockwave, drooping in the opening
-    const beat = Math.sin(t * 2.2) * 0.18 * (1 - A.dim) + (D.kind === 'slam' && D.state === 'windup' ? -0.4 : 0) + A.dim * 0.45;
+    // wings: slow beats, spread while it fires, drooping in the opening
+    const beat = Math.sin(t * 2.2) * 0.18 * (1 - A.dim) + (D.kind === 'orbs' && D.state !== 'walk' && D.state !== 'recover' ? -0.25 : 0) + A.dim * 0.45;
     for (const Wg of A.wings) { Wg.w.rotation.set(-0.25, 0, -Wg.side * (Wg.tilt + beat * (Wg.tilt < 1 ? 1 : 0.6))); Wg.fan.rotation.y = Wg.side * (0.35 + beat * 0.5); }
     // colours: red as it warns, dim in the opening, white while hit
     A.flashT = Math.max(0, A.flashT - dt);
@@ -343,7 +541,7 @@ LAB.shelf('archon', 'Archon', (game) => {
   // ---------------------------------------------------------------- beaten: the rings fly apart, the eyes close, a burst of light
   function die(dt, s) {
     clearAttack(); game.hpBar.visible = false;
-    if (A.dieT === 0) game.shake(0.3);
+    if (A.dieT === 0) { game.shake(0.3); for (const Gd of G) if (Gd.up) { Gd.up = false; Gd.backT = 99; tv.set(Gd.pos.x, Gd.y, Gd.pos.z); game.fxSphere(tv, 0xfff0c0, 2.5, 0.4); Gd.g.visible = false; Gd.sh.visible = false; Gd.ringFx.visible = false; } }
     A.dieT += dt; const k = A.dieT;
     for (const R of A.rings) { R.ang += dt * 6; tq.setFromAxisAngle(R.axis, R.ang); R.g.quaternion.copy(tq); R.g.scale.setScalar(1 + k * 1.6); for (const E of R.eyes) E.ball.scale.set(1, Math.max(0.1, 1 - k * 1.2), 1); }
     A.body.position.y += dt * 0.8; A.body.rotation.y += dt * (2 + k * 6);
@@ -352,24 +550,33 @@ LAB.shelf('archon', 'Archon', (game) => {
     if (k > 1.2 && A.root.visible) {
       A.core.getWorldPosition(tv); game.fxSphere(tv, 0xfff0c0, 7 * s, 0.6); game.fxPillar(D.pos.x, D.pos.z, 0xffe0a0, 18, 3 * s, 0.9);
       game.fxRing(D.pos.x, D.pos.z, 0xffd890, 10 * s, 0.7); game.sparkBurst(tv, 60, 8, 0.9, 3, 0xffe0a0); game.shake(0.4);
-      A.root.visible = false; A.floor.visible = false;
+      A.root.visible = false; A.floor.visible = false; clearOrbs();
     }
     if (k > 1.7) { D.alive = false; D.dying = false; D.spawnT = 3; }
   }
 
-  const ATT = ['BOTH', 'BEAM', 'SHOCKWAVE'];
+  const ATT = ['ORBS', 'BEAM', 'BOTH'], PAT = ['MIX', 'RING', 'FAN', 'SPIRAL'];
   return [
-    { id: 'on', label: 'Archon', help: 'A boss in place of the centipede: an angel of rings and eyes in the middle of the arena. It warns, attacks, then sinks low: hit its core then', kind: 'onoff', value: 0, dice: false,
+    { id: 'on', label: 'Archon', help: 'A boss in place of the centipede: an angel of rings and eyes in the middle of the arena, with defenders. It warns, attacks, then sinks low: hit its core then', kind: 'onoff', value: 0, dice: false,
       apply: (v) => enable(v), frame: () => { if (game.bossHook !== hook) enable(1); } },
-    { id: 'size', label: 'Archon size', help: 'How big it is (and how far apart its rings and wings are)', min: 0.6, max: 1.8, step: 0.1, value: 1, fmt: (x) => x.toFixed(1) + '×' },
-    { id: 'attacks', label: 'Attacks', help: 'BEAM: a sweeping wall of light, jump it. SHOCKWAVE: it slams down, a ring rolls out, jump it. BOTH: it picks (the shockwave when you crowd it)', min: 0, max: 2, step: 1, value: 0, fmt: (x) => ATT[x] },
-    { id: 'windup', label: 'Warning time', help: 'How long it warns before it attacks (the red fan, the rings lining up)', min: 0.5, max: 2.5, step: 0.1, value: 1.3, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'size', label: 'Archon size', help: 'How big it is (and its defenders)', min: 0.6, max: 1.8, step: 0.1, value: 1, fmt: (x) => x.toFixed(1) + '×' },
+    { id: 'attacks', label: 'Attacks', help: 'ORBS: waves of light orbs across the floor, walk through the gaps or dive. BEAM: a sweeping wall of light over a red fan. BOTH: it picks', min: 0, max: 2, step: 1, value: 0, fmt: (x) => ATT[x] },
+    { id: 'pattern', label: 'Orb pattern', help: 'RING: full circles with gaps. FAN: aimed sprays at whoever has the Solid. SPIRAL: two turning streams. MIX: it picks', min: 0, max: 3, step: 1, value: 0, fmt: (x) => PAT[x] },
+    { id: 'orbs', label: 'Orbs a wave', help: 'How many orbs in a ring (a fan has half as many; a spiral fires them faster)', min: 6, max: 32, step: 1, value: 14 },
+    { id: 'orbSpeed', label: 'Orb speed', help: 'How fast the orbs fly', min: 3, max: 18, step: 0.5, value: 8 },
+    { id: 'windup', label: 'Warning time', help: 'How long it warns before it attacks (the rings lining up, light gathering, the red fan)', min: 0.5, max: 2.5, step: 0.1, value: 1.3, fmt: (x) => x.toFixed(1) + ' S' },
     { id: 'sweep', label: 'Beam sweep', help: 'How wide the beam sweeps', min: 40, max: 220, step: 10, value: 110, fmt: (x) => x + '°' },
     { id: 'sweepTime', label: 'Sweep time', help: 'How long the sweep takes (shorter is faster)', min: 0.5, max: 3, step: 0.1, value: 1.6, fmt: (x) => x.toFixed(1) + ' S' },
-    { id: 'reach', label: 'Reach', help: 'How far the beam and the shockwave go', min: 10, max: 44, step: 2, value: 24, fmt: (x) => x + ' M' },
-    { id: 'waveSpeed', label: 'Shockwave speed', help: 'How fast the ring rolls out', min: 5, max: 26, step: 1, value: 12 },
+    { id: 'reach', label: 'Reach', help: 'How far the beam and the orbs go', min: 10, max: 44, step: 2, value: 24, fmt: (x) => x + ' M' },
     { id: 'opening', label: 'Opening', help: 'How long it sinks low after an attack, its core in reach', min: 0.4, max: 4, step: 0.1, value: 1.8, fmt: (x) => x.toFixed(1) + ' S' },
-    { id: 'dodge', label: 'Teammates dodge', help: 'How often the teammate brains jump the beam and the shockwave', min: 0, max: 1, step: 0.05, value: 0.75, fmt: (x) => Math.round(x * 100) + '%' },
-    { id: 'rest', label: 'Rest', help: 'How long it waits after the opening before the next warning (Aggression shortens it)', min: 0.3, max: 6, step: 0.1, value: 2.2, fmt: (x) => x.toFixed(1) + ' S' }
+    { id: 'dodge', label: 'Teammates dodge', help: 'How often the teammate brains jump the beam and the orbs', min: 0, max: 1, step: 0.05, value: 0.75, fmt: (x) => Math.round(x * 100) + '%' },
+    { id: 'rest', label: 'Rest', help: 'How long it waits after the opening before the next warning (Aggression shortens it)', min: 0.3, max: 6, step: 0.1, value: 2.2, fmt: (x) => x.toFixed(1) + ' S' },
+    { id: 'guards', label: 'Defenders', help: 'Smaller wheels with one eye that cover the passing lanes and swat passes away', min: 0, max: 5, step: 1, value: 4, fmt: (x) => (x ? '' + x : 'NONE') },
+    { id: 'guardSpeed', label: 'Defender speed', help: 'How fast they move (half as fast again going for a pass)', min: 1, max: 14, step: 0.5, value: 5.5 },
+    { id: 'guardReach', label: 'Swat reach', help: 'How close a pass has to come for them to swat it (lobs over their heads get past)', min: 0.5, max: 3, step: 0.1, value: 1.4, fmt: (x) => x.toFixed(1) + ' M' },
+    { id: 'guardRing', label: 'Guard distance', help: 'How far from the Archon they circle when there are no lanes to cover', min: 6, max: 26, step: 1, value: 13, fmt: (x) => x + ' M' },
+    { id: 'guardHp', label: 'Defender toughness', help: 'Fast throws it takes to break one', min: 1, max: 8, step: 1, value: 3 },
+    { id: 'guardBack', label: 'Defender return', help: 'How long a broken one stays gone', min: 2, max: 40, step: 1, value: 12, fmt: (x) => x + ' S' },
+    { id: 'shield', label: 'Shield', help: 'While any defender stands, the Archon takes half damage', kind: 'onoff', value: 0 }
   ];
 });
