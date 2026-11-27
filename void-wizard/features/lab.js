@@ -50,6 +50,7 @@ feature('lab', ({ game, on }) => {
     ['archon', 'Archon', [['Archon', 'archon.on archon.size archon.attacks'], ['Light orbs', 'archon.pattern archon.orbs archon.orbSpeed archon.reach'],
       ['Beam', 'archon.sweep archon.sweepTime'], ['Rhythm', 'archon.windup archon.opening archon.rest archon.dodge'],
       ['Defenders', 'archon.guards archon.guardSpeed archon.guardReach archon.guardRing archon.guardHp archon.guardBack archon.shield'],
+      ['Rush the passer', 'archon.rush archon.rushAfter archon.rushMax archon.rushNear archon.rushFar archon.rushSpeed'],
       ['Solid life', 'archon.solidLife archon.solidHp archon.stealDmg archon.stealTime archon.heal']]],
     ['rules', 'Rules', [1, 2, 3, 4].map(n => ['Rule ' + n, `rules.when${n} rules.then${n} rules.for${n}`])],
     ['camera', 'Camera', [['Camera', 'camera.height camera.zoom camera.fov camera.lean camera.tilt camera.spin'],
